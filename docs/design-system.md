@@ -39,3 +39,9 @@ pnpm test:e2e
 ```
 
 Browser tests check the three reference viewports, horizontal overflow, keyboard feedback flows, axe rules, and versioned screenshots under `e2e/snapshots`.
+
+## Storefront shell boundary
+
+Buyer-facing pages live in the Next.js `(storefront)` route group. Its layout is the single owner of `PageShell`, the Shopee-inspired banner, category navigation, and storefront footer; the grouping does not alter public URLs. Operational `/health` and contributor `/design-system` pages remain outside this group.
+
+Header product configuration lives in `apps/web/components/marketplace-navigation.ts`, while the presentation and disclosure behavior live beside it in `marketplace-header.tsx`. The header exposes extension props for a future authenticated account label and cart count, but T06 deliberately supplies `Đăng nhập` and zero items only. `/login`, `/cart`, and `/search` are stable, honest placeholder destinations: authentication is owned by T11, cart persistence by the Commerce MVP, and catalogue/search data by T08–T09.

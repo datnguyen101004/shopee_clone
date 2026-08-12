@@ -1,0 +1,80 @@
+import { fireEvent, render, screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+
+import { StorefrontShell } from './storefront-shell';
+import { marketplaceCategories } from './marketplace-navigation';
+
+function renderShell() {
+  return render(
+    <StorefrontShell>
+      <h1>Trang người mua</h1>
+    </StorefrontShell>,
+  );
+}
+
+describe('StorefrontShell', () => {
+  it('renders stable buyer landmarks, category links, and explicit anonymous states', () => {
+    renderShell();
+    expect(screen.getByRole('banner')).toBeInTheDocument();
+    expect(screen.getByRole('navigation', { name: 'Điều hướng chính' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Shopee Clone - Trang chủ' })).toHaveAttribute(
+      'href',
+      '/',
+    );
+    expect(screen.getByRole('link', { name: 'Đăng nhập · Chưa đăng nhập' })).toHaveAttribute(
+      'href',
+      '/login',
+    );
+    expect(screen.getByRole('link', { name: 'Giỏ hàng, 0 sản phẩm' })).toHaveAttribute(
+      'href',
+      '/cart',
+    );
+    expect(marketplaceCategories).toHaveLength(6);
+    expect(marketplaceCategories.map(({ slug }) => slug)).toEqual([
+      ...new Set(marketplaceCategories.map(({ slug }) => slug)),
+    ]);
+    for (const category of marketplaceCategories)
+      expect(screen.getAllByRole('link', { name: category.label, hidden: true })).toHaveLength(2);
+  });
+
+  it('keeps a progressive GET form and validates whitespace-only searches', () => {
+    renderShell();
+    const search = screen.getByRole('search');
+    const input = screen.getByRole('searchbox', { name: 'Tìm kiếm sản phẩm' });
+    expect(search).toHaveAttribute('method', 'get');
+    expect(search).toHaveAttribute('action', '/search');
+    expect(input).toHaveAttribute('name', 'q');
+
+    fireEvent.input(input, { target: { value: '   ' } });
+    expect(fireEvent.submit(search)).toBe(false);
+    expect(input).toHaveValue('   ');
+    expect(input).toHaveAccessibleDescription('Vui lòng nhập từ khoá cần tìm.');
+    expect(input).toHaveFocus();
+
+    fireEvent.input(input, { target: { value: '  tai nghe bluetooth  ' } });
+    expect(fireEvent.submit(search)).toBe(true);
+    expect(input).toHaveValue('tai nghe bluetooth');
+    expect(screen.queryByText('Vui lòng nhập từ khoá cần tìm.')).not.toBeInTheDocument();
+  });
+
+  it('opens mobile categories and restores trigger focus after Escape', async () => {
+    const user = userEvent.setup();
+    renderShell();
+    const trigger = screen.getByRole('button', { name: 'Danh mục' });
+    const mobilePanel = document.querySelector('#marketplace-mobile-categories');
+    expect(trigger).toHaveAttribute('aria-expanded', 'false');
+    expect(mobilePanel).toHaveAttribute('hidden');
+    expect(
+      within(mobilePanel as HTMLElement).getByRole('link', { name: 'Thời trang', hidden: true }),
+    ).not.toBeVisible();
+
+    trigger.focus();
+    await user.keyboard('{Enter}');
+    expect(trigger).toHaveAttribute('aria-expanded', 'true');
+    expect(mobilePanel).not.toHaveAttribute('hidden');
+    await user.keyboard('{Escape}');
+    expect(trigger).toHaveAttribute('aria-expanded', 'false');
+    expect(mobilePanel).toHaveAttribute('hidden');
+    expect(trigger).toHaveFocus();
+  });
+});

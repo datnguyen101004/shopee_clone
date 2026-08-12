@@ -13,7 +13,7 @@ export default defineConfig({
     screenshot: 'only-on-failure',
   },
   webServer: {
-    command: 'pnpm --filter @shopee-clone/web start',
+    command: 'npx --yes pnpm@10.34.5 --filter @shopee-clone/web start',
     url: 'http://127.0.0.1:3000',
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,

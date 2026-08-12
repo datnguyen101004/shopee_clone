@@ -26,6 +26,9 @@ test.describe('responsive marketplace shell', () => {
       const box = await page.locator('.home-flow').boundingBox();
       expect(Math.abs((box?.x ?? 0) - (1440 - (box?.width ?? 0)) / 2)).toBeLessThan(1);
     }
+
+    // Reset focus and scroll state so the visual baseline represents the default storefront.
+    await page.goto('/');
     await expect(page).toHaveScreenshot('marketplace.png', {
       fullPage: true,
       animations: 'disabled',

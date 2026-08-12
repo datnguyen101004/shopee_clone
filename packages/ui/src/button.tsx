@@ -92,6 +92,17 @@ export const ButtonLink = forwardRef<HTMLAnchorElement, ButtonLinkProps>(functio
   ref,
 ) {
   const unavailable = disabled || loading;
+  const handleClick =
+    unavailable || onClick
+      ? (event: React.MouseEvent<HTMLAnchorElement>) => {
+          if (unavailable) {
+            event.preventDefault();
+            return;
+          }
+          onClick?.(event);
+        }
+      : undefined;
+
   return (
     <a
       ref={ref}
@@ -102,13 +113,7 @@ export const ButtonLink = forwardRef<HTMLAnchorElement, ButtonLinkProps>(functio
       aria-disabled={unavailable || undefined}
       aria-busy={loading || undefined}
       tabIndex={unavailable ? -1 : tabIndex}
-      onClick={(event) => {
-        if (unavailable) {
-          event.preventDefault();
-          return;
-        }
-        onClick?.(event);
-      }}
+      onClick={handleClick}
       {...props}
     >
       <ButtonContent loading={loading} leadingIcon={leadingIcon} trailingIcon={trailingIcon}>

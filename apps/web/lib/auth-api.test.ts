@@ -1,4 +1,10 @@
-import { AuthApiError, loginAccount, logoutAccount, requestPasswordReset } from './auth-api';
+import {
+  AuthApiError,
+  googleSignInStartUrl,
+  loginAccount,
+  logoutAccount,
+  requestPasswordReset,
+} from './auth-api';
 
 const session = {
   accessToken: 'header.payload.signature',
@@ -23,11 +29,20 @@ describe('auth API client', () => {
       loginAccount({ email: 'buyer@example.com', password: 'secret' }, fetcher),
     ).resolves.toEqual(session);
     expect(fetcher).toHaveBeenCalledWith(
-      new URL('http://127.0.0.1:3001/api/v1/auth/login'),
+      new URL('http://localhost:3001/api/v1/auth/login'),
       expect.objectContaining({ credentials: 'include', cache: 'no-store', method: 'POST' }),
     );
     const serialized = JSON.stringify(fetcher.mock.calls[0]?.[1]);
     expect(serialized).not.toContain('accessToken');
+  });
+
+  it('builds Google start URLs with only an allowlisted local return path', () => {
+    expect(googleSignInStartUrl('/products/00000000-0000-4000-8000-000000000010')).toBe(
+      'http://localhost:3001/api/v1/auth/google/start?returnTo=%2Fproducts%2F00000000-0000-4000-8000-000000000010',
+    );
+    expect(googleSignInStartUrl('https://attacker.example')).toBe(
+      'http://localhost:3001/api/v1/auth/google/start?returnTo=%2F',
+    );
   });
 
   it('reduces malformed success and failure bodies to safe typed errors', async () => {

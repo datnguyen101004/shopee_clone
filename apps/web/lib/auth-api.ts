@@ -1,5 +1,6 @@
 import {
   isAuthProblemDetails,
+  isSafeAuthReturnTo,
   isAuthUser,
   parseAuthSessionResponse,
   type AuthProblemDetails,
@@ -11,7 +12,7 @@ import {
   type ResetPasswordRequest,
 } from '@shopee-clone/contracts';
 
-const fallbackBaseUrl = 'http://127.0.0.1:3001';
+const fallbackBaseUrl = 'http://localhost:3001';
 
 export class AuthApiError extends Error {
   constructor(
@@ -26,6 +27,12 @@ export class AuthApiError extends Error {
 
 function endpoint(path: string): URL {
   return new URL(path, process.env.NEXT_PUBLIC_API_BASE_URL ?? fallbackBaseUrl);
+}
+
+export function googleSignInStartUrl(returnTo: string | null | undefined): string {
+  const url = endpoint('/api/v1/auth/google/start');
+  url.searchParams.set('returnTo', isSafeAuthReturnTo(returnTo) ? returnTo : '/');
+  return url.toString();
 }
 
 async function request(

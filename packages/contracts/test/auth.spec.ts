@@ -5,10 +5,12 @@ import {
   isAuthProblemDetails,
   isAuthSessionResponse,
   isForgotPasswordRequest,
+  isGoogleSignInCompletion,
   isLoginRequest,
   isRegisterRequest,
   isResetPasswordRequest,
   normalizeAuthEmail,
+  parseGoogleSignInCompletion,
   parseAuthSessionResponse,
 } from '../src';
 
@@ -89,5 +91,18 @@ describe('authentication contracts', () => {
         token: 'secret',
       }),
     ).toBe(false);
+  });
+
+  it('parses only sanitized Google completion outcomes and local return paths', () => {
+    const completion = {
+      outcome: 'success',
+      returnTo: '/products/00000000-0000-4000-8000-000000000301',
+    };
+    expect(parseGoogleSignInCompletion(completion)).toEqual(completion);
+    expect(isGoogleSignInCompletion({ outcome: 'cancelled', returnTo: '/' })).toBe(true);
+    expect(
+      isGoogleSignInCompletion({ outcome: 'success', returnTo: 'https://attacker.example' }),
+    ).toBe(false);
+    expect(isGoogleSignInCompletion({ ...completion, code: 'secret' })).toBe(false);
   });
 });

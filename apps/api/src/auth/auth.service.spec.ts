@@ -49,6 +49,7 @@ describe('AuthService', () => {
       markPasswordResetFailed: jest.fn(),
       findPasswordResetByHash: jest.fn(),
       consumePasswordReset: jest.fn(),
+      createGoogleIdentitySession: jest.fn(),
     } as unknown as jest.Mocked<AuthRepository>;
     password = {
       hash: jest.fn().mockResolvedValue('stored-hash'),
@@ -108,6 +109,27 @@ describe('AuthService', () => {
       service.login({ email: user.email, password: 'wrong' }, '127.0.0.1'),
     ).rejects.toBeInstanceOf(AuthenticationFailedError);
     expect(password.verify).toHaveBeenCalledWith('wrong', null);
+  });
+
+  it('converts a verified Google subject into the existing local session shape', async () => {
+    repository.createGoogleIdentitySession.mockResolvedValue(user);
+    await expect(
+      service.loginWithGoogle({
+        subject: 'stable-google-subject',
+        email: user.email,
+        displayName: user.displayName,
+      }),
+    ).resolves.toMatchObject({
+      accessToken: 'header.payload.signature',
+      refreshToken: 'a'.repeat(43),
+      user: { email: user.email },
+    });
+    expect(repository.createGoogleIdentitySession).toHaveBeenCalledWith(
+      expect.objectContaining({
+        subject: 'stable-google-subject',
+        tokenHash: 'b'.repeat(64),
+      }),
+    );
   });
 
   it('revokes a refresh family after late rotated-token reuse', async () => {

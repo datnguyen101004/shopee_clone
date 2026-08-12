@@ -76,6 +76,9 @@ async function main() {
     AUTH_WEB_BASE_URL: `http://127.0.0.1:${webPort}`,
     AUTH_RECOVERY_MODE: 'capture',
     AUTH_RECOVERY_CAPTURE_PATH: capturePath,
+    GOOGLE_CLIENT_ID: 'e2e-client.apps.googleusercontent.com',
+    GOOGLE_CLIENT_SECRET: 'e2e-only-google-client-secret',
+    GOOGLE_CALLBACK_URL: `http://127.0.0.1:${apiPort}/login/oauth2/code/google`,
     FULL_STACK_E2E: '1',
   };
   const secrets = [password, variables.DATABASE_URL, variables.TEST_DATABASE_URL];

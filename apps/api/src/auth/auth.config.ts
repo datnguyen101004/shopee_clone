@@ -24,6 +24,13 @@ export interface AuthConfig {
   recoveryOutboxDirectory: string;
   recoveryWebhookUrl: string | null;
   recoveryWebhookSecret: string | null;
+  google: {
+    clientId: string;
+    clientSecret: string;
+    callbackUrl: string;
+    transactionTtlSeconds: number;
+    cookieName: string;
+  };
   scrypt: {
     cost: number;
     blockSize: number;
@@ -40,6 +47,8 @@ export interface AuthConfig {
     resetSource: { max: number; windowSeconds: number };
     resetCredential: { max: number; windowSeconds: number };
     refreshSession: { max: number; windowSeconds: number };
+    googleStartSource: { max: number; windowSeconds: number };
+    googleCallbackSource: { max: number; windowSeconds: number };
   };
 }
 
@@ -115,6 +124,50 @@ function readEndpointUrl(value: string, key: string): string {
   return url.toString();
 }
 
+function readGoogleCredential(
+  environment: NodeJS.ProcessEnv,
+  key: 'GOOGLE_CLIENT_ID' | 'GOOGLE_CLIENT_SECRET',
+  nodeEnv: AuthConfig['nodeEnv'],
+): string {
+  const testFallbacks = {
+    GOOGLE_CLIENT_ID: 'test-client.apps.googleusercontent.com',
+    GOOGLE_CLIENT_SECRET: 'test-only-google-client-secret-2026',
+  } as const;
+  const value = (environment[key] ?? (nodeEnv === 'test' ? testFallbacks[key] : '')).trim();
+  const placeholder = /replace|placeholder|example|your[-_ ]/i.test(value);
+  const valid =
+    key === 'GOOGLE_CLIENT_ID'
+      ? /^[A-Za-z0-9._-]+\.apps\.googleusercontent\.com$/.test(value)
+      : value.length >= 16;
+  if (!value || placeholder || !valid) {
+    throw new Error(`Invalid authentication configuration: ${key}.`);
+  }
+  return value;
+}
+
+function readGoogleCallbackUrl(
+  environment: NodeJS.ProcessEnv,
+  nodeEnv: AuthConfig['nodeEnv'],
+): string {
+  const value = environment.GOOGLE_CALLBACK_URL ?? 'http://localhost:3001/login/oauth2/code/google';
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    throw new Error('Invalid authentication configuration: GOOGLE_CALLBACK_URL.');
+  }
+  if (
+    !['http:', 'https:'].includes(url.protocol) ||
+    (nodeEnv === 'production' && url.protocol !== 'https:') ||
+    url.pathname !== '/login/oauth2/code/google' ||
+    url.search !== '' ||
+    url.hash !== ''
+  ) {
+    throw new Error('Invalid authentication configuration: GOOGLE_CALLBACK_URL.');
+  }
+  return url.toString();
+}
+
 function readOrigins(environment: NodeJS.ProcessEnv, nodeEnv: AuthConfig['nodeEnv']): string[] {
   const raw = environment.AUTH_ALLOWED_ORIGINS ?? 'http://localhost:3000,http://127.0.0.1:3000';
   const origins = [
@@ -154,6 +207,9 @@ export function loadAuthConfig(environment: NodeJS.ProcessEnv = process.env): Au
     ? readEndpointUrl(environment.AUTH_RECOVERY_WEBHOOK_URL, 'AUTH_RECOVERY_WEBHOOK_URL')
     : null;
   const webhookSecret = environment.AUTH_RECOVERY_WEBHOOK_SECRET?.trim() || null;
+  const googleClientId = readGoogleCredential(environment, 'GOOGLE_CLIENT_ID', nodeEnv);
+  const googleClientSecret = readGoogleCredential(environment, 'GOOGLE_CLIENT_SECRET', nodeEnv);
+  const googleCallbackUrl = readGoogleCallbackUrl(environment, nodeEnv);
 
   if (
     nodeEnv === 'production' &&
@@ -218,6 +274,19 @@ export function loadAuthConfig(environment: NodeJS.ProcessEnv = process.env): Au
     ),
     recoveryWebhookUrl: webhookUrl,
     recoveryWebhookSecret: webhookSecret,
+    google: {
+      clientId: googleClientId,
+      clientSecret: googleClientSecret,
+      callbackUrl: googleCallbackUrl,
+      transactionTtlSeconds: readInteger(
+        environment,
+        'AUTH_GOOGLE_TRANSACTION_TTL_SECONDS',
+        600,
+        120,
+        900,
+      ),
+      cookieName: 'sc_google_login',
+    },
     scrypt: {
       cost: scryptCost,
       blockSize: readInteger(environment, 'AUTH_SCRYPT_BLOCK_SIZE', 8, 8, 32),
@@ -234,6 +303,8 @@ export function loadAuthConfig(environment: NodeJS.ProcessEnv = process.env): Au
       resetSource: readLimit(environment, 'AUTH_LIMIT_RESET_SOURCE', 5, 900),
       resetCredential: readLimit(environment, 'AUTH_LIMIT_RESET_CREDENTIAL', 5, 900),
       refreshSession: readLimit(environment, 'AUTH_LIMIT_REFRESH_SESSION', 60, 60),
+      googleStartSource: readLimit(environment, 'AUTH_LIMIT_GOOGLE_START_SOURCE', 20, 900),
+      googleCallbackSource: readLimit(environment, 'AUTH_LIMIT_GOOGLE_CALLBACK_SOURCE', 40, 900),
     },
   };
 }

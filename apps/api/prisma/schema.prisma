@@ -57,6 +57,12 @@ enum PasswordResetDeliveryStatus {
   @@map("password_reset_delivery_status")
 }
 
+enum ExternalIdentityProvider {
+  GOOGLE @map("google")
+
+  @@map("external_identity_provider")
+}
+
 model User {
   id                  String               @id @default(uuid()) @db.Uuid
   email               String               @unique @db.VarChar(320)
@@ -69,10 +75,42 @@ model User {
   shop                Shop?
   authSessions        AuthSession[]
   passwordResetTokens PasswordResetToken[]
+  externalIdentities  ExternalIdentity[]
 
   @@index([status])
   @@index([deletedAt])
   @@map("users")
+}
+
+model ExternalIdentity {
+  id              String                   @id @default(uuid()) @db.Uuid
+  userId          String                   @map("user_id") @db.Uuid
+  provider        ExternalIdentityProvider
+  providerSubject String                   @map("provider_subject") @db.VarChar(255)
+  createdAt       DateTime                 @default(now()) @map("created_at") @db.Timestamptz(3)
+  lastLoginAt     DateTime                 @default(now()) @map("last_login_at") @db.Timestamptz(3)
+  user            User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerSubject])
+  @@unique([provider, userId])
+  @@index([userId])
+  @@map("external_identities")
+}
+
+model GoogleLoginAttempt {
+  id                 String    @id @default(uuid()) @db.Uuid
+  stateHash          String    @unique @map("state_hash") @db.Char(64)
+  browserBindingHash String    @map("browser_binding_hash") @db.Char(64)
+  nonceHash          String    @map("nonce_hash") @db.Char(64)
+  protectedPayload   String    @map("protected_payload") @db.Text
+  returnTo           String    @map("return_to") @db.VarChar(500)
+  expiresAt          DateTime  @map("expires_at") @db.Timestamptz(3)
+  consumedAt         DateTime? @map("consumed_at") @db.Timestamptz(3)
+  createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  @@index([expiresAt])
+  @@index([consumedAt, expiresAt])
+  @@map("google_login_attempts")
 }
 
 model AuthSession {

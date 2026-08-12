@@ -5,8 +5,13 @@ import request from 'supertest';
 import { AppModule } from '../src/app.module';
 import { loadAuthConfig } from '../src/auth/auth.config';
 import { AuthClock } from '../src/auth/auth-clock';
+import {
+  GOOGLE_IDENTITY_PROVIDER,
+  type GoogleIdentityProvider,
+} from '../src/auth/google-identity-provider';
 import { CaptureRecoveryMailer, RECOVERY_MAILER } from '../src/auth/recovery-mailer';
 import { configureApplication } from '../src/configure-application';
+import { loadRepositoryEnvironment } from '../src/config/repository-environment';
 import { PrismaService } from '../src/prisma/prisma.service';
 
 const databaseTest = process.env.RUN_AUTH_DATABASE_TESTS === '1' ? describe : describe.skip;
@@ -17,6 +22,11 @@ const origin =
 const email = 't11-postgres@example.test';
 const initialPassword = 'T11 secure initial passphrase';
 const replacementPassword = 'T11 secure replacement passphrase';
+const googleEmail = 't11-google-postgres@example.test';
+const collisionEmail = 't11-google-collision@example.test';
+
+loadRepositoryEnvironment();
+if (process.env.TEST_DATABASE_URL) process.env.DATABASE_URL = process.env.TEST_DATABASE_URL;
 
 function responseCookie(response: {
   headers: Record<string, string | string[] | undefined>;
@@ -27,12 +37,31 @@ function responseCookie(response: {
   return value.split(';', 1)[0]!;
 }
 
+function namedCookie(
+  response: { headers: Record<string, string | string[] | undefined> },
+  name: string,
+): string {
+  const header = response.headers['set-cookie'];
+  const values = Array.isArray(header) ? header : header ? [header] : [];
+  const value = values.find((entry) => entry.startsWith(`${name}=`));
+  if (!value) throw new Error(`Expected ${name} cookie`);
+  return value.split(';', 1)[0]!;
+}
+
 databaseTest('Authentication with isolated PostgreSQL', () => {
   let app: INestApplication;
   let prisma: PrismaService;
   let mailer: CaptureRecoveryMailer;
   let now = new Date();
   const clock = { now: () => new Date(now) };
+  const googleProvider: GoogleIdentityProvider = {
+    authorizationUrl: ({ state }) => `https://accounts.google.test/authorize?state=${state}`,
+    exchange: async ({ code }) => ({
+      subject: code === 'collision' ? 'google-collision-subject' : 'google-postgres-subject',
+      email: code === 'collision' ? collisionEmail : googleEmail,
+      displayName: code === 'collision' ? 'Collision Buyer' : 'Google PostgreSQL Buyer',
+    }),
+  };
 
   beforeAll(async () => {
     mailer = new CaptureRecoveryMailer();
@@ -41,17 +70,21 @@ databaseTest('Authentication with isolated PostgreSQL', () => {
       .useValue(clock)
       .overrideProvider(RECOVERY_MAILER)
       .useValue(mailer)
+      .overrideProvider(GOOGLE_IDENTITY_PROVIDER)
+      .useValue(googleProvider)
       .compile();
     app = moduleRef.createNestApplication();
     configureApplication(app, loadAuthConfig({ NODE_ENV: 'test' }));
     await app.init();
     prisma = app.get(PrismaService);
     await prisma.user.deleteMany({ where: { email } });
+    await prisma.user.deleteMany({ where: { email: { in: [googleEmail, collisionEmail] } } });
   });
 
   afterAll(async () => {
-    await prisma.user.deleteMany({ where: { email } });
-    await app.close();
+    await prisma?.user.deleteMany({ where: { email } });
+    await prisma?.user.deleteMany({ where: { email: { in: [googleEmail, collisionEmail] } } });
+    await app?.close();
   });
 
   it('persists normalized credentials and enforces refresh/reset lifecycle rules', async () => {
@@ -183,5 +216,68 @@ databaseTest('Authentication with isolated PostgreSQL', () => {
     expect(persisted.passwordResetTokens).toHaveLength(2);
     expect(persisted.passwordResetTokens.some((token) => token.usedAt !== null)).toBe(true);
     expect(persisted.passwordResetTokens.some((token) => token.revokedAt !== null)).toBe(true);
+  });
+
+  it('creates one Google identity, reuses its subject, rejects replay, and refuses email linking', async () => {
+    const starts = await Promise.all([
+      request(app.getHttpServer()).get('/api/v1/auth/google/start?returnTo=%2F'),
+      request(app.getHttpServer()).get('/api/v1/auth/google/start?returnTo=%2F'),
+    ]);
+    expect(starts.map(({ status }) => status)).toEqual([302, 302]);
+    const callbacks = await Promise.all(
+      starts.map((started) => {
+        const state = new URL(started.headers.location as string).searchParams.get('state');
+        return request(app.getHttpServer())
+          .get(`/login/oauth2/code/google?code=new-google&state=${state}`)
+          .set('Cookie', namedCookie(started, 'sc_google_login'));
+      }),
+    );
+    expect(callbacks.map(({ status }) => status)).toEqual([302, 302]);
+    expect(
+      callbacks.every(({ headers }) => String(headers.location).includes('outcome=success')),
+    ).toBe(true);
+    expect(await prisma.user.count({ where: { email: googleEmail } })).toBe(1);
+    const googleUser = await prisma.user.findUniqueOrThrow({
+      where: { email: googleEmail },
+      include: { externalIdentities: true, authSessions: true },
+    });
+    expect(googleUser.passwordHash).toBeNull();
+    expect(googleUser.externalIdentities).toHaveLength(1);
+    expect(googleUser.externalIdentities[0]?.providerSubject).toBe('google-postgres-subject');
+    expect(googleUser.authSessions).toHaveLength(2);
+
+    const replayStart = starts[0]!;
+    const replayState = new URL(replayStart.headers.location as string).searchParams.get('state');
+    const replay = await request(app.getHttpServer())
+      .get(`/login/oauth2/code/google?code=replayed&state=${replayState}`)
+      .set('Cookie', namedCookie(replayStart, 'sc_google_login'))
+      .expect(302);
+    expect(replay.headers.location).toContain('outcome=failed');
+    expect(await prisma.externalIdentity.count({ where: { userId: googleUser.id } })).toBe(1);
+
+    await prisma.user.create({
+      data: {
+        email: collisionEmail,
+        displayName: 'Existing Password Buyer',
+        passwordHash: 'locked',
+      },
+    });
+    const collisionStart = await request(app.getHttpServer()).get(
+      '/api/v1/auth/google/start?returnTo=%2F',
+    );
+    const collisionState = new URL(collisionStart.headers.location as string).searchParams.get(
+      'state',
+    );
+    const collision = await request(app.getHttpServer())
+      .get(`/login/oauth2/code/google?code=collision&state=${collisionState}`)
+      .set('Cookie', namedCookie(collisionStart, 'sc_google_login'))
+      .expect(302);
+    expect(collision.headers.location).toContain('outcome=account-method-required');
+    expect(await prisma.user.count({ where: { email: collisionEmail } })).toBe(1);
+    expect(
+      await prisma.externalIdentity.count({
+        where: { providerSubject: 'google-collision-subject' },
+      }),
+    ).toBe(0);
   });
 });

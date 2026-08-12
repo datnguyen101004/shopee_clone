@@ -75,3 +75,11 @@ test('redacts explicit secrets, PostgreSQL URLs, and password assignments', () =
   assert.doesNotMatch(sanitized, /postgresql:\/\//);
   assert.match(sanitized, /\[REDACTED\]/);
 });
+
+test('redacts Google OAuth credentials, transaction material, identity and email fields', () => {
+  const sanitized = redactSensitiveOutput(
+    'GOOGLE_CLIENT_SECRET=client-secret code=one-time state=opaque nonce=random id_token=jwt provider_subject=123 email=buyer@example.com',
+  );
+  assert.doesNotMatch(sanitized, /client-secret|one-time|opaque|random|jwt|123|buyer@example/);
+  assert.match(sanitized, /GOOGLE_CLIENT_SECRET=\[REDACTED\]/);
+});

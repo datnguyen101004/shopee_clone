@@ -5,7 +5,12 @@ import path from 'node:path';
 import { Pool } from 'pg';
 
 import { loadRepositoryEnvironment } from '../src/config/repository-environment';
-import { ProductStatus, UserStatus, VariantStatus } from '../src/generated/prisma/enums';
+import {
+  ExternalIdentityProvider,
+  ProductStatus,
+  UserStatus,
+  VariantStatus,
+} from '../src/generated/prisma/enums';
 import { createPrismaClient } from './create-prisma-client';
 import {
   seedCategories,
@@ -93,8 +98,16 @@ async function verifyDatabase(databaseUrl: string): Promise<void> {
       homepageProducts: await prisma.homepageModuleProduct.count(),
       authSessions: await prisma.authSession.count(),
       passwordResetTokens: await prisma.passwordResetToken.count(),
+      externalIdentities: await prisma.externalIdentity.count(),
+      googleLoginAttempts: await prisma.googleLoginAttempt.count(),
     };
-    assert.deepEqual(counts, { ...seedExpectedCounts, authSessions: 0, passwordResetTokens: 0 });
+    assert.deepEqual(counts, {
+      ...seedExpectedCounts,
+      authSessions: 0,
+      passwordResetTokens: 0,
+      externalIdentities: 0,
+      googleLoginAttempts: 0,
+    });
 
     const category = await prisma.category.findUnique({
       where: { id: seedCategories[0].id },
@@ -220,10 +233,44 @@ async function verifyDatabase(databaseUrl: string): Promise<void> {
          ,'auth_sessions_user_id_fkey'
          ,'auth_sessions_replaced_by_id_fkey'
          ,'password_reset_tokens_user_id_fkey'
+         ,'external_identities_subject_not_blank'
+         ,'external_identities_valid_last_login'
+         ,'external_identities_user_id_fkey'
+         ,'google_login_attempts_state_hash_format'
+         ,'google_login_attempts_browser_hash_format'
+         ,'google_login_attempts_nonce_hash_format'
+         ,'google_login_attempts_return_to_local'
+         ,'google_login_attempts_valid_expiry'
+         ,'google_login_attempts_valid_consumption'
        )
        ORDER BY conname`,
     );
-    assert.equal(constraintRows.length, 24);
+    assert.equal(constraintRows.length, 33);
+
+    const googleIndexRows = await prisma.$queryRawUnsafe<Array<{ indexname: string }>>(
+      `SELECT indexname
+       FROM pg_indexes
+       WHERE indexname IN (
+         'external_identities_provider_provider_subject_key',
+         'external_identities_provider_user_id_key',
+         'external_identities_user_id_idx',
+         'google_login_attempts_state_hash_key',
+         'google_login_attempts_expires_at_idx',
+         'google_login_attempts_consumed_at_expires_at_idx'
+       )`,
+    );
+    assert.equal(googleIndexRows.length, 6);
+
+    const externalIdentityColumns = await prisma.$queryRawUnsafe<Array<{ column_name: string }>>(
+      `SELECT column_name
+       FROM information_schema.columns
+       WHERE table_schema = 'public' AND table_name = 'external_identities'`,
+    );
+    assert(
+      externalIdentityColumns.every(
+        ({ column_name }) => !/token|email|client|secret/i.test(column_name),
+      ),
+    );
 
     await expectDatabaseRejection('a duplicate user email', () =>
       prisma.user.create({
@@ -272,6 +319,41 @@ async function verifyDatabase(databaseUrl: string): Promise<void> {
         expiresAt: new Date(Date.now() + 60_000),
       },
     });
+    await prisma.externalIdentity.create({
+      data: {
+        id: '00000000-0000-4000-8000-000000009016',
+        userId: authFixtureUserId,
+        provider: ExternalIdentityProvider.GOOGLE,
+        providerSubject: 'CaseSensitiveGoogleSubject',
+      },
+    });
+    const caseFixtureUserId = '00000000-0000-4000-8000-000000009018';
+    await prisma.user.create({
+      data: {
+        id: caseFixtureUserId,
+        email: 'auth-case-fixture@example.com',
+        displayName: 'Auth Case Fixture',
+      },
+    });
+    await prisma.externalIdentity.create({
+      data: {
+        id: '00000000-0000-4000-8000-000000009019',
+        userId: caseFixtureUserId,
+        provider: ExternalIdentityProvider.GOOGLE,
+        providerSubject: 'casesensitivegooglesubject',
+      },
+    });
+    await prisma.googleLoginAttempt.create({
+      data: {
+        id: '00000000-0000-4000-8000-000000009017',
+        stateHash: 'e'.repeat(64),
+        browserBindingHash: 'f'.repeat(64),
+        nonceHash: '0'.repeat(64),
+        protectedPayload: 'versioned-encrypted-envelope',
+        returnTo: '/',
+        expiresAt: new Date(Date.now() + 60_000),
+      },
+    });
     await expectDatabaseRejection('an invalid refresh token digest', () =>
       prisma.authSession.create({
         data: {
@@ -302,12 +384,50 @@ async function verifyDatabase(databaseUrl: string): Promise<void> {
         },
       }),
     );
+    await expectDatabaseRejection('a duplicate Google subject', () =>
+      prisma.externalIdentity.create({
+        data: {
+          userId: seedUsers[0].id,
+          provider: ExternalIdentityProvider.GOOGLE,
+          providerSubject: 'CaseSensitiveGoogleSubject',
+        },
+      }),
+    );
+    await expectDatabaseRejection('an invalid Google state digest', () =>
+      prisma.googleLoginAttempt.create({
+        data: {
+          stateHash: 'invalid',
+          browserBindingHash: '1'.repeat(64),
+          nonceHash: '2'.repeat(64),
+          protectedPayload: 'versioned-encrypted-envelope',
+          returnTo: '/',
+          expiresAt: new Date(Date.now() + 60_000),
+        },
+      }),
+    );
+    await expectDatabaseRejection('an external Google return path', () =>
+      prisma.googleLoginAttempt.create({
+        data: {
+          stateHash: '3'.repeat(64),
+          browserBindingHash: '4'.repeat(64),
+          nonceHash: '5'.repeat(64),
+          protectedPayload: 'versioned-encrypted-envelope',
+          returnTo: 'https://attacker.example',
+          expiresAt: new Date(Date.now() + 60_000),
+        },
+      }),
+    );
     await prisma.user.delete({ where: { id: authFixtureUserId } });
+    await prisma.user.delete({ where: { id: caseFixtureUserId } });
     assert.equal(await prisma.authSession.count({ where: { id: authSessionId } }), 0);
     assert.equal(
       await prisma.passwordResetToken.count({ where: { userId: authFixtureUserId } }),
       0,
     );
+    assert.equal(await prisma.externalIdentity.count({ where: { userId: authFixtureUserId } }), 0);
+    await prisma.googleLoginAttempt.deleteMany({
+      where: { id: '00000000-0000-4000-8000-000000009017' },
+    });
 
     await expectDatabaseRejection('an orphan shop', () =>
       prisma.shop.create({

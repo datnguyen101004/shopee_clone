@@ -35,6 +35,7 @@ interface AuthSessionContextValue {
   register(input: RegisterRequest): Promise<AuthSessionResponse>;
   logout(): Promise<void>;
   restore(): Promise<AuthSessionResponse | null>;
+  completeGoogleSignIn(): Promise<AuthSessionResponse | null>;
   authenticatedFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response>;
 }
 
@@ -48,6 +49,7 @@ const AuthSessionContext = createContext<AuthSessionContextValue>({
   register: unavailable,
   logout: async () => undefined,
   restore: async () => null,
+  completeGoogleSignIn: async () => null,
   authenticatedFetch: unavailable,
 });
 
@@ -130,7 +132,15 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
   );
 
   const value = useMemo(
-    () => ({ state, login, register, logout, restore, authenticatedFetch }),
+    () => ({
+      state,
+      login,
+      register,
+      logout,
+      restore,
+      completeGoogleSignIn: restore,
+      authenticatedFetch,
+    }),
     [authenticatedFetch, login, logout, register, restore, state],
   );
   return <AuthSessionContext.Provider value={value}>{children}</AuthSessionContext.Provider>;

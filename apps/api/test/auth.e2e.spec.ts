@@ -8,6 +8,7 @@ import { AuthenticationFailedError } from '../src/auth/auth.errors';
 import { AuthRateLimitedError } from '../src/auth/auth.errors';
 import { AuthGuard, type AuthenticatedRequest } from '../src/auth/auth.guard';
 import { AuthService } from '../src/auth/auth.service';
+import { GoogleAuthService } from '../src/auth/google-auth.service';
 import { configureApplication } from '../src/configure-application';
 import { PrismaService } from '../src/prisma/prisma.service';
 
@@ -33,6 +34,11 @@ describe('Authentication endpoints', () => {
     logout: jest.fn(),
     forgotPassword: jest.fn(),
     resetPassword: jest.fn(),
+    loginWithGoogle: jest.fn(),
+  };
+  const googleAuth = {
+    start: jest.fn(),
+    complete: jest.fn(),
   };
 
   beforeAll(async () => {
@@ -41,6 +47,8 @@ describe('Authentication endpoints', () => {
       .useValue({ onModuleInit: jest.fn(), onModuleDestroy: jest.fn() })
       .overrideProvider(AuthService)
       .useValue(auth)
+      .overrideProvider(GoogleAuthService)
+      .useValue(googleAuth)
       .overrideGuard(AuthGuard)
       .useValue({
         canActivate(context: { switchToHttp(): { getRequest(): AuthenticatedRequest } }) {
@@ -62,6 +70,11 @@ describe('Authentication endpoints', () => {
     auth.logout.mockResolvedValue(undefined);
     auth.forgotPassword.mockResolvedValue(undefined);
     auth.resetPassword.mockResolvedValue(undefined);
+    googleAuth.start.mockResolvedValue({
+      authorizationUrl: 'https://accounts.google.test/authorize',
+      browserBinding: 'b'.repeat(43),
+    });
+    googleAuth.complete.mockResolvedValue({ outcome: 'success', returnTo: '/', session });
   });
 
   afterAll(async () => app.close());
@@ -180,5 +193,47 @@ describe('Authentication endpoints', () => {
       .post('/api/v1/auth/reset-password')
       .send({ token: 'a'.repeat(43), password: 'Replacement passphrase 2026' })
       .expect(204);
+  });
+
+  it('uses the versioned start route and only the exact unprefixed callback', async () => {
+    const started = await request(app.getHttpServer())
+      .get('/api/v1/auth/google/start?returnTo=%2F')
+      .expect(302);
+    expect(started.headers.location).toBe('https://accounts.google.test/authorize');
+    expect(started.headers['set-cookie']?.[0]).toContain('sc_google_login=');
+    expect(started.headers['set-cookie']?.[0]).toContain('Path=/login/oauth2/code/google');
+
+    const callback = await request(app.getHttpServer())
+      .get('/login/oauth2/code/google?code=opaque&state=opaque')
+      .set('Cookie', `sc_google_login=${'b'.repeat(43)}`)
+      .expect(302);
+    expect(callback.headers.location).toBe(
+      'http://localhost:3000/login/google/complete?outcome=success&returnTo=%2F',
+    );
+    expect(callback.headers['set-cookie']).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining('sc_refresh='),
+        expect.stringContaining('sc_google_login='),
+      ]),
+    );
+    await request(app.getHttpServer()).get('/api/v1/login/oauth2/code/google').expect(404);
+  });
+
+  it('guards Google starts and sanitizes callback dependency failures', async () => {
+    googleAuth.start.mockRejectedValueOnce(new AuthRateLimitedError(21));
+    const limited = await request(app.getHttpServer()).get('/api/v1/auth/google/start').expect(429);
+    expect(limited.body).toMatchObject({ status: 429, retryAfterSeconds: 21 });
+
+    googleAuth.complete.mockRejectedValueOnce(
+      new Error('client_secret=must-not-leak code=must-not-leak'),
+    );
+    const failed = await request(app.getHttpServer())
+      .get('/login/oauth2/code/google?code=opaque&state=opaque')
+      .set('Cookie', `sc_google_login=${'b'.repeat(43)}`)
+      .expect(302);
+    expect(failed.headers.location).toBe(
+      'http://localhost:3000/login/google/complete?outcome=failed&returnTo=%2F',
+    );
+    expect(JSON.stringify(failed.headers)).not.toContain('must-not-leak');
   });
 });

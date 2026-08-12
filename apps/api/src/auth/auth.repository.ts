@@ -1,7 +1,12 @@
 import { Inject, Injectable } from '@nestjs/common';
 
-import { PasswordResetDeliveryStatus, UserStatus } from '../generated/prisma/enums';
+import {
+  ExternalIdentityProvider,
+  PasswordResetDeliveryStatus,
+  UserStatus,
+} from '../generated/prisma/enums';
 import { PrismaService } from '../prisma/prisma.service';
+import { GoogleAccountMethodRequiredError, GoogleSignInFailedError } from './auth.errors';
 
 const safeUserSelect = {
   id: true,
@@ -79,6 +84,127 @@ export class AuthRepository {
         createdAt: input.now,
         lastUsedAt: input.now,
       },
+    });
+  }
+
+  createGoogleLoginAttempt(input: {
+    id: string;
+    stateHash: string;
+    browserBindingHash: string;
+    nonceHash: string;
+    protectedPayload: string;
+    returnTo: string;
+    expiresAt: Date;
+    now: Date;
+  }) {
+    return this.prisma.googleLoginAttempt.create({
+      data: {
+        id: input.id,
+        stateHash: input.stateHash,
+        browserBindingHash: input.browserBindingHash,
+        nonceHash: input.nonceHash,
+        protectedPayload: input.protectedPayload,
+        returnTo: input.returnTo,
+        expiresAt: input.expiresAt,
+        createdAt: input.now,
+      },
+    });
+  }
+
+  async consumeGoogleLoginAttempt(input: {
+    stateHash: string;
+    browserBindingHash: string;
+    now: Date;
+  }) {
+    return this.prisma.$transaction(async (transaction) => {
+      const attempt = await transaction.googleLoginAttempt.findUnique({
+        where: { stateHash: input.stateHash },
+      });
+      if (!attempt) return null;
+      const consumed = await transaction.googleLoginAttempt.updateMany({
+        where: {
+          id: attempt.id,
+          browserBindingHash: input.browserBindingHash,
+          consumedAt: null,
+          expiresAt: { gt: input.now },
+        },
+        data: { consumedAt: input.now },
+      });
+      return consumed.count === 1 ? attempt : null;
+    });
+  }
+
+  async createGoogleIdentitySession(input: {
+    subject: string;
+    email: string;
+    displayName: string;
+    userId: string;
+    identityId: string;
+    sessionId: string;
+    familyId: string;
+    tokenHash: string;
+    expiresAt: Date;
+    now: Date;
+  }) {
+    return this.prisma.$transaction(async (transaction) => {
+      const identity = await transaction.externalIdentity.findUnique({
+        where: {
+          provider_providerSubject: {
+            provider: ExternalIdentityProvider.GOOGLE,
+            providerSubject: input.subject,
+          },
+        },
+        include: { user: { select: safeUserSelect } },
+      });
+      let user;
+      if (identity) {
+        if (identity.user.status !== UserStatus.ACTIVE || identity.user.deletedAt !== null) {
+          throw new GoogleSignInFailedError();
+        }
+        user = identity.user;
+        await transaction.externalIdentity.update({
+          where: { id: identity.id },
+          data: { lastLoginAt: input.now },
+        });
+      } else {
+        const emailOwner = await transaction.user.findUnique({
+          where: { email: input.email },
+          select: { id: true },
+        });
+        if (emailOwner) throw new GoogleAccountMethodRequiredError();
+        user = await transaction.user.create({
+          data: {
+            id: input.userId,
+            email: input.email,
+            displayName: input.displayName,
+            passwordHash: null,
+            status: UserStatus.ACTIVE,
+          },
+          select: safeUserSelect,
+        });
+        await transaction.externalIdentity.create({
+          data: {
+            id: input.identityId,
+            userId: user.id,
+            provider: ExternalIdentityProvider.GOOGLE,
+            providerSubject: input.subject,
+            createdAt: input.now,
+            lastLoginAt: input.now,
+          },
+        });
+      }
+      await transaction.authSession.create({
+        data: {
+          id: input.sessionId,
+          userId: user.id,
+          familyId: input.familyId,
+          tokenHash: input.tokenHash,
+          expiresAt: input.expiresAt,
+          createdAt: input.now,
+          lastUsedAt: input.now,
+        },
+      });
+      return user;
     });
   }
 
@@ -275,6 +401,25 @@ export class AuthRepository {
     ).map(({ id }) => id);
     if (resetIds.length > 0) {
       await this.prisma.passwordResetToken.deleteMany({ where: { id: { in: resetIds } } });
+    }
+
+    const googleAttemptIds = (
+      await this.prisma.googleLoginAttempt.findMany({
+        where: {
+          OR: [
+            { expiresAt: { lt: now } },
+            { consumedAt: { lt: new Date(now.getTime() - 86_400_000) } },
+          ],
+        },
+        select: { id: true },
+        take: limit,
+        orderBy: { expiresAt: 'asc' },
+      })
+    ).map(({ id }) => id);
+    if (googleAttemptIds.length > 0) {
+      await this.prisma.googleLoginAttempt.deleteMany({
+        where: { id: { in: googleAttemptIds } },
+      });
     }
   }
 }

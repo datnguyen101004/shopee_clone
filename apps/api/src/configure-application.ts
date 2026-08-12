@@ -1,4 +1,4 @@
-import { ValidationPipe, type INestApplication } from '@nestjs/common';
+import { RequestMethod, ValidationPipe, type INestApplication } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import cookieParser from 'cookie-parser';
 
@@ -6,7 +6,9 @@ import type { AuthConfig } from './auth/auth.config';
 
 export function configureApplication(app: INestApplication, config: AuthConfig): void {
   app.enableShutdownHooks();
-  app.setGlobalPrefix('api/v1');
+  app.setGlobalPrefix('api/v1', {
+    exclude: [{ path: 'login/oauth2/code/google', method: RequestMethod.GET }],
+  });
   app.use(cookieParser());
   app.getHttpAdapter().getInstance().set('trust proxy', config.trustProxy);
   app.useGlobalPipes(

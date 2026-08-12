@@ -11,7 +11,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 
-import { requestPasswordReset, resetAccountPassword } from '../lib/auth-api';
+import { googleSignInStartUrl, requestPasswordReset, resetAccountPassword } from '../lib/auth-api';
 import type { ProductLoginIntent } from '../lib/login-intent';
 import { useAuthSession } from './auth-session-provider';
 
@@ -85,6 +85,17 @@ export function LoginForm({
           hiện.
         </p>
       ) : null}
+      <a
+        className="account-form__google"
+        href={googleSignInStartUrl(intent?.returnTo)}
+        aria-label="Tiếp tục với Google"
+      >
+        <span aria-hidden="true">G</span>
+        Tiếp tục với Google
+      </a>
+      <div className="account-form__separator" aria-hidden="true">
+        <span>hoặc</span>
+      </div>
       <label htmlFor="login-email">Email</label>
       <input id="login-email" name="email" type="email" autoComplete="email" required />
       <label htmlFor="login-password">Mật khẩu</label>

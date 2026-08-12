@@ -9,6 +9,10 @@ const replace = vi.fn();
 
 vi.mock('next/navigation', () => ({ useRouter: () => ({ replace }) }));
 vi.mock('../lib/auth-api', () => ({
+  googleSignInStartUrl: vi.fn(
+    (returnTo?: string) =>
+      `http://localhost:3001/api/v1/auth/google/start?returnTo=${encodeURIComponent(returnTo ?? '/')}`,
+  ),
   requestPasswordReset: vi.fn(),
   resetAccountPassword: vi.fn(),
 }));
@@ -29,6 +33,7 @@ describe('account forms', () => {
       register,
       logout: vi.fn(),
       restore: vi.fn(),
+      completeGoogleSignIn: vi.fn(),
       authenticatedFetch: vi.fn(),
     } as ReturnType<typeof useAuthSession>);
   });
@@ -37,6 +42,10 @@ describe('account forms', () => {
     login.mockRejectedValue(new Error('internal secret'));
     const user = userEvent.setup();
     render(<LoginForm intent={null} />);
+    expect(screen.getByRole('link', { name: 'Tiếp tục với Google' })).toHaveAttribute(
+      'href',
+      'http://localhost:3001/api/v1/auth/google/start?returnTo=%2F',
+    );
     await user.type(screen.getByRole('textbox', { name: 'Email' }), 'Buyer@Example.com');
     const password = screen.getByLabelText('Mật khẩu');
     await user.type(password, 'wrong password');

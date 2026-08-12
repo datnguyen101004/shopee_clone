@@ -14,6 +14,8 @@ export class RefreshSessionFailedError extends Error {
 export class PasswordResetFailedError extends Error {}
 export class RecoveryDeliveryFailedError extends Error {}
 export class AuthOriginDeniedError extends Error {}
+export class GoogleSignInFailedError extends Error {}
+export class GoogleAccountMethodRequiredError extends Error {}
 
 export class AuthRateLimitedError extends Error {
   constructor(public readonly retryAfterSeconds: number) {

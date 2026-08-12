@@ -139,6 +139,35 @@ export class AuthService {
     return this.sessionResult(user, sessionId, refreshToken, now);
   }
 
+  async loginWithGoogle(input: {
+    subject: string;
+    email: string;
+    displayName: string;
+  }): Promise<AuthSessionResult> {
+    const now = this.clock.now();
+    const refreshToken = this.tokens.createOpaqueToken();
+    const sessionId = this.tokens.createId();
+    const persistence = {
+      ...input,
+      userId: this.tokens.createId(),
+      identityId: this.tokens.createId(),
+      sessionId,
+      familyId: this.tokens.createId(),
+      tokenHash: this.tokens.hashOpaqueToken(refreshToken, 'refresh'),
+      expiresAt: new Date(now.getTime() + this.config.refreshTokenTtlSeconds * 1_000),
+      now,
+    };
+    let user: PersistedUser;
+    try {
+      user = await this.repository.createGoogleIdentitySession(persistence);
+    } catch (error) {
+      if (!isUniqueFailure(error)) throw error;
+      user = await this.repository.createGoogleIdentitySession(persistence);
+    }
+    await this.repository.pruneExpired(now);
+    return this.sessionResult(user, sessionId, refreshToken, now);
+  }
+
   async refresh(refreshToken: string | undefined): Promise<AuthSessionResult> {
     const now = this.clock.now();
     if (!refreshToken || !this.tokens.isOpaqueToken(refreshToken)) {

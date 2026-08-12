@@ -20,6 +20,7 @@
     "infra:reset": "docker compose down --volumes --remove-orphans",
     "infra:smoke": "node scripts/infrastructure-smoke.mjs",
     "ci:validate": "node scripts/validate-ci.mjs",
+    "auth:google:preflight": "node --env-file=.env scripts/google-oauth-preflight.mjs",
     "db:generate": "pnpm --filter @shopee-clone/api db:generate",
     "db:format": "pnpm --filter @shopee-clone/api db:format",
     "db:validate": "pnpm --filter @shopee-clone/api db:validate",

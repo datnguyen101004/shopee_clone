@@ -42,11 +42,23 @@ test.describe('secure account authentication', () => {
   }) => {
     await page.goto('/login');
     await expect(page.getByRole('heading', { name: 'Đăng nhập' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Tiếp tục với Google' })).toHaveAttribute(
+      'href',
+      /\/api\/v1\/auth\/google\/start\?returnTo=%2F$/,
+    );
     await page.getByRole('button', { name: 'Đăng nhập' }).click();
     await expect(page.locator('.account-form__message[role="alert"]').first()).toContainText(
       'email và mật khẩu hợp lệ',
     );
     await expect(page.getByLabel('Mật khẩu')).toHaveValue('');
+    await expectAccessible(page);
+
+    await page.goto('/login/google/complete?outcome=cancelled&returnTo=%2F');
+    await expect(page.locator('.account-form__message[role="alert"]')).toContainText(
+      'hủy đăng nhập Google',
+    );
+    await expect(page).toHaveURL('/login/google/complete');
+    await expect(page.getByRole('link', { name: 'Quay lại đăng nhập' })).toBeVisible();
     await expectAccessible(page);
 
     await page.goto('/register');

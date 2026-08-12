@@ -8,6 +8,7 @@ import {
   HttpStatus,
   Inject,
   Post,
+  Query,
   Req,
   Res,
   UseFilters,
@@ -33,6 +34,8 @@ import { RefreshSessionFailedError } from './auth.errors';
 import { AuthGuard, type AuthenticatedRequest } from './auth.guard';
 import { AuthOriginGuard, requestSource } from './auth-origin.guard';
 import { type AuthSessionResult, AuthService } from './auth.service';
+import { googleTransactionCookieOptions } from './google-auth-cookie';
+import { GoogleAuthService } from './google-auth.service';
 
 function publicSession(result: AuthSessionResult): AuthSessionResponse {
   return {
@@ -57,8 +60,30 @@ export class AuthController {
   constructor(
     @Inject(AuthService)
     private readonly auth: AuthService,
+    @Inject(GoogleAuthService)
+    private readonly googleAuth: GoogleAuthService,
     @Inject(AUTH_CONFIG) private readonly config: AuthConfig,
   ) {}
+
+  @Get('google/start')
+  @Header('Cache-Control', 'no-store')
+  @ApiOperation({ summary: 'Start a browser-bound Google OpenID Connect login' })
+  async startGoogleLogin(
+    @Query('returnTo') returnTo: string | undefined,
+    @Req() request: Request,
+    @Res() response: Response,
+  ): Promise<void> {
+    const started = await this.googleAuth.start(
+      typeof returnTo === 'string' ? returnTo : undefined,
+      requestSource(request, this.config.trustProxy),
+    );
+    response.cookie(
+      this.config.google.cookieName,
+      started.browserBinding,
+      googleTransactionCookieOptions(this.config),
+    );
+    response.redirect(HttpStatus.FOUND, started.authorizationUrl);
+  }
 
   @Post('register')
   @Header('Cache-Control', 'no-store')

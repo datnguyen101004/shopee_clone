@@ -81,7 +81,11 @@ export function redactSensitiveOutput(value, secrets = []) {
 
   return sanitized
     .replace(/postgres(?:ql)?:\/\/[^\s'"`]+/gi, '[REDACTED_DATABASE_URL]')
-    .replace(/(POSTGRES_PASSWORD=)[^\s]+/gi, '$1[REDACTED]');
+    .replace(/(POSTGRES_PASSWORD=)[^\s]+/gi, '$1[REDACTED]')
+    .replace(
+      /((?:GOOGLE_CLIENT_ID|GOOGLE_CLIENT_SECRET|authorization_code|code|state|nonce|code_verifier|id_token|access_token|refresh_token|provider_subject|email)\s*[=:]\s*)[^\s,}&]+/gi,
+      '$1[REDACTED]',
+    );
 }
 
 export async function findAvailablePort() {

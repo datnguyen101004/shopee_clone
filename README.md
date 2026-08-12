@@ -96,6 +96,8 @@ The reusable marketplace foundations live in `packages/ui`; browse the component
 
 See [Product Detail](docs/product-detail.md) for the T10 public product endpoint, variant-media integrity, stock rules, anonymous login intent, and focused verification commands.
 
+See [Account authentication](docs/authentication.md) for T11 email/password sessions and the T11.1 Google sign-in flow, exact local callback, safe environment preflight, and focused verification commands.
+
 See [Account authentication](docs/authentication.md) for T11 endpoints, session/token lifecycle, password policy, local recovery delivery, environment requirements, and focused auth verification commands.
 
 ## Database workflows

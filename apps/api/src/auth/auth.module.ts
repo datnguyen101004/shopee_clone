@@ -14,10 +14,14 @@ import { AuthRepository } from './auth.repository';
 import { AuthService } from './auth.service';
 import { AuthTokenService } from './auth-token.service';
 import { createRecoveryMailer, RECOVERY_MAILER } from './recovery-mailer';
+import { GoogleAuthCallbackController } from './google-auth-callback.controller';
+import { GoogleAuthCryptoService } from './google-auth-crypto.service';
+import { GoogleAuthService } from './google-auth.service';
+import { GOOGLE_IDENTITY_PROVIDER, GoogleOAuthIdentityProvider } from './google-identity-provider';
 
 @Module({
   imports: [JwtModule.register({})],
-  controllers: [AuthController],
+  controllers: [AuthController, GoogleAuthCallbackController],
   providers: [
     { provide: AUTH_CONFIG, useFactory: loadAuthConfig },
     {
@@ -28,6 +32,9 @@ import { createRecoveryMailer, RECOVERY_MAILER } from './recovery-mailer';
     AuthClock,
     AuthExceptionFilter,
     AuthGuard,
+    GoogleAuthCryptoService,
+    GoogleAuthService,
+    { provide: GOOGLE_IDENTITY_PROVIDER, useClass: GoogleOAuthIdentityProvider },
     AuthLimiterService,
     AuthOriginGuard,
     AuthPasswordService,

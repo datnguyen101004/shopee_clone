@@ -39,6 +39,20 @@ export interface ResetPasswordRequest {
   password: string;
 }
 
+export const googleSignInOutcomeValues = [
+  'success',
+  'cancelled',
+  'failed',
+  'account-method-required',
+] as const;
+
+export type GoogleSignInOutcome = (typeof googleSignInOutcomeValues)[number];
+
+export interface GoogleSignInCompletion {
+  outcome: GoogleSignInOutcome;
+  returnTo: string;
+}
+
 export interface AuthProblemDetails {
   type: string;
   title: string;
@@ -153,6 +167,27 @@ export function isResetPasswordRequest(value: unknown): value is ResetPasswordRe
     opaqueTokenPattern.test(value.token) &&
     isAcceptedAuthPassword(value.password)
   );
+}
+
+export function isSafeAuthReturnTo(value: unknown): value is string {
+  return (
+    value === '/' ||
+    (typeof value === 'string' &&
+      /^\/products\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(value))
+  );
+}
+
+export function isGoogleSignInCompletion(value: unknown): value is GoogleSignInCompletion {
+  return (
+    isRecord(value) &&
+    hasExactKeys(value, ['outcome', 'returnTo']) &&
+    googleSignInOutcomeValues.includes(value.outcome as GoogleSignInOutcome) &&
+    isSafeAuthReturnTo(value.returnTo)
+  );
+}
+
+export function parseGoogleSignInCompletion(value: unknown): GoogleSignInCompletion | null {
+  return isGoogleSignInCompletion(value) ? value : null;
 }
 
 export function isAuthProblemDetails(value: unknown): value is AuthProblemDetails {

@@ -106,7 +106,7 @@ async function verifyDatabase(databaseUrl: string): Promise<void> {
       include: {
         shop: true,
         category: true,
-        images: { orderBy: { sortOrder: 'asc' } },
+        images: { orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }] },
         variants: { include: { inventory: true }, orderBy: { sku: 'asc' } },
       },
     });
@@ -119,6 +119,13 @@ async function verifyDatabase(databaseUrl: string): Promise<void> {
     assert.equal(product.ratingCount, seedProducts[0].ratingCount);
     assert.equal(product.soldCount, seedProducts[0].soldCount);
     assert.equal(product.images[0]?.id, seedImages[0].id);
+    assert.equal(product.images[1]?.variantId, seedVariants[0].id);
+    assert.equal(product.images[2]?.variantId, seedVariants[1].id);
+    assert(
+      product.images.every(
+        (image, index) => index === 0 || product.images[index - 1]!.sortOrder <= image.sortOrder,
+      ),
+    );
     assert(product.variants.length >= 2);
     assert(product.variants.every((variant) => variant.inventory !== null));
     assert(product.variants.every((variant) => variant.status === VariantStatus.ACTIVE));
@@ -179,6 +186,7 @@ async function verifyDatabase(databaseUrl: string): Promise<void> {
     assert(new Set(seedProducts.map((item) => item.soldCount)).size >= 4);
     assert(seedVariants.some((item) => item.compareAtPriceMinor !== null));
     assert(seedVariants.some((item) => item.compareAtPriceMinor === null));
+    assert(seedVariants.some((item) => item.quantityOnHand === item.quantityReserved));
     assert(new Set(seedVariants.map((item) => item.priceMinor.toString())).size >= 4);
 
     const constraintRows = await prisma.$queryRawUnsafe<Array<{ constraint_name: string }>>(
@@ -195,10 +203,11 @@ async function verifyDatabase(databaseUrl: string): Promise<void> {
          ,'products_rating_average_bounded'
          ,'products_rating_count_nonnegative'
          ,'products_sold_count_nonnegative'
+         ,'product_images_product_id_variant_id_fkey'
        )
        ORDER BY conname`,
     );
-    assert.equal(constraintRows.length, 10);
+    assert.equal(constraintRows.length, 11);
 
     await expectDatabaseRejection('a duplicate user email', () =>
       prisma.user.create({
@@ -283,6 +292,19 @@ async function verifyDatabase(databaseUrl: string): Promise<void> {
       prisma.product.update({
         where: { id: seedProducts[0].id },
         data: { soldCount: -1 },
+      }),
+    );
+
+    await expectDatabaseRejection('an image associated with a variant of another product', () =>
+      prisma.productImage.create({
+        data: {
+          id: '00000000-0000-4000-8000-000000009005',
+          productId: seedProducts[0].id,
+          variantId: seedVariants[4].id,
+          url: '/media/products/invalid.jpg',
+          altText: 'Invalid relation',
+          sortOrder: 99,
+        },
       }),
     );
   } finally {

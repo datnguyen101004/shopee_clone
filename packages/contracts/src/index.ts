@@ -20,6 +20,20 @@ export {
   isCatalogProductsResponse,
   parseCatalogProductsResponse,
 } from './catalog';
+export {
+  isCanonicalProductId,
+  isProductDetailResponse,
+  parseProductDetailResponse,
+} from './product-detail';
+export type {
+  ProductAvailability,
+  ProductDetailCategory,
+  ProductDetailResponse,
+  ProductDetailShop,
+  ProductDetailVariant,
+  ProductGalleryMedia,
+  ProductShippingPreview,
+} from './product-detail';
 export type {
   CatalogCategorySummary,
   CatalogCategoryFacet,

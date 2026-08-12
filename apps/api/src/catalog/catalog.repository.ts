@@ -37,4 +37,62 @@ export class CatalogRepository {
       orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
     });
   }
+
+  findPublicProduct(productId: string) {
+    return this.prisma.product.findFirst({
+      where: {
+        id: productId,
+        status: ProductStatus.ACTIVE,
+        deletedAt: null,
+        shop: { status: ShopStatus.ACTIVE, deletedAt: null },
+        category: { isActive: true, deletedAt: null },
+      },
+      include: {
+        shop: true,
+        category: true,
+        images: { orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }] },
+        variants: {
+          where: { status: VariantStatus.ACTIVE, deletedAt: null },
+          include: { inventory: true },
+          orderBy: [{ priceMinor: 'asc' }, { id: 'asc' }],
+        },
+      },
+    });
+  }
+
+  countPublicProductsForShop(shopId: string) {
+    return this.prisma.product.count({
+      where: {
+        shopId,
+        status: ProductStatus.ACTIVE,
+        deletedAt: null,
+        category: { isActive: true, deletedAt: null },
+      },
+    });
+  }
+
+  findRelatedCandidates(categoryId: string, excludedProductId: string) {
+    return this.prisma.product.findMany({
+      take: 24,
+      where: {
+        id: { not: excludedProductId },
+        categoryId,
+        status: ProductStatus.ACTIVE,
+        deletedAt: null,
+        shop: { status: ShopStatus.ACTIVE, deletedAt: null },
+        category: { isActive: true, deletedAt: null },
+      },
+      include: {
+        shop: true,
+        category: true,
+        images: { orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }] },
+        variants: {
+          where: { status: VariantStatus.ACTIVE, deletedAt: null },
+          include: { inventory: true },
+          orderBy: [{ priceMinor: 'asc' }, { id: 'asc' }],
+        },
+      },
+      orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
+    });
+  }
 }

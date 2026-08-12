@@ -5,7 +5,7 @@ import DesignSystemPage from '../design-system/page';
 import HealthPage from '../health/page';
 import CartPlaceholderPage from './cart/page';
 import StorefrontLayout from './layout';
-import LoginPlaceholderPage from './login/page';
+import { LoginPlaceholderContent } from './login/page';
 import SearchPage from './search/page';
 
 vi.mock('../../lib/catalog-api', () => ({
@@ -31,7 +31,7 @@ vi.mock('../../lib/catalog-api', () => ({
 
 describe('storefront route boundary', () => {
   it.each([
-    ['login', <LoginPlaceholderPage key="login" />],
+    ['login', <LoginPlaceholderContent key="login" intent={null} />],
     ['cart', <CartPlaceholderPage key="cart" />],
   ])('keeps the shared shell on the %s placeholder', (_name, page) => {
     const { container } = render(<StorefrontLayout>{page}</StorefrontLayout>);

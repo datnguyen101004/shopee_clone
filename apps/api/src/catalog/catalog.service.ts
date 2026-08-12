@@ -9,6 +9,7 @@ import type {
 import { relevanceScore, normalizeDiscoveryText } from './catalog-discovery';
 import type { NormalizedCatalogQuery } from './catalog-query';
 import { CatalogRepository } from './catalog.repository';
+import { mapCatalogProductCard } from './catalog-presentation';
 
 type CatalogCandidate = Awaited<ReturnType<CatalogRepository['findCandidates']>>[number];
 type ActiveCategory = Awaited<ReturnType<CatalogRepository['findActiveCategories']>>[number];
@@ -21,50 +22,16 @@ interface DisplayableCatalogCandidate {
   relevance: number;
 }
 
-function safeMinor(value: bigint): number | null {
-  const converted = Number(value);
-  return Number.isSafeInteger(converted) && converted >= 0 ? converted : null;
-}
-
 function mapDisplayableCandidate(product: CatalogCandidate): DisplayableCatalogCandidate | null {
-  const variant = product.variants.find(
-    (item) =>
-      item.inventory !== null &&
-      item.inventory.quantityOnHand - item.inventory.quantityReserved > 0,
-  );
-  if (!variant) return null;
-
-  const priceMinor = safeMinor(variant.priceMinor);
-  if (priceMinor === null) return null;
-  const compareAt =
-    variant.compareAtPriceMinor === null ? null : safeMinor(variant.compareAtPriceMinor);
-  const discountPercent =
-    compareAt !== null && compareAt > priceMinor
-      ? Math.max(1, Number((BigInt(compareAt - priceMinor) * 100n) / BigInt(compareAt)))
-      : null;
-  const image = product.images[0];
+  const card = mapCatalogProductCard(product);
+  if (!card) return null;
 
   return {
     categoryId: product.categoryId,
     createdAt: product.createdAt,
     description: product.description,
     relevance: 0,
-    card: {
-      id: product.id,
-      name: product.name,
-      href: `/products/${encodeURIComponent(product.id)}`,
-      imageUrl: image?.url ?? null,
-      imageAlt: image?.altText ?? product.name,
-      priceMinor,
-      ...(compareAt !== null && discountPercent !== null
-        ? { compareAtPriceMinor: compareAt, discountPercent }
-        : {}),
-      ratingAverageBasisPoints: product.ratingAverageBasisPoints,
-      ratingCount: product.ratingCount,
-      soldCount: product.soldCount,
-      shop: { name: product.shop.name, location: product.shop.location },
-      category: { slug: product.category.slug, name: product.category.name },
-    },
+    card,
   };
 }
 

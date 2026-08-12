@@ -120,6 +120,7 @@ async function seedMarketplace(): Promise<void> {
         create: image,
         update: {
           productId: image.productId,
+          variantId: image.variantId ?? null,
           url: image.url,
           altText: image.altText,
           sortOrder: image.sortOrder,

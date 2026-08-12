@@ -3,7 +3,9 @@ import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 
 const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const suite = process.argv.includes('catalog') ? 'catalog' : 'homepage';
+const suite =
+  ['homepage', 'catalog', 'product'].find((candidate) => process.argv.includes(candidate)) ??
+  'homepage';
 const webPort = Number(process.env.E2E_WEB_PORT ?? 3000);
 const apiPort = Number(process.env.PORT ?? 3001);
 const webUrl = `http://127.0.0.1:${webPort}`;
@@ -24,7 +26,7 @@ function runPlaywright() {
   if (!packageManagerPath) throw new Error('Quick E2E must run through the pinned pnpm script.');
   const result = spawnSync(
     process.execPath,
-    [packageManagerPath, 'exec', 'playwright', 'test', `e2e/${suite}.spec.ts`],
+    [packageManagerPath, 'exec', 'playwright', 'test', `e2e/${suite}.spec.ts`, '--workers=1'],
     {
       cwd: repositoryRoot,
       env: {
@@ -32,6 +34,7 @@ function runPlaywright() {
         QUICK_E2E: '1',
         E2E_WEB_PORT: String(webPort),
         HOMEPAGE_API_BASE_URL: `http://127.0.0.1:${apiPort}`,
+        PRODUCT_DETAIL_API_BASE_URL: `http://127.0.0.1:${apiPort}`,
       },
       stdio: 'inherit',
       windowsHide: true,

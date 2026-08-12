@@ -26,9 +26,8 @@ test.describe('API-driven marketplace homepage', () => {
     expect(productBox?.height).toBeGreaterThanOrEqual(44);
     await product.click();
     await expect(page).toHaveURL(/\/products\/00000000-/);
-    await expect(
-      page.getByRole('heading', { name: 'Trang sản phẩm đang được hoàn thiện' }),
-    ).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Smartphone Pro' })).toBeVisible();
+    await expect(page.getByRole('group', { name: 'Biến thể sản phẩm' })).toBeVisible();
     await expect(page.getByRole('link', { name: 'Shopee Clone - Trang chủ' })).toBeVisible();
 
     await page.goto('/');
@@ -51,10 +50,12 @@ test.describe('API-driven marketplace homepage', () => {
         ['serious', 'critical'].includes(violation.impact ?? ''),
       ),
     ).toEqual([]);
-    await expect(page).toHaveScreenshot('homepage.png', {
-      fullPage: true,
-      animations: 'disabled',
-    });
+    if (process.env.QUICK_E2E !== '1') {
+      await expect(page).toHaveScreenshot('homepage.png', {
+        fullPage: true,
+        animations: 'disabled',
+      });
+    }
   });
 
   test('keeps empty and data-source failure compositions accessible', async ({

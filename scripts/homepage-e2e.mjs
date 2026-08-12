@@ -51,7 +51,9 @@ function verifyCleanup(projectName, environment) {
 }
 
 async function main() {
-  const suite = process.argv.includes('catalog') ? 'catalog' : 'homepage';
+  const suite =
+    ['homepage', 'catalog', 'product'].find((candidate) => process.argv.includes(candidate)) ??
+    'homepage';
   const projectName = createSmokeProjectName(`${suite}${process.pid}${crypto.randomUUID()}`);
   const databasePort = await findAvailablePort();
   const apiPort = await findAvailablePort();
@@ -63,6 +65,7 @@ async function main() {
     ...variables,
     E2E_WEB_PORT: String(webPort),
     HOMEPAGE_API_BASE_URL: `http://127.0.0.1:${apiPort}`,
+    PRODUCT_DETAIL_API_BASE_URL: `http://127.0.0.1:${apiPort}`,
     FULL_STACK_E2E: '1',
   };
   const secrets = [password, variables.DATABASE_URL, variables.TEST_DATABASE_URL];
@@ -91,6 +94,19 @@ async function main() {
           'test/catalog.postgres.e2e.spec.ts',
         ],
         { ...environment, RUN_CATALOG_DATABASE_TESTS: '1' },
+      );
+    }
+    if (suite === 'product') {
+      pnpm(
+        [
+          '--filter',
+          '@shopee-clone/api',
+          'exec',
+          'jest',
+          '--runInBand',
+          'test/product-detail.postgres.e2e.spec.ts',
+        ],
+        { ...environment, RUN_PRODUCT_DETAIL_DATABASE_TESTS: '1' },
       );
     }
     pnpm(['build'], environment);

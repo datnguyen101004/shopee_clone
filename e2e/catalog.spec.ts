@@ -89,10 +89,12 @@ test.describe('API-driven product discovery', () => {
     await expectAccessible(page);
     await page.evaluate(() => window.scrollTo(0, 0));
     await keyword.evaluate((element) => (element as HTMLElement).blur());
-    await expect(page).toHaveScreenshot('catalog-discovery.png', {
-      fullPage: true,
-      animations: 'disabled',
-    });
+    if (process.env.QUICK_E2E !== '1') {
+      await expect(page).toHaveScreenshot('catalog-discovery.png', {
+        fullPage: true,
+        animations: 'disabled',
+      });
+    }
   });
 
   test('keeps no-match and data-source failure recovery actionable', async ({ page }, testInfo) => {

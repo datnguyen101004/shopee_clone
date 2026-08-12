@@ -94,6 +94,8 @@ Use `pnpm format` to apply the shared Prettier rules. Ordinary `pnpm test` inclu
 
 The reusable marketplace foundations live in `packages/ui`; browse the component showcase at `http://localhost:3000/design-system`. See [Marketplace design system](docs/design-system.md) for tokens, component usage, responsive boundaries, and accessibility guidance.
 
+See [Product Detail](docs/product-detail.md) for the T10 public product endpoint, variant-media integrity, stock rules, anonymous login intent, and focused verification commands.
+
 ## Database workflows
 
 PostgreSQL persistence is owned by `apps/api`. The API and Prisma commands load the ignored root `.env` (with `apps/api/.env` as an optional higher-priority override); never commit credentials.

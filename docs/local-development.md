@@ -38,6 +38,10 @@ The web health page is `http://localhost:3000/health`. The API health endpoint i
 
 The homepage is rendered by Next.js from `GET http://localhost:3001/api/v1/homepage`. Override the server-only base URL with `HOMEPAGE_API_BASE_URL` when the API is hosted elsewhere; never expose database credentials to the browser.
 
+## Canonical product dataset (TS01)
+
+The product catalog is sourced from the repository-owned JSON fixtures in `asserts/`. Use `pnpm db:import:dataset` to rerun only the transactional catalog import. See [Canonical product dataset](./canonical-product-dataset.md) for source mapping, deterministic fallback rules, provenance, and update procedures.
+
 ## Homepage aggregate (T07)
 
 Homepage ordering, Vietnamese display copy, module membership, and UTC activation windows are owned by the normalized `homepage_*` seed tables. An enabled module is active when `activeFrom <= now` (when present) and the exclusive `activeUntil > now` (when present). Empty or inactive modules are omitted; no hardcoded storefront products replace them.

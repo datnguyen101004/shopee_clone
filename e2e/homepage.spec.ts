@@ -17,16 +17,19 @@ test.describe('API-driven marketplace homepage', () => {
     await expect(page.getByRole('heading', { name: 'Danh mục' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Flash Sale' })).toBeVisible();
 
-    const category = page.getByRole('link', { name: /Xem danh mục Điện thoại/ });
+    const category = page.getByRole('link', { name: /Xem danh mục Bách hóa/ });
     await category.click();
-    await expect(page).toHaveURL(/\/search\?category=mobile-accessories$/);
+    await expect(page).toHaveURL(/\/search\?category=bach-hoa$/);
     await page.goto('/');
-    const product = page.getByRole('link', { name: /Xem Smartphone Pro/ }).first();
+    const product = page.locator('.product-card__link').first();
+    const productLabel = await product.getAttribute('aria-label');
+    const productName = productLabel?.replace(/^Xem\s+/, '');
+    expect(productName).toBeTruthy();
     const productBox = await product.boundingBox();
     expect(productBox?.height).toBeGreaterThanOrEqual(44);
     await product.click();
-    await expect(page).toHaveURL(/\/products\/00000000-/);
-    await expect(page.getByRole('heading', { name: 'Smartphone Pro' })).toBeVisible();
+    await expect(page).toHaveURL(/\/products\/[0-9a-f-]+$/);
+    await expect(page.getByRole('heading', { name: productName! })).toBeVisible();
     await expect(page.getByRole('group', { name: 'Biến thể sản phẩm' })).toBeVisible();
     await expect(page.getByRole('link', { name: 'Shopee Clone - Trang chủ' })).toBeVisible();
 

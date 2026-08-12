@@ -71,6 +71,12 @@ const isSafeNonNegativeInteger = (value: unknown): value is number =>
 const isPositiveInteger = (value: unknown): value is number =>
   typeof value === 'number' && Number.isSafeInteger(value) && value > 0;
 
+function isSafeMediaUrl(value: unknown): value is string {
+  if (!isString(value)) return false;
+  if (value.startsWith('/')) return true;
+  return value.startsWith('https://') && !/\s/.test(value);
+}
+
 function isCategory(value: unknown): value is ProductDetailCategory {
   return isRecord(value) && isString(value.slug) && isString(value.name);
 }
@@ -82,8 +88,7 @@ function isGalleryMedia(
   return (
     isRecord(value) &&
     isUuid(value.id) &&
-    isString(value.url) &&
-    value.url.startsWith('/') &&
+    isSafeMediaUrl(value.url) &&
     isString(value.altText) &&
     isSafeNonNegativeInteger(value.sortOrder) &&
     (value.variantId === null ||

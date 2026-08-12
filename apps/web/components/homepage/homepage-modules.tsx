@@ -9,6 +9,8 @@ import { Badge, Card, Container, Truck } from '@shopee-clone/ui';
 import Image from 'next/image';
 import Link from 'next/link';
 
+import { MarketplaceProductImage } from '../marketplace-product-image';
+
 const icons: Record<string, string> = { device: '⚡', phone: '📱', home: '🏠', kitchen: '🍳' };
 
 function CampaignSection({ module }: { module: HomepageCampaignModule }) {
@@ -84,7 +86,12 @@ function ProductCard({ product }: { product: HomepageProductSummary }) {
       <Link href={product.href} className="product-card__link" aria-label={`Xem ${product.name}`}>
         <div className="product-card__image">
           {product.imageUrl ? (
-            <Image src={product.imageUrl} alt={product.imageAlt} width={320} height={320} />
+            <MarketplaceProductImage
+              src={product.imageUrl}
+              alt={product.imageAlt}
+              width={320}
+              height={320}
+            />
           ) : (
             <span className="homepage-media-fallback" role="img" aria-label={product.imageAlt}>
               S

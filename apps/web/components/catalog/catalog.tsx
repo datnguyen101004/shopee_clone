@@ -4,9 +4,9 @@ import type {
   CatalogQueryContext,
 } from '@shopee-clone/contracts';
 import { Badge, Card } from '@shopee-clone/ui';
-import Image from 'next/image';
 import Link from 'next/link';
 
+import { MarketplaceProductImage } from '../marketplace-product-image';
 import {
   catalogSearchHref,
   replaceCatalogQuery,
@@ -26,7 +26,12 @@ function ProductCard({ product }: { product: CatalogProductCard }) {
       <Link href={product.href} className="catalog-card__link" aria-label={`Xem ${product.name}`}>
         <div className="catalog-card__media">
           {product.imageUrl ? (
-            <Image src={product.imageUrl} alt={product.imageAlt} width={360} height={360} />
+            <MarketplaceProductImage
+              src={product.imageUrl}
+              alt={product.imageAlt}
+              width={360}
+              height={360}
+            />
           ) : (
             <span role="img" aria-label={product.imageAlt} className="catalog-card__fallback">
               S

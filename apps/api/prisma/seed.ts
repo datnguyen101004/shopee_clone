@@ -1,25 +1,19 @@
 import {
   HomepageModuleType,
   MarketplaceRole,
-  ProductStatus,
   RoleAuditAction,
   RoleAuditSource,
   ShopStatus,
   UserStatus,
-  VariantStatus,
 } from '../src/generated/prisma/enums';
 import { createPrismaClient } from './create-prisma-client';
+import { importCanonicalDataset } from './dataset/importer';
 import {
   seedCategories,
   seedHomepageBanners,
-  seedHomepageCategories,
   seedHomepageModules,
-  seedHomepageProducts,
-  seedImages,
-  seedProducts,
   seedShops,
   seedUsers,
-  seedVariants,
 } from './seed-data';
 
 const databaseUrl = process.env.DATABASE_URL;
@@ -29,7 +23,7 @@ if (!databaseUrl) {
 
 const prisma = createPrismaClient(databaseUrl);
 
-async function seedMarketplace(): Promise<void> {
+async function seedMarketplace() {
   await prisma.$transaction(async (transaction) => {
     for (const user of seedUsers) {
       await transaction.user.upsert({
@@ -123,63 +117,6 @@ async function seedMarketplace(): Promise<void> {
       });
     }
 
-    for (const product of seedProducts) {
-      await transaction.product.upsert({
-        where: { id: product.id },
-        create: { ...product, status: ProductStatus.ACTIVE },
-        update: {
-          shopId: product.shopId,
-          categoryId: product.categoryId,
-          slug: product.slug,
-          name: product.name,
-          description: product.description,
-          status: ProductStatus.ACTIVE,
-          ratingAverageBasisPoints: product.ratingAverageBasisPoints,
-          ratingCount: product.ratingCount,
-          soldCount: product.soldCount,
-          createdAt: product.createdAt,
-          deletedAt: null,
-        },
-      });
-    }
-
-    for (const variant of seedVariants) {
-      const { quantityOnHand, quantityReserved, ...variantData } = variant;
-      await transaction.productVariant.upsert({
-        where: { id: variant.id },
-        create: { ...variantData, status: VariantStatus.ACTIVE },
-        update: {
-          productId: variant.productId,
-          sku: variant.sku,
-          name: variant.name,
-          priceMinor: variant.priceMinor,
-          compareAtPriceMinor: variant.compareAtPriceMinor,
-          status: VariantStatus.ACTIVE,
-          deletedAt: null,
-        },
-      });
-
-      await transaction.inventory.upsert({
-        where: { variantId: variant.id },
-        create: { variantId: variant.id, quantityOnHand, quantityReserved },
-        update: { quantityOnHand, quantityReserved },
-      });
-    }
-
-    for (const image of seedImages) {
-      await transaction.productImage.upsert({
-        where: { id: image.id },
-        create: image,
-        update: {
-          productId: image.productId,
-          variantId: image.variantId ?? null,
-          url: image.url,
-          altText: image.altText,
-          sortOrder: image.sortOrder,
-        },
-      });
-    }
-
     for (const module of seedHomepageModules) {
       await transaction.homepageModule.upsert({
         where: { id: module.id },
@@ -204,28 +141,14 @@ async function seedMarketplace(): Promise<void> {
         update: banner,
       });
     }
-
-    for (const entry of seedHomepageCategories) {
-      await transaction.homepageModuleCategory.upsert({
-        where: { id: entry.id },
-        create: entry,
-        update: entry,
-      });
-    }
-
-    for (const entry of seedHomepageProducts) {
-      await transaction.homepageModuleProduct.upsert({
-        where: { id: entry.id },
-        create: entry,
-        update: entry,
-      });
-    }
   });
+
+  return importCanonicalDataset(prisma);
 }
 
 seedMarketplace()
-  .then(() => {
-    console.log('Deterministic marketplace seed completed.');
+  .then((summary) => {
+    console.log(`Deterministic marketplace seed completed: ${JSON.stringify(summary)}.`);
   })
   .finally(async () => {
     await prisma.$disconnect();

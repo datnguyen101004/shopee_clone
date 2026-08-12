@@ -73,6 +73,12 @@ describe('product detail contract', () => {
         initialVariantId: variantId,
       }),
     ).toBe(true);
+    expect(
+      isProductDetailResponse({
+        ...response,
+        gallery: [{ ...response.gallery[0], url: 'https://cdn.example.test/product.jpg' }],
+      }),
+    ).toBe(true);
   });
 
   it('rejects unsafe money, inconsistent availability, invalid media and broken related links', () => {
@@ -92,6 +98,12 @@ describe('product detail contract', () => {
       isProductDetailResponse({
         ...response,
         gallery: [{ ...response.gallery[0], variantId: '00000000-0000-4000-8000-000000000402' }],
+      }),
+    ).toBe(false);
+    expect(
+      isProductDetailResponse({
+        ...response,
+        gallery: [{ ...response.gallery[0], url: 'http://insecure.example.test/product.jpg' }],
       }),
     ).toBe(false);
     expect(

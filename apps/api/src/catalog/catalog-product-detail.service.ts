@@ -18,9 +18,18 @@ type ProductDetailCandidate = NonNullable<
   Awaited<ReturnType<CatalogRepository['findPublicProduct']>>
 >;
 
+function isSafeProductImageUrl(value: string): boolean {
+  if (value.startsWith('/')) return true;
+  try {
+    return new URL(value).protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
 function mapGallery(product: ProductDetailCandidate): ProductGalleryMedia[] {
   return product.images
-    .filter((image) => image.url.startsWith('/'))
+    .filter((image) => isSafeProductImageUrl(image.url))
     .map((image, index) => ({
       id: image.id,
       url: image.url,

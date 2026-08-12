@@ -271,6 +271,7 @@ model Product {
   variants                 ProductVariant[]
   images                   ProductImage[]
   homepageEntries          HomepageModuleProduct[]
+  datasetRecord            DatasetProductRecord?
 
   @@unique([shopId, slug])
   @@index([shopId, status])
@@ -278,6 +279,46 @@ model Product {
   @@index([status, createdAt, id])
   @@index([deletedAt])
   @@map("products")
+}
+
+model DatasetSource {
+  id            String                 @id @db.Uuid
+  key           String                 @unique @db.VarChar(64)
+  fileName      String                 @unique @map("file_name") @db.VarChar(120)
+  sourceUrl     String                 @map("source_url") @db.Text
+  checksum      String                 @db.Char(64)
+  recordCount   Int                    @map("record_count")
+  rootMetadata  Json                   @map("root_metadata") @db.JsonB
+  policyVersion String                 @map("policy_version") @db.VarChar(40)
+  importedAt    DateTime               @map("imported_at") @db.Timestamptz(3)
+  createdAt     DateTime               @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt     DateTime               @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  records       DatasetProductRecord[]
+
+  @@index([policyVersion])
+  @@map("dataset_sources")
+}
+
+model DatasetProductRecord {
+  id               String        @id @db.Uuid
+  sourceId         String        @map("source_id") @db.Uuid
+  productId        String        @unique @map("product_id") @db.Uuid
+  stableRecordKey  String        @map("stable_record_key") @db.Char(64)
+  sourceIdentity   String        @map("source_identity") @db.Text
+  sourceIndex      Int           @map("source_index")
+  sourceProductUrl String?       @map("source_product_url") @db.Text
+  sourcePageUrl    String?       @map("source_page_url") @db.Text
+  rawNotes         String?       @map("raw_notes") @db.Text
+  rawPayload       Json          @map("raw_payload") @db.JsonB
+  generatedFields  Json          @map("generated_fields") @db.JsonB
+  isActive         Boolean       @default(true) @map("is_active")
+  normalizedAt     DateTime      @map("normalized_at") @db.Timestamptz(3)
+  source           DatasetSource @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+  product          Product       @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  @@unique([sourceId, stableRecordKey])
+  @@index([sourceId, isActive, sourceIndex])
+  @@map("dataset_product_records")
 }
 
 model ProductVariant {

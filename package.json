@@ -28,6 +28,7 @@
     "db:migrate": "pnpm --filter @shopee-clone/api db:migrate",
     "db:migrate:deploy": "pnpm --filter @shopee-clone/api db:migrate:deploy",
     "db:seed": "pnpm --filter @shopee-clone/api db:seed",
+    "db:import:dataset": "pnpm --filter @shopee-clone/api db:import:dataset",
     "db:reset": "pnpm --filter @shopee-clone/api db:reset",
     "db:verify": "pnpm --filter @shopee-clone/api db:verify",
     "build": "turbo run build",

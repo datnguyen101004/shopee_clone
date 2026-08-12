@@ -19,6 +19,7 @@
     "db:migrate": "prisma migrate dev",
     "db:migrate:deploy": "prisma migrate deploy",
     "db:seed": "prisma db seed",
+    "db:import:dataset": "tsx prisma/import-dataset.ts",
     "db:reset": "prisma migrate reset",
     "db:verify": "tsx prisma/verify.ts",
     "auth:roles:bootstrap-admin": "tsx scripts/bootstrap-admin.ts"

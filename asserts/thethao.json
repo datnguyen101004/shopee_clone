@@ -1,0 +1,2707 @@
+{
+  "source": "https://myshoes.vn/giay-chay-bo",
+  "image_limit": 300,
+  "limit_reached": false,
+  "source_total_pages": 8,
+  "pages_fetched": 8,
+  "page_stats": [
+    {
+      "page": 1,
+      "products": 40,
+      "parsed": 40,
+      "added": 40
+    },
+    {
+      "page": 2,
+      "products": 40,
+      "parsed": 40,
+      "added": 40
+    },
+    {
+      "page": 3,
+      "products": 40,
+      "parsed": 40,
+      "added": 40
+    },
+    {
+      "page": 4,
+      "products": 40,
+      "parsed": 40,
+      "added": 40
+    },
+    {
+      "page": 5,
+      "products": 40,
+      "parsed": 40,
+      "added": 40
+    },
+    {
+      "page": 6,
+      "products": 40,
+      "parsed": 40,
+      "added": 40
+    },
+    {
+      "page": 7,
+      "products": 40,
+      "parsed": 40,
+      "added": 40
+    },
+    {
+      "page": 8,
+      "products": 14,
+      "parsed": 14,
+      "added": 14
+    }
+  ],
+  "record_count": 294,
+  "unique_image_count": 294,
+  "records": [
+    {
+      "name": "Giày Nike Pegasus 42 Nam - Trắng Đen",
+      "price": 3890000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 4.100.000₫; Giảm 210.000₫ (5%); Đã bán 27",
+      "image_url": "https://myshoes.vn/image/catalog/2026/nike/giay-nike-pegasus-42-nam-trang-den-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-pegasus-42-nam-trang-den.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo"
+    },
+    {
+      "name": "Giày Nike Pegasus 42 Nam - Trắng Xám Đen",
+      "price": 3890000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 4.100.000₫; Giảm 210.000₫ (5%); Đã bán 25",
+      "image_url": "https://myshoes.vn/image/catalog/2026/nike/826/giay-nike-pegasus-42-nam-trang-den-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-pegasus-42-nam-trang-xam-den.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo"
+    },
+    {
+      "name": "Giày Nike Quest 7 Nam - Trắng Xám",
+      "price": 2590000,
+      "rating": 4.8,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 2.800.000₫; Giảm 210.000₫ (8%); Đã bán 25",
+      "image_url": "https://myshoes.vn/image/catalog/2026/nike/726/giay-nike-quest-7-nam-trang-den-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-quest-7-nam-trang-xam.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo"
+    },
+    {
+      "name": "Giày Nike Structure Plus Nam - Trắng Xanh",
+      "price": 5190000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 5.500.000₫; Giảm 310.000₫ (6%); Đã bán 20",
+      "image_url": "https://myshoes.vn/image/catalog/2026/nike/726/giay-nike-structure-plus-nam-trang-xanh-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-structure-plus-nam-trang-xanh.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo"
+    },
+    {
+      "name": "Giày Nike Vomero Plus Nam - Đen Xanh",
+      "price": 5290000,
+      "rating": 4.9,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 5.600.000₫; Giảm 310.000₫ (6%); Đã bán 20",
+      "image_url": "https://myshoes.vn/image/catalog/2026/nike/726/giay-nike-vomero-plus-nam-den-xanh-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-vomero-plus-nam-den-xanh.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo"
+    },
+    {
+      "name": "Giày Nike Vomero Plus Nam - Xám Đen",
+      "price": 5290000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 5.600.000₫; Giảm 310.000₫ (6%); Đã bán 18",
+      "image_url": "https://myshoes.vn/image/catalog/2026/nike/726/giay-nike-vomero-plus-nam-xam-den-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-vomero-plus-nam-xam-den.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo"
+    },
+    {
+      "name": "Giày Nike Vomero Plus Nam - Đen Full",
+      "price": 5290000,
+      "rating": 4.9,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 5.600.000₫; Giảm 310.000₫ (6%); Đã bán 30",
+      "image_url": "https://myshoes.vn/image/catalog/2026/nike/726/giay-nike-vomero-plus-nam-den-full-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-vomero-plus-nam-den-full.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo"
+    },
+    {
+      "name": "Giày Nike Vomero Plus Nam - Đen Trắng",
+      "price": 5290000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 5.600.000₫; Giảm 310.000₫ (6%); Đã bán 29",
+      "image_url": "https://myshoes.vn/image/catalog/2026/nike/726/giay-nike-vomero-plus-nam-den-trang-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-vomero-plus-nam-den-trang.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo"
+    },
+    {
+      "name": "Giày Nike Downshifter 14 Nam - Đen Full",
+      "price": 2190000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 2.400.000₫; Giảm 210.000₫ (9%); Đã bán 30",
+      "image_url": "https://myshoes.vn/image/catalog/2026/nike/726/giay-nike-downshifter-14-nam-den-full-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-downshifter-14-nam-den-full.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo"
+    },
+    {
+      "name": "Giày Nike Vomero 18 Nữ - Trắng Gold",
+      "price": 4190000,
+      "rating": 4.8,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 4.700.000₫; Giảm 510.000₫ (11%); Đã bán 25",
+      "image_url": "https://myshoes.vn/image/catalog/2026/nike/726/giay-nike-vomero-18-nu-trang-gold-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-vomero-18-nu-trang-gold.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo"
+    },
+    {
+      "name": "Giày Nike Winflo 12 Nam - Xanh Trắng",
+      "price": 3190000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 3.500.000₫; Giảm 310.000₫ (9%); Đã bán 25",
+      "image_url": "https://myshoes.vn/image/catalog/2026/nike/726/giay-nike-winflo-12-nam-xanh-trang-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-winflo-12-nam-xanh-trang.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo"
+    },
+    {
+      "name": "Giày Nike Metcon 10 Nam - Xám Nâu",
+      "price": 4590000,
+      "rating": 4.8,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 4.900.000₫; Giảm 310.000₫ (6%); Đã bán 25",
+      "image_url": "https://myshoes.vn/image/catalog/2026/nike/726/giay-nike-metcon-10-nam-xam-nau-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-metcon-10-nam-xam-nau.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo"
+    },
+    {
+      "name": "Giày Nike Structure 26 Nam - Trắng Xanh Xanh",
+      "price": 3990000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 4.200.000₫; Giảm 210.000₫ (5%); Đã bán 23",
+      "image_url": "https://myshoes.vn/image/catalog/2026/nike/726/giay-nike-structure-26-nam-trang-xanh-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-structure-26-nam-trang-xanh-xanh.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo"
+    },
+    {
+      "name": "Giày Nike Vomero 18 Nam - Trắng Xanh Xanh",
+      "price": 4190000,
+      "rating": 4.8,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 4.700.000₫; Giảm 510.000₫ (11%); Đã bán 28",
+      "image_url": "https://myshoes.vn/image/catalog/2026/nike/726/giay-nike-vomero-18-nam-trang-xanh-xanh-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-vomero-18-nam-trang-xanh-xanh.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo"
+    },
+    {
+      "name": "Giày Nike Vomero 18 Nam - Đen Xanh",
+      "price": 4190000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 4.700.000₫; Giảm 510.000₫ (11%); Đã bán 23",
+      "image_url": "https://myshoes.vn/image/catalog/2026/nike/726/giay-nike-vomero-18-nam-den-xanh-07.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-vomero-18-nam-den-xanh.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo"
+    },
+    {
+      "name": "Giày Nike Vomero 18 Nam - Xám Xám",
+      "price": 4190000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 4.700.000₫; Giảm 510.000₫ (11%); Đã bán 29",
+      "image_url": "https://myshoes.vn/image/catalog/2026/nike/726/giay-nike-vomero-18-nam-xam-00.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-vomero-18-nam-xam-xam.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo"
+    },
+    {
+      "name": "Giày Nike Vomero 18 Nam - Trắng Xám Xanh",
+      "price": 4190000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 4.700.000₫; Giảm 510.000₫ (11%); Đã bán 31",
+      "image_url": "https://myshoes.vn/image/catalog/2026/nike/726/giay-nike-vomero-18-nam-trang-xanh-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-vomero-18-nam-trang-xam-xanh.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo"
+    },
+    {
+      "name": "Giày Nike Journey Run Nam - Trắng Xanh",
+      "price": 2690000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 3.100.000₫; Giảm 410.000₫ (13%); Đã bán 26",
+      "image_url": "https://myshoes.vn/image/catalog/2026/nike/726/giay-nike-journey-run-nam-trang-xanh-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-journey-run-nam-trang-xanh-xanh.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo"
+    },
+    {
+      "name": "Giày Nike Quest 7 Nữ - Đen Trắng",
+      "price": 2590000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 2.800.000₫; Giảm 210.000₫ (8%); Đã bán 24",
+      "image_url": "https://myshoes.vn/image/catalog/2026/nike/726/giay-nike-quest-7-nu-den-trang-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-quest-7-nu-den-trang.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo"
+    },
+    {
+      "name": "Giày Nike Quest 7 Nữ - Trắng Xanh",
+      "price": 2590000,
+      "rating": 4.8,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 2.800.000₫; Giảm 210.000₫ (8%); Đã bán 22",
+      "image_url": "https://myshoes.vn/image/catalog/2026/nike/726/giay-nike-quest-7-nu-trang-xanh-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-quest-7-nu-trang-xanh.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo"
+    },
+    {
+      "name": "Giày Nike Bella 7 Nữ - Đen Trắng",
+      "price": 2790000,
+      "rating": 4.7,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 3.050.000₫; Giảm 260.000₫ (9%); Đã bán 17",
+      "image_url": "https://myshoes.vn/image/catalog/2026/nike/726/giay-nike-bella-7-nu-den-trang-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-bella-7-nu-den-trang.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo"
+    },
+    {
+      "name": "Giày Nike Pegasus 42 Nữ - Trắng Xám",
+      "price": 3890000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 4.100.000₫; Giảm 210.000₫ (5%); Đã bán 25",
+      "image_url": "https://myshoes.vn/image/catalog/2026/nike/726/giay-nike-pegasus-42-nu-trang-xam-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-pegasus-42-nu-trang-xam.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo"
+    },
+    {
+      "name": "Giày Nike Pegasus 42 Nam - Đen Full",
+      "price": 3890000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 4.100.000₫; Giảm 210.000₫ (5%); Đã bán 26",
+      "image_url": "https://myshoes.vn/image/catalog/2026/nike/726/giay-nike-pegasus-42-nam-den-full-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-pegasus-42-nam-den-full.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo"
+    },
+    {
+      "name": "Giày Nike Pegasus 42 Nam - Đen Trắng",
+      "price": 3890000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 4.100.000₫; Giảm 210.000₫ (5%); Đã bán 43",
+      "image_url": "https://myshoes.vn/image/catalog/2026/nike/626/giay-nike-pegasus-42-nam-den-trang-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-pegasus-42-nam-den-trang.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo"
+    },
+    {
+      "name": "Giày Nike Downshifter 14 Nữ - Hồng Trắng",
+      "price": 2190000,
+      "rating": 4.8,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 2.400.000₫; Giảm 210.000₫ (9%); Đã bán 31",
+      "image_url": "https://myshoes.vn/image/catalog/2026/nike/626/giay-nike-downshifter-14-nu-hong-trang-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-downshifter-14-nu-hong-nhe.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo"
+    },
+    {
+      "name": "Giày Adidas Adizero EVO SL Nam - Trắng Xanh",
+      "price": 3690000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 4.000.000₫; Giảm 310.000₫ (8%); Đã bán 35",
+      "image_url": "https://myshoes.vn/image/catalog/2026/adidas/giay-adidas-adizero-evo-sl-nam-trang-xanh-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-adidas-adizero-evo-sl-nam-trang-xanh.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo"
+    },
+    {
+      "name": "Giày Adidas Supernova Stride 2 Nữ - Trắng Xám",
+      "price": 2790000,
+      "rating": 4.9,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 3.200.000₫; Giảm 410.000₫ (13%); Đã bán 27",
+      "image_url": "https://myshoes.vn/image/catalog/2026/adidas/giay-adidas-supernova-stride-2-nu-trang-xam-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-adidas-supernova-stride-2-nu-trang-xam.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo"
+    },
+    {
+      "name": "Giày Asics GEL-CUMULUS 28 Nam - Đen Trắng",
+      "price": 3390000,
+      "rating": 4.9,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 3.799.000₫; Giảm 409.000₫ (11%); Đã bán 24",
+      "image_url": "https://myshoes.vn/image/catalog/2026/asics/giay-asics-gel-cumulus-28-nam-den-trang-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-asics-gel-cumulus-28-nam-den-trang.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo"
+    },
+    {
+      "name": "Giày Asics Gel-Nimbus 28 Nam - Đen Trắng",
+      "price": 3690000,
+      "rating": 4.9,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 4.599.000₫; Giảm 909.000₫ (20%); Đã bán 22",
+      "image_url": "https://myshoes.vn/image/catalog/2026/asics/giay-asics-gel-nimbus-28-nam-den-trang-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-asics-gel-nimbus-28-nam-den-trang.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo"
+    },
+    {
+      "name": "Giày Asics Gel-Nimbus 28 Nữ - Trắng Đen",
+      "price": 3690000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 4.599.000₫; Giảm 909.000₫ (20%); Đã bán 20",
+      "image_url": "https://myshoes.vn/image/catalog/2026/asics/giay-asics-gel-nimbus-28-nu-den-trang-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-asics-gel-nimbus-28-nu-den-trang.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo"
+    },
+    {
+      "name": "Giày Nike Journey Run SE Nữ - Hồng",
+      "price": 2890000,
+      "rating": 4.8,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 3.100.000₫; Giảm 210.000₫ (7%); Đã bán 48",
+      "image_url": "https://myshoes.vn/image/catalog/2026/nike/526/giay-nike-journey-run-se-nu-hong-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-journey-run-se-nu-hong.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo"
+    },
+    {
+      "name": "Giày Nike Flex Train Nam - Đen",
+      "price": 2390000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 2.600.000₫; Giảm 210.000₫ (8%); Đã bán 41",
+      "image_url": "https://myshoes.vn/image/catalog/2026/nike/526/giay-nike-flex-train-nam-den-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-flex-train-nam-den.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo"
+    },
+    {
+      "name": "Giày Nike Vomero 18 Nam - Xanh Navy",
+      "price": 4190000,
+      "rating": 4.9,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 4.700.000₫; Giảm 510.000₫ (11%); Đã bán 56",
+      "image_url": "https://myshoes.vn/image/catalog/2026/nike/526/giay-nike-vomero-18-nam-xanh-navy-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-vomero-18-nam-xanh-navy.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo"
+    },
+    {
+      "name": "Giày Nike Downshifter 14 Nữ - Trắng Xám",
+      "price": 2190000,
+      "rating": 4.9,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 2.400.000₫; Giảm 210.000₫ (9%); Đã bán 36",
+      "image_url": "https://myshoes.vn/image/catalog/2026/nike/526/giay-nike-downshifter-14-nu-xam-trang-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-downshifter-14-nu-xam-trang.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo"
+    },
+    {
+      "name": "Giày Nike Flex Train Nữ - Xanh Xám",
+      "price": 2390000,
+      "rating": 4.9,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 2.600.000₫; Giảm 210.000₫ (8%); Đã bán 32",
+      "image_url": "https://myshoes.vn/image/catalog/2026/nike/526/giay-nike-flex-train-nu-xanh-xam-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-flex-train-nu-xanh-xam.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo"
+    },
+    {
+      "name": "Giày Nike Vomero 18 Nữ - Barely Green",
+      "price": 4190000,
+      "rating": 4.9,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 4.700.000₫; Giảm 510.000₫ (11%); Đã bán 37",
+      "image_url": "https://myshoes.vn/image/catalog/2026/nike/526/giay-nike-vomero-18-nu-barely-green-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-vomero-18-nu-barely-green.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo"
+    },
+    {
+      "name": "Giày Nike Revolution 8 Nữ - Xanh Hồng",
+      "price": 1990000,
+      "rating": 4.8,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 2.100.000₫; Giảm 110.000₫ (5%); Đã bán 35",
+      "image_url": "https://myshoes.vn/image/catalog/2026/nike/526/giay-nike-revolution-8-nu-xanh-hong-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-revolution-8-nu-xanh-hong.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo"
+    },
+    {
+      "name": "Giày Nike Journey Run Nữ - Trắng Xanh",
+      "price": 2690000,
+      "rating": 4.9,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 3.100.000₫; Giảm 410.000₫ (13%); Đã bán 39",
+      "image_url": "https://myshoes.vn/image/catalog/2026/nike/526/giay-nike-journey-run-nu-trang-xanh-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-journey-run-nu-trang-xanh.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo"
+    },
+    {
+      "name": "Giày Nike Flex Train Nam - Xanh Trắng",
+      "price": 2390000,
+      "rating": 4.9,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 2.600.000₫; Giảm 210.000₫ (8%); Đã bán 38",
+      "image_url": "https://myshoes.vn/image/catalog/2026/nike/526/giay-nike-flex-train-nam-xanh-la-trang-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-flex-train-nam-xanh-trang.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo"
+    },
+    {
+      "name": "Giày Nike Vomero 18 Nam - Xám",
+      "price": 4190000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 4.700.000₫; Giảm 510.000₫ (11%); Đã bán 48",
+      "image_url": "https://myshoes.vn/image/catalog/2026/nike/526/giay-nike-vomero-18-nam-xam-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-vomero-18-nam-xam.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo"
+    },
+    {
+      "name": "Giày Nike Metcon 10 Nam - Xanh Đen",
+      "price": 4590000,
+      "rating": 4.9,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 4.900.000₫; Giảm 310.000₫ (6%); Đã bán 35",
+      "image_url": "https://myshoes.vn/image/catalog/2026/nike/526/giay-nike-metcon-10-nam-xanh-den-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-metcon-10-nam-xanh-den.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=2"
+    },
+    {
+      "name": "Giày Asics GEL-CUMULUS 28 Nam - Xanh Blue",
+      "price": 3390000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 3.799.000₫; Giảm 409.000₫ (11%); Đã bán 49",
+      "image_url": "https://myshoes.vn/image/catalog/2026/asics/giay-asics-gel-cumulus-28-nam-xanh-blue-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-asics-gel-cumulus-28-nam-xanh-blue.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=2"
+    },
+    {
+      "name": "Giày Asics Gel-Nimbus 28 Nam - Xanh Cam",
+      "price": 3690000,
+      "rating": 4.8,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 4.599.000₫; Giảm 909.000₫ (20%); Đã bán 34",
+      "image_url": "https://myshoes.vn/image/catalog/2026/asics/giay-asics-gel-nimbus-28-nam-xanh-cam-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-asics-gel-nimbus-28-nam-xanh-cam.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=2"
+    },
+    {
+      "name": "Giày Asics Gel-Excite 11 Nam - Xanh Navy",
+      "price": 1990000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 2.299.000₫; Giảm 309.000₫ (13%); Đã bán 46",
+      "image_url": "https://myshoes.vn/image/catalog/2026/asics/giay-asics-gel-excite-11-nam-xanh-navy-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-asics-gel-excite-11-nam-xanh-navy.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=2"
+    },
+    {
+      "name": "Giày Asics Gel-Excite 11 Nam - Xám Trắng",
+      "price": 1990000,
+      "rating": 4.9,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 2.299.000₫; Giảm 309.000₫ (13%); Đã bán 43",
+      "image_url": "https://myshoes.vn/image/catalog/2026/asics/giay-asics-gel-excite-11-nam-xam-trang-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-asics-gel-excite-11-nam-xam-trang.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=2"
+    },
+    {
+      "name": "Giày Asics GT-2000 14 GTX Nam - Đen Xanh",
+      "price": 3990000,
+      "rating": 4.9,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 4.599.000₫; Giảm 609.000₫ (13%); Đã bán 40",
+      "image_url": "https://myshoes.vn/image/catalog/2026/asics/giay-asics-gt-2000-14-gtx-nam-den-xanh-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-asics-gt-2000-14-gtx-nam-den-xanh.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=2"
+    },
+    {
+      "name": "Giày Asics Gel-Venture 11 Nữ - Hồng",
+      "price": 1990000,
+      "rating": 4.8,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 2.099.000₫; Giảm 109.000₫ (5%); Đã bán 37",
+      "image_url": "https://myshoes.vn/image/catalog/2026/asics/giay-asics-gel-venture-11-nu-hong-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-asics-gel-venture-11-nu-hong.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=2"
+    },
+    {
+      "name": "Giày Asics Gel-Pulse 17 Nữ - Xanh Xám",
+      "price": 2590000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 2.899.000₫; Giảm 309.000₫ (11%); Đã bán 35",
+      "image_url": "https://myshoes.vn/image/catalog/2026/asics/giay-asics-gel-pulse-17-nu-xanh-xam-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-asics-gel-pulse-17-nu-xanh-xam.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=2"
+    },
+    {
+      "name": "Giày Asics GEL-CUMULUS 28 Nữ - Trắng Tím",
+      "price": 3390000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 3.799.000₫; Giảm 409.000₫ (11%); Đã bán 36",
+      "image_url": "https://myshoes.vn/image/catalog/2026/asics/giay-asics-gel-cumulus-28-nu-trang-tim-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-asics-gel-cumulus-28-nu-trang-tim.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=2"
+    },
+    {
+      "name": "Giày Asics Gel Kayano 32 Nữ - Hồng",
+      "price": 3790000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 4.599.000₫; Giảm 809.000₫ (18%); Đã bán 34",
+      "image_url": "https://myshoes.vn/image/catalog/2026/asics/giay-asics-gel-kayano-32-nu-hong-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-asics-gel-kayano-32-nu-hong.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=2"
+    },
+    {
+      "name": "Giày Asics Gel-Excite 11 Nữ - Xám Cam",
+      "price": 1990000,
+      "rating": 4.8,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 2.299.000₫; Giảm 309.000₫ (13%); Đã bán 32",
+      "image_url": "https://myshoes.vn/image/catalog/2026/asics/giay-asics-gel-excite-11-nu-xam-cam-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-asics-gel-excite-11-nu-xam-cam.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=2"
+    },
+    {
+      "name": "Giày Nike Pegasus 42 Nữ - Hồng",
+      "price": 3890000,
+      "rating": 4.9,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 4.100.000₫; Giảm 210.000₫ (5%); Đã bán 46",
+      "image_url": "https://myshoes.vn/image/catalog/2026/nike/526/giay-nike-pegasus-42-nu-hong-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-pegasus-42-nu-hong.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=2"
+    },
+    {
+      "name": "Giày Nike Pegasus 42 Nữ - Trắng Xanh Lá",
+      "price": 3890000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 4.100.000₫; Giảm 210.000₫ (5%); Đã bán 43",
+      "image_url": "https://myshoes.vn/image/catalog/2026/nike/526/giay-nike-pegasus-42-nu-trang-xanh-la-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-pegasus-42-nu-trang-xanh-la.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=2"
+    },
+    {
+      "name": "Giày Nike Pegasus 42 Nam - Trắng Xanh Cam",
+      "price": 3890000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 4.100.000₫; Giảm 210.000₫ (5%); Đã bán 54",
+      "image_url": "https://myshoes.vn/image/catalog/2026/nike/526/giay-nike-pegasus-42-nam-trang-xanh-cam-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-pegasus-42-nam-trang-xanh-cam.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=2"
+    },
+    {
+      "name": "Giày Nike Downshifter 14 Nữ - Hồng Trắng",
+      "price": 2190000,
+      "rating": 4.9,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 2.400.000₫; Giảm 210.000₫ (9%); Đã bán 34",
+      "image_url": "https://myshoes.vn/image/catalog/2026/nike/526/giay-nike-downshifter-14-nu-hong-trang-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-downshifter-14-nu-hong-trang.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=2"
+    },
+    {
+      "name": "Giày Nike Downshifter 14 Nam - Trắng Xanh",
+      "price": 2190000,
+      "rating": 4.9,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 2.400.000₫; Giảm 210.000₫ (9%); Đã bán 32",
+      "image_url": "https://myshoes.vn/image/catalog/2026/nike/526/giay-nike-downshifter-14-nam-trang-xanh-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-downshifter-14-nam-trang-xanh.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=2"
+    },
+    {
+      "name": "Giày Asics GT-1000 14 Nam - Xám Xanh",
+      "price": 2690000,
+      "rating": 4.9,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 2.999.000₫; Giảm 309.000₫ (10%); Đã bán 32",
+      "image_url": "https://myshoes.vn/image/catalog/2026/asics/giay-asics-gt-1000-14-nam-xam-xanh-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-asics-gt-1000-14-nam-xam-xanh.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=2"
+    },
+    {
+      "name": "Giày Asics Gel Kayano 32 Nam - Xanh Blue",
+      "price": 3790000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 4.599.000₫; Giảm 809.000₫ (18%); Đã bán 27",
+      "image_url": "https://myshoes.vn/image/catalog/2026/asics/giay-asics-gel-kayano-32-nam-xanh-blue-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-asics-gel-kayano-32-nam-xanh-blue.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=2"
+    },
+    {
+      "name": "Giày Asics Patriot 14 Nam - Đen Xanh",
+      "price": 1590000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 1.699.000₫; Giảm 109.000₫ (6%); Đã bán 27",
+      "image_url": "https://myshoes.vn/image/catalog/2026/asics/giay-asics-patriot-14-den-xanh-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-asics-patriot-14-den-xanh.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=2"
+    },
+    {
+      "name": "Giày Asics Gel-Contend 9 Nam - Đen Trắng",
+      "price": 1490000,
+      "rating": 4.7,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 1.599.000₫; Giảm 109.000₫ (7%); Đã bán 35",
+      "image_url": "https://myshoes.vn/image/catalog/2026/asics/giay-asics-gel-contend-9-nam-den-trang-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-asics-gel-contend-9-nam-den-trang.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=2"
+    },
+    {
+      "name": "Giày Nike Pegasus 42 Nữ - Hồng Cam",
+      "price": 3890000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 4.100.000₫; Giảm 210.000₫ (5%); Đã bán 50",
+      "image_url": "https://myshoes.vn/image/catalog/2026/nike/526/giay-nike-pegasus-42-nu-hong-cam-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-pegasus-42-nu-hong-cam.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=2"
+    },
+    {
+      "name": "Giày Nike Pegasus 42 Nữ - Đen Trắng",
+      "price": 3890000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 4.100.000₫; Giảm 210.000₫ (5%); Đã bán 48",
+      "image_url": "https://myshoes.vn/image/catalog/2026/nike/526/giay-nike-pegasus-42-nu-den-trang-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-pegasus-42-nu-den-trang.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=2"
+    },
+    {
+      "name": "Giày Nike Pegasus 42 Nữ - Xám Hồng",
+      "price": 3890000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 4.100.000₫; Giảm 210.000₫ (5%); Đã bán 48",
+      "image_url": "https://myshoes.vn/image/catalog/2026/nike/526/giay-nike-pegasus-42-nu-xam-hong-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-pegasus-42-nu-xam-hong.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=2"
+    },
+    {
+      "name": "Giày Nike Winflo 12 Nữ - Đen",
+      "price": 3090000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 3.500.000₫; Giảm 410.000₫ (12%); Đã bán 41",
+      "image_url": "https://myshoes.vn/image/catalog/2026/nike/526/giay-nike-winflo-12-nu-den-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-winflo-12-nu-den.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=2"
+    },
+    {
+      "name": "Giày Nike Winflo 12 Nữ - Đen Trắng",
+      "price": 3090000,
+      "rating": 4.8,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 3.500.000₫; Giảm 410.000₫ (12%); Đã bán 43",
+      "image_url": "https://myshoes.vn/image/catalog/2026/nike/526/giay-nike-winflo-12-nu-den-trang-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-winflo-12-nu-den-trang.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=2"
+    },
+    {
+      "name": "Giày Nike Winflo 12 Nữ - Hồng Cam",
+      "price": 3090000,
+      "rating": 4.9,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 3.500.000₫; Giảm 410.000₫ (12%); Đã bán 39",
+      "image_url": "https://myshoes.vn/image/catalog/2026/nike/526/giay-nike-winflo-12-nu-hong-cam-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-winflo-12-nu-hong-cam.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=2"
+    },
+    {
+      "name": "Giày Nike Winflo 12 Nữ - Xám Trắng",
+      "price": 3190000,
+      "rating": 4.7,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 3.500.000₫; Giảm 310.000₫ (9%); Đã bán 38",
+      "image_url": "https://myshoes.vn/image/catalog/2026/nike/526/giay-nike-winflo-12-nu-xam-trang-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-winflo-12-nu-xam-trang.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=2"
+    },
+    {
+      "name": "Giày Nike Winflo 12 Nữ - Trắng Hồng",
+      "price": 3090000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 3.500.000₫; Giảm 410.000₫ (12%); Đã bán 38",
+      "image_url": "https://myshoes.vn/image/catalog/2026/nike/526/giay-nike-winflo-12-nu-trang-hong-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-winflo-12-nu-trang-hong.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=2"
+    },
+    {
+      "name": "Giày Nike Winflo 12 Nam - Xám Trắng",
+      "price": 3090000,
+      "rating": 4.9,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 3.500.000₫; Giảm 410.000₫ (12%); Đã bán 37",
+      "image_url": "https://myshoes.vn/image/catalog/2026/nike/526/giay-nike-winflo-12-nam-xam-trang-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-winflo-12-nam-xam-trang.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=2"
+    },
+    {
+      "name": "Giày Nike Winflo 12 Nam - Đen Trắng",
+      "price": 3090000,
+      "rating": 4.7,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 3.500.000₫; Giảm 410.000₫ (12%); Đã bán 38",
+      "image_url": "https://myshoes.vn/image/catalog/2026/nike/526/giay-nike-winflo-12-nam-den-trang-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-winflo-12-nam-den-trang.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=2"
+    },
+    {
+      "name": "Giày Nike Winflo 12 Nam - Đen",
+      "price": 3090000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 3.500.000₫; Giảm 410.000₫ (12%); Đã bán 36",
+      "image_url": "https://myshoes.vn/image/catalog/2026/nike/526/giay-nike-winflo-12-nam-den-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-winflo-12-nam-den.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=2"
+    },
+    {
+      "name": "Giày Nike Structure 26 Nam - Trắng Xanh",
+      "price": 3990000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 4.200.000₫; Giảm 210.000₫ (5%); Đã bán 40",
+      "image_url": "https://myshoes.vn/image/catalog/2026/nike/526/giay-nike-structure-26-nam-trang-xanh-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-structure-26-nam-trang-xanh.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=2"
+    },
+    {
+      "name": "Giày Nike Run Defy Nữ - Trắng Xanh",
+      "price": 1890000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 2.000.000₫; Giảm 110.000₫ (6%); Đã bán 45",
+      "image_url": "https://myshoes.vn/image/catalog/2026/nike/526/giay-nike-run-defy-nam-trang-xanh-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-run-defy-nu-trang-xanh.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=2"
+    },
+    {
+      "name": "Giày Nike Revolution 8 Nam - Trắng Xanh",
+      "price": 1990000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 2.100.000₫; Giảm 110.000₫ (5%); Đã bán 39",
+      "image_url": "https://myshoes.vn/image/catalog/2026/nike/526/giay-nike-revolution-8-nam-trang-xanh-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-revolution-8-nam-trang-xanh.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=2"
+    },
+    {
+      "name": "Giày Nike Revolution 8 Nữ - Trắng Tím",
+      "price": 1990000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 2.100.000₫; Giảm 110.000₫ (5%); Đã bán 40",
+      "image_url": "https://myshoes.vn/image/catalog/2026/nike/526/giay-nike-revolution-8-nu-trang-tim-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-revolution-8-nu-trang-tim.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=2"
+    },
+    {
+      "name": "Giày Nike Structure 26 Nữ - Hồng Tím",
+      "price": 3990000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 4.200.000₫; Giảm 210.000₫ (5%); Đã bán 40",
+      "image_url": "https://myshoes.vn/image/catalog/2026/nike/526/giay-nike-structure-26-nu-hong-tim-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-structure-26-nu-hong-tim.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=2"
+    },
+    {
+      "name": "Giày Nike Structure 26 Nữ - Trắng Đen",
+      "price": 3990000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 4.200.000₫; Giảm 210.000₫ (5%); Đã bán 45",
+      "image_url": "https://myshoes.vn/image/catalog/2026/nike/526/giay-nike-structure-26-nu-trang-xam-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-structure-26-nu-trang-xam.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=2"
+    },
+    {
+      "name": "Giày Nike Pegasus 42 Nam - Xám Trắng",
+      "price": 3890000,
+      "rating": 4.8,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 4.100.000₫; Giảm 210.000₫ (5%); Đã bán 57",
+      "image_url": "https://myshoes.vn/image/catalog/2026/nike/526/giay-nike-pegasus-42-nam-xam-trang-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-pegasus-42-nam-xam-trang.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=2"
+    },
+    {
+      "name": "Giày Adidas Pureboost 5 Nam - Xám Xanh",
+      "price": 2790000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 3.200.000₫; Giảm 410.000₫ (13%); Đã bán 43",
+      "image_url": "https://myshoes.vn/image/catalog/2026/adidas/giay-adidas-pureboost-5-nam-xam-xanh-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-adidas-pureboost-5-nam-xam-xanh.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=2"
+    },
+    {
+      "name": "Giày Adidas Duramo Speed 2 Nữ - Trắng Nâu",
+      "price": 2290000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 2.500.000₫; Giảm 210.000₫ (8%); Đã bán 36",
+      "image_url": "https://myshoes.vn/image/catalog/2026/adidas/giay-adidas-duramo-speed-2-nu-trang-nau-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-adidas-duramo-speed-2-nu-trang-nau.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=2"
+    },
+    {
+      "name": "Giày Nike Run Swift 3 Nữ - Trắng",
+      "price": 2290000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 2.450.000₫; Giảm 160.000₫ (7%); Đã bán 43",
+      "image_url": "https://myshoes.vn/image/catalog/2026/nike/giay-nike-run-swift-3-nu-trang-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-run-swift-3-nu-trang-trang.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=3"
+    },
+    {
+      "name": "Giày Nike Flex Train Nữ - Hồng",
+      "price": 2390000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 2.600.000₫; Giảm 210.000₫ (8%); Đã bán 37",
+      "image_url": "https://myshoes.vn/image/catalog/2026/nike/giay-nike-flex-train-nu-hong-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-flex-train-nu-hong.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=3"
+    },
+    {
+      "name": "Giày Nike Flex Train Nữ - Xanh Rêu",
+      "price": 2390000,
+      "rating": 4.9,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 2.600.000₫; Giảm 210.000₫ (8%); Đã bán 34",
+      "image_url": "https://myshoes.vn/image/catalog/2026/nike/giay-nike-flex-train-nu-xanh-reu-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-flex-train-nu-xanh-reu.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=3"
+    },
+    {
+      "name": "Giày Nike Flex Train Nữ - Đen Đen",
+      "price": 2390000,
+      "rating": 4.8,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 2.600.000₫; Giảm 210.000₫ (8%); Đã bán 28",
+      "image_url": "https://myshoes.vn/image/catalog/2026/nike/giay-nike-flex-train-nam-den-den-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-flex-train-nam-den-den.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=3"
+    },
+    {
+      "name": "Giày Nike Winflo 12 Nam - Trắng Xám",
+      "price": 3190000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 3.500.000₫; Giảm 310.000₫ (9%); Đã bán 41",
+      "image_url": "https://myshoes.vn/image/catalog/2026/nike/giay-nike-winflo-12-nam-trang-xam-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-winflo-12-nam-trang-xam.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=3"
+    },
+    {
+      "name": "Giày Nike Run Defy Nam - Trắng Xám",
+      "price": 1890000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 2.000.000₫; Giảm 110.000₫ (6%); Đã bán 60",
+      "image_url": "https://myshoes.vn/image/catalog/2026/nike/giay-nike-run-defy-nam-trang-xam-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-run-defy-nam-trang-xam.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=3"
+    },
+    {
+      "name": "Giày Nike Run Defy Nam - Trắng Cam",
+      "price": 1890000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 2.000.000₫; Giảm 110.000₫ (6%); Đã bán 54",
+      "image_url": "https://myshoes.vn/image/catalog/2026/nike/giay-nike-run-defy-nam-trang-cam-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-run-defy-nam-trang-cam-xanh.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=3"
+    },
+    {
+      "name": "Giày Nike Bella 7 Nữ - Xám Tím",
+      "price": 2790000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 3.050.000₫; Giảm 260.000₫ (9%); Đã bán 47",
+      "image_url": "https://myshoes.vn/image/catalog/2026/nike/giay-nike-bella-7-nu-xam-hong-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-bella-7-nu-xam-hong.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=3"
+    },
+    {
+      "name": "Giày Nike Vomero 18 Nữ - Hồng Tím",
+      "price": 4190000,
+      "rating": 4.8,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 4.700.000₫; Giảm 510.000₫ (11%); Đã bán 48",
+      "image_url": "https://myshoes.vn/image/catalog/2026/nike/giay-nike-vomero-18-nu-hong-tim-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-vomero-18-nu-hong-tim.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=3"
+    },
+    {
+      "name": "Giày Nike Metcon 10 Nam - Xám Xanh",
+      "price": 4590000,
+      "rating": 4.9,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 4.900.000₫; Giảm 310.000₫ (6%); Đã bán 48",
+      "image_url": "https://myshoes.vn/image/catalog/2026/nike/giay-nike-metcon-10-nam-xam-xanh-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-metcon-10-nam-xam-xanh.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=3"
+    },
+    {
+      "name": "Giày Nike Journey Run Nam - Trắng Xanh Cam",
+      "price": 2690000,
+      "rating": 4.9,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 3.100.000₫; Giảm 410.000₫ (13%); Đã bán 46",
+      "image_url": "https://myshoes.vn/image/catalog/2026/nike/giay-nike-journey-run-nam-trang-xanh-cam-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-journey-run-nam-trang-xanh-cam.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=3"
+    },
+    {
+      "name": "Giày Nike Journey Run Nữ - Xám Trắng",
+      "price": 2690000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 3.100.000₫; Giảm 410.000₫ (13%); Đã bán 48",
+      "image_url": "https://myshoes.vn/image/catalog/2026/nike/giay-nike-journey-run-nu-xam-trang-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-journey-run-nu-xam-trang.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=3"
+    },
+    {
+      "name": "Giày Nike Run Swift 3 Nữ - Hồng Tím",
+      "price": 2290000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 2.450.000₫; Giảm 160.000₫ (7%); Đã bán 38",
+      "image_url": "https://myshoes.vn/image/catalog/2026/nike/giay-nike-run-swift-3-nu-hong-tim-02.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-run-swift-3-nu-hong-tim.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=3"
+    },
+    {
+      "name": "Giày Asics Gel-Venture 11 Nam - Đen Trắng",
+      "price": 1990000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 2.099.000₫; Giảm 109.000₫ (5%); Đã bán 36",
+      "image_url": "https://myshoes.vn/image/catalog/2026/asics/giay-asics-gel-venture-11-nam-den-trang-01.jpeg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-asics-gel-venture-11-nam-den-trang.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=3"
+    },
+    {
+      "name": "Giày Asics GEL-CUMULUS 28 Nam - Xám Xanh",
+      "price": 3390000,
+      "rating": 4.6,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 3.799.000₫; Giảm 409.000₫ (11%); Đã bán 37",
+      "image_url": "https://myshoes.vn/image/catalog/2026/asics/giay-asics-gel-cumulus-28-nam-xam-xanh-01.jpeg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-asics-gel-cumulus-28-nam-xam-xanh.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=3"
+    },
+    {
+      "name": "Giày Asics Versablast 4 Nữ - Đen Trắng",
+      "price": 1790000,
+      "rating": 4.8,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 1.899.000₫; Giảm 109.000₫ (6%); Đã bán 29",
+      "image_url": "https://myshoes.vn/image/catalog/2026/asics/giay-asics-versablast-4-nu-den-trang-01.jpeg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-asics-versablast-4-nu-den-trang.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=3"
+    },
+    {
+      "name": "Giày Asics Gel-Contend 9 Nữ - Đen Trắng",
+      "price": 1490000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 1.599.000₫; Giảm 109.000₫ (7%); Đã bán 31",
+      "image_url": "https://myshoes.vn/image/catalog/2026/asics/giay-asics-gel-contend-9-nu-den-trang-01.jpeg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-asics-gel-contend-9-nu-den-trang.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=3"
+    },
+    {
+      "name": "Giày Asics Gel-Excite 11 Nữ - Xám Tím",
+      "price": 1990000,
+      "rating": 4.9,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 2.299.000₫; Giảm 309.000₫ (13%); Đã bán 28",
+      "image_url": "https://myshoes.vn/image/catalog/2026/asics/giay-asics-gel-excite-11-nu-xam-tim-01.jpeg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-asics-gel-excite-11-nu-xam-tim.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=3"
+    },
+    {
+      "name": "Giày Asics Gel-Nimbus 28 Nữ - Tím",
+      "price": 3690000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 4.599.000₫; Giảm 909.000₫ (20%); Đã bán 28",
+      "image_url": "https://myshoes.vn/image/catalog/2026/asics/giay-asics-gel-nimbus-28-nu-tim-01.jpeg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-asics-gel-nimbus-28-nu-tim.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=3"
+    },
+    {
+      "name": "Giày Asics Gel-Nimbus 28 Nam - Đen Xanh",
+      "price": 3690000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 4.599.000₫; Giảm 909.000₫ (20%); Đã bán 32",
+      "image_url": "https://myshoes.vn/image/catalog/2026/asics/giay-asics-gel-nimbus-28-nam-den-xanh-01.jpeg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-asics-gel-nimbus-28-nam-den-xanh.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=3"
+    },
+    {
+      "name": "Giày Asics Gel Kayano 32 Nam - Xanh Lá",
+      "price": 3790000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 4.599.000₫; Giảm 809.000₫ (18%); Đã bán 28",
+      "image_url": "https://myshoes.vn/image/catalog/2026/asics/giay-asics-gel-kayano-32-nam-xanh-la-01.jpeg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-asics-gel-kayano-32-nam-xanh-la.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=3"
+    },
+    {
+      "name": "Giày Nike Downshifter 14 Nam - Trắng Đen",
+      "price": 2190000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 2.400.000₫; Giảm 210.000₫ (9%); Đã bán 58",
+      "image_url": "https://myshoes.vn/image/catalog/2026/nike/giay-nike-downshifter-14-nam-trang-den-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-downshifter-14-nam-trang-den.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=3"
+    },
+    {
+      "name": "Giày Nike Downshifter 14 Nữ - Tím Trắng",
+      "price": 2190000,
+      "rating": 4.9,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 2.400.000₫; Giảm 210.000₫ (9%); Đã bán 44",
+      "image_url": "https://myshoes.vn/image/catalog/2026/nike/giay-nike-downshifter-14-nu-tim-trang-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-downshifter-14-nu-tim-trang.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=3"
+    },
+    {
+      "name": "Giày Nike Vomero 18 Nam - Trắng Xanh Đen",
+      "price": 4190000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 4.700.000₫; Giảm 510.000₫ (11%); Đã bán 58",
+      "image_url": "https://myshoes.vn/image/catalog/2026/nike/giay-nike-vomero-18-nam-trang-xanh-den-01.jpeg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-vomero-18-nam-trang-xanh-den",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=3"
+    },
+    {
+      "name": "Giày Nike Metcon 10 Nam - Xanh Rêu",
+      "price": 4590000,
+      "rating": 4.9,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 4.900.000₫; Giảm 310.000₫ (6%); Đã bán 45",
+      "image_url": "https://myshoes.vn/image/catalog/2026/nike/giay-nike-metcon-10-nam-xanh-reu-01.jpeg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-metcon-10-nam-xanh-reu",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=3"
+    },
+    {
+      "name": "Giày Nike Pegasus 41 Nam - Trắng Xanh Đen",
+      "price": 3590000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 3.990.000₫; Giảm 400.000₫ (10%); Đã bán 57",
+      "image_url": "https://myshoes.vn/image/catalog/2026/nike/giay-nike-pegasus-41-nam-trang-xanh-den-01.jpeg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-pegasus-41-nam-trang-xanh-den",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=3"
+    },
+    {
+      "name": "Giày Nike Winflo 11 Nữ - Trắng Ngà",
+      "price": 2890000,
+      "rating": 4.9,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 3.200.000₫; Giảm 310.000₫ (10%); Đã bán 41",
+      "image_url": "https://myshoes.vn/image/catalog/2026/nike/giay-nike-winflo-11-nu-trang-nga-01.jpeg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-winflo-11-nu-trang-nga",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=3"
+    },
+    {
+      "name": "Giày Nike Downshifter 14 Nữ - Trắng Đen",
+      "price": 2190000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 2.400.000₫; Giảm 210.000₫ (9%); Đã bán 44",
+      "image_url": "https://myshoes.vn/image/catalog/2026/nike/giay-nike-downshifter-14-nu-trang-den-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-downshifter-14-nu-trang-den",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=3"
+    },
+    {
+      "name": "Giày Nike Downshifter 14 Nữ - Đen Trắng",
+      "price": 2090000,
+      "rating": 4.6,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 2.400.000₫; Giảm 310.000₫ (13%); Đã bán 40",
+      "image_url": "https://myshoes.vn/image/catalog/2026/nike/giay-nike-downshifter-14-nu-den-trang-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-downshifter-14-nu-den-trang",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=3"
+    },
+    {
+      "name": "Giày Nike Downshifter 14 Nam - Trắng Xanh",
+      "price": 2190000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 2.400.000₫; Giảm 210.000₫ (9%); Đã bán 42",
+      "image_url": "https://myshoes.vn/image/catalog/2026/nike/giay-nike-downshifter-14-nam-trang-xanh-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-downshifter-14-nam-trang-xanh",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=3"
+    },
+    {
+      "name": "Giày Nike Downshifter 14 Nam - Đen Trắng",
+      "price": 2190000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 2.400.000₫; Giảm 210.000₫ (9%); Đã bán 52",
+      "image_url": "https://myshoes.vn/image/catalog/2026/nike/giay-nike-downshifter-14-nam-den-trang-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-downshifter-14-nam-den-trang",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=3"
+    },
+    {
+      "name": "Giày Nike Flex Train Nam - Xanh Trắng",
+      "price": 2390000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 2.600.000₫; Giảm 210.000₫ (8%); Đã bán 57",
+      "image_url": "https://myshoes.vn/image/catalog/2026/nike/giay-nike-flex-train-nam-xanh-trang-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-flex-train-nam-xanh-trang",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=3"
+    },
+    {
+      "name": "Giày Adidas Duramo Speed 2 Nam - Xanh Navy",
+      "price": 2290000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 2.500.000₫; Giảm 210.000₫ (8%); Đã bán 54",
+      "image_url": "https://myshoes.vn/image/catalog/2026/adidas/giay-adidas-duramo-speed-2-nam-xanh-navy-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-adidas-duramo-speed-2-nam-xanh-navy.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=3"
+    },
+    {
+      "name": "Giày Nike Vomero 18 Nam - Đen Đỏ",
+      "price": 4190000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 4.700.000₫; Giảm 510.000₫ (11%); Đã bán 62",
+      "image_url": "https://myshoes.vn/image/catalog/2026/nike/giay-nike-vomero-18-nam-den-do-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-vomero-18-nam-den-do",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=3"
+    },
+    {
+      "name": "Giày Nike Vomero 18 Nữ - Trắng Tím",
+      "price": 4190000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 4.700.000₫; Giảm 510.000₫ (11%); Đã bán 54",
+      "image_url": "https://myshoes.vn/image/catalog/2026/nike/giay-nike-vomero-18-nu-trang-tim-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-vomero-18-nu-trang-tim",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=3"
+    },
+    {
+      "name": "Giày Nike Revolution 8 Nữ - Trắng Gold",
+      "price": 1990000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 2.100.000₫; Giảm 110.000₫ (5%); Đã bán 53",
+      "image_url": "https://myshoes.vn/image/catalog/2026/nike/giay-nike-revolution-8-nu-trang-gold-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-revolution-8-nu-trang-gold",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=3"
+    },
+    {
+      "name": "Giày Nike Journey Run Nữ - Xám",
+      "price": 2690000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 3.100.000₫; Giảm 410.000₫ (13%); Đã bán 45",
+      "image_url": "https://myshoes.vn/image/catalog/2026/nike/giay-nike-journey-run-nu-xam-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-journey-run-nu-xam",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=3"
+    },
+    {
+      "name": "Giày Nike Run Swift 3 Nữ - Hồng Trắng",
+      "price": 2290000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 2.450.000₫; Giảm 160.000₫ (7%); Đã bán 49",
+      "image_url": "https://myshoes.vn/image/catalog/2026/nike/giay-nike-run-swift-3-nu-hong-trang-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-run-swift-3-nu-hong-trang",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=3"
+    },
+    {
+      "name": "Giày Nike Vomero 18 Extra Wide Nam - Đen Trắng",
+      "price": 4190000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 4.700.000₫; Giảm 510.000₫ (11%); Đã bán 43",
+      "image_url": "https://myshoes.vn/image/catalog/2026/nike/giay-nike-vomero-18-extra-wide-nam-den-trang-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-vomero-18-extra-wide-nam-den-trang",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=3"
+    },
+    {
+      "name": "Giày Nike Flex Train Nam - Đen Trắng",
+      "price": 2390000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 2.600.000₫; Giảm 210.000₫ (8%); Đã bán 39",
+      "image_url": "https://myshoes.vn/image/catalog/2026/nike/giay-nike-flex-train-nam-den-trang-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-flex-train-nam-den-trang",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=3"
+    },
+    {
+      "name": "Giày Nike Revolution 8 EasyOn Nam - Trắng Đen",
+      "price": 2090000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 2.300.000₫; Giảm 210.000₫ (9%); Đã bán 47",
+      "image_url": "https://myshoes.vn/image/catalog/2026/nike/giay-nike-revolution-8-easyon-nam-trang-den-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-revolution-8-easyon-nam-trang-den",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=4"
+    },
+    {
+      "name": "Giày Nike Revolution 8 EasyOn Nam - Đen Trắng",
+      "price": 2090000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 2.300.000₫; Giảm 210.000₫ (9%); Đã bán 54",
+      "image_url": "https://myshoes.vn/image/catalog/2026/nike/giay-nike-revolution-8-easyon-nam-den-trang-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-revolution-8-easyon-nam-den-trang",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=4"
+    },
+    {
+      "name": "Giày Nike Run Defy Nữ - Hồng Nâu",
+      "price": 1890000,
+      "rating": 4.9,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 2.000.000₫; Giảm 110.000₫ (6%); Đã bán 38",
+      "image_url": "https://myshoes.vn/image/catalog/2026/nike/giay-nike-run-defy-nu-hong-nau-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-run-defy-nu-hong-nau",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=4"
+    },
+    {
+      "name": "Giày Nike Vomero 18 Nữ - Trắng Silver",
+      "price": 4090000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 4.700.000₫; Giảm 610.000₫ (13%); Đã bán 37",
+      "image_url": "https://myshoes.vn/image/catalog/2026/nike/giay-nike-vomero-18-nu-trang-silver-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-vomero-18-nu-trang-silver",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=4"
+    },
+    {
+      "name": "Giày Nike Revolution 8 Nam - Trắng Đen Xanh",
+      "price": 1990000,
+      "rating": 4.8,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 2.100.000₫; Giảm 110.000₫ (5%); Đã bán 52",
+      "image_url": "https://myshoes.vn/image/catalog/2026/nike/giay-nike-revolution-8-nam-trang-den-xanh-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-revolution-8-nam-trang-den-xanh",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=4"
+    },
+    {
+      "name": "Giày Nike Revolution 8 Nữ - Tím Trắng",
+      "price": 1990000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 2.100.000₫; Giảm 110.000₫ (5%); Đã bán 52",
+      "image_url": "https://myshoes.vn/image/catalog/2026/nike/giay-nike-revolution-8-nu-tim-trang-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-revolution-8-nu-tim-trang",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=4"
+    },
+    {
+      "name": "Giày Nike Revolution 8 Nữ - Trắng",
+      "price": 1990000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 2.100.000₫; Giảm 110.000₫ (5%); Đã bán 56",
+      "image_url": "https://myshoes.vn/image/catalog/2026/nike/giay-nike-revolution-8-nu-trang-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-revolution-8-nu-trang",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=4"
+    },
+    {
+      "name": "Giày Nike Revolution 8 Nữ - Đen",
+      "price": 1990000,
+      "rating": 4.8,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 2.100.000₫; Giảm 110.000₫ (5%); Đã bán 49",
+      "image_url": "https://myshoes.vn/image/catalog/2026/nike/giay-nike-revolution-8-nu-den-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-revolution-8-nu-den",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=4"
+    },
+    {
+      "name": "Giày Nike Structure 26 Nam - Trắng Đỏ",
+      "price": 3990000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 4.200.000₫; Giảm 210.000₫ (5%); Đã bán 67",
+      "image_url": "https://myshoes.vn/image/catalog/2026/nike/giay-nike-structure-26-nam-trang-do-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-structure-26-nam-trang-do",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=4"
+    },
+    {
+      "name": "Giày Nike Structure 26 Nữ - Tím",
+      "price": 3790000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 4.200.000₫; Giảm 410.000₫ (10%); Đã bán 58",
+      "image_url": "https://myshoes.vn/image/catalog/2026/nike/giay-nike-structure-26-nu-tim-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-structure-26-nu-tim",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=4"
+    },
+    {
+      "name": "Giày Adidas Response 2 Nữ - Trắng",
+      "price": 1790000,
+      "rating": 4.8,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 2.000.000₫; Giảm 210.000₫ (10%); Đã bán 50",
+      "image_url": "https://myshoes.vn/image/catalog/2026/adidas/giay-adidas-response-2-nu-trang-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-adidas-response-2-nu-trang",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=4"
+    },
+    {
+      "name": "Giày Nike Pegasus Trail 5 GORE-TEX Nam - Đen Xanh",
+      "price": 4990000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 5.500.000₫; Giảm 510.000₫ (9%); Đã bán 54",
+      "image_url": "https://myshoes.vn/image/catalog/2026/nike/giay-nike-pegasus-trail-5-gore-tex-nam-den-xanh-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-pegasus-trail-5-gore-tex-nam-den-xanh",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=4"
+    },
+    {
+      "name": "Giày Nike Pegasus Trail 5 GORE-TEX Nam - Đen",
+      "price": 4990000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 5.500.000₫; Giảm 510.000₫ (9%); Đã bán 44",
+      "image_url": "https://myshoes.vn/image/catalog/2026/nike/giay-nike-pegasus-trail-5-gore-tex-nam-den-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-pegasus-trail-5-gore-tex-nam-den",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=4"
+    },
+    {
+      "name": "Giày Nike Juniper Trail 3 Nam - Xanh Navy",
+      "price": 2590000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 2.800.000₫; Giảm 210.000₫ (8%); Đã bán 49",
+      "image_url": "https://myshoes.vn/image/catalog/2026/nike/giay-nike-juniper-trail-3-nam-xanh-navy-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-juniper-trail-3-nam-xanh-navy",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=4"
+    },
+    {
+      "name": "Giày Nike Journey Run Nam - Trắng Xanh Lá",
+      "price": 2690000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 3.100.000₫; Giảm 410.000₫ (13%); Đã bán 44",
+      "image_url": "https://myshoes.vn/image/catalog/2026/nike/giay-nike-journey-run-nam-trang-xanh-la-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-journey-run-nam-trang-xanh-la",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=4"
+    },
+    {
+      "name": "Giày Nike Journey Run Nam - Trắng Đen",
+      "price": 2690000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 3.100.000₫; Giảm 410.000₫ (13%); Đã bán 54",
+      "image_url": "https://myshoes.vn/image/catalog/2024/nike/nk4/giay-nike-journey-run-nam-den-trang.01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-journey-run-nam-trang-den.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=4"
+    },
+    {
+      "name": "Giày Nike Winflo 11 Nữ - Hồng Nâu",
+      "price": 2890000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 3.200.000₫; Giảm 310.000₫ (10%); Đã bán 37",
+      "image_url": "https://myshoes.vn/image/catalog/2026/nike/giay-nike-winflo-11-nu-hong-nau-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-winflo-11-nu-hong-nau",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=4"
+    },
+    {
+      "name": "Giày Nike Winflo 11 Nữ - Trắng Hồng",
+      "price": 2890000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 3.200.000₫; Giảm 310.000₫ (10%); Đã bán 34",
+      "image_url": "https://myshoes.vn/image/catalog/2026/nike/giay-nike-winflo-11-nu-trang-hong-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-winflo-11-nu-trang-hong",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=4"
+    },
+    {
+      "name": "Giày Nike Journey Run Nữ - Tím",
+      "price": 2690000,
+      "rating": 4.8,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 3.100.000₫; Giảm 410.000₫ (13%); Đã bán 38",
+      "image_url": "https://myshoes.vn/image/catalog/2026/nike/giay-nike-journey-run-nu-tim-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-journey-run-nu-tim",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=4"
+    },
+    {
+      "name": "Giày Nike Quest 6 Nam - Trắng Xanh lá",
+      "price": 2390000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 2.700.000₫; Giảm 310.000₫ (11%); Đã bán 38",
+      "image_url": "https://myshoes.vn/image/catalog/2026/nike/giay-nike-quest-6-nam-trang-xanh-la-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-quest-6-nam-trang-xanh-la",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=4"
+    },
+    {
+      "name": "Giày Nike Quest 6 Nam - Đen",
+      "price": 2090000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 2.700.000₫; Giảm 610.000₫ (23%); Đã bán 37",
+      "image_url": "https://myshoes.vn/image/catalog/2026/nike/giay-nike-quest-6-nam-den-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-quest-6-nam-den",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=4"
+    },
+    {
+      "name": "Giày Nike Pegasus 41 Nữ - Tím",
+      "price": 3390000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 3.990.000₫; Giảm 600.000₫ (15%); Đã bán 36",
+      "image_url": "https://myshoes.vn/image/catalog/2026/nike/giay-nike-pegasus-41-nu-tim-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-pegasus-41-nu-tim",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=4"
+    },
+    {
+      "name": "Giày Nike Run Swift 3 Nữ - Đen Trắng",
+      "price": 2190000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 2.450.000₫; Giảm 260.000₫ (11%); Đã bán 41",
+      "image_url": "https://myshoes.vn/image/catalog/2024/nike/nk01/giay-nike-run-swift-3-nu-den-trang-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-run-swift-3-nu-den-trang.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=4"
+    },
+    {
+      "name": "Giày Nike Run Swift 3 Nam - Trắng Xanh Lá",
+      "price": 2190000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 2.450.000₫; Giảm 260.000₫ (11%); Đã bán 50",
+      "image_url": "https://myshoes.vn/image/catalog/2026/nike/giay-nike-run-swift-3-nam-trang-xanh-la-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-run-swift-3-nam-trang-xanh-la",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=4"
+    },
+    {
+      "name": "Giày Adidas Pureboost 5 Nam - Xám Cam",
+      "price": 2790000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 3.200.000₫; Giảm 410.000₫ (13%); Đã bán 51",
+      "image_url": "https://myshoes.vn/image/catalog/2026/adidas/giay-adidas-pureboost-5-nam-xam-cam-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-adidas-pureboost-5-nam-xam-cam.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=4"
+    },
+    {
+      "name": "Giày Adidas Response 2 Nam - Xám",
+      "price": 1790000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 2.000.000₫; Giảm 210.000₫ (10%); Đã bán 54",
+      "image_url": "https://myshoes.vn/image/catalog/2026/adidas/giay-adidas-response-2-nam-xam-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-adidas-response-2-nam-xam.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=4"
+    },
+    {
+      "name": "Giày Adidas Response 2 Nữ - Hồng Nhẹ",
+      "price": 1790000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 2.000.000₫; Giảm 210.000₫ (10%); Đã bán 40",
+      "image_url": "https://myshoes.vn/image/catalog/2026/adidas/giay-adidas-response-2-nu-hong-nhe-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-adidas-response-2-nu-hong-nhe.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=4"
+    },
+    {
+      "name": "Giày Adidas Pureboost 5 Nữ - Xám Trắng",
+      "price": 2790000,
+      "rating": 4.9,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 3.200.000₫; Giảm 410.000₫ (13%); Đã bán 35",
+      "image_url": "https://myshoes.vn/image/catalog/2026/adidas/giay-adidas-pureboost-5-nu-xam-trang-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-adidas-pureboost-5-nu-xam-trang.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=4"
+    },
+    {
+      "name": "Giày Asics Gel-Excite 11 Nữ - Xám",
+      "price": 1990000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 2.299.000₫; Giảm 309.000₫ (13%); Đã bán 30",
+      "image_url": "https://myshoes.vn/image/catalog/2026/asics/giay-asics-gel-excite-11-nu-xam-trang-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-asics-gel-excite-11-nu-xam-trang.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=4"
+    },
+    {
+      "name": "Giày Asics Gel Kayano 32 Nữ - Xanh Xám",
+      "price": 3790000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 4.599.000₫; Giảm 809.000₫ (18%); Đã bán 31",
+      "image_url": "https://myshoes.vn/image/catalog/2026/asics/giay-asics-gel-kayano-32-nu-xanh-xam-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-asics-gel-kayano-32-nu-xanh-xam.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=4"
+    },
+    {
+      "name": "Giày Asics Gel-Pulse 17 Nam - Xanh Navy",
+      "price": 2590000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 2.899.000₫; Giảm 309.000₫ (11%); Đã bán 30",
+      "image_url": "https://myshoes.vn/image/catalog/2026/asics/giay-asics-gel-pulse-17-nam-xanh-navy-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-asics-gel-pulse-17-nam-xanh-navy.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=4"
+    },
+    {
+      "name": "Giày Asics Gel-Nimbus 28 Nam - Xám Kem",
+      "price": 3690000,
+      "rating": 4.8,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 4.599.000₫; Giảm 909.000₫ (20%); Đã bán 32",
+      "image_url": "https://myshoes.vn/image/catalog/2026/asics/giay-asics-gel-nimbus-28-nam-xam-kem-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-asics-gel-nimbus-28-nam-xam-kem.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=4"
+    },
+    {
+      "name": "Giày Asics GT-1000 14 Nam - Đen Xanh",
+      "price": 2490000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 2.999.000₫; Giảm 509.000₫ (17%); Đã bán 46",
+      "image_url": "https://myshoes.vn/image/catalog/2026/asics/giay-asics-gt-1000-14-nam-den-xanh-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-asics-gt-1000-14-nam-den-xanh.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=4"
+    },
+    {
+      "name": "Giày Asics Gel-Contend 9 Nam - Xám Trắng",
+      "price": 1490000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 1.599.000₫; Giảm 109.000₫ (7%); Đã bán 57",
+      "image_url": "https://myshoes.vn/image/catalog/2026/asics/giay-asics-gel-contend-9-nam-xam-trang-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-asics-gel-contend-9-nam-xam-trang.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=4"
+    },
+    {
+      "name": "Giày Asics Patriot 14 Nam - Xanh Navy",
+      "price": 1590000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 1.699.000₫; Giảm 109.000₫ (6%); Đã bán 45",
+      "image_url": "https://myshoes.vn/image/catalog/2026/asics/giay-asics-patriot-14-nam-navy-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-asics-patriot-14-nam-navy.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=4"
+    },
+    {
+      "name": "Giày Asics Gel-Venture 11 Nam - Xanh Navy",
+      "price": 1990000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 2.099.000₫; Giảm 109.000₫ (5%); Đã bán 31",
+      "image_url": "https://myshoes.vn/image/catalog/2026/asics/giay-asics-gel-venture-11-nam-xanh-navy-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-asics-gel-venture-11-nam-xanh-navy.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=4"
+    },
+    {
+      "name": "Giày Asics GT-2000 14 Nam - Xanh Navy",
+      "price": 3390000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 3.799.000₫; Giảm 409.000₫ (11%); Đã bán 57",
+      "image_url": "https://myshoes.vn/image/catalog/2026/asics/giay-asics-gt-2000-14-nam-xanh-navy-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-asics-gt-2000-14-nam-xanh-navy.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=4"
+    },
+    {
+      "name": "Giày Asics Gel-Nimbus 28 Nữ - Hồng Nhẹ",
+      "price": 3690000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 4.599.000₫; Giảm 909.000₫ (20%); Đã bán 48",
+      "image_url": "https://myshoes.vn/image/catalog/2026/asics/giay-asics-gel-nimbus-28-nu-hong-nhe-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-asics-gel-nimbus-28-nu-hong-nhe.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=4"
+    },
+    {
+      "name": "Giày Asics Gel-Nimbus 28 Nam - Xám Xanh",
+      "price": 3690000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 4.599.000₫; Giảm 909.000₫ (20%); Đã bán 46",
+      "image_url": "https://myshoes.vn/image/catalog/2026/asics/giay-asics-gel-nimbus-28-nam-xam-xanh-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-asics-gel-nimbus-28-nam-xam-xanh.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=4"
+    },
+    {
+      "name": "Giày Asics Gel-Nimbus 28 Nam - Đen",
+      "price": 3690000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 4.599.000₫; Giảm 909.000₫ (20%); Đã bán 46",
+      "image_url": "https://myshoes.vn/image/catalog/2026/asics/giay-asics-gel-nimbus-28-nam-den-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-asics-gel-nimbus-28-nam-den.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=4"
+    },
+    {
+      "name": "Giày Asics Gel Kayano 32 Nam - Xám Xanh",
+      "price": 3790000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 4.599.000₫; Giảm 809.000₫ (18%); Đã bán 44",
+      "image_url": "https://myshoes.vn/image/catalog/2026/asics/giay-asics-gel-kayano-32-nam-xam-xanh-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-asics-gel-kayano-32-nam-xam-xanh.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=5"
+    },
+    {
+      "name": "Giày Asics Gel Kayano 32 Nam - Xám Trắng",
+      "price": 3790000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 4.599.000₫; Giảm 809.000₫ (18%); Đã bán 43",
+      "image_url": "https://myshoes.vn/image/catalog/2026/asics/giay-asics-gel-kayano-32-nam-xam-trang-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-asics-gel-kayano-32-nam-xam-trang.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=5"
+    },
+    {
+      "name": "Giày Nike Quest 6 Nữ - Trắng Tím",
+      "price": 2290000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 2.700.000₫; Giảm 410.000₫ (15%); Đã bán 54",
+      "image_url": "https://myshoes.vn/image/catalog/2026/nike/giay-nike-quest-6-nu-trang-tim-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-quest-6-nu-trang-tim.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=5"
+    },
+    {
+      "name": "Giày Nike Structure 26 Nam - Đen Trắng",
+      "price": 3790000,
+      "rating": 4.9,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 4.200.000₫; Giảm 410.000₫ (10%); Đã bán 74",
+      "image_url": "https://myshoes.vn/image/catalog/2025/nike/nike12/giay-nike-structure-26-nam-den-trang-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-structure-26-nam-den-trang.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=5"
+    },
+    {
+      "name": "Giày Asics Versablast 4 Nữ - Tím Trắng",
+      "price": 1790000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 1.899.000₫; Giảm 109.000₫ (6%); Đã bán 50",
+      "image_url": "https://myshoes.vn/image/catalog/2025/asics/giay-asics-versablast-4-nu-tim-trang-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-asics-versablast-4-nu-tim-trang.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=5"
+    },
+    {
+      "name": "Giày Asics Versablast 4 Nam - Xanh Lam",
+      "price": 1690000,
+      "rating": 4.9,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 1.899.000₫; Giảm 209.000₫ (11%); Đã bán 47",
+      "image_url": "https://myshoes.vn/image/catalog/2025/asics/giay-asics-versablast-4-nam-xanh-lam-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-asics-versablast-4-nam-xanh-lam.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=5"
+    },
+    {
+      "name": "Giày Asics Gel-Excite 11 Nam - Đen Xanh",
+      "price": 1990000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 2.299.000₫; Giảm 309.000₫ (13%); Đã bán 48",
+      "image_url": "https://myshoes.vn/image/catalog/2025/asics/giay-asics-gel-excite-11-nam-den-xanh-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-asics-gel-excite-11-nam-den-xanh.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=5"
+    },
+    {
+      "name": "Giày Adidas Supernova Comfortglide Nữ - Xám Trắng",
+      "price": 2590000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 2.900.000₫; Giảm 310.000₫ (11%); Đã bán 51",
+      "image_url": "https://myshoes.vn/image/catalog/2025/adidas/adidas12/giay-adidas-supernova-comfortglide-nu-xam-trang-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-adidas-supernova-comfortglide-nu-xam-trang.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=5"
+    },
+    {
+      "name": "Giày Nike Run Defy Nam - Xanh Trắng Đen",
+      "price": 1890000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 2.000.000₫; Giảm 110.000₫ (6%); Đã bán 57",
+      "image_url": "https://myshoes.vn/image/catalog/2025/nike/nike12/giay-nike-run-defy-nam-xanh-trang-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-run-defy-nam-xanh-trang-den.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=5"
+    },
+    {
+      "name": "Giày Nike Pegasus 41 GORE-TEX Nam - Đen Đen",
+      "price": 4690000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 5.200.000₫; Giảm 510.000₫ (10%); Đã bán 60",
+      "image_url": "https://myshoes.vn/image/catalog/2025/nike/nike12/giay-nike-pegasus-41-gore-tex-nam-den-den-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-pegasus-41-gore-tex-nam-den-den.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=5"
+    },
+    {
+      "name": "Giày Nike Run Swift 3 Nam - Xanh Trắng",
+      "price": 2190000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 2.450.000₫; Giảm 260.000₫ (11%); Đã bán 47",
+      "image_url": "https://myshoes.vn/image/catalog/2025/nike/nike12/giay-nike-run-swift-3-nam-xanh-trang-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-run-swift-3-nam-xanh-trang.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=5"
+    },
+    {
+      "name": "Giày Nike Revolution 8 Nam - Xanh Royal",
+      "price": 1990000,
+      "rating": 4.7,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 2.100.000₫; Giảm 110.000₫ (5%); Đã bán 85",
+      "image_url": "https://myshoes.vn/image/catalog/2025/nike/nike11/giay-nike-revolution-8-nam-xanh-royal-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-revolution-8-nam-xanh-royal.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=5"
+    },
+    {
+      "name": "Giày Nike Juniper Trail 3 Nam - Xám Đen",
+      "price": 2590000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 2.800.000₫; Giảm 210.000₫ (8%); Đã bán 58",
+      "image_url": "https://myshoes.vn/image/catalog/2025/nike/nike11/giay-nike-juniper-trail-3-nam-xam-den-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-juniper-trail-3-nam-xam-den.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=5"
+    },
+    {
+      "name": "Giày Nike Structure 26 Nữ - Xám Xanh Tím",
+      "price": 3990000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 4.200.000₫; Giảm 210.000₫ (5%); Đã bán 46",
+      "image_url": "https://myshoes.vn/image/catalog/2025/nike/nike11/giay-nike-structure-26-nu-xam-xanh-tim-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-structure-26-nu-xam-xanh-tim.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=5"
+    },
+    {
+      "name": "Giày Nike Vomero 18 Nữ - Trắng Xanh Tím",
+      "price": 4190000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 4.700.000₫; Giảm 510.000₫ (11%); Đã bán 46",
+      "image_url": "https://myshoes.vn/image/catalog/2025/nike/nike11/giay-nike-vomero-18-nu-trang-xanh-tim-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-vomero-18-nu-trang-xanh-tim.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=5"
+    },
+    {
+      "name": "Giày Nike Revolution 8 Nữ - Tím Trắng",
+      "price": 1990000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 2.100.000₫; Giảm 110.000₫ (5%); Đã bán 42",
+      "image_url": "https://myshoes.vn/image/catalog/2025/nike/nike11/giay-nike-revolution-8-nu-tim-trang-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-revolution-8-nu-tim-trang.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=5"
+    },
+    {
+      "name": "Giày Nike Winflo 11 Nữ - Trắng Xám",
+      "price": 2890000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 3.200.000₫; Giảm 310.000₫ (10%); Đã bán 52",
+      "image_url": "https://myshoes.vn/image/catalog/2025/nike/nike11/giay-nike-winflo-11-nu-trang-xam-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-winflo-11-nu-trang-xam.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=5"
+    },
+    {
+      "name": "Giày Nike DownShifter 13 Nam - Đen Full",
+      "price": 1990000,
+      "rating": 4.8,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 2.500.000₫; Giảm 510.000₫ (20%); Đã bán 72",
+      "image_url": "https://myshoes.vn/image/catalog/2024/nike/nk4/giay-nike-downshifter-13-nam-den-full.01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-downshifter-13-nam-den-full.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=5"
+    },
+    {
+      "name": "Giày Nike Winflo 11 Nam - Trắng Xanh",
+      "price": 2990000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 3.200.000₫; Giảm 210.000₫ (7%); Đã bán 51",
+      "image_url": "https://myshoes.vn/image/catalog/2025/nike/nike11/giay-nike-winflo-11-nam-trang-xanh-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-winflo-11-nam-trang-xanh.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=5"
+    },
+    {
+      "name": "Giày Nike Pegasus 41 Nữ - Trắng Xanh",
+      "price": 3590000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 3.990.000₫; Giảm 400.000₫ (10%); Đã bán 52",
+      "image_url": "https://myshoes.vn/image/catalog/2025/nike/nike11/giay-nike-pegasus-41-nu-trang-xanh-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-pegasus-41-nu-trang-xanh.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=5"
+    },
+    {
+      "name": "Giày Nike DownShifter 13 Nữ - Trắng Xám",
+      "price": 1990000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 2.500.000₫; Giảm 510.000₫ (20%); Đã bán 47",
+      "image_url": "https://myshoes.vn/image/catalog/2025/nike/nike11/giay-nike-downshifter-13-nu-trang-xam-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-downshifter-13-nu-trang-xam.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=5"
+    },
+    {
+      "name": "Giày Adidas Ultraboost 5X Nữ - Trắng Đen",
+      "price": 4190000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 5.000.000₫; Giảm 810.000₫ (16%); Đã bán 58",
+      "image_url": "https://myshoes.vn/image/catalog/2025/adidas/adidas11/giay-adidas-ultraboost-5x-nu-trang-den-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-adidas-ultraboost-5x-nu-trang-den.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=5"
+    },
+    {
+      "name": "Giày Adidas Ultraboost 5 Nam - Xám",
+      "price": 4190000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 5.000.000₫; Giảm 810.000₫ (16%); Đã bán 58",
+      "image_url": "https://myshoes.vn/image/catalog/2025/adidas/adidas11/giay-adidas-ultraboost-5-nam-xam-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-adidas-ultraboost-5-nam-xam.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=5"
+    },
+    {
+      "name": "Giày adidas Galaxy 7 Nữ - Đen Trắng",
+      "price": 1690000,
+      "rating": 4.9,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 1.800.000₫; Giảm 110.000₫ (6%); Đã bán 43",
+      "image_url": "https://myshoes.vn/image/catalog/2025/adidas/adidas11/giay-adidas-galaxy-7-nu-den-trang-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-adidas-galaxy-7-nu-den-trang.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=5"
+    },
+    {
+      "name": "Giày Adidas Response Super Nữ- Hồng Trắng",
+      "price": 2190000,
+      "rating": 4.9,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 2.500.000₫; Giảm 310.000₫ (12%); Đã bán 44",
+      "image_url": "https://myshoes.vn/image/catalog/2025/adidas/adidas11/giay-adidas-response-super-nu-hong-trang-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-adidas-response-super-nu-hong-trang.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=5"
+    },
+    {
+      "name": "Giày Adidas Runfalcon 5 Nữ - Đen Trắng",
+      "price": 1690000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 1.800.000₫; Giảm 110.000₫ (6%); Đã bán 46",
+      "image_url": "https://myshoes.vn/image/catalog/2025/adidas/adidas11/giay-adidas-runfalcon-5-nu-den-trang-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-adidas-runfalcon-5-nu-den-trang.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=5"
+    },
+    {
+      "name": "Giày Adidas Pureboost 5 Nữ - Hồng Trắng",
+      "price": 2790000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 3.200.000₫; Giảm 410.000₫ (13%); Đã bán 46",
+      "image_url": "https://myshoes.vn/image/catalog/2025/adidas/adidas11/giay-adidas-pureboost-5-nu-hong-trang-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-adidas-pureboost-5-nu-hong-trang.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=5"
+    },
+    {
+      "name": "Giày Adidas Jogit Nữ - Xám",
+      "price": 1790000,
+      "rating": 4.9,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 2.000.000₫; Giảm 210.000₫ (10%); Đã bán 39",
+      "image_url": "https://myshoes.vn/image/catalog/2025/adidas/adidas11/giay-adidas-jogit-nu-xam-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-adidas-jogit-nu-xam.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=5"
+    },
+    {
+      "name": "Giày Adidas Adizero SL 2 Nam - Xanh Lam",
+      "price": 2590000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 3.000.000₫; Giảm 410.000₫ (14%); Đã bán 44",
+      "image_url": "https://myshoes.vn/image/catalog/2025/adidas/adidas11/giay-adidas-adizero-sl-2-nam-xanh-nam-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-adidas-adizero-sl-2-nam-xanh-nam.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=5"
+    },
+    {
+      "name": "Giày adidas Duramo SL 2 Nam - Đen Trắng",
+      "price": 1690000,
+      "rating": 4.9,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 1.800.000₫; Giảm 110.000₫ (6%); Đã bán 78",
+      "image_url": "https://myshoes.vn/image/catalog/2025/adidas/adidas10/giay-adidas-duramo-sl-2-nam-den-trang-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-adidas-duramo-sl-2-nam-den-trang",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=5"
+    },
+    {
+      "name": "Giày adidas Duramo SL 2 Nữ - Đen Trắng",
+      "price": 1590000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 1.800.000₫; Giảm 210.000₫ (12%); Đã bán 42",
+      "image_url": "https://myshoes.vn/image/catalog/2025/adidas/adidas10/giay-adidas-duramo-sl-2-nu-den-trang-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-adidas-duramo-sl-2-nu-den-trang.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=5"
+    },
+    {
+      "name": "Giày Adidas Runfalcon 5 Nữ - Trắng Tím",
+      "price": 1690000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 1.800.000₫; Giảm 110.000₫ (6%); Đã bán 65",
+      "image_url": "https://myshoes.vn/image/catalog/2025/adidas/adidas10/giay-adidas-runfalcon-5-nu-trang-tim-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-adidas-runfalcon-5-nu-trang-tim.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=5"
+    },
+    {
+      "name": "Giày Nike Metcon 10 Nam - Trắng Nâu",
+      "price": 4590000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 4.900.000₫; Giảm 310.000₫ (6%); Đã bán 71",
+      "image_url": "https://myshoes.vn/image/catalog/2025/nike/nike10/giay-nike-metcon-10-nam-trang-nau-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-metcon-10-nam-trang-nau.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=5"
+    },
+    {
+      "name": "Giày Nike Metcon 10 Nam - Cam Xanh",
+      "price": 4190000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 4.900.000₫; Giảm 710.000₫ (14%); Đã bán 55",
+      "image_url": "https://myshoes.vn/image/catalog/2025/nike/nike10/giay-nike-metcon-10-nam-cam-xanh-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-metcon-10-nam-cam-xanh.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=5"
+    },
+    {
+      "name": "Giày Nike Metcon 10 Nam - Đen Trắng",
+      "price": 3990000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 4.900.000₫; Giảm 910.000₫ (19%); Đã bán 63",
+      "image_url": "https://myshoes.vn/image/catalog/2025/nike/nike10/giay-nike-metcon-10-nam-den-trang-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-metcon-10-nam-den-trang.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=5"
+    },
+    {
+      "name": "Giày Nike Structure 26 Nữ - Trắng Xanh",
+      "price": 3990000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 4.200.000₫; Giảm 210.000₫ (5%); Đã bán 71",
+      "image_url": "https://myshoes.vn/image/catalog/2025/nike/nike10/giay-nike-structure-26-nu-trang-xanh-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-structure-26-nu-trang-xanh.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=5"
+    },
+    {
+      "name": "Giày Nike Pegasus 41 Nữ - Xanh Trắng",
+      "price": 3590000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 3.990.000₫; Giảm 400.000₫ (10%); Đã bán 60",
+      "image_url": "https://myshoes.vn/image/catalog/2025/nike/nike10/giay-nike-pegasus-41-nu-xanh-ngoc-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-pegasus-41-nu-xanh-trang.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=5"
+    },
+    {
+      "name": "Giày Nike Journey Run Nam - Xanh Xám",
+      "price": 2790000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 3.100.000₫; Giảm 310.000₫ (10%); Đã bán 68",
+      "image_url": "https://myshoes.vn/image/catalog/2025/nike/nike10/giay-nike-journey-run-nam-xanh-xam-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-journey-run-nam-xanh-xam.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=5"
+    },
+    {
+      "name": "Giày Adidas Duramo Speed 2 Nam - Xám",
+      "price": 2190000,
+      "rating": 4.9,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 2.500.000₫; Giảm 310.000₫ (12%); Đã bán 53",
+      "image_url": "https://myshoes.vn/image/catalog/2025/adidas/giay-adidas-duramo-speed-2-nam-xam-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-adidas-duramo-speed-2-nam-xam.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=5"
+    },
+    {
+      "name": "Giày adidas Duramo SL 2 Nữ - Tím",
+      "price": 1590000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 1.800.000₫; Giảm 210.000₫ (12%); Đã bán 48",
+      "image_url": "https://myshoes.vn/image/catalog/2025/adidas/giay-adidas-duramo-sl-2-nu-tim-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-adidas-duramo-sl-2-nu-tim.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=5"
+    },
+    {
+      "name": "Giày Adidas Adizero SL 2 Nữ - Be Cam",
+      "price": 2590000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 3.000.000₫; Giảm 410.000₫ (14%); Đã bán 46",
+      "image_url": "https://myshoes.vn/image/catalog/2025/adidas/giay-adidas-adizero-sl-2-nu-be-cam-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-adidas-adizero-sl-2-nu-be-cam.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=6"
+    },
+    {
+      "name": "Giày Adidas Response Super Nam - Xanh Lam",
+      "price": 2190000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 2.500.000₫; Giảm 310.000₫ (12%); Đã bán 69",
+      "image_url": "https://myshoes.vn/image/catalog/2025/adidas/adidas9/giay-adidas-response-super-nam-xanh-lam-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-adidas-response-super-nam-xanh-lam.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=6"
+    },
+    {
+      "name": "Giày Adidas Adizero SL 2 Nam - Xám",
+      "price": 2590000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 3.000.000₫; Giảm 410.000₫ (14%); Đã bán 76",
+      "image_url": "https://myshoes.vn/image/catalog/2025/adidas/adidas9/giay-adidas-adizero-sl-2-nam-xam-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-adidas-adizero-sl-2-nam-xam.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=6"
+    },
+    {
+      "name": "Giày Adidas Pureboost 5 Nữ - Đen Hồng",
+      "price": 2790000,
+      "rating": 4.9,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 3.200.000₫; Giảm 410.000₫ (13%); Đã bán 66",
+      "image_url": "https://myshoes.vn/image/catalog/2025/adidas/adidas9/giay-adidas-pureboost-5-nu-den-hong-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-adidas-pureboost-5-nu-den-hong.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=6"
+    },
+    {
+      "name": "Giày Adidas Jogit Nam - Xám Cam",
+      "price": 1890000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 2.000.000₫; Giảm 110.000₫ (6%); Đã bán 67",
+      "image_url": "https://myshoes.vn/image/catalog/2025/adidas/adidas9/giay-adidas-jogit-nam-xam-cam-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-adidas-jogit-nam-xam-cam.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=6"
+    },
+    {
+      "name": "Giày Nike ReactX Pegasus Trail 5 Nữ - Xanh",
+      "price": 3990000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 4.350.000₫; Giảm 360.000₫ (8%); Đã bán 58",
+      "image_url": "https://myshoes.vn/image/catalog/2025/nike/nike9/giay-nike-reactx-pegasus-trail-5-nu-xanh-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-reactx-pegasus-trail-5-nu-xanh.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=6"
+    },
+    {
+      "name": "Giày Adidas Pureboost 5 Nữ - Trắng Hồng",
+      "price": 2890000,
+      "rating": 4.8,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 3.200.000₫; Giảm 310.000₫ (10%); Đã bán 56",
+      "image_url": "https://myshoes.vn/image/catalog/2025/adidas/giay-adidas-pureboost-5-nu-trang-hong-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-adidas-pureboost-5-nu-trang-hong.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=6"
+    },
+    {
+      "name": "Giày Adidas Supernova Stride 2 Nữ - Hồng Tím",
+      "price": 2790000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 3.200.000₫; Giảm 410.000₫ (13%); Đã bán 60",
+      "image_url": "https://myshoes.vn/image/catalog/2025/adidas/giay-adidas-supernova-stride-2-nu-hong-tim-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-adidas-supernova-stride-2-nu-hong-tim.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=6"
+    },
+    {
+      "name": "Giày Nike Structure 26 Nam - Đen Đen",
+      "price": 3790000,
+      "rating": 4.9,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 4.200.000₫; Giảm 410.000₫ (10%); Đã bán 80",
+      "image_url": "https://myshoes.vn/image/catalog/2025/nike/nike8/giay-nike-structure-26-run-nam-den-den-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-structure-26-run-nam-den-den.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=6"
+    },
+    {
+      "name": "Giày Nike Structure 26 Run Nam - Trắng Đen",
+      "price": 3990000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 4.200.000₫; Giảm 210.000₫ (5%); Đã bán 85",
+      "image_url": "https://myshoes.vn/image/catalog/2025/nike/nike8/giay-nike-structure-26-run-nam-trang-den-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-structure-26-run-nam-trang-den.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=6"
+    },
+    {
+      "name": "Giày Nike Structure 26 Nữ - Hồng Nâu",
+      "price": 3990000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 4.200.000₫; Giảm 210.000₫ (5%); Đã bán 61",
+      "image_url": "https://myshoes.vn/image/catalog/2025/nike/nike8/giay-nike-structure-26-nu-hong-nau-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-structure-26-nu-hong-nau.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=6"
+    },
+    {
+      "name": "Giày Nike Quest 6 Nam - Đen Đỏ Trắng",
+      "price": 1990000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 2.700.000₫; Giảm 710.000₫ (26%); Đã bán 66",
+      "image_url": "https://myshoes.vn/image/catalog/2025/nike/nike8/giay-nike-quest-6-nam-den-do-trang-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-quest-6-nam-den-do-trang.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=6"
+    },
+    {
+      "name": "Giày Nike Quest 6 Nam - Xám Xanh Lá",
+      "price": 2190000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 2.800.000₫; Giảm 610.000₫ (22%); Đã bán 66",
+      "image_url": "https://myshoes.vn/image/catalog/2025/nike/nike8/giay-nike-quest-6-nam-xam-xanh-la-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-quest-6-nam-xam-xanh-la.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=6"
+    },
+    {
+      "name": "Giày Adidas Pureboost 5 Nam - Trắng Xanh Đỏ",
+      "price": 2790000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 3.200.000₫; Giảm 410.000₫ (13%); Đã bán 68",
+      "image_url": "https://myshoes.vn/image/catalog/2025/adidas/giay-adidas-pureboost-5-nam-trang-xanh-do-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-adidas-pureboost-5-nam-trang-xanh-do.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=6"
+    },
+    {
+      "name": "Giày Adidas Ultrarun 5 Nam - Xanh Xám",
+      "price": 1990000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 2.200.000₫; Giảm 210.000₫ (10%); Đã bán 73",
+      "image_url": "https://myshoes.vn/image/catalog/2025/adidas/giay-adidas-ultrarun-5-nam-xanh-xam-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-adidas-ultrarun-5-nam-xanh-xam.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=6"
+    },
+    {
+      "name": "Giày Adidas Pureboost 5 Nam - Navy Trắng",
+      "price": 2890000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 3.200.000₫; Giảm 310.000₫ (10%); Đã bán 107",
+      "image_url": "https://myshoes.vn/image/catalog/2025/adidas/giay-adidas-pureboost-5-nam-navy-trang-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-adidas-pureboost-5-nam-navy-trang.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=6"
+    },
+    {
+      "name": "Giày Adidas Ultrarun 5 Nam - Navy Đen",
+      "price": 1990000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 2.200.000₫; Giảm 210.000₫ (10%); Đã bán 52",
+      "image_url": "https://myshoes.vn/image/catalog/2025/adidas/giay-adidas-ultrarun-5-nam-navy-den-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-adidas-ultrarun-5-nam-navy-den.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=6"
+    },
+    {
+      "name": "Giày Nike Structure 26 Nữ - Đen Trắng",
+      "price": 3990000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 4.200.000₫; Giảm 210.000₫ (5%); Đã bán 60",
+      "image_url": "https://myshoes.vn/image/catalog/2025/nike/nike8/giay-nike-structure-26-nu-den-trang-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-structure-26-nu-den-trang.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=6"
+    },
+    {
+      "name": "Giày Nike Promina Nam - Đen Xanh",
+      "price": 1990000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 2.400.000₫; Giảm 410.000₫ (17%); Đã bán 75",
+      "image_url": "https://myshoes.vn/image/catalog/2025/nike/nike8/giay-nike-promina-nam-den-xanh-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-promina-nam-den-xanh.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=6"
+    },
+    {
+      "name": "Giày Nike Revolution 8 Nam - Đen Trắng",
+      "price": 1990000,
+      "rating": 4.7,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 2.100.000₫; Giảm 110.000₫ (5%); Đã bán 127",
+      "image_url": "https://myshoes.vn/image/catalog/2025/nike/nike7/giay-nike-revolution-8-nam-den-trang-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-revolution-8-nam-den-trang.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=6"
+    },
+    {
+      "name": "Giày Nike Revolution 8 Nữ - Đen Trắng",
+      "price": 1990000,
+      "rating": 4.8,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 2.100.000₫; Giảm 110.000₫ (5%); Đã bán 91",
+      "image_url": "https://myshoes.vn/image/catalog/2025/nike/nike6/giay-nike-revolution-8-nu-den-trang-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-revolution-8-nu-den-trang.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=6"
+    },
+    {
+      "name": "Giày Nike Revolution 8 Nam - Trắng Xám",
+      "price": 1990000,
+      "rating": 4.7,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 2.100.000₫; Giảm 110.000₫ (5%); Đã bán 89",
+      "image_url": "https://myshoes.vn/image/catalog/2025/nike/nike6/giay-nike-revolution-8-nam-trang-xam-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-revolution-8-nam-trang-xam.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=6"
+    },
+    {
+      "name": "Giày Nike Revolution 8 Nam - Đen Đen",
+      "price": 1890000,
+      "rating": 4.9,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 2.100.000₫; Giảm 210.000₫ (10%); Đã bán 113",
+      "image_url": "https://myshoes.vn/image/catalog/2025/nike/nike6/giay-nike-revolution-8-nam-den-den-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-revolution-8-nam-den-den.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=6"
+    },
+    {
+      "name": "Giày Nike Vomero 18 Nam - Đen Đen",
+      "price": 4190000,
+      "rating": 4.8,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 4.700.000₫; Giảm 510.000₫ (11%); Đã bán 98",
+      "image_url": "https://myshoes.vn/image/catalog/2025/nike/nike6/giay-nike-vomero-18-nam-den-den-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-vomero-18-nam-den-den.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=6"
+    },
+    {
+      "name": "Giày Nike Run Defy Nữ - Hồng Nhẹ",
+      "price": 1890000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 2.000.000₫; Giảm 110.000₫ (6%); Đã bán 71",
+      "image_url": "https://myshoes.vn/image/catalog/2025/nike/nike6/giay-nike-run-defy-nu-hong-nhe-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-run-defy-nu-hong-nhe.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=6"
+    },
+    {
+      "name": "Giày Nike Vomero 18 Nam - Trắng Xám",
+      "price": 4190000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 4.700.000₫; Giảm 510.000₫ (11%); Đã bán 85",
+      "image_url": "https://myshoes.vn/image/catalog/2025/nike/nike6/giay-nike-vomero-18-nam-trang-xam-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-vomero-18-nam-trang-xam.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=6"
+    },
+    {
+      "name": "Giày Nike Vomero 18 Nữ - Đen Trắng",
+      "price": 3790000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 4.700.000₫; Giảm 910.000₫ (19%); Đã bán 76",
+      "image_url": "https://myshoes.vn/image/catalog/2025/nike/nike6/giay-nike-vomero-18-nu-den-trang-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-vomero-18-nu-den-trang.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=6"
+    },
+    {
+      "name": "Giày Nike Run Defy Nam - Đen Đen",
+      "price": 1890000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 2.000.000₫; Giảm 110.000₫ (6%); Đã bán 121",
+      "image_url": "https://myshoes.vn/image/catalog/2025/nike/nike5/giay-nike-run-defy-nam-den-den-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-run-defy-nam-den-den.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=6"
+    },
+    {
+      "name": "Giày Nike Run Defy Nữ - Trắng Tím",
+      "price": 1890000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 2.000.000₫; Giảm 110.000₫ (6%); Đã bán 88",
+      "image_url": "https://myshoes.vn/image/catalog/2025/nike/nike5/giay-nike-run-defy-nu-trang-tim-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-run-defy-nu-trang-tim.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=6"
+    },
+    {
+      "name": "Giày Nike Run Defy Nữ - Đen Trắng",
+      "price": 1890000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 2.000.000₫; Giảm 110.000₫ (6%); Đã bán 64",
+      "image_url": "https://myshoes.vn/image/catalog/2025/nike/nike5/giay-nike-run-defy-nu-den-trang-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-run-defy-nu-den-trang.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=6"
+    },
+    {
+      "name": "Giày Nike Vomero 18 Nam - Đen Trắng",
+      "price": 4190000,
+      "rating": 4.9,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 4.700.000₫; Giảm 510.000₫ (11%); Đã bán 133",
+      "image_url": "https://myshoes.vn/image/catalog/2025/nike/nike5/giay-nike-vomero-18-nam-den-trang-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-vomero-18-nam-den-trang.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=6"
+    },
+    {
+      "name": "Giày Nike Promina Nữ - Trắng Xanh",
+      "price": 1990000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 2.400.000₫; Giảm 410.000₫ (17%); Đã bán 72",
+      "image_url": "https://myshoes.vn/image/catalog/2025/nike/giay-nike-promina-nu-trang-xanh-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-promina-nu-trang-xanh.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=6"
+    },
+    {
+      "name": "Giày Nike Quest 6 Nam - Xanh Lam",
+      "price": 2390000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 2.700.000₫; Giảm 310.000₫ (11%); Đã bán 87",
+      "image_url": "https://myshoes.vn/image/catalog/2025/nike/giay-nike-quest-6-nam-xanh-lam-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-quest-6-nam-xanh-lam.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=6"
+    },
+    {
+      "name": "Giày Nike ReactX Infinity 4 Nam Nữ - Blueprint",
+      "price": 2990000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 4.959.000₫; Giảm 1.969.000₫ (40%); Đã bán 138",
+      "image_url": "https://myshoes.vn/image/catalog/2025/nike/giay-nike-reactx-infinity-4-nam-nu-blueprint-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-reactx-infinity-4-nam-nu-blueprint.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=6"
+    },
+    {
+      "name": "Giày Adidas Supernova Stride 2 Nữ - Hồng Nhẹ",
+      "price": 2490000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 3.200.000₫; Giảm 710.000₫ (22%); Đã bán 100",
+      "image_url": "https://myshoes.vn/image/catalog/2025/adidas/giay-adidas-supernova-stride-2-nu-hong-nhe-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-adidas-supernova-stride-2-nu-hong-nhe.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=6"
+    },
+    {
+      "name": "Giày Adidas Pureboost 5 Nam - Đen Trắng",
+      "price": 2890000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 3.200.000₫; Giảm 310.000₫ (10%); Đã bán 87",
+      "image_url": "https://myshoes.vn/image/catalog/2025/adidas/giay-adidas-pureboost-5-nam-den-trang-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-adidas-pureboost-5-nam-den-trang.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=6"
+    },
+    {
+      "name": "Giày Adidas Pureboost 5 Nam - Xám Đen",
+      "price": 2590000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 3.200.000₫; Giảm 610.000₫ (19%); Đã bán 120",
+      "image_url": "https://myshoes.vn/image/catalog/2025/adidas/giay-adidas-pureboost-5-nam-xam-den-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-adidas-pureboost-5-nam-xam-den.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=6"
+    },
+    {
+      "name": "Giày Adidas Terrex AX3 Nam - Camo",
+      "price": 1790000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 3.060.000₫; Giảm 1.270.000₫ (42%); Đã bán 109",
+      "image_url": "https://myshoes.vn/image/catalog/2025/adidas/giay-adidas-terrex-ax3-nam-camo-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-adidas-terrex-ax3-nam-camo.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=6"
+    },
+    {
+      "name": "Giày Adidas Pureboost 5 Nam - Đen",
+      "price": 2790000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 3.200.000₫; Giảm 410.000₫ (13%); Đã bán 119",
+      "image_url": "https://myshoes.vn/image/catalog/2025/adidas/giay-adidas-pureboost-5-nam-den-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-adidas-pureboost-5-nam-den.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=6"
+    },
+    {
+      "name": "Giày Nike Pegasus 41 Nữ - Trắng Tím",
+      "price": 3190000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 3.990.000₫; Giảm 800.000₫ (20%); Đã bán 112",
+      "image_url": "https://myshoes.vn/image/catalog/2025/nike/giay-nike-pegasus-41-nu-trang-tim-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-pegasus-41-nu-trang-tim.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=6"
+    },
+    {
+      "name": "Giày Nike Rival Fly 4 Nam Nữ - Đen Trắng",
+      "price": 2390000,
+      "rating": 4.9,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 3.200.000₫; Giảm 810.000₫ (25%); Đã bán 146",
+      "image_url": "https://myshoes.vn/image/catalog/2025/nike/giay-nike-rival-fly-4-nam-den-trang-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-rival-fly-4-nam-nu-den-trang.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=7"
+    },
+    {
+      "name": "Giày Nike ReactX Pegasus Trail 5 Nam - Đen Trắng",
+      "price": 4190000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 4.550.000₫; Giảm 360.000₫ (8%); Đã bán 122",
+      "image_url": "https://myshoes.vn/image/catalog/2025/nike/giay-nike-reactx-pegasus-trail-5-nam-den-trang-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-reactx-pegasus-trail-5-nam-den-trang.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=7"
+    },
+    {
+      "name": "Giày Adidas Ultrarun 5 Nam - Xanh Navy",
+      "price": 1990000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 2.200.000₫; Giảm 210.000₫ (10%); Đã bán 154",
+      "image_url": "https://myshoes.vn/image/catalog/2024_11/adidas/giay-adidas-ultrarun-5-nam-xanh-navy-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-adidas-ultrarun-5-nam-xanh-navy.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=7"
+    },
+    {
+      "name": "Giày Nike Air Winflo 10 Nữ - Xám Trắng",
+      "price": 2190000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 3.099.000₫; Giảm 909.000₫ (29%); Đã bán 116",
+      "image_url": "https://myshoes.vn/image/catalog/2024_11/nike/giay-nike-air-winflo-10-nu-xam-trang-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-air-winflo-10-nu-xam-trang.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=7"
+    },
+    {
+      "name": "Giày Adidas Runfalcon 5 Nam - Xanh Đen",
+      "price": 1690000,
+      "rating": 4.9,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 1.800.000₫; Giảm 110.000₫ (6%); Đã bán 118",
+      "image_url": "https://myshoes.vn/image/catalog/2024/adidas/ad5/giay-adidas-runfalcon-5-nam-xanh-den-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-adidas-runfalcon-5-nam-xanh-den.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=7"
+    },
+    {
+      "name": "Giày Nike Winflo 11 Nam - Xanh",
+      "price": 2890000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 3.200.000₫; Giảm 310.000₫ (10%); Đã bán 149",
+      "image_url": "https://myshoes.vn/image/catalog/2024/nike/nk8/giay-nike-air-winflo-11-nam-xanh-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-air-winflo-11-nam-xanh.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=7"
+    },
+    {
+      "name": "Giày Nike Quest 6 Nữ- Đen Trắng",
+      "price": 2090000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 2.700.000₫; Giảm 610.000₫ (23%); Đã bán 97",
+      "image_url": "https://myshoes.vn/image/catalog/2024/nike/nk8/giay-nike-quest-6-nu-den-trang-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-quest-6-nu-den-trang.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=7"
+    },
+    {
+      "name": "Giày Nike Quest 6 Nam - Đen Trắng",
+      "price": 1990000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 2.700.000₫; Giảm 710.000₫ (26%); Đã bán 136",
+      "image_url": "https://myshoes.vn/image/catalog/2024/nike/nk8/giay-nike-quest-6-nam-den-trang-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-quest-6-nam-den-trang.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=7"
+    },
+    {
+      "name": "Giày Nike ReactX Pegasus Trail 5 Nam - Đen",
+      "price": 4190000,
+      "rating": 4.8,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 4.550.000₫; Giảm 360.000₫ (8%); Đã bán 99",
+      "image_url": "https://myshoes.vn/image/catalog/2024/nike/nk8/giay-nike-reactx-pegasus-trail-5-nam-den-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-reactx-pegasus-trail-5-nam-den.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=7"
+    },
+    {
+      "name": "Giày Nike Winflo 11 Nữ - Trắng Gold",
+      "price": 2890000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 3.200.000₫; Giảm 310.000₫ (10%); Đã bán 125",
+      "image_url": "https://myshoes.vn/image/catalog/2024/nike/nk8/giay-nike-winflo-11-nu-trang-gold-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-winflo-11-nu-trang-gold.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=7"
+    },
+    {
+      "name": "Giày Nike Promina Nữ - Hồng",
+      "price": 1990000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 2.400.000₫; Giảm 410.000₫ (17%); Đã bán 98",
+      "image_url": "https://myshoes.vn/image/catalog/2024/nike/nk6/giay-nike-promina-nu-hong-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-promina-nu-hong.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=7"
+    },
+    {
+      "name": "Giày adidas Galaxy 7 Nam - Trắng Xám",
+      "price": 1690000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 1.800.000₫; Giảm 110.000₫ (6%); Đã bán 107",
+      "image_url": "https://myshoes.vn/image/catalog/2024/adidas/ad4/giay-adidas-galaxy-7-nam-trang-xam-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-adidas-galaxy-7-nam-trang-xam.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=7"
+    },
+    {
+      "name": "Giày adidas Galaxy 7 Nam - Xám",
+      "price": 1690000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 1.800.000₫; Giảm 110.000₫ (6%); Đã bán 125",
+      "image_url": "https://myshoes.vn/image/catalog/2024/adidas/ad4/giay-adidas-galaxy-7-nam-xam-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-adidas-galaxy-7-nam-xam.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=7"
+    },
+    {
+      "name": "Giày Adidas Supernova Stride Nam - Trắng Xám",
+      "price": 2390000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 3.200.000₫; Giảm 810.000₫ (25%); Đã bán 99",
+      "image_url": "https://myshoes.vn/image/catalog/2024/adidas/ad4/giay-adidas-supernova-stride-nam-trang-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-adidas-supernova-stride-nam-trang.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=7"
+    },
+    {
+      "name": "Giày Nike Pegasus 41 Blueprint Nữ - Trắng",
+      "price": 3190000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 3.990.000₫; Giảm 800.000₫ (20%); Đã bán 134",
+      "image_url": "https://myshoes.vn/image/catalog/2024/nike/nk6/giay-nike-pegasus-41-blueprint-nu-trang-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-pegasus-41-blueprint-nu-trang",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=7"
+    },
+    {
+      "name": "Giày Adidas Supernova Rise Nữ - Xanh",
+      "price": 1990000,
+      "rating": 4.9,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 4.000.000₫; Giảm 2.010.000₫ (50%); Đã bán 99",
+      "image_url": "https://myshoes.vn/image/catalog/2024/adidas/ad3/giay-adidas-supernova-rise-nu-xanh-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-adidas-supernova-rise-nu-xanh",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=7"
+    },
+    {
+      "name": "Giày Nike Pegasus 41 Nam - Xám Xanh",
+      "price": 3590000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 3.990.000₫; Giảm 400.000₫ (10%); Đã bán 200",
+      "image_url": "https://myshoes.vn/image/catalog/2024/nike/nk5/giay-nike-pegasus-41-nam-den-xam-xanh-00.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-pegasus-41-nam-den-xam-xanh.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=7"
+    },
+    {
+      "name": "Giày Nike Pegasus 41 Nam - Trắng",
+      "price": 3590000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 3.990.000₫; Giảm 400.000₫ (10%); Đã bán 147",
+      "image_url": "https://myshoes.vn/image/catalog/2024/nike/nk5/giay-nike-pegasus-41-nam-trang-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-pegasus-41-nam-trang.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=7"
+    },
+    {
+      "name": "Giày Nike Vomero 17 Nam - Trắng Xám Đỏ",
+      "price": 3590000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 4.960.000₫; Giảm 1.370.000₫ (28%); Đã bán 131",
+      "image_url": "https://myshoes.vn/image/catalog/2024/nike/nk4/giay-nike-air-zoom-vomero-17-nam-trang-xam-do.01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-air-zoom-vomero-17-nam-trang-xam-do.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=7"
+    },
+    {
+      "name": "Giày Nike Pegasus 41 Nam - Đen Full",
+      "price": 3590000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 3.990.000₫; Giảm 400.000₫ (10%); Đã bán 177",
+      "image_url": "https://myshoes.vn/image/catalog/2024/nike/nk4/giay-nike-air-zoom-pegasus-41-nam-den.01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-pegasus-41-nam-den-full.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=7"
+    },
+    {
+      "name": "Giày Nike ZoomX Invincible Run FK 3 Nam - Đen Trắng",
+      "price": 4690000,
+      "rating": 4.9,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 5.579.000₫; Giảm 889.000₫ (16%); Đã bán 138",
+      "image_url": "https://myshoes.vn/image/catalog/2024/nike/nk4/giay-nike-zoomx-invincible-run-fk-3-nam-den-trang.01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-zoomx-invincible-run-fk-3-nam-trang-den.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=7"
+    },
+    {
+      "name": "Giày Nike Free RN NN Nam - Trắng",
+      "price": 1690000,
+      "rating": 4.8,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 3.050.000₫; Giảm 1.360.000₫ (45%); Đã bán 164",
+      "image_url": "https://myshoes.vn/image/catalog/2024/nike/nk4/giay-nike-free-rn-nn-nam-trang.01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-free-rn-nn-nam-trang.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=7"
+    },
+    {
+      "name": "Giày Adidas Supernova Rise Nữ - Tím",
+      "price": 2590000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 4.000.000₫; Giảm 1.410.000₫ (35%); Đã bán 99",
+      "image_url": "https://myshoes.vn/image/catalog/2024/adidas/ad3/giay-adidas-supernova-rise-nu-tim.01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-adidas-supernova-rise-nu-tim.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=7"
+    },
+    {
+      "name": "Giày Nike ReactX Infinity 4 Nữ - Đen Vàng",
+      "price": 2990000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 5.250.000₫; Giảm 2.260.000₫ (43%); Đã bán 140",
+      "image_url": "https://myshoes.vn/image/catalog/2024/nike/nk4/giay-nike-reactx-infinity-4-nu-den-vang.01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-reactx-infinity-4-nu-den-vang.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=7"
+    },
+    {
+      "name": "Giày Nike Winflo 11 Nam - Đen Trắng",
+      "price": 2890000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 3.200.000₫; Giảm 310.000₫ (10%); Đã bán 221",
+      "image_url": "https://myshoes.vn/image/catalog/2024/nike/nk4/giay-nike-winflo-11-nam-den-trang.01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-air-winflo-11-nam-den-trang.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=7"
+    },
+    {
+      "name": "Giày Nike Interact Run Nữ - Đen Trắng",
+      "price": 2190000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 2.479.000₫; Giảm 289.000₫ (12%); Đã bán 117",
+      "image_url": "https://myshoes.vn/image/catalog/2024/nike/nk4/giay-nike-interact-run-nu-den-trang.01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-interact-run-nu-den-trang.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=7"
+    },
+    {
+      "name": "Giày Nike Journey Run Nữ - Đen Trắng",
+      "price": 2390000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 3.100.000₫; Giảm 710.000₫ (23%); Đã bán 126",
+      "image_url": "https://myshoes.vn/image/catalog/2024/nike/nk4/giay-nike-journey-run-nu-den-trang.01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-journey-run-nu-den-trang.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=7"
+    },
+    {
+      "name": "Giày Nike Winflo 11 Nam - Đen Đen",
+      "price": 2690000,
+      "rating": 4.9,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 3.110.000₫; Giảm 420.000₫ (14%); Đã bán 134",
+      "image_url": "https://myshoes.vn/image/catalog/2024/nike/nk3/giay-nike-air-winflo-11-nam-den-den-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-air-winflo-11-nam-den-den.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=7"
+    },
+    {
+      "name": "Giày Nike Air Zoom TR 1 - Đen Trắng",
+      "price": 2690000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 3.700.000₫; Giảm 1.010.000₫ (27%); Đã bán 156",
+      "image_url": "https://myshoes.vn/image/catalog/2024/nike/nk4/giay-nike-air-zoom-tr-1.01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-air-zoom-tr-1-den-trang.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=7"
+    },
+    {
+      "name": "Giày Nike Interact Run Nam - Xanh Trắng",
+      "price": 2190000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 2.479.000₫; Giảm 289.000₫ (12%); Đã bán 129",
+      "image_url": "https://myshoes.vn/image/catalog/2024/nike/nk3/giay-nike-interact-run-nam-xanh-trang-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-interact-run-nam-xanh-trang.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=7"
+    },
+    {
+      "name": "Giày Nike Interact Run Nam - Đen Trắng",
+      "price": 1990000,
+      "rating": 4.8,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 2.479.000₫; Giảm 489.000₫ (20%); Đã bán 143",
+      "image_url": "https://myshoes.vn/image/catalog/2024/nike/nk3/giay-nike-interact-run-nam-den-trang-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-interact-run-nam-den-trang.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=7"
+    },
+    {
+      "name": "Giày Nike Interact Run SE Nam - Đen Đen",
+      "price": 2190000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 2.479.000₫; Giảm 289.000₫ (12%); Đã bán 119",
+      "image_url": "https://myshoes.vn/image/catalog/2024/nike/nk3/giay-nike-interact-run-se-nam-den-den-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-interact-run-se-nam-den-den.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=7"
+    },
+    {
+      "name": "Giày Nike Flex Experience 12 Nam - Xám Xanh",
+      "price": 1890000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 2.190.000₫; Giảm 300.000₫ (14%); Đã bán 168",
+      "image_url": "https://myshoes.vn/image/catalog/2024/nike/nk5/giay-nike-flex-experience-12-nam-xam-xanh-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-flex-experience-12-nam- xam-xanh.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=7"
+    },
+    {
+      "name": "Giày Nike Metcon 9 Nam - Đen",
+      "price": 2990000,
+      "rating": 4.9,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 4.489.000₫; Giảm 1.499.000₫ (33%); Đã bán 116",
+      "image_url": "https://myshoes.vn/image/catalog/2024/nike/nk2/giay-nike-metcon-9-nam-den-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-metcon-9-nam-den.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=7"
+    },
+    {
+      "name": "Giày Nike Run Swift 3 Nam - Đen Nâu",
+      "price": 1590000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 2.450.000₫; Giảm 860.000₫ (35%); Đã bán 157",
+      "image_url": "https://myshoes.vn/image/catalog/2024/nike/nk01/giay-nike-run-swift-3-nam-den-nau-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-run-swift-3-nam-den-nau.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=7"
+    },
+    {
+      "name": "Giày Nike Air Zoom Structure 25 Nữ - Hồng Nhẹ",
+      "price": 2890000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 3.965.000₫; Giảm 1.075.000₫ (27%); Đã bán 109",
+      "image_url": "https://myshoes.vn/image/catalog/2024/nike/nk01/giay-nike-air-zoom-structure-25-nu-hong-nhe-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-air-zoom-structure-25-nu-hong-nhe.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=7"
+    },
+    {
+      "name": "Giày Nike In-Season TR 13 Nữ - Xanh Ngọc",
+      "price": 1890000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 2.319.000₫; Giảm 429.000₫ (18%); Đã bán 116",
+      "image_url": "https://myshoes.vn/image/catalog/2024/nike/nk01/giay-nike-in-season-tr-13-nu-xanh-ngoc-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-in-season-tr-13-nu-xanh-ngoc.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=7"
+    },
+    {
+      "name": "Giày Nike ReactX Infinity 4 Nam - Đen Full",
+      "price": 3790000,
+      "rating": 4.9,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 4.959.000₫; Giảm 1.169.000₫ (24%); Đã bán 190",
+      "image_url": "https://myshoes.vn/image/catalog/2023/nike/nike03/giay-nike-reactx-infinity-4-nam-den-full-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-reactx-infinity-4-nam-den-full.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=7"
+    },
+    {
+      "name": "Giày adidas Ultraboost Light Nữ - Hồng",
+      "price": 2990000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 5.200.000₫; Giảm 2.210.000₫ (42%); Đã bán 130",
+      "image_url": "https://myshoes.vn/image/catalog/2023/adidas/adi3/giay-adidas-ultraboost-light-nu-hong-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-adidas-ultraboost-light-nu-hong.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=7"
+    },
+    {
+      "name": "Giày adidas Tracefinder Trail Nữ - Xám Hồng",
+      "price": 1590000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 2.700.000₫; Giảm 1.110.000₫ (41%); Đã bán 145",
+      "image_url": "https://myshoes.vn/image/catalog/2023/adidas/adi3/giay-adidas-tracefinder-trail-nu-xam-hong-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-adidas-tracefinder-trail-nu-xam-hong.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=7"
+    },
+    {
+      "name": "Giày adidas Duramo Speed Nam - Trắng",
+      "price": 2090000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 2.500.000₫; Giảm 410.000₫ (16%); Đã bán 130",
+      "image_url": "https://myshoes.vn/image/catalog/2023/adidas/ad6/giay-adidas-duramo-speed-nam-trang-den-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-adidas-duramo-speed-nam-trang-den.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=8"
+    },
+    {
+      "name": "Giày Nike Renew Serenity Run 2 Nữ- Trắng",
+      "price": 1690000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 2.550.000₫; Giảm 860.000₫ (34%); Đã bán 128",
+      "image_url": "https://myshoes.vn/image/catalog/2023/nike/nike01/giay-nike-renew-serenity-run-nu-trang-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-renew-serenity-run-nu-trang.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=8"
+    },
+    {
+      "name": "Giày Nike Pegasus Turbo Next Nature Nam - Camo",
+      "price": 2590000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 4.409.000₫; Giảm 1.819.000₫ (41%); Đã bán 192",
+      "image_url": "https://myshoes.vn/image/catalog/2023/nike/nk07/giay-nike-pegasus-turbo-next-nature-nam-camo-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-pegasus-turbo-next-nature-nam-camo.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=8"
+    },
+    {
+      "name": "Giày Nike Revolution 7 Nữ - Trắng",
+      "price": 1690000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 1.950.000₫; Giảm 260.000₫ (13%); Đã bán 169",
+      "image_url": "https://myshoes.vn/image/catalog/2023/nike/nk011/giay-nike-revolution-7-nu-trang-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-revolution-7-nu-trang.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=8"
+    },
+    {
+      "name": "Giày Nike Zoom Bella 6 Nữ - Đen Trắng",
+      "price": 1690000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 2.560.000₫; Giảm 870.000₫ (34%); Đã bán 142",
+      "image_url": "https://myshoes.vn/image/catalog/2023/nike/nk10/giay-nike-zoom-bella-6-nu-den-trang-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-zoom-bella-6-nu-den-trang.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=8"
+    },
+    {
+      "name": "Giày Nike Air Zoom Pegasus 40 Nữ - Đen Trắng",
+      "price": 2390000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 3.965.000₫; Giảm 1.575.000₫ (40%); Đã bán 171",
+      "image_url": "https://myshoes.vn/image/catalog/2023/nike/nk011/giay-nike-air-zoom-pegasus-40-nu-den-trang-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-air-zoom-pegasus-40-nu-den-trang.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=8"
+    },
+    {
+      "name": "Giày adidas Duramo Speed Nam - Đen",
+      "price": 2090000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 2.500.000₫; Giảm 410.000₫ (16%); Đã bán 163",
+      "image_url": "https://myshoes.vn/image/catalog/2023/adidas/ad5/giay-adidas-duramo-speed-nam-den-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-adidas-duramo-speed-nam-den.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=8"
+    },
+    {
+      "name": "Giày adidas Duramo Speed Nam - Trắng",
+      "price": 2090000,
+      "rating": 4.9,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 2.500.000₫; Giảm 410.000₫ (16%); Đã bán 155",
+      "image_url": "https://myshoes.vn/image/catalog/2023/adidas/ad5/giay-adidas-duramo-speed-nam-trang-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-adidas-duramo-speed-nam-trang.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=8"
+    },
+    {
+      "name": "Giày Nike React Terra Kiger 9 Nam - Đen",
+      "price": 2890000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 4.230.000₫; Giảm 1.340.000₫ (32%); Đã bán 175",
+      "image_url": "https://myshoes.vn/image/catalog/2023/nike/nk12/giay-nike-react-terra-kiger-9-nam-den-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-react-terra-kiger-9-nam-den.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=8"
+    },
+    {
+      "name": "Giày Nike Quest 4 Nữ - Trắng",
+      "price": 1990000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 2.600.000₫; Giảm 610.000₫ (23%); Đã bán 183",
+      "image_url": "https://myshoes.vn/image/catalog/2023/nike/nk6/giay-nike-quest-4-nu-trang-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-quest-4-nu-trang.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=8"
+    },
+    {
+      "name": "Giày Nike React Miler 3 Nam - Xanh Lam",
+      "price": 2190000,
+      "rating": 4.8,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 3.519.000₫; Giảm 1.329.000₫ (38%); Đã bán 150",
+      "image_url": "https://myshoes.vn/image/catalog/2023/nike/nk1/giay-nike-react-miler-3-nam-xanh-lam-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-react-miler-3-nam-xanh-lam.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=8"
+    },
+    {
+      "name": "Giày Nike React Miler 3 Nam - Đen Trắng",
+      "price": 2190000,
+      "rating": 4.9,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 3.519.000₫; Giảm 1.329.000₫ (38%); Đã bán 184",
+      "image_url": "https://myshoes.vn/image/catalog/2023/nike/nk1/giay-nike-react-miler-3-nam-den-trang-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-react-miler-3-nam-den-trang.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=8"
+    },
+    {
+      "name": "Giày adidas Adizero RC 4 Nam Nữ - Xám",
+      "price": 1390000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 2.880.000₫; Giảm 1.490.000₫ (52%); Đã bán 235",
+      "image_url": "https://myshoes.vn/image/catalog/2022/adidas2/giay-adidas-adizero-rc-4-nam-xam-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-adidas-adizero-rc-4-nam-xam.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=8"
+    },
+    {
+      "name": "Giày Nike Renew Ride 3 Nam - Đen Full",
+      "price": 1390000,
+      "rating": 5.0,
+      "notes": "Danh mục: Giày chạy bộ; Giá gốc: 2.650.000₫; Giảm 1.260.000₫ (48%); Đã bán 224",
+      "image_url": "https://myshoes.vn/image/catalog/2022/nike/6.5/giay-nike-renew-ride-3-nam-den-full-01.jpg",
+      "product_url": "https://myshoes.vn/giay-chay-bo/giay-nike-renew-ride-3-nam-den-full.html",
+      "source_page": "https://myshoes.vn/giay-chay-bo?page=8"
+    }
+  ]
+}

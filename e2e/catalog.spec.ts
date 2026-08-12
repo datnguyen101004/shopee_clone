@@ -19,10 +19,10 @@ test.describe('API-driven product discovery', () => {
   }) => {
     await page.goto('/search?pageSize=2&utm_source=ignored');
     const form = page.getByRole('search', { name: 'Tìm và lọc sản phẩm' });
-    await form.getByRole('searchbox', { name: 'Từ khóa' }).fill('op lung');
-    await form.getByRole('combobox', { name: 'Danh mục' }).selectOption('electronics');
-    await form.getByRole('spinbutton', { name: 'Giá thấp nhất' }).fill('100000');
-    await form.getByRole('spinbutton', { name: 'Giá cao nhất' }).fill('300000');
+    await form.getByRole('searchbox', { name: 'Từ khóa' }).fill('nuoc kiem');
+    await form.getByRole('combobox', { name: 'Danh mục' }).selectOption('bach-hoa');
+    await form.getByRole('spinbutton', { name: 'Giá thấp nhất' }).fill('1000');
+    await form.getByRole('spinbutton', { name: 'Giá cao nhất' }).fill('1000000');
     await form.getByRole('combobox', { name: 'Đánh giá' }).selectOption('4');
     await form
       .getByRole('combobox', { name: 'Nơi bán' })
@@ -31,7 +31,7 @@ test.describe('API-driven product discovery', () => {
     await form.getByRole('checkbox', { name: 'Đang giảm giá' }).check();
     await form.getByRole('combobox', { name: 'Sắp xếp' }).selectOption('price-asc');
     await form.getByRole('button', { name: 'Áp dụng' }).click();
-    await expect(page).toHaveURL(/q=op(?:\+|%20)lung/);
+    await expect(page).toHaveURL(/q=nuoc(?:\+|%20)kiem/);
     await expect(page).not.toHaveURL(/utm_source/);
     await expect(page).not.toHaveURL(/page=/);
     await expect(page.getByRole('heading', { name: /Kết quả cho/ })).toBeVisible();
@@ -57,12 +57,12 @@ test.describe('API-driven product discovery', () => {
     await expect(page).toHaveURL(/\/search$/);
   });
 
-  test('supports every sort and parent category without broken discovery state', async ({
+  test('supports every sort and canonical category without broken discovery state', async ({
     page,
   }) => {
     for (const sort of ['relevance', 'newest', 'best-selling', 'price-asc', 'price-desc']) {
-      const keyword = sort === 'relevance' ? '&q=phone' : '';
-      await page.goto(`/search?category=electronics&sort=${sort}${keyword}`);
+      const keyword = sort === 'relevance' ? '&q=airpods' : '';
+      await page.goto(`/search?category=dien-thoai&sort=${sort}${keyword}`);
       await expect(page.getByRole('combobox', { name: 'Sắp xếp' })).toHaveValue(sort);
       await expect(page.getByRole('status')).toContainText('sản phẩm');
     }

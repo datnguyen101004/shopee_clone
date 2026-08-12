@@ -138,8 +138,8 @@ test.describe('secure account authentication', () => {
     const email = `t11-${testInfo.project.name}@example.test`;
     const initialPassword = `T11 initial ${testInfo.project.name} passphrase`;
     const replacementPassword = `T11 replacement ${testInfo.project.name} passphrase`;
-    const productId = '00000000-0000-4000-8000-000000000301';
-    const variantId = '00000000-0000-4000-8000-000000000401';
+    const productId = '62852d61-b95f-53cd-bcac-c832a6c47877';
+    const variantId = '0024503e-074e-5e2a-a990-4a51d58bdaa7';
 
     await page.goto('/register');
     await page.getByLabel('Tên hiển thị').fill(`Buyer ${testInfo.project.name}`);
@@ -173,7 +173,9 @@ test.describe('secure account authentication', () => {
     await page.getByLabel('Mật khẩu').fill(initialPassword);
     await page.getByRole('button', { name: 'Đăng nhập' }).click();
     await expect(page).toHaveURL(`/products/${productId}`);
-    await expect(page.getByRole('heading', { name: 'Smartphone Pro' })).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: 'Thùng 24 chai nước kiềm có khoáng La Vie + 500ml' }),
+    ).toBeVisible();
 
     await page.goto(
       `/login?intent=buy-now&productId=${productId}&variantId=${variantId}&quantity=1&returnTo=https%3A%2F%2Fattacker.example`,

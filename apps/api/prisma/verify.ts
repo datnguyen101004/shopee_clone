@@ -14,18 +14,15 @@ import {
   VariantStatus,
 } from '../src/generated/prisma/enums';
 import { createPrismaClient } from './create-prisma-client';
+import { createCanonicalDatasetPlan } from './dataset/normalizer';
+import { loadCanonicalDataset } from './dataset/loader';
 import {
   seedCategories,
   seedExpectedCounts,
   seedHomepageBanners,
-  seedHomepageCategories,
   seedHomepageModules,
-  seedHomepageProducts,
-  seedImages,
-  seedProducts,
   seedShops,
   seedUsers,
-  seedVariants,
 } from './seed-data';
 import { assertSafeTestDatabaseUrl } from './test-database-url';
 
@@ -86,6 +83,8 @@ async function recreatePublicSchema(databaseUrl: string): Promise<void> {
 async function verifyDatabase(databaseUrl: string): Promise<void> {
   const prisma = createPrismaClient(databaseUrl);
   try {
+    const datasetPlan = createCanonicalDatasetPlan(await loadCanonicalDataset());
+    const datasetOwnerCount = datasetPlan.sources.length;
     const counts = {
       users: await prisma.user.count(),
       shops: await prisma.shop.count(),
@@ -111,8 +110,14 @@ async function verifyDatabase(databaseUrl: string): Promise<void> {
       passwordResetTokens: 0,
       externalIdentities: 0,
       googleLoginAttempts: 0,
-      roleAssignments: seedUsers.length + new Set(seedShops.map(({ ownerId }) => ownerId)).size,
-      roleAuditEvents: seedUsers.length + new Set(seedShops.map(({ ownerId }) => ownerId)).size,
+      roleAssignments:
+        seedUsers.length +
+        new Set(seedShops.map(({ ownerId }) => ownerId)).size +
+        datasetOwnerCount * 2,
+      roleAuditEvents:
+        seedUsers.length +
+        new Set(seedShops.map(({ ownerId }) => ownerId)).size +
+        datasetOwnerCount * 2,
     });
 
     const category = await prisma.category.findUnique({
@@ -122,34 +127,65 @@ async function verifyDatabase(databaseUrl: string): Promise<void> {
     assert(category);
     assert.equal(category.children[0]?.id, seedCategories[1].id);
 
-    const product = await prisma.product.findUnique({
-      where: { id: seedProducts[0].id },
+    const datasetRecord = await prisma.datasetProductRecord.findFirstOrThrow({
+      where: { isActive: true },
+      orderBy: [{ sourceId: 'asc' }, { sourceIndex: 'asc' }],
       include: {
-        shop: true,
-        category: true,
-        images: { orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }] },
-        variants: { include: { inventory: true }, orderBy: { sku: 'asc' } },
+        source: true,
+        product: {
+          include: {
+            shop: true,
+            category: true,
+            images: { orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }] },
+            variants: { include: { inventory: true }, orderBy: { sku: 'asc' } },
+          },
+        },
       },
     });
-    assert(product);
-    assert.equal(product.shop.id, seedShops[0].id);
-    assert.equal(product.category.id, seedCategories[1].id);
+    const product = datasetRecord.product;
+    const primaryVariant = product.variants[0];
+    assert(primaryVariant);
+    const otherVariant = await prisma.productVariant.findFirstOrThrow({
+      where: { productId: { not: product.id }, product: { datasetRecord: { isActive: true } } },
+    });
+    assert(datasetPlan.sources.some(({ shop }) => shop.id === product.shop.id));
+    assert(datasetPlan.sources.some(({ category }) => category.id === product.category.id));
     assert.equal(product.status, ProductStatus.ACTIVE);
-    assert.equal(product.shop.location, seedShops[0].location);
-    assert.equal(product.ratingAverageBasisPoints, seedProducts[0].ratingAverageBasisPoints);
-    assert.equal(product.ratingCount, seedProducts[0].ratingCount);
-    assert.equal(product.soldCount, seedProducts[0].soldCount);
-    assert.equal(product.images[0]?.id, seedImages[0].id);
-    assert.equal(product.images[1]?.variantId, seedVariants[0].id);
-    assert.equal(product.images[2]?.variantId, seedVariants[1].id);
+    assert(product.ratingAverageBasisPoints >= 100 && product.ratingAverageBasisPoints <= 500);
+    assert(product.ratingCount >= 0);
+    assert(product.soldCount >= 0);
+    assert.equal(product.images.length, 1);
+    assert.equal(product.images[0]?.variantId, null);
     assert(
       product.images.every(
         (image, index) => index === 0 || product.images[index - 1]!.sortOrder <= image.sortOrder,
       ),
     );
-    assert(product.variants.length >= 2);
+    assert.equal(product.variants.length, 1);
     assert(product.variants.every((variant) => variant.inventory !== null));
     assert(product.variants.every((variant) => variant.status === VariantStatus.ACTIVE));
+    assert.equal(datasetRecord.source.checksum.length, 64);
+    assert.equal(datasetRecord.source.recordCount > 0, true);
+    assert.equal(datasetRecord.sourceIdentity.trim().length > 0, true);
+
+    const provenance = await prisma.datasetProductRecord.findMany({
+      where: { isActive: true },
+      select: { stableRecordKey: true, generatedFields: true, product: { select: { slug: true } } },
+    });
+    assert.equal(provenance.length, 1_377);
+    assert.equal(new Set(provenance.map(({ stableRecordKey }) => stableRecordKey)).size, 1_377);
+    assert.equal(new Set(provenance.map(({ product }) => product.slug)).size, 1_377);
+    const generatedFieldNames = provenance.flatMap(({ generatedFields }) =>
+      Array.isArray(generatedFields)
+        ? generatedFields.flatMap((entry) =>
+            entry && typeof entry === 'object' && !Array.isArray(entry) && entry.field
+              ? [String(entry.field)]
+              : [],
+          )
+        : [],
+    );
+    assert.equal(generatedFieldNames.filter((field) => field === 'priceMinor').length, 3);
+    assert.equal(generatedFieldNames.filter((field) => field === 'rating').length, 952);
 
     const user = await prisma.user.findUniqueOrThrow({ where: { id: seedUsers[0].id } });
     assert.equal(user.email, seedUsers[0].email);
@@ -165,11 +201,11 @@ async function verifyDatabase(databaseUrl: string): Promise<void> {
     });
     assert.equal(
       roleAssignments.filter(({ role }) => role === MarketplaceRole.BUYER).length,
-      seedUsers.length,
+      seedUsers.length + datasetOwnerCount,
     );
     assert.equal(
       roleAssignments.filter(({ role }) => role === MarketplaceRole.SELLER).length,
-      new Set(seedShops.map(({ ownerId }) => ownerId)).size,
+      new Set(seedShops.map(({ ownerId }) => ownerId)).size + datasetOwnerCount,
     );
     assert.equal(
       roleAssignments.some(({ role }) => role === MarketplaceRole.ADMIN),
@@ -182,7 +218,7 @@ async function verifyDatabase(databaseUrl: string): Promise<void> {
         ),
       );
     }
-    for (const shop of seedShops) {
+    for (const shop of [...seedShops, ...datasetPlan.sources.map(({ shop }) => shop)]) {
       assert(
         roleAssignments.some(
           ({ userId, role }) => userId === shop.ownerId && role === MarketplaceRole.SELLER,
@@ -199,10 +235,10 @@ async function verifyDatabase(databaseUrl: string): Promise<void> {
     });
     assert.equal(homepageModules.length, seedHomepageModules.length);
     assert.equal(homepageModules[0]?.banners[0]?.id, seedHomepageBanners[0]?.id);
-    assert.equal(homepageModules[1]?.categories.length, seedHomepageCategories.length);
+    assert.equal(homepageModules[1]?.categories.length, datasetPlan.sources.length);
     assert.equal(
       homepageModules.reduce((count, module) => count + module.products.length, 0),
-      seedHomepageProducts.length,
+      24,
     );
     assert(
       homepageModules.every(
@@ -219,30 +255,56 @@ async function verifyDatabase(databaseUrl: string): Promise<void> {
         .length >= 1,
     );
     assert(seedHomepageBanners.every((banner) => banner.destinationPath.startsWith('/')));
-    assert(seedImages.every((image) => image.url.startsWith('/media/products/')));
-    assert(seedImages.every((image) => /\.(?:jpg|svg)$/.test(image.url)));
+    assert(product.images.every((image) => /^(?:\/|https:\/\/)/.test(image.url)));
 
     const orderedProducts = await prisma.product.findMany({
       where: { status: ProductStatus.ACTIVE, deletedAt: null },
       select: { id: true, createdAt: true, categoryId: true },
       orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
     });
-    assert(orderedProducts.length > 12);
+    assert.equal(orderedProducts.length, 1_377);
     assert.equal(
       new Set(orderedProducts.map((item) => item.createdAt.toISOString())).size,
       orderedProducts.length,
     );
-    assert(orderedProducts.some((item) => item.categoryId === seedCategories[1].id));
-    assert(orderedProducts.some((item) => item.categoryId === seedCategories[3].id));
+    for (const source of datasetPlan.sources) {
+      assert(orderedProducts.some((item) => item.categoryId === source.category.id));
+    }
 
     assert(new Set(seedShops.map((shop) => shop.location)).size >= 2);
-    assert(seedProducts.some((item) => /[À-ỹĐđ]/u.test(item.name)));
-    assert(new Set(seedProducts.map((item) => item.ratingAverageBasisPoints)).size >= 4);
-    assert(new Set(seedProducts.map((item) => item.soldCount)).size >= 4);
-    assert(seedVariants.some((item) => item.compareAtPriceMinor !== null));
-    assert(seedVariants.some((item) => item.compareAtPriceMinor === null));
-    assert(seedVariants.some((item) => item.quantityOnHand === item.quantityReserved));
-    assert(new Set(seedVariants.map((item) => item.priceMinor.toString())).size >= 4);
+    assert(
+      datasetPlan.sources
+        .flatMap(({ products }) => products)
+        .some((item) => /[À-ỹĐđ]/u.test(item.name)),
+    );
+    assert(
+      new Set(
+        datasetPlan.sources
+          .flatMap(({ products }) => products)
+          .map((item) => item.ratingAverageBasisPoints),
+      ).size >= 4,
+    );
+    assert(
+      new Set(datasetPlan.sources.flatMap(({ products }) => products).map((item) => item.soldCount))
+        .size >= 4,
+    );
+    assert(
+      datasetPlan.sources
+        .flatMap(({ products }) => products)
+        .some((item) => item.variant.compareAtPriceMinor !== null),
+    );
+    assert(
+      datasetPlan.sources
+        .flatMap(({ products }) => products)
+        .some((item) => item.variant.compareAtPriceMinor === null),
+    );
+    assert(
+      new Set(
+        datasetPlan.sources
+          .flatMap(({ products }) => products)
+          .map((item) => item.variant.priceMinor.toString()),
+      ).size >= 4,
+    );
 
     const constraintRows = await prisma.$queryRawUnsafe<Array<{ constraint_name: string }>>(
       `SELECT conname AS constraint_name
@@ -288,10 +350,18 @@ async function verifyDatabase(databaseUrl: string): Promise<void> {
          ,'user_role_assignments_granted_by_user_id_fkey'
          ,'role_audit_events_target_user_id_fkey'
          ,'role_audit_events_actor_user_id_fkey'
+         ,'dataset_sources_key_not_blank'
+         ,'dataset_sources_checksum_format'
+         ,'dataset_sources_record_count_nonnegative'
+         ,'dataset_product_records_stable_key_format'
+         ,'dataset_product_records_source_index_nonnegative'
+         ,'dataset_product_records_source_identity_not_blank'
+         ,'dataset_product_records_source_id_fkey'
+         ,'dataset_product_records_product_id_fkey'
        )
        ORDER BY conname`,
     );
-    assert.equal(constraintRows.length, 40);
+    assert.equal(constraintRows.length, 48);
 
     const googleIndexRows = await prisma.$queryRawUnsafe<Array<{ indexname: string }>>(
       `SELECT indexname
@@ -559,7 +629,7 @@ async function verifyDatabase(databaseUrl: string): Promise<void> {
       prisma.productVariant.create({
         data: {
           id: '00000000-0000-4000-8000-000000009003',
-          productId: seedProducts[0].id,
+          productId: product.id,
           sku: 'INVALID-NEGATIVE-PRICE',
           name: 'Invalid Negative Price',
           priceMinor: -1n,
@@ -571,7 +641,7 @@ async function verifyDatabase(databaseUrl: string): Promise<void> {
       prisma.productVariant.create({
         data: {
           id: '00000000-0000-4000-8000-000000009004',
-          productId: seedProducts[0].id,
+          productId: product.id,
           sku: 'INVALID-NEGATIVE-COMPARE',
           name: 'Invalid Negative Compare Price',
           priceMinor: 1n,
@@ -582,40 +652,40 @@ async function verifyDatabase(databaseUrl: string): Promise<void> {
 
     await expectDatabaseRejection('negative on-hand inventory', () =>
       prisma.inventory.update({
-        where: { variantId: seedVariants[0].id },
+        where: { variantId: primaryVariant.id },
         data: { quantityOnHand: -1 },
       }),
     );
 
     await expectDatabaseRejection('negative reserved inventory', () =>
       prisma.inventory.update({
-        where: { variantId: seedVariants[0].id },
+        where: { variantId: primaryVariant.id },
         data: { quantityReserved: -1 },
       }),
     );
 
     await expectDatabaseRejection('reserved inventory above on-hand inventory', () =>
       prisma.inventory.update({
-        where: { variantId: seedVariants[0].id },
+        where: { variantId: primaryVariant.id },
         data: { quantityOnHand: 5, quantityReserved: 6 },
       }),
     );
 
     await expectDatabaseRejection('a rating above five stars', () =>
       prisma.product.update({
-        where: { id: seedProducts[0].id },
+        where: { id: product.id },
         data: { ratingAverageBasisPoints: 501 },
       }),
     );
     await expectDatabaseRejection('a negative rating count', () =>
       prisma.product.update({
-        where: { id: seedProducts[0].id },
+        where: { id: product.id },
         data: { ratingCount: -1 },
       }),
     );
     await expectDatabaseRejection('a negative sold count', () =>
       prisma.product.update({
-        where: { id: seedProducts[0].id },
+        where: { id: product.id },
         data: { soldCount: -1 },
       }),
     );
@@ -624,8 +694,8 @@ async function verifyDatabase(databaseUrl: string): Promise<void> {
       prisma.productImage.create({
         data: {
           id: '00000000-0000-4000-8000-000000009005',
-          productId: seedProducts[0].id,
-          variantId: seedVariants[4].id,
+          productId: product.id,
+          variantId: otherVariant.id,
           url: '/media/products/invalid.jpg',
           altText: 'Invalid relation',
           sortOrder: 99,

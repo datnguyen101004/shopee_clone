@@ -47,7 +47,14 @@ export function ProductDetailExperience({ product }: { product: ProductDetailRes
       <div className="product-detail-gallery">
         <div className="product-detail-gallery__main" aria-live="polite">
           {image ? (
-            <img src={image.url} alt={image.altText} />
+            <img
+              src={image.url}
+              alt={image.altText}
+              onError={(event) => {
+                event.currentTarget.onerror = null;
+                event.currentTarget.src = '/media/products/product-placeholder.svg';
+              }}
+            />
           ) : (
             <span
               role="img"
@@ -71,7 +78,14 @@ export function ProductDetailExperience({ product }: { product: ProductDetailRes
                   setSelection((current) => ({ ...current, activeImageId: thumbnail.id }))
                 }
               >
-                <img src={thumbnail.url} alt="" />
+                <img
+                  src={thumbnail.url}
+                  alt=""
+                  onError={(event) => {
+                    event.currentTarget.onerror = null;
+                    event.currentTarget.src = '/media/products/product-placeholder.svg';
+                  }}
+                />
               </button>
             ))}
           </div>

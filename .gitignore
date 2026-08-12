@@ -7,6 +7,8 @@ node_modules/
 dist/
 coverage/
 .turbo/
+playwright-report/
+test-results/
 
 # Local environment files
 .env

@@ -87,9 +87,12 @@ pnpm lint
 pnpm typecheck
 pnpm test
 pnpm build
+pnpm test:e2e
 ```
 
 Use `pnpm format` to apply the shared Prettier rules. Ordinary `pnpm test` includes infrastructure helper unit tests but does not require Docker. GitHub Actions runs the repository gates and the Docker-backed smoke workflow for pull requests and pushes to `development` or `main`.
+
+The reusable marketplace foundations live in `packages/ui`; browse the component showcase at `http://localhost:3000/design-system`. See [Marketplace design system](docs/design-system.md) for tokens, component usage, responsive boundaries, and accessibility guidance.
 
 ## Database workflows
 
@@ -139,5 +142,6 @@ Docker Compose provisions both database targets locally, while CI uses the same 
 - `apps/api`: NestJS modular monolith and HTTP transport concerns.
 - `packages/contracts`: framework-neutral TypeScript contracts consumed by both apps.
 - `packages/config`: shared TypeScript and ESLint configuration.
+- `packages/ui`: shared design tokens, accessible UI primitives, feedback patterns, and responsive page shell.
 
 Applications may depend on shared packages. Shared packages must not import application code, framework runtime code, database clients, or infrastructure adapters. Add future reusable packages only when at least two consumers need the same stable abstraction.

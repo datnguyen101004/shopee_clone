@@ -26,6 +26,9 @@ const requiredFragments = [
   'pnpm typecheck',
   'pnpm test',
   'pnpm build',
+  'pnpm exec playwright install --with-deps chromium',
+  'pnpm test:e2e',
+  'path: playwright-report/',
   'pnpm infra:smoke',
   'if: always()',
 ];
@@ -44,7 +47,12 @@ for (const [, action, revision] of actionReferences) {
   assert.match(revision, /^[0-9a-f]{40}$/, `${action} must be pinned to a commit SHA.`);
 }
 
-for (const action of ['actions/checkout', 'actions/setup-node', 'pnpm/action-setup']) {
+for (const action of [
+  'actions/checkout',
+  'actions/setup-node',
+  'pnpm/action-setup',
+  'actions/upload-artifact',
+]) {
   assert(
     actionReferences.some((reference) => reference[1] === action),
     `CI is missing ${action}.`,

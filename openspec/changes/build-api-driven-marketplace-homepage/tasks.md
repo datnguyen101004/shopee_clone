@@ -56,4 +56,4 @@
 
 - [x] 7.1 Document the homepage aggregate contract, normalized seed ownership, activation-window semantics, local API/database prerequisites, and T08–T10/T36 boundaries.
 - [x] 7.2 Run frozen install, Prisma format/validate/generate, migration/seed verification, format, lint, typecheck, all tests, production builds, full-stack Playwright, and strict OpenSpec validation; fix every failure.
-- [ ] 7.3 Record local verification evidence for issue #8, commit and push T07 directly to `development` without a pull request, confirm no automatic GitHub Actions run was created while CI is manual-only, close the issue as completed, and confirm no issue branch remains.
+- [x] 7.3 Record local verification evidence for issue #8, commit and push T07 directly to `development` without a pull request, confirm no automatic GitHub Actions run was created while CI is manual-only, close the issue as completed, and confirm no issue branch remains.

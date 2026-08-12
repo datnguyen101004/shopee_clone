@@ -2,7 +2,10 @@ import { Inject, Injectable } from '@nestjs/common';
 
 import {
   ExternalIdentityProvider,
+  MarketplaceRole,
   PasswordResetDeliveryStatus,
+  RoleAuditAction,
+  RoleAuditSource,
   UserStatus,
 } from '../generated/prisma/enums';
 import { PrismaService } from '../prisma/prisma.service';
@@ -15,6 +18,9 @@ const safeUserSelect = {
   status: true,
   deletedAt: true,
   passwordHash: true,
+  roleAssignments: {
+    select: { role: true },
+  },
 } as const;
 
 @Injectable()
@@ -51,6 +57,22 @@ export class AuthRepository {
         },
         select: safeUserSelect,
       });
+      await transaction.userRoleAssignment.create({
+        data: {
+          userId: user.id,
+          role: MarketplaceRole.BUYER,
+          source: RoleAuditSource.SYSTEM,
+        },
+      });
+      await transaction.roleAuditEvent.create({
+        data: {
+          targetUserId: user.id,
+          role: MarketplaceRole.BUYER,
+          action: RoleAuditAction.GRANT,
+          source: RoleAuditSource.SYSTEM,
+          reason: 'Buyer role assigned at account creation',
+        },
+      });
       await transaction.authSession.create({
         data: {
           id: input.sessionId,
@@ -62,7 +84,7 @@ export class AuthRepository {
           lastUsedAt: input.now,
         },
       });
-      return user;
+      return transaction.user.findUniqueOrThrow({ where: { id: user.id }, select: safeUserSelect });
     });
   }
 
@@ -182,6 +204,22 @@ export class AuthRepository {
           },
           select: safeUserSelect,
         });
+        await transaction.userRoleAssignment.create({
+          data: {
+            userId: user.id,
+            role: MarketplaceRole.BUYER,
+            source: RoleAuditSource.SYSTEM,
+          },
+        });
+        await transaction.roleAuditEvent.create({
+          data: {
+            targetUserId: user.id,
+            role: MarketplaceRole.BUYER,
+            action: RoleAuditAction.GRANT,
+            source: RoleAuditSource.SYSTEM,
+            reason: 'Buyer role assigned at account creation',
+          },
+        });
         await transaction.externalIdentity.create({
           data: {
             id: input.identityId,
@@ -204,7 +242,7 @@ export class AuthRepository {
           lastUsedAt: input.now,
         },
       });
-      return user;
+      return transaction.user.findUniqueOrThrow({ where: { id: user.id }, select: safeUserSelect });
     });
   }
 

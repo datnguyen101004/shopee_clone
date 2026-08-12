@@ -4,6 +4,7 @@ import { JwtModule } from '@nestjs/jwt';
 import { AuthClock } from './auth-clock';
 import { AUTH_CONFIG, loadAuthConfig, type AuthConfig } from './auth.config';
 import { AuthController } from './auth.controller';
+import { AdminRoleController } from './admin-role.controller';
 import { AuthExceptionFilter } from './auth-exception.filter';
 import { AuthGuard } from './auth.guard';
 import { AuthLimiterService } from './auth-limiter.service';
@@ -18,10 +19,19 @@ import { GoogleAuthCallbackController } from './google-auth-callback.controller'
 import { GoogleAuthCryptoService } from './google-auth-crypto.service';
 import { GoogleAuthService } from './google-auth.service';
 import { GOOGLE_IDENTITY_PROVIDER, GoogleOAuthIdentityProvider } from './google-identity-provider';
+import { MarketplaceOwnershipService } from './marketplace-ownership.service';
+import { RolesGuard } from './role-authorization.guard';
+import { RoleAuthorizationService } from './role-authorization.service';
+import { SellerController } from './seller.controller';
 
 @Module({
   imports: [JwtModule.register({})],
-  controllers: [AuthController, GoogleAuthCallbackController],
+  controllers: [
+    AuthController,
+    GoogleAuthCallbackController,
+    SellerController,
+    AdminRoleController,
+  ],
   providers: [
     { provide: AUTH_CONFIG, useFactory: loadAuthConfig },
     {
@@ -32,6 +42,9 @@ import { GOOGLE_IDENTITY_PROVIDER, GoogleOAuthIdentityProvider } from './google-
     AuthClock,
     AuthExceptionFilter,
     AuthGuard,
+    RolesGuard,
+    MarketplaceOwnershipService,
+    RoleAuthorizationService,
     GoogleAuthCryptoService,
     GoogleAuthService,
     { provide: GOOGLE_IDENTITY_PROVIDER, useClass: GoogleOAuthIdentityProvider },
@@ -43,6 +56,6 @@ import { GOOGLE_IDENTITY_PROVIDER, GoogleOAuthIdentityProvider } from './google-
     AuthService,
     AuthTokenService,
   ],
-  exports: [AuthGuard, AuthService],
+  exports: [AuthGuard, RolesGuard, AuthService, MarketplaceOwnershipService],
 })
 export class AuthModule {}

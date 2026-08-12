@@ -1,7 +1,16 @@
-import type { AuthSessionResponse, AuthUser } from '@shopee-clone/contracts';
+import {
+  marketplaceRoleValues,
+  type AuthSessionResponse,
+  type AuthUser,
+  type MarketplaceRole as ContractMarketplaceRole,
+} from '@shopee-clone/contracts';
 import { Inject, Injectable } from '@nestjs/common';
 
-import { PasswordResetDeliveryStatus, UserStatus } from '../generated/prisma/enums';
+import {
+  MarketplaceRole,
+  PasswordResetDeliveryStatus,
+  UserStatus,
+} from '../generated/prisma/enums';
 import { AUTH_CONFIG, type AuthConfig } from './auth.config';
 import { AuthClock } from './auth-clock';
 import {
@@ -24,6 +33,7 @@ type PersistedUser = {
   status: UserStatus;
   deletedAt: Date | null;
   passwordHash: string | null;
+  roleAssignments: Array<{ role: MarketplaceRole }>;
 };
 
 export interface AuthSessionResult extends AuthSessionResponse {
@@ -31,11 +41,26 @@ export interface AuthSessionResult extends AuthSessionResponse {
 }
 
 function safeUser(user: PersistedUser): AuthUser {
+  const persistedRoles = new Set(
+    user.roleAssignments.map((assignment): ContractMarketplaceRole => {
+      switch (assignment.role) {
+        case MarketplaceRole.BUYER:
+          return 'buyer';
+        case MarketplaceRole.SELLER:
+          return 'seller';
+        case MarketplaceRole.ADMIN:
+          return 'admin';
+      }
+    }),
+  );
+  const roles = marketplaceRoleValues.filter((role) => persistedRoles.has(role));
+  if (roles[0] !== 'buyer') throw new AuthenticationFailedError();
   return {
     id: user.id,
     email: user.email,
     displayName: user.displayName,
     status: user.status === UserStatus.ACTIVE ? 'active' : 'suspended',
+    roles,
   };
 }
 

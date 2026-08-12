@@ -7,7 +7,9 @@ import { Pool } from 'pg';
 import { loadRepositoryEnvironment } from '../src/config/repository-environment';
 import {
   ExternalIdentityProvider,
+  MarketplaceRole,
   ProductStatus,
+  RoleAuditSource,
   UserStatus,
   VariantStatus,
 } from '../src/generated/prisma/enums';
@@ -100,6 +102,8 @@ async function verifyDatabase(databaseUrl: string): Promise<void> {
       passwordResetTokens: await prisma.passwordResetToken.count(),
       externalIdentities: await prisma.externalIdentity.count(),
       googleLoginAttempts: await prisma.googleLoginAttempt.count(),
+      roleAssignments: await prisma.userRoleAssignment.count(),
+      roleAuditEvents: await prisma.roleAuditEvent.count(),
     };
     assert.deepEqual(counts, {
       ...seedExpectedCounts,
@@ -107,6 +111,8 @@ async function verifyDatabase(databaseUrl: string): Promise<void> {
       passwordResetTokens: 0,
       externalIdentities: 0,
       googleLoginAttempts: 0,
+      roleAssignments: seedUsers.length + new Set(seedShops.map(({ ownerId }) => ownerId)).size,
+      roleAuditEvents: seedUsers.length + new Set(seedShops.map(({ ownerId }) => ownerId)).size,
     });
 
     const category = await prisma.category.findUnique({
@@ -153,6 +159,39 @@ async function verifyDatabase(databaseUrl: string): Promise<void> {
     assert(user.updatedAt instanceof Date);
     assert.equal(user.deletedAt, null);
     assert.equal(user.passwordHash, null);
+
+    const roleAssignments = await prisma.userRoleAssignment.findMany({
+      orderBy: [{ userId: 'asc' }, { role: 'asc' }],
+    });
+    assert.equal(
+      roleAssignments.filter(({ role }) => role === MarketplaceRole.BUYER).length,
+      seedUsers.length,
+    );
+    assert.equal(
+      roleAssignments.filter(({ role }) => role === MarketplaceRole.SELLER).length,
+      new Set(seedShops.map(({ ownerId }) => ownerId)).size,
+    );
+    assert.equal(
+      roleAssignments.some(({ role }) => role === MarketplaceRole.ADMIN),
+      false,
+    );
+    for (const seedUser of seedUsers) {
+      assert(
+        roleAssignments.some(
+          ({ userId, role }) => userId === seedUser.id && role === MarketplaceRole.BUYER,
+        ),
+      );
+    }
+    for (const shop of seedShops) {
+      assert(
+        roleAssignments.some(
+          ({ userId, role }) => userId === shop.ownerId && role === MarketplaceRole.SELLER,
+        ),
+      );
+    }
+    const seedRoleAuditEvents = await prisma.roleAuditEvent.findMany();
+    assert(seedRoleAuditEvents.every(({ source }) => source === RoleAuditSource.SEED));
+    assert(seedRoleAuditEvents.every(({ actorUserId }) => actorUserId === null));
 
     const homepageModules = await prisma.homepageModule.findMany({
       include: { banners: true, categories: true, products: true },
@@ -242,10 +281,17 @@ async function verifyDatabase(databaseUrl: string): Promise<void> {
          ,'google_login_attempts_return_to_local'
          ,'google_login_attempts_valid_expiry'
          ,'google_login_attempts_valid_consumption'
+         ,'user_role_assignments_actor_source'
+         ,'role_audit_events_reason_bounded'
+         ,'role_audit_events_actor_source'
+         ,'user_role_assignments_user_id_fkey'
+         ,'user_role_assignments_granted_by_user_id_fkey'
+         ,'role_audit_events_target_user_id_fkey'
+         ,'role_audit_events_actor_user_id_fkey'
        )
        ORDER BY conname`,
     );
-    assert.equal(constraintRows.length, 33);
+    assert.equal(constraintRows.length, 40);
 
     const googleIndexRows = await prisma.$queryRawUnsafe<Array<{ indexname: string }>>(
       `SELECT indexname
@@ -261,6 +307,33 @@ async function verifyDatabase(databaseUrl: string): Promise<void> {
     );
     assert.equal(googleIndexRows.length, 6);
 
+    const roleIndexRows = await prisma.$queryRawUnsafe<Array<{ indexname: string }>>(
+      `SELECT indexname
+       FROM pg_indexes
+       WHERE indexname IN (
+         'user_role_assignments_role_user_id_idx',
+         'user_role_assignments_granted_by_user_id_idx',
+         'role_audit_events_created_at_id_idx',
+         'role_audit_events_target_user_id_created_at_idx',
+         'role_audit_events_actor_user_id_created_at_idx',
+         'role_audit_events_role_action_created_at_idx'
+       )`,
+    );
+    assert.equal(roleIndexRows.length, 6);
+
+    const roleEnumLabels = await prisma.$queryRawUnsafe<Array<{ label: string; type: string }>>(
+      `SELECT t.typname AS type, e.enumlabel AS label
+       FROM pg_type t
+       JOIN pg_enum e ON e.enumtypid = t.oid
+       WHERE t.typname IN ('marketplace_role', 'role_audit_action', 'role_audit_source')`,
+    );
+    assert.deepEqual(
+      new Set(
+        roleEnumLabels.filter(({ type }) => type === 'marketplace_role').map(({ label }) => label),
+      ),
+      new Set(['buyer', 'seller', 'admin']),
+    );
+
     const externalIdentityColumns = await prisma.$queryRawUnsafe<Array<{ column_name: string }>>(
       `SELECT column_name
        FROM information_schema.columns
@@ -270,6 +343,48 @@ async function verifyDatabase(databaseUrl: string): Promise<void> {
       externalIdentityColumns.every(
         ({ column_name }) => !/token|email|client|secret/i.test(column_name),
       ),
+    );
+
+    const roleColumns = await prisma.$queryRawUnsafe<Array<{ column_name: string }>>(
+      `SELECT column_name
+       FROM information_schema.columns
+       WHERE table_schema = 'public'
+         AND table_name IN ('user_role_assignments', 'role_audit_events')`,
+    );
+    assert(
+      roleColumns.every(
+        ({ column_name }) => !/password|token|cookie|email|secret/i.test(column_name),
+      ),
+    );
+
+    await expectDatabaseRejection('a duplicate active buyer role', () =>
+      prisma.userRoleAssignment.create({
+        data: {
+          userId: seedUsers[0].id,
+          role: MarketplaceRole.BUYER,
+          source: RoleAuditSource.SEED,
+        },
+      }),
+    );
+    await expectDatabaseRejection('an admin-source role without an actor', () =>
+      prisma.userRoleAssignment.create({
+        data: {
+          userId: seedUsers[0].id,
+          role: MarketplaceRole.ADMIN,
+          source: RoleAuditSource.ADMIN,
+        },
+      }),
+    );
+    const firstAuditEvent = seedRoleAuditEvents[0];
+    assert(firstAuditEvent);
+    await expectDatabaseRejection('role audit event update', () =>
+      prisma.roleAuditEvent.update({
+        where: { id: firstAuditEvent.id },
+        data: { reason: 'Mutated audit reason is prohibited' },
+      }),
+    );
+    await expectDatabaseRejection('role audit event deletion', () =>
+      prisma.roleAuditEvent.delete({ where: { id: firstAuditEvent.id } }),
     );
 
     await expectDatabaseRejection('a duplicate user email', () =>

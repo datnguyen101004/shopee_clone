@@ -37,6 +37,52 @@ async function latestResetUrl(email: string): Promise<string> {
 }
 
 test.describe('secure account authentication', () => {
+  test('keeps guest and buyer-only operational routes role-aware and accessible', async ({
+    page,
+  }) => {
+    await page.goto('/');
+    await expect(page.getByRole('link', { name: 'Kênh người bán' })).toHaveCount(0);
+    await expect(page.getByRole('link', { name: 'Quản trị' })).toHaveCount(0);
+
+    await page.goto('/seller');
+    await expect(page.getByRole('heading', { name: 'Cần đăng nhập' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Đăng nhập', exact: true })).toHaveAttribute(
+      'href',
+      '/login',
+    );
+    await expectAccessible(page);
+
+    await page.route('**/api/v1/auth/refresh', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          accessToken: 'header.payload.signature',
+          expiresAt: '2099-08-13T03:00:00.000Z',
+          user: {
+            id: '00000000-0000-4000-8000-000000000001',
+            email: 'buyer@example.test',
+            displayName: 'Buyer Example',
+            status: 'active',
+            roles: ['buyer'],
+          },
+        }),
+      });
+    });
+    await page.goto('/admin');
+    await expect(page.getByRole('heading', { name: 'Không có quyền truy cập' })).toBeVisible();
+    await expect(page.getByText('Tài khoản hiện tại chưa được cấp quyền phù hợp.')).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Kênh người bán' })).toHaveCount(0);
+    await expect(page.getByRole('link', { name: 'Quản trị' })).toHaveCount(0);
+    await expectAccessible(page);
+
+    const dimensions = await page.evaluate(() => ({
+      width: document.documentElement.clientWidth,
+      scrollWidth: document.documentElement.scrollWidth,
+    }));
+    expect(dimensions.scrollWidth).toBeLessThanOrEqual(dimensions.width);
+  });
+
   test('renders responsive guest account pages with validation and accessibility', async ({
     page,
   }) => {

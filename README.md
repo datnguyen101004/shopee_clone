@@ -98,7 +98,7 @@ See [Product Detail](docs/product-detail.md) for the T10 public product endpoint
 
 See [Account authentication](docs/authentication.md) for T11 email/password sessions and the T11.1 Google sign-in flow, exact local callback, safe environment preflight, and focused verification commands.
 
-See [Account authentication](docs/authentication.md) for T11 endpoints, session/token lifecycle, password policy, local recovery delivery, environment requirements, and focused auth verification commands.
+See [Marketplace role authorization](docs/role-authorization.md) for the T12 permission matrix, persisted seller ownership, first-admin bootstrap, admin role workflow, append-only audit, and focused verification commands.
 
 ## Database workflows
 

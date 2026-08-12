@@ -2,13 +2,20 @@ import { describe, expect, it } from 'vitest';
 
 import {
   isAcceptedAuthPassword,
+  isAuthorizationProblemDetails,
   isAuthProblemDetails,
   isAuthSessionResponse,
+  isCanonicalMarketplaceRoles,
   isForgotPasswordRequest,
   isGoogleSignInCompletion,
   isLoginRequest,
+  isRoleAssignmentResult,
+  isRoleAuditPage,
+  isRoleGrantRequest,
+  isRoleRevokeRequest,
   isRegisterRequest,
   isResetPasswordRequest,
+  isSellerShop,
   normalizeAuthEmail,
   parseGoogleSignInCompletion,
   parseAuthSessionResponse,
@@ -19,6 +26,7 @@ const user = {
   email: 'buyer@example.com',
   displayName: 'Buyer Example',
   status: 'active',
+  roles: ['buyer'],
 };
 
 const session = {
@@ -73,6 +81,64 @@ describe('authentication contracts', () => {
     );
   });
 
+  it('requires exact, deduplicated roles in canonical buyer-seller-admin order', () => {
+    expect(isCanonicalMarketplaceRoles(['buyer'])).toBe(true);
+    expect(isCanonicalMarketplaceRoles(['buyer', 'seller', 'admin'])).toBe(true);
+    expect(isCanonicalMarketplaceRoles(['seller', 'buyer'])).toBe(false);
+    expect(isCanonicalMarketplaceRoles(['buyer', 'buyer'])).toBe(false);
+    expect(isCanonicalMarketplaceRoles(['buyer', 'operator'])).toBe(false);
+    expect(isAuthSessionResponse({ ...session, user: { ...user, roles: undefined } })).toBe(false);
+  });
+
+  it('accepts only strict elevated-role commands and rejects authority assertions', () => {
+    const grant = { role: 'seller', reason: 'Approved seller onboarding' };
+    expect(isRoleGrantRequest(grant)).toBe(true);
+    expect(isRoleGrantRequest({ ...grant, role: 'buyer' })).toBe(false);
+    expect(isRoleGrantRequest({ ...grant, actorUserId: user.id })).toBe(false);
+    expect(isRoleGrantRequest({ ...grant, ownerId: user.id })).toBe(false);
+    expect(isRoleGrantRequest({ ...grant, reason: ' padded reason ' })).toBe(false);
+    expect(isRoleRevokeRequest({ reason: 'Seller access withdrawn' })).toBe(true);
+    expect(isRoleRevokeRequest({ reason: 'short' })).toBe(false);
+  });
+
+  it('parses only safe role, shop, and bounded audit projections', () => {
+    expect(isRoleAssignmentResult({ userId: user.id, roles: ['buyer', 'seller'] })).toBe(true);
+    expect(
+      isSellerShop({
+        id: '00000000-0000-4000-8000-000000000101',
+        slug: 'example-shop',
+        name: 'Example Shop',
+        status: 'active',
+      }),
+    ).toBe(true);
+    expect(
+      isSellerShop({
+        id: '00000000-0000-4000-8000-000000000101',
+        slug: 'example-shop',
+        name: 'Example Shop',
+        status: 'active',
+        ownerId: user.id,
+      }),
+    ).toBe(false);
+    const auditEvent = {
+      id: '00000000-0000-4000-8000-000000000901',
+      targetUserId: user.id,
+      role: 'seller',
+      action: 'grant',
+      source: 'admin',
+      actorUserId: '00000000-0000-4000-8000-000000000002',
+      reason: 'Approved seller onboarding',
+      createdAt: '2026-08-13T03:00:00.000Z',
+    };
+    expect(isRoleAuditPage({ items: [auditEvent], nextCursor: 'opaque_cursor_value_123' })).toBe(
+      true,
+    );
+    expect(isRoleAuditPage({ items: Array(101).fill(auditEvent), nextCursor: null })).toBe(false);
+    expect(
+      isRoleAuditPage({ items: [{ ...auditEvent, email: user.email }], nextCursor: null }),
+    ).toBe(false);
+  });
+
   it('accepts bounded authentication Problem Details and rejects secret extensions', () => {
     expect(
       isAuthProblemDetails({
@@ -89,6 +155,22 @@ describe('authentication contracts', () => {
         status: 401,
         detail: 'The credentials could not be verified.',
         token: 'secret',
+      }),
+    ).toBe(false);
+    expect(
+      isAuthorizationProblemDetails({
+        type: 'https://shopee-clone.local/problems/authorization-denied',
+        title: 'Authorization denied',
+        status: 403,
+        detail: 'The operation is not allowed.',
+      }),
+    ).toBe(true);
+    expect(
+      isAuthorizationProblemDetails({
+        type: 'https://shopee-clone.local/problems/authorization-denied',
+        title: 'Authorization denied',
+        status: 404,
+        detail: 'The operation is not allowed.',
       }),
     ).toBe(false);
   });

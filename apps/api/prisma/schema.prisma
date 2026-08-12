@@ -63,6 +63,31 @@ enum ExternalIdentityProvider {
   @@map("external_identity_provider")
 }
 
+enum MarketplaceRole {
+  BUYER  @map("buyer")
+  SELLER @map("seller")
+  ADMIN  @map("admin")
+
+  @@map("marketplace_role")
+}
+
+enum RoleAuditAction {
+  GRANT  @map("grant")
+  REVOKE @map("revoke")
+
+  @@map("role_audit_action")
+}
+
+enum RoleAuditSource {
+  SYSTEM    @map("system")
+  MIGRATION @map("migration")
+  SEED      @map("seed")
+  BOOTSTRAP @map("bootstrap")
+  ADMIN     @map("admin")
+
+  @@map("role_audit_source")
+}
+
 model User {
   id                  String               @id @default(uuid()) @db.Uuid
   email               String               @unique @db.VarChar(320)
@@ -76,10 +101,48 @@ model User {
   authSessions        AuthSession[]
   passwordResetTokens PasswordResetToken[]
   externalIdentities  ExternalIdentity[]
+  roleAssignments     UserRoleAssignment[] @relation("RoleAssignmentTarget")
+  rolesGranted        UserRoleAssignment[] @relation("RoleAssignmentActor")
+  roleAuditEvents     RoleAuditEvent[]     @relation("RoleAuditTarget")
+  roleAuditActions    RoleAuditEvent[]     @relation("RoleAuditActor")
 
   @@index([status])
   @@index([deletedAt])
   @@map("users")
+}
+
+model UserRoleAssignment {
+  userId          String          @map("user_id") @db.Uuid
+  role            MarketplaceRole
+  grantedAt       DateTime        @default(now()) @map("granted_at") @db.Timestamptz(3)
+  source          RoleAuditSource
+  grantedByUserId String?         @map("granted_by_user_id") @db.Uuid
+  user            User            @relation("RoleAssignmentTarget", fields: [userId], references: [id], onDelete: Restrict)
+  grantedBy       User?           @relation("RoleAssignmentActor", fields: [grantedByUserId], references: [id], onDelete: Restrict)
+
+  @@id([userId, role])
+  @@index([role, userId])
+  @@index([grantedByUserId])
+  @@map("user_role_assignments")
+}
+
+model RoleAuditEvent {
+  id           String          @id @default(uuid()) @db.Uuid
+  targetUserId String          @map("target_user_id") @db.Uuid
+  role         MarketplaceRole
+  action       RoleAuditAction
+  source       RoleAuditSource
+  actorUserId  String?         @map("actor_user_id") @db.Uuid
+  reason       String          @db.VarChar(240)
+  createdAt    DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
+  targetUser   User            @relation("RoleAuditTarget", fields: [targetUserId], references: [id], onDelete: Restrict)
+  actorUser    User?           @relation("RoleAuditActor", fields: [actorUserId], references: [id], onDelete: Restrict)
+
+  @@index([createdAt, id])
+  @@index([targetUserId, createdAt])
+  @@index([actorUserId, createdAt])
+  @@index([role, action, createdAt])
+  @@map("role_audit_events")
 }
 
 model ExternalIdentity {

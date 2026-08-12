@@ -1,5 +1,6 @@
 'use client';
 
+import { hasMarketplaceRole } from '@shopee-clone/contracts';
 import { Container, Search, ShoppingCart, Store, UserRound } from '@shopee-clone/ui';
 import Link from 'next/link';
 import { useEffect, useRef, useState, type FormEvent, type RefObject } from 'react';
@@ -46,7 +47,12 @@ export function MarketplaceHeader({
   return (
     <Container className="market-header">
       <div className="market-topline">
-        <Link href="/login">Kênh người bán</Link>
+        {account.status === 'authenticated' && hasMarketplaceRole(account.user, 'seller') ? (
+          <Link href="/seller">Kênh người bán</Link>
+        ) : null}
+        {account.status === 'authenticated' && hasMarketplaceRole(account.user, 'admin') ? (
+          <Link href="/admin">Quản trị</Link>
+        ) : null}
         <span>Kết nối · Hỗ trợ</span>
       </div>
       <div className="market-header__main">

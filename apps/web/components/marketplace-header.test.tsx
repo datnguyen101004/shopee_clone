@@ -94,6 +94,7 @@ describe('StorefrontShell', () => {
             email: 'buyer@example.com',
             displayName: 'Buyer Example',
             status: 'active',
+            roles: ['buyer'],
           },
         }}
         onLogout={onLogout}
@@ -102,5 +103,42 @@ describe('StorefrontShell', () => {
     expect(screen.getByLabelText('Tài khoản Buyer Example')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Đăng xuất' }));
     expect(onLogout).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows only links backed by the corresponding validated roles', () => {
+    const account = {
+      status: 'authenticated' as const,
+      user: {
+        id: '00000000-0000-4000-8000-000000000001',
+        email: 'seller@example.com',
+        displayName: 'Seller Example',
+        status: 'active' as const,
+        roles: ['buyer', 'seller'] as ['buyer', 'seller'],
+      },
+    };
+    const { rerender } = render(
+      <MarketplaceHeader
+        categoriesOpen={false}
+        onCategoriesToggle={vi.fn()}
+        menuButtonRef={{ current: null }}
+        account={account}
+      />,
+    );
+    expect(screen.getByRole('link', { name: 'Kênh người bán' })).toHaveAttribute('href', '/seller');
+    expect(screen.queryByRole('link', { name: 'Quản trị' })).not.toBeInTheDocument();
+
+    rerender(
+      <MarketplaceHeader
+        categoriesOpen={false}
+        onCategoriesToggle={vi.fn()}
+        menuButtonRef={{ current: null }}
+        account={{
+          ...account,
+          user: { ...account.user, roles: ['buyer', 'admin'] },
+        }}
+      />,
+    );
+    expect(screen.queryByRole('link', { name: 'Kênh người bán' })).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Quản trị' })).toHaveAttribute('href', '/admin');
   });
 });

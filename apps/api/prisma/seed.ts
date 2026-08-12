@@ -1,6 +1,9 @@
 import {
   HomepageModuleType,
+  MarketplaceRole,
   ProductStatus,
+  RoleAuditAction,
+  RoleAuditSource,
   ShopStatus,
   UserStatus,
   VariantStatus,
@@ -55,6 +58,54 @@ async function seedMarketplace(): Promise<void> {
           deletedAt: null,
         },
       });
+    }
+
+    for (const [index, user] of seedUsers.entries()) {
+      const assignment = await transaction.userRoleAssignment.createMany({
+        data: {
+          userId: user.id,
+          role: MarketplaceRole.BUYER,
+          source: RoleAuditSource.SEED,
+        },
+        skipDuplicates: true,
+      });
+      if (assignment.count === 1) {
+        await transaction.roleAuditEvent.create({
+          data: {
+            id: `10000000-0000-4000-8000-${String(index + 1).padStart(12, '0')}`,
+            targetUserId: user.id,
+            role: MarketplaceRole.BUYER,
+            action: RoleAuditAction.GRANT,
+            source: RoleAuditSource.SEED,
+            reason: 'Buyer role assigned by deterministic local seed',
+          },
+        });
+      }
+    }
+
+    for (const [index, ownerId] of [
+      ...new Set(seedShops.map(({ ownerId }) => ownerId)),
+    ].entries()) {
+      const assignment = await transaction.userRoleAssignment.createMany({
+        data: {
+          userId: ownerId,
+          role: MarketplaceRole.SELLER,
+          source: RoleAuditSource.SEED,
+        },
+        skipDuplicates: true,
+      });
+      if (assignment.count === 1) {
+        await transaction.roleAuditEvent.create({
+          data: {
+            id: `20000000-0000-4000-8000-${String(index + 1).padStart(12, '0')}`,
+            targetUserId: ownerId,
+            role: MarketplaceRole.SELLER,
+            action: RoleAuditAction.GRANT,
+            source: RoleAuditSource.SEED,
+            reason: 'Seller role assigned to deterministic shop owner',
+          },
+        });
+      }
     }
 
     for (const category of seedCategories) {

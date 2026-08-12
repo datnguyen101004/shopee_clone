@@ -21,6 +21,7 @@
     "infra:smoke": "node scripts/infrastructure-smoke.mjs",
     "ci:validate": "node scripts/validate-ci.mjs",
     "auth:google:preflight": "node --env-file=.env scripts/google-oauth-preflight.mjs",
+    "auth:roles:bootstrap-admin": "pnpm --filter @shopee-clone/api auth:roles:bootstrap-admin",
     "db:generate": "pnpm --filter @shopee-clone/api db:generate",
     "db:format": "pnpm --filter @shopee-clone/api db:format",
     "db:validate": "pnpm --filter @shopee-clone/api db:validate",

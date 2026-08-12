@@ -20,7 +20,8 @@
     "db:migrate:deploy": "prisma migrate deploy",
     "db:seed": "prisma db seed",
     "db:reset": "prisma migrate reset",
-    "db:verify": "tsx prisma/verify.ts"
+    "db:verify": "tsx prisma/verify.ts",
+    "auth:roles:bootstrap-admin": "tsx scripts/bootstrap-admin.ts"
   },
   "dependencies": {
     "@nestjs/common": "11.1.29",

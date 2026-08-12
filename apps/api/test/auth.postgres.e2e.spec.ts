@@ -12,6 +12,7 @@ import {
 import { CaptureRecoveryMailer, RECOVERY_MAILER } from '../src/auth/recovery-mailer';
 import { configureApplication } from '../src/configure-application';
 import { loadRepositoryEnvironment } from '../src/config/repository-environment';
+import { MarketplaceRole, RoleAuditAction, RoleAuditSource } from '../src/generated/prisma/enums';
 import { PrismaService } from '../src/prisma/prisma.service';
 
 const databaseTest = process.env.RUN_AUTH_DATABASE_TESTS === '1' ? describe : describe.skip;
@@ -77,13 +78,9 @@ databaseTest('Authentication with isolated PostgreSQL', () => {
     configureApplication(app, loadAuthConfig({ NODE_ENV: 'test' }));
     await app.init();
     prisma = app.get(PrismaService);
-    await prisma.user.deleteMany({ where: { email } });
-    await prisma.user.deleteMany({ where: { email: { in: [googleEmail, collisionEmail] } } });
   });
 
   afterAll(async () => {
-    await prisma?.user.deleteMany({ where: { email } });
-    await prisma?.user.deleteMany({ where: { email: { in: [googleEmail, collisionEmail] } } });
     await app?.close();
   });
 
@@ -103,6 +100,7 @@ databaseTest('Authentication with isolated PostgreSQL', () => {
     expect(registered.body.user).toMatchObject({
       email,
       displayName: 'T11 PostgreSQL Buyer',
+      roles: ['buyer'],
     });
     expect(await prisma.user.findUniqueOrThrow({ where: { email } })).toMatchObject({
       email,
@@ -209,13 +207,20 @@ databaseTest('Authentication with isolated PostgreSQL', () => {
 
     const persisted = await prisma.user.findUniqueOrThrow({
       where: { email },
-      include: { authSessions: true, passwordResetTokens: true },
+      include: {
+        authSessions: true,
+        passwordResetTokens: true,
+        roleAssignments: true,
+        roleAuditEvents: true,
+      },
     });
     expect(persisted.passwordHash).toMatch(/^scrypt\$1\$/);
     expect(persisted.authSessions.some((session) => session.revokedAt !== null)).toBe(true);
     expect(persisted.passwordResetTokens).toHaveLength(2);
     expect(persisted.passwordResetTokens.some((token) => token.usedAt !== null)).toBe(true);
     expect(persisted.passwordResetTokens.some((token) => token.revokedAt !== null)).toBe(true);
+    expect(persisted.roleAssignments.map(({ role }) => role)).toEqual([MarketplaceRole.BUYER]);
+    expect(persisted.roleAuditEvents).toHaveLength(1);
   });
 
   it('creates one Google identity, reuses its subject, rejects replay, and refuses email linking', async () => {
@@ -239,12 +244,19 @@ databaseTest('Authentication with isolated PostgreSQL', () => {
     expect(await prisma.user.count({ where: { email: googleEmail } })).toBe(1);
     const googleUser = await prisma.user.findUniqueOrThrow({
       where: { email: googleEmail },
-      include: { externalIdentities: true, authSessions: true },
+      include: {
+        externalIdentities: true,
+        authSessions: true,
+        roleAssignments: true,
+        roleAuditEvents: true,
+      },
     });
     expect(googleUser.passwordHash).toBeNull();
     expect(googleUser.externalIdentities).toHaveLength(1);
     expect(googleUser.externalIdentities[0]?.providerSubject).toBe('google-postgres-subject');
     expect(googleUser.authSessions).toHaveLength(2);
+    expect(googleUser.roleAssignments.map(({ role }) => role)).toEqual([MarketplaceRole.BUYER]);
+    expect(googleUser.roleAuditEvents).toHaveLength(1);
 
     const replayStart = starts[0]!;
     const replayState = new URL(replayStart.headers.location as string).searchParams.get('state');
@@ -255,12 +267,30 @@ databaseTest('Authentication with isolated PostgreSQL', () => {
     expect(replay.headers.location).toContain('outcome=failed');
     expect(await prisma.externalIdentity.count({ where: { userId: googleUser.id } })).toBe(1);
 
-    await prisma.user.create({
-      data: {
-        email: collisionEmail,
-        displayName: 'Existing Password Buyer',
-        passwordHash: 'locked',
-      },
+    await prisma.$transaction(async (transaction) => {
+      const collisionUser = await transaction.user.create({
+        data: {
+          email: collisionEmail,
+          displayName: 'Existing Password Buyer',
+          passwordHash: 'locked',
+        },
+      });
+      await transaction.userRoleAssignment.create({
+        data: {
+          userId: collisionUser.id,
+          role: MarketplaceRole.BUYER,
+          source: RoleAuditSource.SYSTEM,
+        },
+      });
+      await transaction.roleAuditEvent.create({
+        data: {
+          targetUserId: collisionUser.id,
+          role: MarketplaceRole.BUYER,
+          action: RoleAuditAction.GRANT,
+          source: RoleAuditSource.SYSTEM,
+          reason: 'Buyer role assigned for collision test',
+        },
+      });
     });
     const collisionStart = await request(app.getHttpServer()).get(
       '/api/v1/auth/google/start?returnTo=%2F',

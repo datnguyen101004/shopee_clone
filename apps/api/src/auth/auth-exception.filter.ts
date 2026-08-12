@@ -5,9 +5,11 @@ import {
   type ExceptionFilter,
 } from '@nestjs/common';
 import type { Response } from 'express';
+import type { Request } from 'express';
 
 import {
   AuthenticationFailedError,
+  AuthorizationDeniedError,
   AuthInputError,
   AuthOriginDeniedError,
   AuthRateLimitedError,
@@ -15,12 +17,16 @@ import {
   RecoveryDeliveryFailedError,
   RefreshSessionFailedError,
   RegistrationUnavailableError,
+  RoleConflictError,
+  RoleRequestError,
+  RoleTargetUnavailableError,
 } from './auth.errors';
 
 @Catch()
 export class AuthExceptionFilter implements ExceptionFilter {
   catch(exception: unknown, host: ArgumentsHost): void {
     const response = host.switchToHttp().getResponse<Response>();
+    const request = host.switchToHttp().getRequest<Request>();
     response.setHeader('Cache-Control', 'no-store');
     if (exception instanceof AuthRateLimitedError) {
       response.setHeader('Retry-After', String(exception.retryAfterSeconds));
@@ -36,13 +42,20 @@ export class AuthExceptionFilter implements ExceptionFilter {
       );
       return;
     }
-    if (exception instanceof AuthInputError || exception instanceof BadRequestException) {
+    if (
+      exception instanceof AuthInputError ||
+      exception instanceof BadRequestException ||
+      exception instanceof RoleRequestError
+    ) {
+      const roleRequest = request.path.startsWith('/api/v1/admin');
       this.problem(
         response,
         400,
-        'invalid-authentication-request',
+        roleRequest ? 'invalid-role-request' : 'invalid-authentication-request',
         'Invalid request',
-        'One or more authentication fields are invalid.',
+        roleRequest
+          ? 'One or more role command fields are invalid.'
+          : 'One or more authentication fields are invalid.',
         {
           invalidParameters:
             exception instanceof AuthInputError ? exception.invalidParameters : ['request'],
@@ -90,6 +103,36 @@ export class AuthExceptionFilter implements ExceptionFilter {
         'authentication-origin-denied',
         'Origin denied',
         'This browser origin is not allowed to perform authentication actions.',
+      );
+      return;
+    }
+    if (exception instanceof AuthorizationDeniedError) {
+      this.problem(
+        response,
+        403,
+        'authorization-denied',
+        'Authorization denied',
+        'The authenticated account is not allowed to perform this operation.',
+      );
+      return;
+    }
+    if (exception instanceof RoleTargetUnavailableError) {
+      this.problem(
+        response,
+        404,
+        'role-target-unavailable',
+        'Role target unavailable',
+        'The requested role target is unavailable.',
+      );
+      return;
+    }
+    if (exception instanceof RoleConflictError) {
+      this.problem(
+        response,
+        409,
+        'role-conflict',
+        'Role change conflict',
+        'The requested role change conflicts with the current authorization state.',
       );
       return;
     }

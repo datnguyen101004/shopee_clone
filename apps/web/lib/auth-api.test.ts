@@ -14,6 +14,7 @@ const session = {
     email: 'buyer@example.com',
     displayName: 'Buyer Example',
     status: 'active',
+    roles: ['buyer'],
   },
 };
 

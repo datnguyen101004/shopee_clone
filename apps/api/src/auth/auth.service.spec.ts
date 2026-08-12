@@ -1,4 +1,4 @@
-import { UserStatus } from '../generated/prisma/enums';
+import { MarketplaceRole, UserStatus } from '../generated/prisma/enums';
 import { loadAuthConfig } from './auth.config';
 import type { AuthClock } from './auth-clock';
 import {
@@ -21,6 +21,7 @@ const user = {
   status: UserStatus.ACTIVE,
   deletedAt: null,
   passwordHash: 'stored-hash',
+  roleAssignments: [{ role: MarketplaceRole.BUYER }],
 };
 
 describe('AuthService', () => {

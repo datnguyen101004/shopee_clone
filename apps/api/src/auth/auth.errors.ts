@@ -16,6 +16,10 @@ export class RecoveryDeliveryFailedError extends Error {}
 export class AuthOriginDeniedError extends Error {}
 export class GoogleSignInFailedError extends Error {}
 export class GoogleAccountMethodRequiredError extends Error {}
+export class AuthorizationDeniedError extends Error {}
+export class RoleConflictError extends Error {}
+export class RoleTargetUnavailableError extends Error {}
+export class RoleRequestError extends Error {}
 
 export class AuthRateLimitedError extends Error {
   constructor(public readonly retryAfterSeconds: number) {

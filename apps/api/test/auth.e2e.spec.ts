@@ -17,6 +17,7 @@ const authUser = {
   email: 'buyer@example.com',
   displayName: 'Buyer Example',
   status: 'active' as const,
+  roles: ['buyer'] as ['buyer'],
 };
 const session = {
   accessToken: 'header.payload.signature',

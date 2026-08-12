@@ -27,6 +27,6 @@
 - [x] 5.1 Generate and commit the pnpm lockfile using the pinned package manager, then verify `pnpm install --frozen-lockfile` from the repository root.
 - [x] 5.2 Verify `dev:web` and `dev:api` start independently and the root `dev` command starts both applications with distinguishable logs.
 - [x] 5.3 Run root formatting check, lint, typecheck, unit tests, and production build; fix every workspace failure.
-- [ ] 5.4 Perform HTTP smoke checks against the built/running frontend health page and backend health endpoint and record the verification in the pull request.
+- [x] 5.4 Perform HTTP smoke checks against the built/running frontend health page and backend health endpoint and record the verification in the pull request.
 
-  HTTP smoke checks are complete and documented in `verification.md`; copying the evidence into a pull request remains pending until the branch is published.
+  HTTP smoke checks are complete and documented in `verification.md` and pull request #41.

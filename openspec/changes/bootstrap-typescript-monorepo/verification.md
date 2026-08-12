@@ -24,6 +24,6 @@ Verified locally on 2026-08-12 with Node.js 22.12.0 and pnpm 10.34.5.
 
 The API production payload was validated as `{ "status": "ok", "service": "api", "timestamp": "<ISO 8601>" }`.
 
-## Pull request note
+## Pull request
 
-Copy this verification summary into the T02 pull request when the branch is published.
+The verification summary is recorded in [pull request #41](https://github.com/datnguyen101004/shopee_clone/pull/41).

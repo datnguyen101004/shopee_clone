@@ -16,14 +16,21 @@ export {
   CATALOG_DEFAULT_PAGE,
   CATALOG_DEFAULT_PAGE_SIZE,
   CATALOG_MAX_PAGE_SIZE,
+  catalogSortValues,
   isCatalogProductsResponse,
   parseCatalogProductsResponse,
 } from './catalog';
 export type {
   CatalogCategorySummary,
+  CatalogCategoryFacet,
+  CatalogAvailability,
+  CatalogFacets,
   CatalogPagination,
   CatalogProductCard,
   CatalogProductsResponse,
   CatalogQueryContext,
+  CatalogPriceRangeFacet,
+  CatalogPromotion,
   CatalogShopSummary,
+  CatalogSort,
 } from './catalog';

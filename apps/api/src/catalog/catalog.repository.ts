@@ -10,7 +10,8 @@ export class CatalogRepository {
   findActiveCategories() {
     return this.prisma.category.findMany({
       where: { isActive: true, deletedAt: null },
-      select: { id: true, parentId: true, slug: true },
+      select: { id: true, parentId: true, slug: true, name: true, sortOrder: true },
+      orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }],
     });
   }
 

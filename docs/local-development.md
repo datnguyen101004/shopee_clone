@@ -48,11 +48,13 @@ For fast homepage iteration, first run `pnpm dev` against an already migrated an
 
 GitHub Actions automatic push and pull-request triggers are temporarily disabled. The workflow remains available through manual dispatch; run local quality gates before pushing until automatic CI is restored.
 
-## Product catalogue (T08)
+## Product discovery (T08–T09)
 
-`GET /api/v1/catalog/products` is an anonymous, no-store catalogue endpoint. It accepts `category`, `page` (default `1`), and `pageSize` (default `12`, maximum `48`). A parent category includes active descendants; an unknown, inactive, or deleted category returns a valid empty page. Results are ordered by `createdAt DESC, id ASC` after display eligibility is applied.
+`GET /api/v1/catalog/products` is an anonymous, no-store discovery endpoint. It accepts `q`, `category`, `minPrice`, `maxPrice`, `rating` (whole stars `1`–`5`), `location`, `availability=in-stock`, `promotion=discounted`, `sort`, `page` (default `1`), and `pageSize` (default `12`, maximum `48`). Sort values are `relevance`, `newest`, `best-selling`, `price-asc`, and `price-desc`. With a keyword the default is relevance; without one it is newest, including explicit relevance fallback. Malformed or repeated supported parameters return sanitized Problem Details; unknown but safe category/location values return zero matches with usable facets.
 
-Cards use the lowest-priced active in-stock variant for integer-minor-unit price and server-computed discount. Shop location and the product rating/count/sold summaries are seed/admin-owned presentation fields until future order and review projections become authoritative. T09 owns free-text search and ranking, so `q` is preserved in browser pagination but does not filter T08 API results. Product links intentionally hand off to the existing T10 placeholder route.
+Search is Unicode-normalized, accent-insensitive, maps `đ` to `d`, tokenizes unique words, and matches product name, category, shop, or description. Integer relevance weights are: exact name `1000`, name prefix `500`, exact name token `200`, partial name `100`, category `50`, shop `30`, and description `10`. All filters use AND semantics before totals, sorting, and pagination. Parent categories include active descendants. The response always carries unfiltered displayable category/location/representative-price facets so zero-result pages can recover.
+
+Cards still use the lowest-priced active in-stock variant for integer-minor-unit price and server-computed discount. Shop location and rating/count/sold summaries remain seed/admin-owned presentation fields until future order and review projections become authoritative. T09 intentionally does not add typo correction, semantic search, personalization, facet counts, multi-select filters, or a dedicated search engine. `/search` uses one allowlisted URL serializer; GET form application resets to page 1, while pagination and retry preserve supported normalized state only.
 
 Use `pnpm test:e2e:catalog:quick` against already-running local services for focused iteration. Use `pnpm test:e2e:catalog` for the isolated migration, seed, real PostgreSQL/Supertest, production build, and three-viewport browser gate.
 

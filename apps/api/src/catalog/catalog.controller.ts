@@ -10,7 +10,7 @@ import { CatalogService } from './catalog.service';
 export class CatalogController {
   constructor(@Inject(CatalogService) private readonly service: CatalogService) {}
 
-  /** Public, deterministic product catalogue for category browsing. */
+  /** Public, deterministic product discovery across the displayable catalogue. */
   @Get()
   @Header('Cache-Control', 'no-store')
   getProducts(@Query() query: Record<string, unknown>): Promise<CatalogProductsResponse> {

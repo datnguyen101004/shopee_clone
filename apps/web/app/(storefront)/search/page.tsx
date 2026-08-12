@@ -1,11 +1,13 @@
+import { Badge, Container } from '@shopee-clone/ui';
+
 import {
   CatalogContent,
-  catalogPageHref,
+  DiscoveryControls,
   type CatalogRouteContext,
 } from '../../../components/catalog/catalog';
 import { CatalogEmptyState, CatalogErrorState } from '../../../components/catalog/catalog-states';
 import { fetchCatalogProducts } from '../../../lib/catalog-api';
-import { Badge, Container } from '@shopee-clone/ui';
+import { catalogSearchHref, pickCatalogQuery } from '../../../lib/catalog-query';
 
 export const dynamic = 'force-dynamic';
 
@@ -13,60 +15,58 @@ type SearchPageProps = {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 };
 
-function firstValue(value?: string | string[]): string {
-  return (Array.isArray(value) ? value[0] : value)?.trim() ?? '';
-}
-
-function positiveInteger(value: string, maximum?: number): number | undefined {
-  if (!/^[1-9]\d*$/.test(value)) return undefined;
-  const parsed = Number(value);
-  return Number.isSafeInteger(parsed) && (!maximum || parsed <= maximum) ? parsed : undefined;
-}
-
 export default async function SearchPage({ searchParams }: SearchPageProps) {
-  const raw = await searchParams;
-  const category = firstValue(raw.category) || undefined;
-  const q = firstValue(raw.q) || undefined;
-  const page = positiveInteger(firstValue(raw.page)) ?? 1;
-  const pageSize = positiveInteger(firstValue(raw.pageSize), 48);
-  const context: CatalogRouteContext = {
-    ...(category ? { category } : {}),
-    ...(q ? { q } : {}),
-    ...(pageSize ? { pageSize } : {}),
-  };
-  const retryHref = catalogPageHref(context, page);
-
+  const requested = pickCatalogQuery(await searchParams);
   let response = null;
   try {
-    response = await fetchCatalogProducts({ category, page, pageSize });
+    response = await fetchCatalogProducts(requested);
   } catch {
     // The explicit error composition below keeps the shared storefront shell available.
   }
 
-  const content = response ? (
-    response.items.length ? (
-      <CatalogContent response={response} context={context} />
-    ) : (
-      <CatalogEmptyState filtered={Boolean(category || q)} />
-    )
-  ) : (
-    <CatalogErrorState retryHref={retryHref} />
-  );
+  if (!response) {
+    return (
+      <Container className="catalog-page">
+        <header className="catalog-heading">
+          <Badge variant="brand">SHOPEE CLONE</Badge>
+          <h1>Khám phá sản phẩm</h1>
+          <p>
+            Đường dẫn hoặc dịch vụ tìm kiếm hiện chưa thể xử lý. Hãy kiểm tra bộ lọc và thử lại.
+          </p>
+        </header>
+        <CatalogErrorState retryHref={catalogSearchHref(requested)} />
+      </Container>
+    );
+  }
 
-  const description = q
-    ? `Từ khóa “${q}” được giữ cho T09; hiện đang hiển thị catalog theo danh mục.`
-    : category
-      ? `Sản phẩm trong danh mục “${category}” và các danh mục con.`
-      : 'Khám phá sản phẩm mới nhất từ các gian hàng.';
+  const context: CatalogRouteContext = {
+    ...response.query,
+    pageSize: response.pagination.pageSize,
+  };
+  const isFiltered = [
+    response.query.q,
+    response.query.category,
+    response.query.minPrice,
+    response.query.maxPrice,
+    response.query.rating,
+    response.query.location,
+    response.query.availability,
+    response.query.promotion,
+  ].some((value) => value !== null);
 
   return (
     <Container className="catalog-page">
       <header className="catalog-heading">
         <Badge variant="brand">SHOPEE CLONE</Badge>
-        <h1>Danh mục sản phẩm</h1>
-        <p>{description}</p>
+        <h1>{response.query.q ? `Kết quả cho “${response.query.q}”` : 'Khám phá sản phẩm'}</h1>
+        <p>Tìm kiếm, lọc và sắp xếp sản phẩm từ các gian hàng đang hoạt động.</p>
       </header>
-      {content}
+      <DiscoveryControls response={response} context={context} />
+      {response.items.length ? (
+        <CatalogContent response={response} context={context} />
+      ) : (
+        <CatalogEmptyState filtered={isFiltered} />
+      )}
     </Container>
   );
 }

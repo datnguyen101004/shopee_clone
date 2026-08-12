@@ -1,7 +1,30 @@
 import type { CatalogRepository } from './catalog.repository';
+import type { NormalizedCatalogQuery } from './catalog-query';
 import { CatalogService } from './catalog.service';
 
 type Candidate = Awaited<ReturnType<CatalogRepository['findCandidates']>>[number];
+
+function query(overrides: Partial<NormalizedCatalogQuery> = {}): NormalizedCatalogQuery {
+  return {
+    q: null,
+    category: null,
+    minPrice: null,
+    maxPrice: null,
+    rating: null,
+    location: null,
+    availability: null,
+    promotion: null,
+    sort: 'newest',
+    page: 1,
+    pageSize: 12,
+    ...overrides,
+  };
+}
+
+const categories = [
+  { id: 'root-1', parentId: null, slug: 'electronics', name: 'Điện tử', sortOrder: 0 },
+  { id: 'leaf-1', parentId: 'root-1', slug: 'phones', name: 'Điện thoại', sortOrder: 1 },
+];
 
 function candidate(overrides: Partial<Candidate> = {}): Candidate {
   return {
@@ -86,19 +109,18 @@ describe('CatalogService', () => {
   beforeEach(() => jest.clearAllMocks());
 
   it('resolves descendants, maps promotions, and paginates after eligibility', async () => {
-    repository.findActiveCategories.mockResolvedValue([
-      { id: 'root-1', parentId: null, slug: 'electronics' },
-      { id: 'leaf-1', parentId: 'root-1', slug: 'phones' },
-    ]);
+    repository.findActiveCategories.mockResolvedValue(categories);
     repository.findCandidates.mockResolvedValue([
       candidate(),
       candidate({ id: 'product-2', variants: [] }),
       candidate({ id: 'product-3', name: 'Tai nghe', soldCount: 99 }),
     ]);
 
-    const response = await service.getProducts({ category: 'electronics', page: 2, pageSize: 1 });
+    const response = await service.getProducts(
+      query({ category: 'electronics', page: 2, pageSize: 1 }),
+    );
 
-    expect(repository.findCandidates).toHaveBeenCalledWith(['root-1', 'leaf-1']);
+    expect(repository.findCandidates).toHaveBeenCalledWith();
     expect(response.pagination).toEqual({ page: 2, pageSize: 1, totalItems: 2, totalPages: 2 });
     expect(response.items[0]).toMatchObject({
       id: 'product-3',
@@ -111,19 +133,22 @@ describe('CatalogService', () => {
   });
 
   it('returns a valid empty page for an unknown category and beyond-final page', async () => {
-    repository.findActiveCategories.mockResolvedValue([]);
-    expect(await service.getProducts({ category: 'unknown', page: 3, pageSize: 12 })).toMatchObject(
-      { items: [], pagination: { page: 3, totalItems: 0, totalPages: 0 } },
-    );
-    expect(repository.findCandidates).not.toHaveBeenCalled();
-
     repository.findCandidates.mockResolvedValue([candidate()]);
-    const beyond = await service.getProducts({ category: null, page: 2, pageSize: 12 });
+    repository.findActiveCategories.mockResolvedValue(categories);
+    const unknown = await service.getProducts(query({ category: 'unknown', page: 3 }));
+    expect(unknown).toMatchObject({
+      items: [],
+      pagination: { page: 3, totalItems: 0, totalPages: 0 },
+      facets: { categories: expect.any(Array), locations: ['Hà Nội'] },
+    });
+
+    const beyond = await service.getProducts(query({ page: 2 }));
     expect(beyond.items).toEqual([]);
     expect(beyond.pagination).toMatchObject({ totalItems: 1, totalPages: 1 });
   });
 
   it('omits invalid promotion metadata and chooses the lowest in-stock offer', async () => {
+    repository.findActiveCategories.mockResolvedValue(categories);
     repository.findCandidates.mockResolvedValue([
       candidate({
         variants: [
@@ -146,9 +171,85 @@ describe('CatalogService', () => {
         ],
       }),
     ]);
-    const response = await service.getProducts({ category: null, page: 1, pageSize: 12 });
+    const response = await service.getProducts(query());
     expect(response.items[0]).toMatchObject({ priceMinor: 500 });
     expect(response.items[0]).not.toHaveProperty('compareAtPriceMinor');
     expect(response.items[0]).not.toHaveProperty('discountPercent');
+  });
+
+  it('derives unfiltered facets and applies every criterion with AND semantics', async () => {
+    repository.findActiveCategories.mockResolvedValue(categories);
+    repository.findCandidates.mockResolvedValue([
+      candidate(),
+      candidate({
+        id: 'product-2',
+        name: 'Ốp lưng',
+        description: 'Phụ kiện điện thoại',
+        ratingAverageBasisPoints: 399,
+        shop: { ...candidate().shop, location: 'Đà Nẵng' },
+        variants: [
+          {
+            ...candidate().variants[0]!,
+            priceMinor: 300n,
+            compareAtPriceMinor: null,
+          },
+        ],
+      }),
+    ]);
+
+    const response = await service.getProducts(
+      query({
+        q: 'dien thoai',
+        category: 'electronics',
+        minPrice: 500,
+        maxPrice: 900,
+        rating: 4,
+        location: 'ha noi',
+        availability: 'in-stock',
+        promotion: 'discounted',
+        sort: 'relevance',
+      }),
+    );
+
+    expect(response.items.map((item) => item.id)).toEqual(['00000000-0000-4000-8000-000000000301']);
+    expect(response.query.location).toBe('Hà Nội');
+    expect(response.facets).toEqual({
+      categories: [
+        { slug: 'electronics', name: 'Điện tử', parentSlug: null },
+        { slug: 'phones', name: 'Điện thoại', parentSlug: 'electronics' },
+      ],
+      locations: ['Đà Nẵng', 'Hà Nội'],
+      priceRange: { min: 300, max: 800 },
+    });
+  });
+
+  it.each([
+    ['best-selling', ['product-2', 'product-1']],
+    ['price-asc', ['product-2', 'product-1']],
+    ['price-desc', ['product-1', 'product-2']],
+  ] as const)('sorts by %s with stable tie-breakers', async (sort, expected) => {
+    repository.findActiveCategories.mockResolvedValue(categories);
+    repository.findCandidates.mockResolvedValue([
+      candidate({ id: 'product-1', soldCount: 10, createdAt: new Date('2026-08-11') }),
+      candidate({
+        id: 'product-2',
+        soldCount: 20,
+        createdAt: new Date('2026-08-10'),
+        variants: [{ ...candidate().variants[0]!, priceMinor: 400n }],
+      }),
+    ]);
+
+    const response = await service.getProducts(query({ sort }));
+    expect(response.items.map((item) => item.id)).toEqual(expected);
+  });
+
+  it('falls back to newest ordering when relevance has no keyword', async () => {
+    repository.findActiveCategories.mockResolvedValue(categories);
+    repository.findCandidates.mockResolvedValue([
+      candidate({ id: 'older', createdAt: new Date('2026-08-10') }),
+      candidate({ id: 'newer', createdAt: new Date('2026-08-12') }),
+    ]);
+    const response = await service.getProducts(query({ sort: 'relevance' }));
+    expect(response.items.map((item) => item.id)).toEqual(['newer', 'older']);
   });
 });

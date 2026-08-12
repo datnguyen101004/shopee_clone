@@ -3,8 +3,25 @@ import { describe, expect, it } from 'vitest';
 import { isCatalogProductsResponse, parseCatalogProductsResponse } from '../src';
 
 const response = {
-  query: { category: 'mobile-accessories' },
+  query: {
+    q: 'tai nghe',
+    category: 'mobile-accessories',
+    minPrice: 100_000,
+    maxPrice: 500_000,
+    rating: 4,
+    location: 'TP. Hồ Chí Minh',
+    availability: 'in-stock',
+    promotion: 'discounted',
+    sort: 'relevance',
+  },
   pagination: { page: 1, pageSize: 12, totalItems: 1, totalPages: 1 },
+  facets: {
+    categories: [
+      { slug: 'mobile-accessories', name: 'Điện thoại & Phụ kiện', parentSlug: 'electronics' },
+    ],
+    locations: ['TP. Hồ Chí Minh'],
+    priceRange: { min: 179_000, max: 12_990_000 },
+  },
   items: [
     {
       id: 'product-1',
@@ -71,6 +88,27 @@ describe('catalog contract', () => {
       isCatalogProductsResponse({
         ...response,
         pagination: { ...response.pagination, pageSize: 49 },
+      }),
+    ).toBe(false);
+  });
+
+  it('rejects malformed discovery context and facets', () => {
+    expect(
+      isCatalogProductsResponse({
+        ...response,
+        query: { ...response.query, minPrice: 600_000, maxPrice: 500_000 },
+      }),
+    ).toBe(false);
+    expect(
+      isCatalogProductsResponse({
+        ...response,
+        query: { ...response.query, sort: 'popular' },
+      }),
+    ).toBe(false);
+    expect(
+      isCatalogProductsResponse({
+        ...response,
+        facets: { ...response.facets, priceRange: { min: 2, max: 1 } },
       }),
     ).toBe(false);
   });

@@ -3,6 +3,8 @@ import {
   type CatalogProductsResponse,
 } from '@shopee-clone/contracts';
 
+import { serializeCatalogQuery, type CatalogUrlQuery } from './catalog-query';
+
 export type CatalogApiErrorKind = 'timeout' | 'transport' | 'status' | 'contract';
 
 export class CatalogApiError extends Error {
@@ -12,11 +14,7 @@ export class CatalogApiError extends Error {
   }
 }
 
-export interface CatalogApiQuery {
-  category?: string;
-  page?: number;
-  pageSize?: number;
-}
+export type CatalogApiQuery = CatalogUrlQuery;
 
 export async function fetchCatalogProducts(
   query: CatalogApiQuery,
@@ -28,9 +26,7 @@ export async function fetchCatalogProducts(
     process.env.HOMEPAGE_API_BASE_URL ??
     'http://127.0.0.1:3001';
   const url = new URL('/api/v1/catalog/products', baseUrl);
-  if (query.category) url.searchParams.set('category', query.category);
-  if (query.page !== undefined) url.searchParams.set('page', String(query.page));
-  if (query.pageSize !== undefined) url.searchParams.set('pageSize', String(query.pageSize));
+  url.search = serializeCatalogQuery(query);
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
   try {

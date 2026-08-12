@@ -173,6 +173,14 @@ async function verifyDatabase(databaseUrl: string): Promise<void> {
     assert(orderedProducts.some((item) => item.categoryId === seedCategories[1].id));
     assert(orderedProducts.some((item) => item.categoryId === seedCategories[3].id));
 
+    assert(new Set(seedShops.map((shop) => shop.location)).size >= 2);
+    assert(seedProducts.some((item) => /[À-ỹĐđ]/u.test(item.name)));
+    assert(new Set(seedProducts.map((item) => item.ratingAverageBasisPoints)).size >= 4);
+    assert(new Set(seedProducts.map((item) => item.soldCount)).size >= 4);
+    assert(seedVariants.some((item) => item.compareAtPriceMinor !== null));
+    assert(seedVariants.some((item) => item.compareAtPriceMinor === null));
+    assert(new Set(seedVariants.map((item) => item.priceMinor.toString())).size >= 4);
+
     const constraintRows = await prisma.$queryRawUnsafe<Array<{ constraint_name: string }>>(
       `SELECT conname AS constraint_name
        FROM pg_constraint

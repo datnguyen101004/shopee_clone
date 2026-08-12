@@ -9,11 +9,24 @@ import LoginPlaceholderPage from './login/page';
 import SearchPage from './search/page';
 
 vi.mock('../../lib/catalog-api', () => ({
-  fetchCatalogProducts: vi.fn().mockResolvedValue({
-    query: { category: null },
-    pagination: { page: 1, pageSize: 12, totalItems: 0, totalPages: 0 },
-    items: [],
-  }),
+  fetchCatalogProducts: vi.fn().mockImplementation((query: { q?: string }) =>
+    Promise.resolve({
+      query: {
+        q: query.q?.trim().replace(/\s+/g, ' ') ?? null,
+        category: null,
+        minPrice: null,
+        maxPrice: null,
+        rating: null,
+        location: null,
+        availability: null,
+        promotion: null,
+        sort: query.q ? 'relevance' : 'newest',
+      },
+      pagination: { page: 1, pageSize: 12, totalItems: 0, totalPages: 0 },
+      facets: { categories: [], locations: [], priceRange: { min: null, max: null } },
+      items: [],
+    }),
+  ),
 }));
 
 describe('storefront route boundary', () => {
@@ -32,7 +45,7 @@ describe('storefront route boundary', () => {
       searchParams: Promise.resolve({ q: '  tai nghe bluetooth  ' }),
     });
     const { container } = render(<StorefrontLayout>{page}</StorefrontLayout>);
-    expect(screen.getByText(/tai nghe bluetooth/)).toBeInTheDocument();
+    expect(screen.getAllByText(/tai nghe bluetooth/).length).toBeGreaterThan(0);
     expect(container.querySelectorAll('main')).toHaveLength(1);
   });
 

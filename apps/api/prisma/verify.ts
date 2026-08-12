@@ -91,8 +91,10 @@ async function verifyDatabase(databaseUrl: string): Promise<void> {
       homepageBanners: await prisma.homepageBanner.count(),
       homepageCategories: await prisma.homepageModuleCategory.count(),
       homepageProducts: await prisma.homepageModuleProduct.count(),
+      authSessions: await prisma.authSession.count(),
+      passwordResetTokens: await prisma.passwordResetToken.count(),
     };
-    assert.deepEqual(counts, seedExpectedCounts);
+    assert.deepEqual(counts, { ...seedExpectedCounts, authSessions: 0, passwordResetTokens: 0 });
 
     const category = await prisma.category.findUnique({
       where: { id: seedCategories[0].id },
@@ -137,6 +139,7 @@ async function verifyDatabase(databaseUrl: string): Promise<void> {
     assert(user.createdAt instanceof Date);
     assert(user.updatedAt instanceof Date);
     assert.equal(user.deletedAt, null);
+    assert.equal(user.passwordHash, null);
 
     const homepageModules = await prisma.homepageModule.findMany({
       include: { banners: true, categories: true, products: true },
@@ -204,10 +207,23 @@ async function verifyDatabase(databaseUrl: string): Promise<void> {
          ,'products_rating_count_nonnegative'
          ,'products_sold_count_nonnegative'
          ,'product_images_product_id_variant_id_fkey'
+         ,'users_email_normalized'
+         ,'auth_sessions_token_hash_format'
+         ,'auth_sessions_valid_expiry'
+         ,'auth_sessions_valid_rotation'
+         ,'auth_sessions_valid_revocation'
+         ,'auth_sessions_valid_last_use'
+         ,'password_reset_tokens_token_hash_format'
+         ,'password_reset_tokens_valid_expiry'
+         ,'password_reset_tokens_valid_use'
+         ,'password_reset_tokens_valid_revocation'
+         ,'auth_sessions_user_id_fkey'
+         ,'auth_sessions_replaced_by_id_fkey'
+         ,'password_reset_tokens_user_id_fkey'
        )
        ORDER BY conname`,
     );
-    assert.equal(constraintRows.length, 11);
+    assert.equal(constraintRows.length, 24);
 
     await expectDatabaseRejection('a duplicate user email', () =>
       prisma.user.create({
@@ -217,6 +233,80 @@ async function verifyDatabase(databaseUrl: string): Promise<void> {
           displayName: 'Duplicate User',
         },
       }),
+    );
+
+    await expectDatabaseRejection('a non-normalized user email', () =>
+      prisma.user.create({
+        data: {
+          id: '00000000-0000-4000-8000-000000009006',
+          email: 'UPPERCASE@example.com',
+          displayName: 'Invalid Canonical Email',
+        },
+      }),
+    );
+
+    const authFixtureUserId = '00000000-0000-4000-8000-000000009010';
+    await prisma.user.create({
+      data: {
+        id: authFixtureUserId,
+        email: 'auth-fixture@example.com',
+        displayName: 'Auth Fixture',
+        passwordHash: 'scrypt$1$1024$8$1$salt$hash',
+      },
+    });
+    const authSessionId = '00000000-0000-4000-8000-000000009011';
+    await prisma.authSession.create({
+      data: {
+        id: authSessionId,
+        userId: authFixtureUserId,
+        familyId: '00000000-0000-4000-8000-000000009012',
+        tokenHash: 'a'.repeat(64),
+        expiresAt: new Date(Date.now() + 60_000),
+      },
+    });
+    await prisma.passwordResetToken.create({
+      data: {
+        id: '00000000-0000-4000-8000-000000009013',
+        userId: authFixtureUserId,
+        tokenHash: 'b'.repeat(64),
+        expiresAt: new Date(Date.now() + 60_000),
+      },
+    });
+    await expectDatabaseRejection('an invalid refresh token digest', () =>
+      prisma.authSession.create({
+        data: {
+          userId: authFixtureUserId,
+          familyId: '00000000-0000-4000-8000-000000009014',
+          tokenHash: 'not-a-token-digest',
+          expiresAt: new Date(Date.now() + 60_000),
+        },
+      }),
+    );
+    await expectDatabaseRejection('an expired-at-creation refresh session', () =>
+      prisma.authSession.create({
+        data: {
+          userId: authFixtureUserId,
+          familyId: '00000000-0000-4000-8000-000000009015',
+          tokenHash: 'c'.repeat(64),
+          createdAt: new Date('2026-01-02T00:00:00.000Z'),
+          expiresAt: new Date('2026-01-01T00:00:00.000Z'),
+        },
+      }),
+    );
+    await expectDatabaseRejection('an orphan password reset token', () =>
+      prisma.passwordResetToken.create({
+        data: {
+          userId: '00000000-0000-4000-8000-000000009999',
+          tokenHash: 'd'.repeat(64),
+          expiresAt: new Date(Date.now() + 60_000),
+        },
+      }),
+    );
+    await prisma.user.delete({ where: { id: authFixtureUserId } });
+    assert.equal(await prisma.authSession.count({ where: { id: authSessionId } }), 0);
+    assert.equal(
+      await prisma.passwordResetToken.count({ where: { userId: authFixtureUserId } }),
+      0,
     );
 
     await expectDatabaseRejection('an orphan shop', () =>

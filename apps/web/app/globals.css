@@ -98,6 +98,33 @@
   width: 22px;
   height: 22px;
 }
+.market-account {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+.market-account > span,
+.market-account__loading {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-height: 44px;
+  color: #fff;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+.market-account button {
+  min-height: 36px;
+  border: 1px solid #ffffff80;
+  border-radius: 0.35rem;
+  background: transparent;
+  color: #fff;
+  cursor: pointer;
+}
+.market-account button:hover,
+.market-account button:focus-visible {
+  background: #ffffff1f;
+}
 .market-cart-icon {
   position: relative;
 }
@@ -172,6 +199,111 @@
 .placeholder-page > .sc-stack {
   max-width: 800px;
   margin-inline: auto;
+}
+.account-page {
+  min-height: 68vh;
+  padding-block: clamp(1.5rem, 6vw, 4.5rem);
+}
+.account-page__panel {
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(320px, 1.1fr);
+  align-items: center;
+  gap: clamp(1.25rem, 5vw, 4rem);
+  max-width: 920px;
+  margin-inline: auto;
+}
+.account-page__intro span {
+  color: var(--sc-color-brand-700);
+  font-size: 0.75rem;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+}
+.account-page__intro h1 {
+  margin: 0.55rem 0;
+  font-size: clamp(2rem, 5vw, 3.3rem);
+  line-height: 1;
+}
+.account-page__intro p {
+  color: var(--sc-color-text-muted);
+  line-height: 1.6;
+}
+.account-page__card {
+  padding: clamp(1.25rem, 4vw, 2rem);
+}
+.account-form {
+  display: grid;
+  gap: 0.65rem;
+}
+.account-form label {
+  margin-top: 0.25rem;
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+.account-form input {
+  width: 100%;
+  min-height: 46px;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid var(--sc-color-border);
+  border-radius: 0.35rem;
+  background: #fff;
+  color: inherit;
+}
+.account-form input:focus-visible {
+  border-color: var(--sc-color-brand-600);
+  outline: 3px solid #ee4d2d2b;
+}
+.account-form small {
+  color: var(--sc-color-text-muted);
+}
+.account-form > button {
+  min-height: 48px;
+  margin-top: 0.5rem;
+  border: 0;
+  border-radius: 0.35rem;
+  background: var(--sc-color-brand-600);
+  color: #fff;
+  font-weight: 800;
+  cursor: pointer;
+}
+.account-form > button:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+.account-form a {
+  min-height: 44px;
+  color: var(--sc-color-brand-700);
+  font-weight: 700;
+}
+.account-form__links {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.65rem;
+}
+.account-form__links a {
+  display: inline-flex;
+  align-items: center;
+}
+.account-form__message,
+.account-form__intent {
+  margin: 0 0 0.35rem;
+  padding: 0.75rem;
+  border-radius: 0.35rem;
+  font-size: 0.84rem;
+  line-height: 1.45;
+}
+.account-form__message.is-error {
+  background: #fff1f0;
+  color: #b42318;
+}
+.account-form__message.is-success {
+  background: #ecfdf3;
+  color: #067647;
+}
+.account-form__intent {
+  background: var(--sc-color-brand-50);
+  color: #7a271a;
 }
 .placeholder-eyebrow {
   margin-bottom: 0;
@@ -590,6 +722,13 @@
   .market-actions a {
     padding-inline: 0.4rem;
   }
+  .market-account > span > span,
+  .market-account__loading {
+    max-width: 96px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
   .market-search {
     grid-column: 1 / -1;
   }
@@ -660,6 +799,15 @@
   }
   .market-footer {
     flex-direction: column;
+  }
+  .account-page__panel {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .account-page__intro h1 {
+    font-size: 2rem;
+  }
+  .account-page__card {
+    padding: 1rem;
   }
 }
 

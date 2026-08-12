@@ -5,11 +5,13 @@ import Link from 'next/link';
 import { useEffect, useRef, useState, type FormEvent, type RefObject } from 'react';
 
 import { marketplaceCategories } from './marketplace-navigation';
+import type { AuthSessionState } from './auth-session-provider';
 
 const mobileNavigationId = 'marketplace-mobile-categories';
 
 type MarketplaceHeaderProps = {
-  accountLabel?: string;
+  account?: AuthSessionState;
+  onLogout?: () => void;
   cartCount?: number;
   categoriesOpen: boolean;
   onCategoriesToggle: () => void;
@@ -17,7 +19,8 @@ type MarketplaceHeaderProps = {
 };
 
 export function MarketplaceHeader({
-  accountLabel = 'Đăng nhập',
+  account = { status: 'guest', user: null },
+  onLogout,
   cartCount = 0,
   categoriesOpen,
   onCategoriesToggle,
@@ -83,10 +86,24 @@ export function MarketplaceHeader({
           ) : null}
         </form>
         <div className="market-actions">
-          <Link href="/login" aria-label={`${accountLabel} · Chưa đăng nhập`}>
-            <UserRound aria-hidden="true" />
-            <span>{accountLabel}</span>
-          </Link>
+          {account.status === 'authenticated' ? (
+            <div className="market-account">
+              <span aria-label={`Tài khoản ${account.user.displayName}`}>
+                <UserRound aria-hidden="true" />
+                <span>{account.user.displayName}</span>
+              </span>
+              <button type="button" onClick={onLogout}>
+                Đăng xuất
+              </button>
+            </div>
+          ) : account.status === 'loading' ? (
+            <span className="market-account__loading">Đang kiểm tra phiên…</span>
+          ) : (
+            <Link href="/login" aria-label="Đăng nhập · Chưa đăng nhập">
+              <UserRound aria-hidden="true" />
+              <span>Đăng nhập</span>
+            </Link>
+          )}
           <Link href="/cart" aria-label={`Giỏ hàng, ${cartCount} sản phẩm`}>
             <span className="market-cart-icon">
               <ShoppingCart aria-hidden="true" />

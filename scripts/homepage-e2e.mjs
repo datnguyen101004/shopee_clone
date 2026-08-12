@@ -1,5 +1,7 @@
 import crypto from 'node:crypto';
 import { spawnSync } from 'node:child_process';
+import { mkdtempSync, rmSync } from 'node:fs';
+import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 
@@ -52,13 +54,16 @@ function verifyCleanup(projectName, environment) {
 
 async function main() {
   const suite =
-    ['homepage', 'catalog', 'product'].find((candidate) => process.argv.includes(candidate)) ??
-    'homepage';
+    ['homepage', 'catalog', 'product', 'auth'].find((candidate) =>
+      process.argv.includes(candidate),
+    ) ?? 'homepage';
   const projectName = createSmokeProjectName(`${suite}${process.pid}${crypto.randomUUID()}`);
   const databasePort = await findAvailablePort();
   const apiPort = await findAvailablePort();
   const webPort = await findAvailablePort();
   const password = `homepage_${crypto.randomBytes(18).toString('base64url')}`;
+  const captureDirectory = mkdtempSync(path.join(os.tmpdir(), 'shopee-auth-e2e-'));
+  const capturePath = path.join(captureDirectory, 'recovery.jsonl');
   const variables = createSmokeEnvironment({ databasePort, apiPort, password, projectName });
   const environment = {
     ...process.env,
@@ -66,6 +71,11 @@ async function main() {
     E2E_WEB_PORT: String(webPort),
     HOMEPAGE_API_BASE_URL: `http://127.0.0.1:${apiPort}`,
     PRODUCT_DETAIL_API_BASE_URL: `http://127.0.0.1:${apiPort}`,
+    NEXT_PUBLIC_API_BASE_URL: `http://127.0.0.1:${apiPort}`,
+    AUTH_ALLOWED_ORIGINS: `http://127.0.0.1:${webPort}`,
+    AUTH_WEB_BASE_URL: `http://127.0.0.1:${webPort}`,
+    AUTH_RECOVERY_MODE: 'capture',
+    AUTH_RECOVERY_CAPTURE_PATH: capturePath,
     FULL_STACK_E2E: '1',
   };
   const secrets = [password, variables.DATABASE_URL, variables.TEST_DATABASE_URL];
@@ -109,6 +119,19 @@ async function main() {
         { ...environment, RUN_PRODUCT_DETAIL_DATABASE_TESTS: '1' },
       );
     }
+    if (suite === 'auth') {
+      pnpm(
+        [
+          '--filter',
+          '@shopee-clone/api',
+          'exec',
+          'jest',
+          '--runInBand',
+          'test/auth.postgres.e2e.spec.ts',
+        ],
+        { ...environment, RUN_AUTH_DATABASE_TESTS: '1' },
+      );
+    }
     pnpm(['build'], environment);
     const playwrightArgs = ['exec', 'playwright', 'test', `e2e/${suite}.spec.ts`];
     if (process.argv.includes('--update-snapshots')) playwrightArgs.push('--update-snapshots');
@@ -118,14 +141,18 @@ async function main() {
     primaryError = error;
   } finally {
     try {
-      run(
-        'docker',
-        buildComposeArgs(projectName, composeFile, ['down', '--volumes', '--remove-orphans']),
-        environment,
-        true,
-      );
-      verifyCleanup(projectName, environment);
-      console.log(`Removed isolated ${suite} E2E project ${projectName}.`);
+      try {
+        run(
+          'docker',
+          buildComposeArgs(projectName, composeFile, ['down', '--volumes', '--remove-orphans']),
+          environment,
+          true,
+        );
+        verifyCleanup(projectName, environment);
+        console.log(`Removed isolated ${suite} E2E project ${projectName}.`);
+      } finally {
+        rmSync(captureDirectory, { recursive: true, force: true });
+      }
     } catch (cleanupError) {
       primaryError ??= cleanupError;
     }

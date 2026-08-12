@@ -4,6 +4,7 @@ import { Container, PageShell } from '@shopee-clone/ui';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 
+import { useAuthSession } from './auth-session-provider';
 import {
   MarketplaceCategoryNavigation,
   MarketplaceHeader,
@@ -22,6 +23,7 @@ function StorefrontFooter() {
 
 export function StorefrontShell({ children }: { children: ReactNode }) {
   const navigation = useMarketplaceNavigation();
+  const auth = useAuthSession();
   return (
     <PageShell
       header={
@@ -29,6 +31,8 @@ export function StorefrontShell({ children }: { children: ReactNode }) {
           categoriesOpen={navigation.categoriesOpen}
           onCategoriesToggle={navigation.toggleCategories}
           menuButtonRef={navigation.menuButtonRef}
+          account={auth.state}
+          onLogout={() => void auth.logout()}
         />
       }
       navigation={

@@ -5,8 +5,10 @@ import DesignSystemPage from '../design-system/page';
 import HealthPage from '../health/page';
 import CartPlaceholderPage from './cart/page';
 import StorefrontLayout from './layout';
-import { LoginPlaceholderContent } from './login/page';
+import { LoginPageContent } from './login/page';
 import SearchPage from './search/page';
+
+vi.mock('next/navigation', () => ({ useRouter: () => ({ replace: vi.fn() }) }));
 
 vi.mock('../../lib/catalog-api', () => ({
   fetchCatalogProducts: vi.fn().mockImplementation((query: { q?: string }) =>
@@ -31,7 +33,7 @@ vi.mock('../../lib/catalog-api', () => ({
 
 describe('storefront route boundary', () => {
   it.each([
-    ['login', <LoginPlaceholderContent key="login" intent={null} />],
+    ['login', <LoginPageContent key="login" intent={null} />],
     ['cart', <CartPlaceholderPage key="cart" />],
   ])('keeps the shared shell on the %s placeholder', (_name, page) => {
     const { container } = render(<StorefrontLayout>{page}</StorefrontLayout>);

@@ -35,6 +35,7 @@ async function seedMarketplace(): Promise<void> {
         update: {
           email: user.email,
           displayName: user.displayName,
+          passwordHash: user.passwordHash,
           status: UserStatus.ACTIVE,
           deletedAt: null,
         },

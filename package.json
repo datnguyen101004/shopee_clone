@@ -43,6 +43,9 @@
     "test:e2e:product": "node scripts/homepage-e2e.mjs product",
     "test:e2e:product:update": "node scripts/homepage-e2e.mjs product --update-snapshots",
     "test:e2e:product:quick": "node scripts/quick-e2e.mjs product",
+    "test:e2e:auth": "node scripts/homepage-e2e.mjs auth",
+    "test:e2e:auth:update": "node scripts/homepage-e2e.mjs auth --update-snapshots",
+    "test:e2e:auth:quick": "node scripts/quick-e2e.mjs auth",
     "test:infra": "node --test scripts/infrastructure-smoke.test.mjs",
     "format": "prettier --write .",
     "format:check": "prettier --check ."

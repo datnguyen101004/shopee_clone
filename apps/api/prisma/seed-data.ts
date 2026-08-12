@@ -3,11 +3,13 @@ export const seedUsers = [
     id: '00000000-0000-4000-8000-000000000001',
     email: 'an.nguyen@shopee-clone.local',
     displayName: 'An Nguyen',
+    passwordHash: null,
   },
   {
     id: '00000000-0000-4000-8000-000000000002',
     email: 'binh.tran@shopee-clone.local',
     displayName: 'Binh Tran',
+    passwordHash: null,
   },
 ] as const;
 

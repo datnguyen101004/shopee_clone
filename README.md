@@ -90,11 +90,13 @@ pnpm build
 pnpm test:e2e
 ```
 
-Use `pnpm format` to apply the shared Prettier rules. Ordinary `pnpm test` includes infrastructure helper unit tests but does not require Docker. GitHub Actions runs the repository gates and the Docker-backed smoke workflow for pull requests and pushes to `development` or `main`.
+Use `pnpm format` to apply the shared Prettier rules. Ordinary `pnpm test` includes infrastructure helper unit tests but does not require Docker. GitHub Actions automatic triggers are temporarily disabled; the workflow can be started manually with `workflow_dispatch` when needed.
 
 The reusable marketplace foundations live in `packages/ui`; browse the component showcase at `http://localhost:3000/design-system`. See [Marketplace design system](docs/design-system.md) for tokens, component usage, responsive boundaries, and accessibility guidance.
 
 See [Product Detail](docs/product-detail.md) for the T10 public product endpoint, variant-media integrity, stock rules, anonymous login intent, and focused verification commands.
+
+See [Account authentication](docs/authentication.md) for T11 endpoints, session/token lifecycle, password policy, local recovery delivery, environment requirements, and focused auth verification commands.
 
 ## Database workflows
 

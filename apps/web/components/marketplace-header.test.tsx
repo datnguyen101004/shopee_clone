@@ -2,6 +2,7 @@ import { fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import { StorefrontShell } from './storefront-shell';
+import { MarketplaceHeader } from './marketplace-header';
 import { marketplaceCategories } from './marketplace-navigation';
 
 function renderShell() {
@@ -76,5 +77,30 @@ describe('StorefrontShell', () => {
     expect(trigger).toHaveAttribute('aria-expanded', 'false');
     expect(mobilePanel).toHaveAttribute('hidden');
     expect(trigger).toHaveFocus();
+  });
+
+  it('shows the safe authenticated name and supports explicit logout', async () => {
+    const user = userEvent.setup();
+    const onLogout = vi.fn();
+    render(
+      <MarketplaceHeader
+        categoriesOpen={false}
+        onCategoriesToggle={vi.fn()}
+        menuButtonRef={{ current: null }}
+        account={{
+          status: 'authenticated',
+          user: {
+            id: '00000000-0000-4000-8000-000000000001',
+            email: 'buyer@example.com',
+            displayName: 'Buyer Example',
+            status: 'active',
+          },
+        }}
+        onLogout={onLogout}
+      />,
+    );
+    expect(screen.getByLabelText('Tài khoản Buyer Example')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Đăng xuất' }));
+    expect(onLogout).toHaveBeenCalledTimes(1);
   });
 });

@@ -9,6 +9,7 @@ coverage/
 .turbo/
 playwright-report/
 test-results/
+.runtime/
 
 # Local environment files
 .env

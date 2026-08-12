@@ -4,8 +4,9 @@ import path from 'node:path';
 
 const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const suite =
-  ['homepage', 'catalog', 'product'].find((candidate) => process.argv.includes(candidate)) ??
-  'homepage';
+  ['homepage', 'catalog', 'product', 'auth'].find((candidate) =>
+    process.argv.includes(candidate),
+  ) ?? 'homepage';
 const webPort = Number(process.env.E2E_WEB_PORT ?? 3000);
 const apiPort = Number(process.env.PORT ?? 3001);
 const webUrl = `http://127.0.0.1:${webPort}`;
@@ -35,6 +36,7 @@ function runPlaywright() {
         E2E_WEB_PORT: String(webPort),
         HOMEPAGE_API_BASE_URL: `http://127.0.0.1:${apiPort}`,
         PRODUCT_DETAIL_API_BASE_URL: `http://127.0.0.1:${apiPort}`,
+        NEXT_PUBLIC_API_BASE_URL: `http://127.0.0.1:${apiPort}`,
       },
       stdio: 'inherit',
       windowsHide: true,

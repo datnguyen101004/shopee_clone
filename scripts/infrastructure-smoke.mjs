@@ -166,7 +166,7 @@ async function main() {
     runPnpm(['db:verify'], environment);
 
     console.log('Building and starting the API against isolated PostgreSQL...');
-    runPnpm(['--filter', '@shopee-clone/api', 'build'], environment);
+    runPnpm(['build', '--filter=@shopee-clone/api'], environment);
     apiProcess = spawn(process.execPath, [path.join(apiRoot, 'dist', 'main.js')], {
       cwd: apiRoot,
       env: environment,

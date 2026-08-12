@@ -57,4 +57,4 @@
 - [x] 7.1 Document discovery parameters, validation/defaults, relevance weights, filter semantics, facet ownership, URL behavior, local quick commands, and T09 non-goals.
 - [x] 7.2 During development run focused tests plus `test:e2e:homepage:quick` and `test:e2e:catalog:quick`; retain manual-only GitHub Actions.
 - [x] 7.3 Run frozen install, Prisma verification, format, lint, typecheck, all tests, production builds, isolated catalogue PostgreSQL/browser E2E, and strict OpenSpec validation before delivery.
-- [ ] 7.4 Record verification evidence, commit and push T09 directly to `development` without a pull request, confirm no automatic Actions run, close issue `#10`, and confirm no issue branch remains.
+- [x] 7.4 Record verification evidence, commit and push T09 directly to `development` without a pull request, confirm no automatic Actions run, close issue `#10`, and confirm no issue branch remains.

@@ -25,6 +25,12 @@ describe('canonical product dataset', () => {
     );
     expect(loaded.every(({ checksum }) => /^[0-9a-f]{64}$/.test(checksum))).toBe(true);
     expect(loaded.every(({ rootMetadata }) => !('records' in rootMetadata))).toBe(true);
+    expect(canonicalDatasetManifest.find(({ key }) => key === 'dienthoai')?.category).toMatchObject(
+      {
+        slug: 'dien-thoai',
+        name: 'Thiết bị điện tử',
+      },
+    );
   });
 
   it('normalizes every source deterministically with expected missing-field counts', async () => {

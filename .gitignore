@@ -1,0 +1,24 @@
+# Dependencies and package-manager state
+node_modules/
+.pnpm-store/
+
+# Build and test outputs
+.next/
+dist/
+coverage/
+.turbo/
+
+# Local environment files
+.env
+.env.*
+!.env.example
+
+# Logs and editor/OS files
+*.log
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# TypeScript incremental metadata
+*.tsbuildinfo

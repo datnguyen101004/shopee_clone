@@ -1,7 +1,9 @@
-import 'dotenv/config';
 import { NestFactory } from '@nestjs/core';
 
 import { AppModule } from './app.module';
+import { loadRepositoryEnvironment } from './config/repository-environment';
+
+loadRepositoryEnvironment();
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);

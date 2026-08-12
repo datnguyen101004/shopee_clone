@@ -53,4 +53,12 @@ Never edit or remove a migration after another environment has applied it. Corre
 - non-negative price and inventory checks;
 - reserved inventory not exceeding on-hand inventory.
 
-Error output redacts PostgreSQL credentials. T04 will provide the standard Compose service, safe environment template, and CI invocation for this contract.
+Error output redacts PostgreSQL credentials. T04 provides the standard PostgreSQL Compose service, root `.env.example`, and CI invocation for this contract.
+
+## Compose integration
+
+The root `compose.yaml` owns a loopback-only PostgreSQL service, a persistent development volume, and first-initialization creation of the distinct `_test` database. Copy `.env.example` to the ignored `.env`, start the service with `pnpm infra:up`, and use `pnpm infra:down` for normal data-preserving shutdown.
+
+`pnpm infra:reset` is deliberately separate and destructive: it deletes the Compose-owned local database volume. `pnpm infra:smoke` instead creates an isolated project with runtime-only credentials and ephemeral storage, exercises migrations, seed idempotency, database constraints, and live API connectivity, then removes its exact resources.
+
+The safety boundary remains unchanged: application migrations and seed target `DATABASE_URL`; destructive persistence verification accepts only a distinct `TEST_DATABASE_URL` whose database name ends in `_test`.

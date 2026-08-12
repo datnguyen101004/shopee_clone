@@ -7,18 +7,40 @@ Shopee Clone is a TypeScript monorepo for incrementally reproducing the core Sho
 - Node.js 22.12.x (see `.nvmrc`)
 - Corepack enabled: `corepack enable`
 - pnpm 10.34.5 (Corepack reads the pinned version from `package.json`)
+- Docker Desktop or Docker Engine with Docker Compose v2
 
-## Setup
+## Clean-machine setup
+
+Install dependencies and create the ignored local configuration file:
 
 ```bash
 pnpm install --frozen-lockfile
+cp .env.example .env
 ```
+
+PowerShell equivalent:
+
+```powershell
+Copy-Item .env.example .env
+```
+
+The committed values are conspicuous local-only examples. Change them in `.env` if needed and never reuse them for shared, staging, or production infrastructure. Real `.env` files are ignored.
 
 If the Corepack bundled with Node reports a stale package-signing key, run the same pinned package manager without changing the global installation:
 
 ```bash
 npx --yes pnpm@10.34.5 install --frozen-lockfile
 ```
+
+Start PostgreSQL, apply committed migrations, and load deterministic demo data:
+
+```bash
+pnpm infra:up
+pnpm db:migrate:deploy
+pnpm db:seed
+```
+
+`infra:up` waits for PostgreSQL to become healthy. Running it again is safe and does not duplicate the service or erase the named development volume.
 
 ## Development
 
@@ -33,6 +55,28 @@ Health checks:
 - Web: `http://localhost:3000/health`
 - API: `http://localhost:3001/api/v1/health`
 
+Stop the applications with `Ctrl+C`, then stop infrastructure without deleting development data:
+
+```bash
+pnpm infra:down
+```
+
+See [Local Development](docs/local-development.md) for lifecycle commands, destructive reset behavior, smoke verification, and troubleshooting.
+
+## Local infrastructure commands
+
+```bash
+pnpm infra:config          # validate the ignored .env configuration
+pnpm infra:up              # start PostgreSQL and wait for health
+pnpm infra:status          # show service state and published ports
+pnpm infra:logs            # follow the last 100 PostgreSQL log lines
+pnpm infra:down            # stop containers; preserve the named volume
+pnpm infra:reset           # DESTRUCTIVE: remove containers, network, and database volume
+pnpm infra:smoke           # isolated migration/seed/constraint/API verification
+```
+
+`infra:reset` permanently deletes the local Compose database volume. It is not an alias for normal shutdown. `infra:smoke` uses runtime-only credentials, free ports, an ephemeral volume, and an isolated Compose project; it cleans up those exact resources on success or failure.
+
 ## Quality gates
 
 Run the same repository-wide commands from the root:
@@ -45,16 +89,16 @@ pnpm test
 pnpm build
 ```
 
-Use `pnpm format` to apply the shared Prettier rules.
+Use `pnpm format` to apply the shared Prettier rules. Ordinary `pnpm test` includes infrastructure helper unit tests but does not require Docker. GitHub Actions runs the repository gates and the Docker-backed smoke workflow for pull requests and pushes to `development` or `main`.
 
 ## Database workflows
 
-PostgreSQL persistence is owned by `apps/api`. Provide connection URLs through the shell or an uncommitted local `.env`; never commit credentials.
+PostgreSQL persistence is owned by `apps/api`. The API and Prisma commands load the ignored root `.env` (with `apps/api/.env` as an optional higher-priority override); never commit credentials.
 
 - `DATABASE_URL`: development/runtime PostgreSQL URL.
 - `TEST_DATABASE_URL`: isolated database used only by destructive verification. Its database name must end in `_test` and must differ from `DATABASE_URL`.
 
-Safe placeholder examples:
+The root `.env.example` contains the complete local template. The connection URL shape is:
 
 ```text
 DATABASE_URL=postgresql://user:password@127.0.0.1:5432/shopee_clone
@@ -87,7 +131,7 @@ pnpm db:reset             # DESTRUCTIVE: reset DATABASE_URL in development
 
 The deterministic seed creates two users and shops, four hierarchical categories, four products, six variants with inventory, and four images using fixed UUIDs and business keys. Rerunning it converges on the same demo records without deleting unrelated development data.
 
-Docker Compose, committed environment templates, and CI database services are intentionally deferred to T04.
+Docker Compose provisions both database targets locally, while CI uses the same guarded verification against an ephemeral Compose project.
 
 ## Workspace boundaries
 

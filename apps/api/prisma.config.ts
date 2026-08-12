@@ -1,5 +1,8 @@
-import 'dotenv/config';
 import { defineConfig } from 'prisma/config';
+
+import { loadRepositoryEnvironment } from './src/config/repository-environment';
+
+loadRepositoryEnvironment();
 
 const placeholderDatabaseUrl =
   'postgresql://placeholder:placeholder@127.0.0.1:5432/shopee_clone?schema=public';

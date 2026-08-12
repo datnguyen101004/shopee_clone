@@ -36,6 +36,16 @@ On PowerShell use `Copy-Item .env.example .env` instead of `cp`. The example val
 
 The web health page is `http://localhost:3000/health`. The API health endpoint is `http://localhost:3001/api/v1/health`.
 
+The homepage is rendered by Next.js from `GET http://localhost:3001/api/v1/homepage`. Override the server-only base URL with `HOMEPAGE_API_BASE_URL` when the API is hosted elsewhere; never expose database credentials to the browser.
+
+## Homepage aggregate (T07)
+
+Homepage ordering, Vietnamese display copy, module membership, and UTC activation windows are owned by the normalized `homepage_*` seed tables. An enabled module is active when `activeFrom <= now` (when present) and the exclusive `activeUntil > now` (when present). Empty or inactive modules are omitted; no hardcoded storefront products replace them.
+
+Run the real-boundary browser gate with `pnpm test:e2e:homepage`. It creates an isolated PostgreSQL Compose project, deploys and seeds twice-verified migrations, builds and starts NestJS plus Next.js on free local ports, runs the three responsive Playwright projects, and removes only that temporary project. T08 owns catalogue browsing, T09 search, T10 full product details, and T36 genuine Mall verification.
+
+GitHub Actions automatic push and pull-request triggers are temporarily disabled. The workflow remains available through manual dispatch; run local quality gates before pushing until automatic CI is restored.
+
 ## Daily lifecycle
 
 | Command | Behavior |

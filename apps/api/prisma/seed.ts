@@ -1,4 +1,5 @@
 import {
+  HomepageModuleType,
   ProductStatus,
   ShopStatus,
   UserStatus,
@@ -7,6 +8,10 @@ import {
 import { createPrismaClient } from './create-prisma-client';
 import {
   seedCategories,
+  seedHomepageBanners,
+  seedHomepageCategories,
+  seedHomepageModules,
+  seedHomepageProducts,
   seedImages,
   seedProducts,
   seedShops,
@@ -114,6 +119,47 @@ async function seedMarketplace(): Promise<void> {
           altText: image.altText,
           sortOrder: image.sortOrder,
         },
+      });
+    }
+
+    for (const module of seedHomepageModules) {
+      await transaction.homepageModule.upsert({
+        where: { id: module.id },
+        create: { ...module, type: HomepageModuleType[module.type] },
+        update: {
+          key: module.key,
+          type: HomepageModuleType[module.type],
+          title: module.title,
+          subtitle: module.subtitle,
+          isEnabled: module.isEnabled,
+          sortOrder: module.sortOrder,
+          activeFrom: module.activeFrom,
+          activeUntil: module.activeUntil,
+        },
+      });
+    }
+
+    for (const banner of seedHomepageBanners) {
+      await transaction.homepageBanner.upsert({
+        where: { id: banner.id },
+        create: banner,
+        update: banner,
+      });
+    }
+
+    for (const entry of seedHomepageCategories) {
+      await transaction.homepageModuleCategory.upsert({
+        where: { id: entry.id },
+        create: entry,
+        update: entry,
+      });
+    }
+
+    for (const entry of seedHomepageProducts) {
+      await transaction.homepageModuleProduct.upsert({
+        where: { id: entry.id },
+        create: entry,
+        update: entry,
       });
     }
   });

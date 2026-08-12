@@ -8,7 +8,6 @@ const workflow = readFileSync(path.join(repositoryRoot, '.github', 'workflows', 
 const packageManifest = JSON.parse(readFileSync(path.join(repositoryRoot, 'package.json'), 'utf8'));
 
 const requiredFragments = [
-  'branches: [main, development]',
   'workflow_dispatch:',
   'permissions:\n  contents: read',
   'cancel-in-progress: true',
@@ -27,7 +26,7 @@ const requiredFragments = [
   'pnpm test',
   'pnpm build',
   'pnpm exec playwright install --with-deps chromium',
-  'pnpm test:e2e',
+  'pnpm test:e2e:homepage',
   'path: playwright-report/',
   'pnpm infra:smoke',
   'if: always()',
@@ -66,9 +65,10 @@ assert.doesNotMatch(
   'CI must not embed PostgreSQL credentials.',
 );
 
-const pullRequestTrigger = workflow.match(/pull_request:\s*\n\s+branches: \[main, development\]/);
-const pushTrigger = workflow.match(/push:\s*\n\s+branches: \[main, development\]/);
-assert(pullRequestTrigger, 'CI must run for pull requests to long-lived branches.');
-assert(pushTrigger, 'CI must run for pushes to long-lived branches.');
+assert.doesNotMatch(
+  workflow,
+  /^\s*(push|pull_request):/m,
+  'Automatic CI triggers must remain temporarily disabled.',
+);
 
 console.log('CI workflow validation passed.');

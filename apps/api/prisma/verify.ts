@@ -4,11 +4,16 @@ import path from 'node:path';
 
 import { Pool } from 'pg';
 
+import { loadRepositoryEnvironment } from '../src/config/repository-environment';
 import { ProductStatus, UserStatus, VariantStatus } from '../src/generated/prisma/enums';
 import { createPrismaClient } from './create-prisma-client';
 import {
   seedCategories,
   seedExpectedCounts,
+  seedHomepageBanners,
+  seedHomepageCategories,
+  seedHomepageModules,
+  seedHomepageProducts,
   seedImages,
   seedProducts,
   seedShops,
@@ -16,6 +21,8 @@ import {
   seedVariants,
 } from './seed-data';
 import { assertSafeTestDatabaseUrl } from './test-database-url';
+
+loadRepositoryEnvironment();
 
 const apiRoot = path.resolve(__dirname, '..');
 
@@ -80,6 +87,10 @@ async function verifyDatabase(databaseUrl: string): Promise<void> {
       variants: await prisma.productVariant.count(),
       images: await prisma.productImage.count(),
       inventory: await prisma.inventory.count(),
+      homepageModules: await prisma.homepageModule.count(),
+      homepageBanners: await prisma.homepageBanner.count(),
+      homepageCategories: await prisma.homepageModuleCategory.count(),
+      homepageProducts: await prisma.homepageModuleProduct.count(),
     };
     assert.deepEqual(counts, seedExpectedCounts);
 
@@ -116,6 +127,34 @@ async function verifyDatabase(databaseUrl: string): Promise<void> {
     assert(user.updatedAt instanceof Date);
     assert.equal(user.deletedAt, null);
 
+    const homepageModules = await prisma.homepageModule.findMany({
+      include: { banners: true, categories: true, products: true },
+      orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }],
+    });
+    assert.equal(homepageModules.length, seedHomepageModules.length);
+    assert.equal(homepageModules[0]?.banners[0]?.id, seedHomepageBanners[0]?.id);
+    assert.equal(homepageModules[1]?.categories.length, seedHomepageCategories.length);
+    assert.equal(
+      homepageModules.reduce((count, module) => count + module.products.length, 0),
+      seedHomepageProducts.length,
+    );
+    assert(
+      homepageModules.every(
+        (module, index, modules) =>
+          index === 0 || module.sortOrder >= modules[index - 1]!.sortOrder,
+      ),
+    );
+    assert(
+      homepageModules.filter((module) => module.activeUntil && module.activeUntil <= new Date())
+        .length >= 1,
+    );
+    assert(
+      homepageModules.filter((module) => module.activeFrom && module.activeFrom > new Date())
+        .length >= 1,
+    );
+    assert(seedHomepageBanners.every((banner) => banner.destinationPath.startsWith('/')));
+    assert(seedImages.every((image) => image.url.startsWith('/media/products/')));
+
     const constraintRows = await prisma.$queryRawUnsafe<Array<{ constraint_name: string }>>(
       `SELECT conname AS constraint_name
        FROM pg_constraint
@@ -125,10 +164,12 @@ async function verifyDatabase(databaseUrl: string): Promise<void> {
          'inventory_quantity_on_hand_nonnegative',
          'inventory_quantity_reserved_nonnegative',
          'inventory_reserved_not_above_on_hand'
+         ,'homepage_modules_valid_window'
+         ,'homepage_module_products_sold_count_nonnegative'
        )
        ORDER BY conname`,
     );
-    assert.equal(constraintRows.length, 5);
+    assert.equal(constraintRows.length, 7);
 
     await expectDatabaseRejection('a duplicate user email', () =>
       prisma.user.create({

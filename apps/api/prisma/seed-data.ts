@@ -159,32 +159,179 @@ export const seedImages = [
   {
     id: '00000000-0000-4000-8000-000000000501',
     productId: seedProducts[0].id,
-    url: 'https://images.shopee-clone.local/products/smartphone-pro.webp',
+    url: '/media/products/smartphone-pro.svg',
     altText: 'Smartphone Pro',
     sortOrder: 0,
   },
   {
     id: '00000000-0000-4000-8000-000000000502',
     productId: seedProducts[1].id,
-    url: 'https://images.shopee-clone.local/products/wireless-earbuds.webp',
+    url: '/media/products/wireless-earbuds.svg',
     altText: 'Wireless Earbuds',
     sortOrder: 0,
   },
   {
     id: '00000000-0000-4000-8000-000000000503',
     productId: seedProducts[2].id,
-    url: 'https://images.shopee-clone.local/products/power-blender.webp',
+    url: '/media/products/power-blender.svg',
     altText: 'Power Blender',
     sortOrder: 0,
   },
   {
     id: '00000000-0000-4000-8000-000000000504',
     productId: seedProducts[3].id,
-    url: 'https://images.shopee-clone.local/products/smart-rice-cooker.webp',
+    url: '/media/products/smart-rice-cooker.svg',
     altText: 'Smart Rice Cooker',
     sortOrder: 0,
   },
 ] as const;
+
+export const seedHomepageModules = [
+  {
+    id: '00000000-0000-4000-8000-000000000601',
+    key: 'campaign',
+    type: 'CAMPAIGN_BANNER',
+    title: 'Siêu hội mua sắm',
+    subtitle: 'Ưu đãi nổi bật mỗi ngày',
+    isEnabled: true,
+    sortOrder: 10,
+    activeFrom: null,
+    activeUntil: null,
+  },
+  {
+    id: '00000000-0000-4000-8000-000000000602',
+    key: 'categories',
+    type: 'CATEGORY_SHORTCUTS',
+    title: 'Danh mục',
+    subtitle: 'Tìm nhanh sản phẩm bạn cần',
+    isEnabled: true,
+    sortOrder: 20,
+    activeFrom: null,
+    activeUntil: null,
+  },
+  {
+    id: '00000000-0000-4000-8000-000000000603',
+    key: 'flash-sale',
+    type: 'FLASH_SALE',
+    title: 'Flash Sale',
+    subtitle: 'Giá tốt trong thời gian giới hạn',
+    isEnabled: true,
+    sortOrder: 30,
+    activeFrom: null,
+    activeUntil: new Date('2999-12-31T00:00:00.000Z'),
+  },
+  {
+    id: '00000000-0000-4000-8000-000000000604',
+    key: 'top-selling',
+    type: 'TOP_SELLING',
+    title: 'Top sản phẩm bán chạy',
+    subtitle: 'Lựa chọn nổi bật từ cộng đồng',
+    isEnabled: true,
+    sortOrder: 40,
+    activeFrom: null,
+    activeUntil: null,
+  },
+  {
+    id: '00000000-0000-4000-8000-000000000605',
+    key: 'mall',
+    type: 'MALL',
+    title: 'Shopee Mall',
+    subtitle: 'Bộ sưu tập chính hãng mô phỏng',
+    isEnabled: true,
+    sortOrder: 50,
+    activeFrom: null,
+    activeUntil: null,
+  },
+  {
+    id: '00000000-0000-4000-8000-000000000606',
+    key: 'daily',
+    type: 'DAILY_RECOMMENDATIONS',
+    title: 'Gợi ý hôm nay',
+    subtitle: 'Sản phẩm dành cho mọi nhà',
+    isEnabled: true,
+    sortOrder: 60,
+    activeFrom: null,
+    activeUntil: null,
+  },
+  {
+    id: '00000000-0000-4000-8000-000000000607',
+    key: 'future',
+    type: 'CAMPAIGN_BANNER',
+    title: 'Chiến dịch tương lai',
+    subtitle: null,
+    isEnabled: true,
+    sortOrder: 70,
+    activeFrom: new Date('2999-01-01T00:00:00.000Z'),
+    activeUntil: null,
+  },
+  {
+    id: '00000000-0000-4000-8000-000000000608',
+    key: 'expired',
+    type: 'CAMPAIGN_BANNER',
+    title: 'Chiến dịch đã hết hạn',
+    subtitle: null,
+    isEnabled: true,
+    sortOrder: 80,
+    activeFrom: null,
+    activeUntil: new Date('2020-01-01T00:00:00.000Z'),
+  },
+  {
+    id: '00000000-0000-4000-8000-000000000609',
+    key: 'disabled',
+    type: 'CAMPAIGN_BANNER',
+    title: 'Chiến dịch tạm dừng',
+    subtitle: null,
+    isEnabled: false,
+    sortOrder: 90,
+    activeFrom: null,
+    activeUntil: null,
+  },
+] as const;
+
+export const seedHomepageBanners = [
+  {
+    id: '00000000-0000-4000-8000-000000000701',
+    moduleId: seedHomepageModules[0].id,
+    eyebrow: '8.8 SIÊU HỘI',
+    title: 'Mua sắm thả ga, deal về đầy nhà',
+    description: 'Khám phá ưu đãi nổi bật từ các gian hàng trên Shopee Clone.',
+    imageUrl: '/media/homepage/campaign-88.svg',
+    altText: 'Hộp quà chiến dịch 8.8',
+    destinationPath: '/search?q=flash+sale',
+    themeKey: 'brand',
+    sortOrder: 10,
+  },
+] as const;
+
+export const seedHomepageCategories = seedCategories.map((category, index) => ({
+  id: `00000000-0000-4000-8000-0000000008${String(index + 1).padStart(2, '0')}`,
+  moduleId: seedHomepageModules[1].id,
+  categoryId: category.id,
+  label: ['Thiết bị điện tử', 'Điện thoại & phụ kiện', 'Nhà cửa & đời sống', 'Thiết bị nhà bếp'][
+    index
+  ],
+  iconKey: ['device', 'phone', 'home', 'kitchen'][index],
+  sortOrder: (index + 1) * 10,
+}));
+
+const productModuleSeed = [
+  [seedHomepageModules[2], 'Giảm đến 20%', 2100],
+  [seedHomepageModules[3], 'Bán chạy', 5800],
+  [seedHomepageModules[4], 'Mall', 980],
+  [seedHomepageModules[5], 'Gợi ý', 620],
+] as const;
+
+export const seedHomepageProducts = productModuleSeed.flatMap(
+  ([module, label, soldCount], moduleIndex) =>
+    seedProducts.map((product, productIndex) => ({
+      id: `00000000-0000-4000-8000-000000001${moduleIndex}${String(productIndex + 1).padStart(2, '0')}`,
+      moduleId: module.id,
+      productId: product.id,
+      label,
+      soldCount: soldCount + productIndex * 137,
+      sortOrder: (productIndex + 1) * 10,
+    })),
+);
 
 export const seedExpectedCounts = {
   users: seedUsers.length,
@@ -194,4 +341,8 @@ export const seedExpectedCounts = {
   variants: seedVariants.length,
   images: seedImages.length,
   inventory: seedVariants.length,
+  homepageModules: seedHomepageModules.length,
+  homepageBanners: seedHomepageBanners.length,
+  homepageCategories: seedHomepageCategories.length,
+  homepageProducts: seedHomepageProducts.length,
 } as const;

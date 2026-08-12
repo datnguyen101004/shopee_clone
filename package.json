@@ -34,6 +34,8 @@
     "test": "pnpm test:infra && turbo run test",
     "test:e2e": "playwright test",
     "test:e2e:update": "playwright test --update-snapshots",
+    "test:e2e:homepage": "node scripts/homepage-e2e.mjs",
+    "test:e2e:homepage:update": "node scripts/homepage-e2e.mjs --update-snapshots",
     "test:infra": "node --test scripts/infrastructure-smoke.test.mjs",
     "format": "prettier --write .",
     "format:check": "prettier --check ."

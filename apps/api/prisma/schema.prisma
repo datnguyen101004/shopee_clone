@@ -38,6 +38,17 @@ enum VariantStatus {
   @@map("variant_status")
 }
 
+enum HomepageModuleType {
+  CAMPAIGN_BANNER       @map("campaign_banner")
+  CATEGORY_SHORTCUTS    @map("category_shortcuts")
+  FLASH_SALE            @map("flash_sale")
+  TOP_SELLING           @map("top_selling")
+  MALL                  @map("mall")
+  DAILY_RECOMMENDATIONS @map("daily_recommendations")
+
+  @@map("homepage_module_type")
+}
+
 model User {
   id          String     @id @default(uuid()) @db.Uuid
   email       String     @unique @db.VarChar(320)
@@ -71,18 +82,19 @@ model Shop {
 }
 
 model Category {
-  id        String     @id @default(uuid()) @db.Uuid
-  parentId  String?    @map("parent_id") @db.Uuid
-  slug      String     @unique @db.VarChar(120)
-  name      String     @db.VarChar(160)
-  sortOrder Int        @default(0) @map("sort_order")
-  isActive  Boolean    @default(true) @map("is_active")
-  createdAt DateTime   @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt DateTime   @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
-  deletedAt DateTime?  @map("deleted_at") @db.Timestamptz(3)
-  parent    Category?  @relation("CategoryHierarchy", fields: [parentId], references: [id], onDelete: Restrict)
-  children  Category[] @relation("CategoryHierarchy")
-  products  Product[]
+  id              String                   @id @default(uuid()) @db.Uuid
+  parentId        String?                  @map("parent_id") @db.Uuid
+  slug            String                   @unique @db.VarChar(120)
+  name            String                   @db.VarChar(160)
+  sortOrder       Int                      @default(0) @map("sort_order")
+  isActive        Boolean                  @default(true) @map("is_active")
+  createdAt       DateTime                 @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt       DateTime                 @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt       DateTime?                @map("deleted_at") @db.Timestamptz(3)
+  parent          Category?                @relation("CategoryHierarchy", fields: [parentId], references: [id], onDelete: Restrict)
+  children        Category[]               @relation("CategoryHierarchy")
+  products        Product[]
+  homepageEntries HomepageModuleCategory[]
 
   @@index([parentId])
   @@index([isActive, sortOrder])
@@ -91,20 +103,21 @@ model Category {
 }
 
 model Product {
-  id          String           @id @default(uuid()) @db.Uuid
-  shopId      String           @map("shop_id") @db.Uuid
-  categoryId  String           @map("category_id") @db.Uuid
-  slug        String           @db.VarChar(160)
-  name        String           @db.VarChar(240)
-  description String           @db.Text
-  status      ProductStatus    @default(DRAFT)
-  createdAt   DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt   DateTime         @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
-  deletedAt   DateTime?        @map("deleted_at") @db.Timestamptz(3)
-  shop        Shop             @relation(fields: [shopId], references: [id], onDelete: Restrict)
-  category    Category         @relation(fields: [categoryId], references: [id], onDelete: Restrict)
-  variants    ProductVariant[]
-  images      ProductImage[]
+  id              String                  @id @default(uuid()) @db.Uuid
+  shopId          String                  @map("shop_id") @db.Uuid
+  categoryId      String                  @map("category_id") @db.Uuid
+  slug            String                  @db.VarChar(160)
+  name            String                  @db.VarChar(240)
+  description     String                  @db.Text
+  status          ProductStatus           @default(DRAFT)
+  createdAt       DateTime                @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt       DateTime                @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt       DateTime?               @map("deleted_at") @db.Timestamptz(3)
+  shop            Shop                    @relation(fields: [shopId], references: [id], onDelete: Restrict)
+  category        Category                @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  variants        ProductVariant[]
+  images          ProductImage[]
+  homepageEntries HomepageModuleProduct[]
 
   @@unique([shopId, slug])
   @@index([shopId, status])
@@ -157,4 +170,71 @@ model Inventory {
 
   @@index([updatedAt])
   @@map("inventory")
+}
+
+model HomepageModule {
+  id          String                   @id @default(uuid()) @db.Uuid
+  key         String                   @unique @db.VarChar(120)
+  type        HomepageModuleType
+  title       String                   @db.VarChar(160)
+  subtitle    String?                  @db.VarChar(240)
+  isEnabled   Boolean                  @default(true) @map("is_enabled")
+  sortOrder   Int                      @default(0) @map("sort_order")
+  activeFrom  DateTime?                @map("active_from") @db.Timestamptz(3)
+  activeUntil DateTime?                @map("active_until") @db.Timestamptz(3)
+  createdAt   DateTime                 @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt   DateTime                 @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  banners     HomepageBanner[]
+  categories  HomepageModuleCategory[]
+  products    HomepageModuleProduct[]
+
+  @@index([isEnabled, activeFrom, activeUntil, sortOrder])
+  @@map("homepage_modules")
+}
+
+model HomepageBanner {
+  id              String         @id @default(uuid()) @db.Uuid
+  moduleId        String         @map("module_id") @db.Uuid
+  eyebrow         String?        @db.VarChar(80)
+  title           String         @db.VarChar(160)
+  description     String?        @db.VarChar(320)
+  imageUrl        String?        @map("image_url") @db.Text
+  altText         String?        @map("alt_text") @db.VarChar(240)
+  destinationPath String         @map("destination_path") @db.VarChar(500)
+  themeKey        String         @default("brand") @map("theme_key") @db.VarChar(40)
+  sortOrder       Int            @default(0) @map("sort_order")
+  module          HomepageModule @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+
+  @@unique([moduleId, sortOrder])
+  @@map("homepage_banners")
+}
+
+model HomepageModuleCategory {
+  id         String         @id @default(uuid()) @db.Uuid
+  moduleId   String         @map("module_id") @db.Uuid
+  categoryId String         @map("category_id") @db.Uuid
+  label      String?        @db.VarChar(160)
+  iconKey    String?        @map("icon_key") @db.VarChar(40)
+  sortOrder  Int            @default(0) @map("sort_order")
+  module     HomepageModule @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  category   Category       @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+
+  @@unique([moduleId, categoryId])
+  @@unique([moduleId, sortOrder])
+  @@map("homepage_module_categories")
+}
+
+model HomepageModuleProduct {
+  id        String         @id @default(uuid()) @db.Uuid
+  moduleId  String         @map("module_id") @db.Uuid
+  productId String         @map("product_id") @db.Uuid
+  label     String?        @db.VarChar(120)
+  soldCount Int?           @map("sold_count")
+  sortOrder Int            @default(0) @map("sort_order")
+  module    HomepageModule @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  product   Product        @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  @@unique([moduleId, productId])
+  @@unique([moduleId, sortOrder])
+  @@map("homepage_module_products")
 }

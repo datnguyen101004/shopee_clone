@@ -22,3 +22,6 @@ Thumbs.db
 
 # TypeScript incremental metadata
 *.tsbuildinfo
+
+# Prisma generated client (recreated by db:generate)
+apps/api/src/generated/prisma/

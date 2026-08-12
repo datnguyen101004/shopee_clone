@@ -1,0 +1,160 @@
+generator client {
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
+  moduleFormat = "cjs"
+  runtime      = "nodejs"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserStatus {
+  ACTIVE    @map("active")
+  SUSPENDED @map("suspended")
+
+  @@map("user_status")
+}
+
+enum ShopStatus {
+  ACTIVE   @map("active")
+  INACTIVE @map("inactive")
+
+  @@map("shop_status")
+}
+
+enum ProductStatus {
+  DRAFT    @map("draft")
+  ACTIVE   @map("active")
+  ARCHIVED @map("archived")
+
+  @@map("product_status")
+}
+
+enum VariantStatus {
+  ACTIVE   @map("active")
+  INACTIVE @map("inactive")
+
+  @@map("variant_status")
+}
+
+model User {
+  id          String     @id @default(uuid()) @db.Uuid
+  email       String     @unique @db.VarChar(320)
+  displayName String     @map("display_name") @db.VarChar(120)
+  status      UserStatus @default(ACTIVE)
+  createdAt   DateTime   @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt   DateTime   @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt   DateTime?  @map("deleted_at") @db.Timestamptz(3)
+  shop        Shop?
+
+  @@index([status])
+  @@index([deletedAt])
+  @@map("users")
+}
+
+model Shop {
+  id        String     @id @default(uuid()) @db.Uuid
+  ownerId   String     @unique @map("owner_id") @db.Uuid
+  slug      String     @unique @db.VarChar(120)
+  name      String     @db.VarChar(160)
+  status    ShopStatus @default(ACTIVE)
+  createdAt DateTime   @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime   @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt DateTime?  @map("deleted_at") @db.Timestamptz(3)
+  owner     User       @relation(fields: [ownerId], references: [id], onDelete: Restrict)
+  products  Product[]
+
+  @@index([status])
+  @@index([deletedAt])
+  @@map("shops")
+}
+
+model Category {
+  id        String     @id @default(uuid()) @db.Uuid
+  parentId  String?    @map("parent_id") @db.Uuid
+  slug      String     @unique @db.VarChar(120)
+  name      String     @db.VarChar(160)
+  sortOrder Int        @default(0) @map("sort_order")
+  isActive  Boolean    @default(true) @map("is_active")
+  createdAt DateTime   @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime   @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt DateTime?  @map("deleted_at") @db.Timestamptz(3)
+  parent    Category?  @relation("CategoryHierarchy", fields: [parentId], references: [id], onDelete: Restrict)
+  children  Category[] @relation("CategoryHierarchy")
+  products  Product[]
+
+  @@index([parentId])
+  @@index([isActive, sortOrder])
+  @@index([deletedAt])
+  @@map("categories")
+}
+
+model Product {
+  id          String           @id @default(uuid()) @db.Uuid
+  shopId      String           @map("shop_id") @db.Uuid
+  categoryId  String           @map("category_id") @db.Uuid
+  slug        String           @db.VarChar(160)
+  name        String           @db.VarChar(240)
+  description String           @db.Text
+  status      ProductStatus    @default(DRAFT)
+  createdAt   DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt   DateTime         @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt   DateTime?        @map("deleted_at") @db.Timestamptz(3)
+  shop        Shop             @relation(fields: [shopId], references: [id], onDelete: Restrict)
+  category    Category         @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  variants    ProductVariant[]
+  images      ProductImage[]
+
+  @@unique([shopId, slug])
+  @@index([shopId, status])
+  @@index([categoryId, status])
+  @@index([deletedAt])
+  @@map("products")
+}
+
+model ProductVariant {
+  id                  String        @id @default(uuid()) @db.Uuid
+  productId           String        @map("product_id") @db.Uuid
+  sku                 String        @unique @db.VarChar(80)
+  name                String        @db.VarChar(160)
+  priceMinor          BigInt        @map("price_minor")
+  compareAtPriceMinor BigInt?       @map("compare_at_price_minor")
+  status              VariantStatus @default(ACTIVE)
+  createdAt           DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt           DateTime      @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt           DateTime?     @map("deleted_at") @db.Timestamptz(3)
+  product             Product       @relation(fields: [productId], references: [id], onDelete: Restrict)
+  inventory           Inventory?
+
+  @@index([productId, status])
+  @@index([deletedAt])
+  @@map("product_variants")
+}
+
+model ProductImage {
+  id        String   @id @default(uuid()) @db.Uuid
+  productId String   @map("product_id") @db.Uuid
+  url       String   @db.Text
+  altText   String?  @map("alt_text") @db.VarChar(240)
+  sortOrder Int      @default(0) @map("sort_order")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([productId, sortOrder])
+  @@index([productId])
+  @@map("product_images")
+}
+
+model Inventory {
+  variantId        String         @id @map("variant_id") @db.Uuid
+  quantityOnHand   Int            @default(0) @map("quantity_on_hand")
+  quantityReserved Int            @default(0) @map("quantity_reserved")
+  createdAt        DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt        DateTime       @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  variant          ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+
+  @@index([updatedAt])
+  @@map("inventory")
+}

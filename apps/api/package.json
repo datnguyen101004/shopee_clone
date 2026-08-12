@@ -3,18 +3,34 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "predev": "pnpm db:generate",
     "dev": "nest start --watch",
+    "prebuild": "pnpm db:generate",
     "build": "nest build",
     "start": "node dist/main.js",
     "lint": "eslint .",
+    "pretypecheck": "pnpm db:generate",
     "typecheck": "tsc --noEmit",
-    "test": "jest --runInBand"
+    "pretest": "pnpm db:generate",
+    "test": "jest --runInBand",
+    "db:generate": "prisma generate",
+    "db:format": "prisma format",
+    "db:validate": "prisma validate",
+    "db:migrate": "prisma migrate dev",
+    "db:migrate:deploy": "prisma migrate deploy",
+    "db:seed": "prisma db seed",
+    "db:reset": "prisma migrate reset",
+    "db:verify": "tsx prisma/verify.ts"
   },
   "dependencies": {
     "@nestjs/common": "11.1.29",
     "@nestjs/core": "11.1.29",
     "@nestjs/platform-express": "11.1.29",
+    "@prisma/adapter-pg": "7.9.1",
+    "@prisma/client": "7.9.1",
     "@shopee-clone/contracts": "workspace:*",
+    "dotenv": "17.4.2",
+    "pg": "8.23.0",
     "reflect-metadata": "0.2.2",
     "rxjs": "7.8.2"
   },
@@ -25,11 +41,14 @@
     "@types/express": "5.0.6",
     "@types/jest": "29.5.14",
     "@types/node": "22.20.1",
+    "@types/pg": "8.21.0",
     "@types/supertest": "7.2.1",
     "eslint": "9.39.5",
     "jest": "29.7.0",
+    "prisma": "7.9.1",
     "supertest": "7.2.2",
     "ts-jest": "29.4.12",
+    "tsx": "4.23.12",
     "typescript": "5.9.3"
   }
 }

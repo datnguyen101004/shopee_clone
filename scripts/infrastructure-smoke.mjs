@@ -155,6 +155,9 @@ async function main() {
       environment,
     });
 
+    console.log('Generating the ignored Prisma client from the committed schema...');
+    runPnpm(['db:generate'], environment);
+
     console.log('Applying development migrations and deterministic seed...');
     runPnpm(['db:migrate:deploy'], environment);
     runPnpm(['db:seed'], environment);

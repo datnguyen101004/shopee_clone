@@ -28,6 +28,7 @@ Verified locally on 2026-08-12 for GitHub issue #5 (T04).
 port, and API port. It completed the following checks:
 
 - PostgreSQL reached its health check.
+- The ignored Prisma client was generated from the committed schema.
 - The committed migration deployed from an empty development database.
 - The deterministic development seed completed.
 - Guarded test verification deployed migrations twice, seeded twice, and

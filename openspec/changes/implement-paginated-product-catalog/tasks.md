@@ -52,4 +52,4 @@
 
 - [x] 7.1 Document the catalogue endpoint, pagination bounds, presentation-field ownership, category semantics, local prerequisites, and T09/T10 boundaries.
 - [x] 7.2 During development use focused unit/integration tests plus `test:e2e:homepage:quick`; run frozen install, Prisma gates, migration/seed verification, format, lint, typecheck, all tests, production builds, isolated catalogue E2E, and strict OpenSpec validation before delivery.
-- [ ] 7.3 Record verification evidence, commit and push T08 directly to `development` without a pull request, confirm no automatic GitHub Actions run was created, close issue `#9`, and confirm no issue branch remains.
+- [x] 7.3 Record verification evidence, commit and push T08 directly to `development` without a pull request, confirm no automatic GitHub Actions run was created, close issue `#9`, and confirm no issue branch remains.

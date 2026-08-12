@@ -14,3 +14,4 @@ Date: 2026-08-12
 - `pnpm test:e2e:catalog`: passed a real isolated PostgreSQL Supertest suite plus 7 Playwright journeys; 2 duplicate viewport state-mutation cases were intentionally skipped. The runner removed its exact temporary Compose project.
 - Axe reported no serious or critical violations for populated, empty, and failure catalogue states after the rating contrast fix.
 - `catalog-mobile.png`, `catalog-tablet.png`, and `catalog-desktop.png` were manually reviewed for Shopee-like density, Vietnamese context, card consistency, pagination, and overflow.
+- Delivery commit `46661aa` was pushed directly to `development` without a pull request. No Actions run was created for its SHA, issue `#9` was closed, and the repository has no T08 issue branch.

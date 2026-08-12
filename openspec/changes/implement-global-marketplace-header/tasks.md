@@ -38,4 +38,4 @@
 - [x] 6.1 Document the storefront route-group boundary, header extension props, reserved destinations, category configuration, and deferred authentication/cart/search ownership.
 - [x] 6.2 Run frozen install, format, lint, typecheck, all unit/component tests, production build, Playwright suites, and strict OpenSpec validation; fix every failure.
 - [x] 6.3 Manually inspect homepage and placeholder routes at 360, 768, and 1440 px for Shopee fidelity, Vietnamese copy, focus, contrast, disclosure behavior, sticky layout, and overflow.
-- [ ] 6.4 Record verification evidence for issue #7, commit and push T06 directly to `development`, wait for every GitHub Actions job to succeed, close the issue as completed, and confirm no issue branch remains.
+- [x] 6.4 Record verification evidence for issue #7, commit and push T06 directly to `development`, wait for every GitHub Actions job to succeed, close the issue as completed, and confirm no issue branch remains.

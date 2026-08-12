@@ -19,4 +19,7 @@ During review, two production-only defects were found and fixed: server-rendered
 
 ## Delivery
 
-Commit, GitHub Actions, issue closure, and branch evidence will be recorded after the implementation is pushed to `development`.
+- Implementation commit `d865336` was pushed directly to `development` without a pull request.
+- GitHub Actions run `31587955314` completed successfully: Repository quality and PostgreSQL persistence smoke both passed.
+- Verification evidence was posted to issue #7, which was closed with reason `completed`.
+- Local and remote branch inspection found only `development` and `main`; no T06 issue branch exists.

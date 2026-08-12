@@ -43,4 +43,4 @@
 - [x] 6.1 Document token intent, package boundaries, public component APIs, state/accessibility rules, responsive reference widths, showcase usage, and the process for approving intentional screenshot changes.
 - [x] 6.2 Run frozen install, package-boundary/token checks, format, lint, typecheck, all component/unit tests, production build, Playwright accessibility/responsive/visual suites, and strict OpenSpec validation; fix every failure.
 - [x] 6.3 Manually inspect the rendered root and showcase at 360, 768, and 1440 px for Shopee-inspired visual fidelity, Vietnamese copy, interaction polish, overflow, focus, contrast, and reduced motion while confirming T06+ feature behavior remains absent.
-- [ ] 6.4 Record verification evidence for issue #6, commit and push the completed T05 change directly to `development`, wait for every GitHub Actions job to succeed, close the issue as completed, and confirm no issue branch remains.
+- [x] 6.4 Record verification evidence for issue #6, commit and push the completed T05 change directly to `development`, wait for every GitHub Actions job to succeed, close the issue as completed, and confirm no issue branch remains.

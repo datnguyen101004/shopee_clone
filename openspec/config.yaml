@@ -1,13 +1,19 @@
 schema: spec-driven
 
-# Project context (optional)
-# This is shown to AI when creating artifacts.
-# Add your tech stack, conventions, style guides, domain knowledge, etc.
-# Example:
-#   context: |
-#     Tech stack: TypeScript, React, Node.js
-#     We use conventional commits
-#     Domain: e-commerce platform
+context: |
+  Domain: A responsive, multi-vendor Shopee clone for buyer, seller, and admin workflows.
+  Architecture: TypeScript modular monolith in a pnpm workspace, orchestrated with Turborepo.
+  Frontend: Next.js App Router, React, and TypeScript under apps/web.
+  Backend: NestJS REST API under apps/api. Use /api/v1, OpenAPI, DTO boundary validation,
+  Problem Details errors, and server-authoritative business calculations.
+  Persistence: PostgreSQL with Prisma; the backend exclusively owns schema and migrations.
+  Shared packages: framework-neutral API contracts/config and frontend-only UI primitives.
+  Infrastructure: Docker Compose for local dependencies and GitHub Actions for CI.
+  Testing: Vitest/Testing Library for frontend, Jest/Supertest for backend, and Playwright
+  for critical browser journeys.
+  Conventions: strict TypeScript, Conventional Commits, UTC date-times, integer minor units
+  for money, no committed secrets, and capability-oriented modules.
+  Architecture decisions and detailed conventions live in docs/architecture/technology-stack.md.
 
 # Per-artifact rules (optional)
 # Add custom rules for specific artifacts.

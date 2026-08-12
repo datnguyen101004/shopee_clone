@@ -1,0 +1,39 @@
+import { Inject, Injectable } from '@nestjs/common';
+
+import { ProductStatus, ShopStatus, VariantStatus } from '../generated/prisma/enums';
+import { PrismaService } from '../prisma/prisma.service';
+
+@Injectable()
+export class CatalogRepository {
+  constructor(@Inject(PrismaService) private readonly prisma: PrismaService) {}
+
+  findActiveCategories() {
+    return this.prisma.category.findMany({
+      where: { isActive: true, deletedAt: null },
+      select: { id: true, parentId: true, slug: true },
+    });
+  }
+
+  findCandidates(categoryIds?: string[]) {
+    return this.prisma.product.findMany({
+      where: {
+        status: ProductStatus.ACTIVE,
+        deletedAt: null,
+        ...(categoryIds ? { categoryId: { in: categoryIds } } : {}),
+        shop: { status: ShopStatus.ACTIVE, deletedAt: null },
+        category: { isActive: true, deletedAt: null },
+      },
+      include: {
+        shop: true,
+        category: true,
+        images: { orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }] },
+        variants: {
+          where: { status: VariantStatus.ACTIVE, deletedAt: null },
+          include: { inventory: true },
+          orderBy: [{ priceMinor: 'asc' }, { id: 'asc' }],
+        },
+      },
+      orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
+    });
+  }
+}

@@ -44,7 +44,17 @@ Homepage ordering, Vietnamese display copy, module membership, and UTC activatio
 
 Run the real-boundary browser gate with `pnpm test:e2e:homepage`. It creates an isolated PostgreSQL Compose project, deploys and seeds twice-verified migrations, builds and starts NestJS plus Next.js on free local ports, runs the three responsive Playwright projects, and removes only that temporary project. T08 owns catalogue browsing, T09 search, T10 full product details, and T36 genuine Mall verification.
 
+For fast homepage iteration, first run `pnpm dev` against an already migrated and seeded local database, then run `pnpm test:e2e:homepage:quick`. The quick command only health-checks the local API and web app and runs the homepage browser spec; it never starts Docker, migrates, seeds, builds, or mutates the local database. Use the isolated `test:e2e:homepage` command for persistence changes and final delivery gates.
+
 GitHub Actions automatic push and pull-request triggers are temporarily disabled. The workflow remains available through manual dispatch; run local quality gates before pushing until automatic CI is restored.
+
+## Product catalogue (T08)
+
+`GET /api/v1/catalog/products` is an anonymous, no-store catalogue endpoint. It accepts `category`, `page` (default `1`), and `pageSize` (default `12`, maximum `48`). A parent category includes active descendants; an unknown, inactive, or deleted category returns a valid empty page. Results are ordered by `createdAt DESC, id ASC` after display eligibility is applied.
+
+Cards use the lowest-priced active in-stock variant for integer-minor-unit price and server-computed discount. Shop location and the product rating/count/sold summaries are seed/admin-owned presentation fields until future order and review projections become authoritative. T09 owns free-text search and ranking, so `q` is preserved in browser pagination but does not filter T08 API results. Product links intentionally hand off to the existing T10 placeholder route.
+
+Use `pnpm test:e2e:catalog:quick` against already-running local services for focused iteration. Use `pnpm test:e2e:catalog` for the isolated migration, seed, real PostgreSQL/Supertest, production build, and three-viewport browser gate.
 
 ## Daily lifecycle
 

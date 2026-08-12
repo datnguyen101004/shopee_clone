@@ -49,6 +49,7 @@ async function seedMarketplace(): Promise<void> {
           ownerId: shop.ownerId,
           slug: shop.slug,
           name: shop.name,
+          location: shop.location,
           status: ShopStatus.ACTIVE,
           deletedAt: null,
         },
@@ -81,6 +82,10 @@ async function seedMarketplace(): Promise<void> {
           name: product.name,
           description: product.description,
           status: ProductStatus.ACTIVE,
+          ratingAverageBasisPoints: product.ratingAverageBasisPoints,
+          ratingCount: product.ratingCount,
+          soldCount: product.soldCount,
+          createdAt: product.createdAt,
           deletedAt: null,
         },
       });

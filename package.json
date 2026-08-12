@@ -36,6 +36,10 @@
     "test:e2e:update": "playwright test --update-snapshots",
     "test:e2e:homepage": "node scripts/homepage-e2e.mjs",
     "test:e2e:homepage:update": "node scripts/homepage-e2e.mjs --update-snapshots",
+    "test:e2e:homepage:quick": "node scripts/quick-e2e.mjs homepage",
+    "test:e2e:catalog": "node scripts/homepage-e2e.mjs catalog",
+    "test:e2e:catalog:update": "node scripts/homepage-e2e.mjs catalog --update-snapshots",
+    "test:e2e:catalog:quick": "node scripts/quick-e2e.mjs catalog",
     "test:infra": "node --test scripts/infrastructure-smoke.test.mjs",
     "format": "prettier --write .",
     "format:check": "prettier --check ."

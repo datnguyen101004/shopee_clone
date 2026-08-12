@@ -19,7 +19,7 @@ function productRecord() {
       status: ProductStatus.ACTIVE,
       deletedAt: null,
       shop: { name: 'Tech Store', status: ShopStatus.ACTIVE, deletedAt: null },
-      images: [{ url: '/media/products/wireless-earbuds.svg', altText: null }],
+      images: [{ url: '/media/products/wireless-earbuds.jpg', altText: null }],
       variants: [
         {
           id: 'v1',

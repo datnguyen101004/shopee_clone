@@ -114,6 +114,10 @@ async function verifyDatabase(databaseUrl: string): Promise<void> {
     assert.equal(product.shop.id, seedShops[0].id);
     assert.equal(product.category.id, seedCategories[1].id);
     assert.equal(product.status, ProductStatus.ACTIVE);
+    assert.equal(product.shop.location, seedShops[0].location);
+    assert.equal(product.ratingAverageBasisPoints, seedProducts[0].ratingAverageBasisPoints);
+    assert.equal(product.ratingCount, seedProducts[0].ratingCount);
+    assert.equal(product.soldCount, seedProducts[0].soldCount);
     assert.equal(product.images[0]?.id, seedImages[0].id);
     assert(product.variants.length >= 2);
     assert(product.variants.every((variant) => variant.inventory !== null));
@@ -154,6 +158,20 @@ async function verifyDatabase(databaseUrl: string): Promise<void> {
     );
     assert(seedHomepageBanners.every((banner) => banner.destinationPath.startsWith('/')));
     assert(seedImages.every((image) => image.url.startsWith('/media/products/')));
+    assert(seedImages.every((image) => /\.(?:jpg|svg)$/.test(image.url)));
+
+    const orderedProducts = await prisma.product.findMany({
+      where: { status: ProductStatus.ACTIVE, deletedAt: null },
+      select: { id: true, createdAt: true, categoryId: true },
+      orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
+    });
+    assert(orderedProducts.length > 12);
+    assert.equal(
+      new Set(orderedProducts.map((item) => item.createdAt.toISOString())).size,
+      orderedProducts.length,
+    );
+    assert(orderedProducts.some((item) => item.categoryId === seedCategories[1].id));
+    assert(orderedProducts.some((item) => item.categoryId === seedCategories[3].id));
 
     const constraintRows = await prisma.$queryRawUnsafe<Array<{ constraint_name: string }>>(
       `SELECT conname AS constraint_name
@@ -166,10 +184,13 @@ async function verifyDatabase(databaseUrl: string): Promise<void> {
          'inventory_reserved_not_above_on_hand'
          ,'homepage_modules_valid_window'
          ,'homepage_module_products_sold_count_nonnegative'
+         ,'products_rating_average_bounded'
+         ,'products_rating_count_nonnegative'
+         ,'products_sold_count_nonnegative'
        )
        ORDER BY conname`,
     );
-    assert.equal(constraintRows.length, 7);
+    assert.equal(constraintRows.length, 10);
 
     await expectDatabaseRejection('a duplicate user email', () =>
       prisma.user.create({
@@ -235,6 +256,25 @@ async function verifyDatabase(databaseUrl: string): Promise<void> {
       prisma.inventory.update({
         where: { variantId: seedVariants[0].id },
         data: { quantityOnHand: 5, quantityReserved: 6 },
+      }),
+    );
+
+    await expectDatabaseRejection('a rating above five stars', () =>
+      prisma.product.update({
+        where: { id: seedProducts[0].id },
+        data: { ratingAverageBasisPoints: 501 },
+      }),
+    );
+    await expectDatabaseRejection('a negative rating count', () =>
+      prisma.product.update({
+        where: { id: seedProducts[0].id },
+        data: { ratingCount: -1 },
+      }),
+    );
+    await expectDatabaseRejection('a negative sold count', () =>
+      prisma.product.update({
+        where: { id: seedProducts[0].id },
+        data: { soldCount: -1 },
       }),
     );
   } finally {

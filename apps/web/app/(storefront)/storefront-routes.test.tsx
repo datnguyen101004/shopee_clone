@@ -8,6 +8,14 @@ import StorefrontLayout from './layout';
 import LoginPlaceholderPage from './login/page';
 import SearchPage from './search/page';
 
+vi.mock('../../lib/catalog-api', () => ({
+  fetchCatalogProducts: vi.fn().mockResolvedValue({
+    query: { category: null },
+    pagination: { page: 1, pageSize: 12, totalItems: 0, totalPages: 0 },
+    items: [],
+  }),
+}));
+
 describe('storefront route boundary', () => {
   it.each([
     ['login', <LoginPlaceholderPage key="login" />],

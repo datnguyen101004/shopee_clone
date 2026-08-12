@@ -51,7 +51,8 @@ function verifyCleanup(projectName, environment) {
 }
 
 async function main() {
-  const projectName = createSmokeProjectName(`homepage${process.pid}${crypto.randomUUID()}`);
+  const suite = process.argv.includes('catalog') ? 'catalog' : 'homepage';
+  const projectName = createSmokeProjectName(`${suite}${process.pid}${crypto.randomUUID()}`);
   const databasePort = await findAvailablePort();
   const apiPort = await findAvailablePort();
   const webPort = await findAvailablePort();
@@ -69,7 +70,7 @@ async function main() {
   assertCleanupTargets({ projectName, composeFile, repositoryRoot });
 
   try {
-    console.log(`Starting isolated homepage E2E project ${projectName}...`);
+    console.log(`Starting isolated ${suite} E2E project ${projectName}...`);
     run(
       'docker',
       buildComposeArgs(projectName, composeFile, ['up', '--detach', '--wait']),
@@ -79,11 +80,24 @@ async function main() {
     pnpm(['db:migrate:deploy'], environment);
     pnpm(['db:seed'], environment);
     pnpm(['db:verify'], environment);
+    if (suite === 'catalog') {
+      pnpm(
+        [
+          '--filter',
+          '@shopee-clone/api',
+          'exec',
+          'jest',
+          '--runInBand',
+          'test/catalog.postgres.e2e.spec.ts',
+        ],
+        { ...environment, RUN_CATALOG_DATABASE_TESTS: '1' },
+      );
+    }
     pnpm(['build'], environment);
-    const playwrightArgs = ['exec', 'playwright', 'test', 'e2e/homepage.spec.ts'];
+    const playwrightArgs = ['exec', 'playwright', 'test', `e2e/${suite}.spec.ts`];
     if (process.argv.includes('--update-snapshots')) playwrightArgs.push('--update-snapshots');
     pnpm(playwrightArgs, environment);
-    console.log('Real API-driven homepage E2E verification passed.');
+    console.log(`Real API-driven ${suite} E2E verification passed.`);
   } catch (error) {
     primaryError = error;
   } finally {
@@ -95,7 +109,7 @@ async function main() {
         true,
       );
       verifyCleanup(projectName, environment);
-      console.log(`Removed isolated homepage E2E project ${projectName}.`);
+      console.log(`Removed isolated ${suite} E2E project ${projectName}.`);
     } catch (cleanupError) {
       primaryError ??= cleanupError;
     }

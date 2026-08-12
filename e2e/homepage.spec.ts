@@ -61,6 +61,10 @@ test.describe('API-driven marketplace homepage', () => {
     page,
   }, testInfo) => {
     test.skip(
+      process.env.QUICK_E2E === '1',
+      'Quick E2E never mutates an already-running local database.',
+    );
+    test.skip(
       testInfo.project.name !== 'desktop',
       'State mutation runs once against isolated E2E data.',
     );

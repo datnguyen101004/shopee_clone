@@ -17,12 +17,14 @@ export const seedShops = [
     ownerId: seedUsers[0].id,
     slug: 'shopee-tech-store',
     name: 'Shopee Tech Store',
+    location: 'TP. Hồ Chí Minh',
   },
   {
     id: '00000000-0000-4000-8000-000000000102',
     ownerId: seedUsers[1].id,
     slug: 'happy-home-store',
     name: 'Happy Home Store',
+    location: 'Hà Nội',
   },
 ] as const;
 
@@ -65,6 +67,10 @@ export const seedProducts = [
     slug: 'smartphone-pro',
     name: 'Smartphone Pro',
     description: 'Demo flagship smartphone for marketplace development.',
+    ratingAverageBasisPoints: 490,
+    ratingCount: 1284,
+    soldCount: 4210,
+    createdAt: new Date('2026-08-12T12:00:00.000Z'),
   },
   {
     id: '00000000-0000-4000-8000-000000000302',
@@ -73,6 +79,10 @@ export const seedProducts = [
     slug: 'wireless-earbuds',
     name: 'Wireless Earbuds',
     description: 'Demo wireless earbuds with multiple color variants.',
+    ratingAverageBasisPoints: 480,
+    ratingCount: 896,
+    soldCount: 2730,
+    createdAt: new Date('2026-08-11T12:00:00.000Z'),
   },
   {
     id: '00000000-0000-4000-8000-000000000303',
@@ -81,6 +91,10 @@ export const seedProducts = [
     slug: 'power-blender',
     name: 'Power Blender',
     description: 'Demo countertop blender for home catalog scenarios.',
+    ratingAverageBasisPoints: 470,
+    ratingCount: 342,
+    soldCount: 758,
+    createdAt: new Date('2026-08-10T12:00:00.000Z'),
   },
   {
     id: '00000000-0000-4000-8000-000000000304',
@@ -89,7 +103,37 @@ export const seedProducts = [
     slug: 'smart-rice-cooker',
     name: 'Smart Rice Cooker',
     description: 'Demo rice cooker with two capacity variants.',
+    ratingAverageBasisPoints: 485,
+    ratingCount: 621,
+    soldCount: 1480,
+    createdAt: new Date('2026-08-09T12:00:00.000Z'),
   },
+  ...[
+    'Ốp lưng chống sốc',
+    'Cáp sạc nhanh USB-C',
+    'Giá đỡ điện thoại',
+    'Máy xay mini',
+    'Nồi chiên không dầu',
+    'Ấm siêu tốc',
+    'Sạc dự phòng 20000mAh',
+    'Loa Bluetooth mini',
+    'Bộ nồi inox gia đình',
+  ].map((name, index) => {
+    const number = index + 5;
+    const electronics = index % 2 === 0;
+    return {
+      id: `00000000-0000-4000-8000-${String(300 + number).padStart(12, '0')}`,
+      shopId: electronics ? seedShops[0].id : seedShops[1].id,
+      categoryId: electronics ? seedCategories[1].id : seedCategories[3].id,
+      slug: `catalog-product-${number}`,
+      name,
+      description: `Sản phẩm mẫu ${name} cho danh mục phân trang.`,
+      ratingAverageBasisPoints: 440 + index * 5,
+      ratingCount: 80 + index * 37,
+      soldCount: 120 + index * 91,
+      createdAt: new Date(Date.UTC(2026, 7, 8 - index, 12)),
+    };
+  }),
 ] as const;
 
 export const seedVariants = [
@@ -153,37 +197,54 @@ export const seedVariants = [
     quantityOnHand: 10,
     quantityReserved: 1,
   },
+  ...seedProducts.slice(4).map((product, index) => ({
+    id: `00000000-0000-4000-8000-${String(407 + index).padStart(12, '0')}`,
+    productId: product.id,
+    sku: `CATALOG-${String(index + 5).padStart(3, '0')}`,
+    name: 'Tiêu chuẩn',
+    priceMinor: BigInt(179_000 + index * 125_000),
+    compareAtPriceMinor: index % 2 === 0 ? BigInt(249_000 + index * 145_000) : null,
+    quantityOnHand: 40 + index,
+    quantityReserved: index,
+  })),
 ] as const;
 
 export const seedImages = [
   {
     id: '00000000-0000-4000-8000-000000000501',
     productId: seedProducts[0].id,
-    url: '/media/products/smartphone-pro.svg',
+    url: '/media/products/smartphone-pro.jpg',
     altText: 'Smartphone Pro',
     sortOrder: 0,
   },
   {
     id: '00000000-0000-4000-8000-000000000502',
     productId: seedProducts[1].id,
-    url: '/media/products/wireless-earbuds.svg',
+    url: '/media/products/wireless-earbuds.jpg',
     altText: 'Wireless Earbuds',
     sortOrder: 0,
   },
   {
     id: '00000000-0000-4000-8000-000000000503',
     productId: seedProducts[2].id,
-    url: '/media/products/power-blender.svg',
+    url: '/media/products/power-blender.jpg',
     altText: 'Power Blender',
     sortOrder: 0,
   },
   {
     id: '00000000-0000-4000-8000-000000000504',
     productId: seedProducts[3].id,
-    url: '/media/products/smart-rice-cooker.svg',
+    url: '/media/products/smart-rice-cooker.jpg',
     altText: 'Smart Rice Cooker',
     sortOrder: 0,
   },
+  ...seedProducts.slice(4).map((product, index) => ({
+    id: `00000000-0000-4000-8000-${String(505 + index).padStart(12, '0')}`,
+    productId: product.id,
+    url: `/media/products/${['wireless-earbuds', 'smartphone-pro', 'wireless-earbuds', 'power-blender', 'smart-rice-cooker', 'power-blender', 'smartphone-pro', 'wireless-earbuds', 'smart-rice-cooker'][index]}.jpg`,
+    altText: product.name,
+    sortOrder: 0,
+  })),
 ] as const;
 
 export const seedHomepageModules = [
@@ -295,7 +356,7 @@ export const seedHomepageBanners = [
     eyebrow: '8.8 SIÊU HỘI',
     title: 'Mua sắm thả ga, deal về đầy nhà',
     description: 'Khám phá ưu đãi nổi bật từ các gian hàng trên Shopee Clone.',
-    imageUrl: '/media/homepage/campaign-88.svg',
+    imageUrl: '/media/homepage/campaign-88.webp',
     altText: 'Hộp quà chiến dịch 8.8',
     destinationPath: '/search?q=flash+sale',
     themeKey: 'brand',
@@ -323,7 +384,7 @@ const productModuleSeed = [
 
 export const seedHomepageProducts = productModuleSeed.flatMap(
   ([module, label, soldCount], moduleIndex) =>
-    seedProducts.map((product, productIndex) => ({
+    seedProducts.slice(0, 4).map((product, productIndex) => ({
       id: `00000000-0000-4000-8000-000000001${moduleIndex}${String(productIndex + 1).padStart(2, '0')}`,
       moduleId: module.id,
       productId: product.id,

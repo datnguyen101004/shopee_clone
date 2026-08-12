@@ -62,7 +62,7 @@ test.describe('API-driven product discovery', () => {
   }) => {
     for (const sort of ['relevance', 'newest', 'best-selling', 'price-asc', 'price-desc']) {
       const keyword = sort === 'relevance' ? '&q=airpods' : '';
-      await page.goto(`/search?category=dien-thoai&sort=${sort}${keyword}`);
+      await page.goto(`/search?category=thiet-bi-dien-tu&sort=${sort}${keyword}`);
       await expect(page.getByRole('combobox', { name: 'Sắp xếp' })).toHaveValue(sort);
       await expect(page.getByRole('status')).toContainText('sản phẩm');
     }

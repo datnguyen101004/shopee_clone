@@ -60,7 +60,7 @@ databaseTest('Catalog endpoint with isolated PostgreSQL', () => {
 
     for (const category of [
       'bach-hoa',
-      'dien-thoai',
+      'thiet-bi-dien-tu',
       'my-pham',
       'noi-that',
       'the-thao',

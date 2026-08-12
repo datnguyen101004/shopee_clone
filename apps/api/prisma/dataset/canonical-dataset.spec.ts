@@ -27,7 +27,7 @@ describe('canonical product dataset', () => {
     expect(loaded.every(({ rootMetadata }) => !('records' in rootMetadata))).toBe(true);
     expect(canonicalDatasetManifest.find(({ key }) => key === 'dienthoai')?.category).toMatchObject(
       {
-        slug: 'dien-thoai',
+        slug: 'thiet-bi-dien-tu',
         name: 'Thiết bị điện tử',
       },
     );

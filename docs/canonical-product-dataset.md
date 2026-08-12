@@ -7,7 +7,7 @@ TS01 makes the six JSON files in `asserts/` the canonical development catalog. I
 | File | Source key | Category | Records |
 | --- | --- | --- | ---: |
 | `bachhoa.json` | `bachhoa` | `bach-hoa` | 51 |
-| `dienthoai.json` | `dienthoai` | `dien-thoai` | 93 |
+| `dienthoai.json` | `dienthoai` | `thiet-bi-dien-tu` | 93 |
 | `mypham.json` | `mypham` | `my-pham` | 300 |
 | `noithat.json` | `noithat` | `noi-that` | 300 |
 | `thethao.json` | `thethao` | `the-thao` | 294 |

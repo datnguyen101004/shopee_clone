@@ -19,7 +19,12 @@ export const canonicalDatasetManifest = [
     key: 'dienthoai',
     fileName: 'dienthoai.json',
     expectedCount: 93,
-    category: { slug: 'dien-thoai', name: 'Thiết bị điện tử', iconKey: 'phone', sortOrder: 20 },
+    category: {
+      slug: 'thiet-bi-dien-tu',
+      name: 'Thiết bị điện tử',
+      iconKey: 'phone',
+      sortOrder: 20,
+    },
     shop: {
       slug: 'dien-thoai-hay-dataset',
       name: 'Điện Thoại Hay',

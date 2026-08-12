@@ -54,7 +54,7 @@ Product IDs use a fixed namespace and SHA-derived UUID formatting. Slugs use nor
 
 ### 4. Normalize every record into one default sellable projection
 
-Each source maps to one canonical category (`bach-hoa`, `dien-thoai`, `my-pham`, `noi-that`, `the-thao`, or `thoi-trang`) and one synthetic source-backed shop. Each shop has a non-interactive system seed owner with no documented plaintext credential; the import does not grant admin access or alter normal RBAC bootstrap behavior.
+Each source maps to one canonical category (`bach-hoa`, `thiet-bi-dien-tu`, `my-pham`, `noi-that`, `the-thao`, or `thoi-trang`) and one synthetic source-backed shop. Each shop has a non-interactive system seed owner with no documented plaintext credential; the import does not grant admin access or alter normal RBAC bootstrap behavior.
 
 Each record produces one active product, one `Mặc định` variant, one primary image, and one inventory row. Notes become the base description and are also retained raw. Original-price text is mapped to compare-at price only when it parses as a valid value greater than current price. Recognized rating-count, sold-count, brand, type, discount, and stock tokens are parsed conservatively; unrecognized content stays in provenance.
 

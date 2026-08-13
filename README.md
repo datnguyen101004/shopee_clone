@@ -100,6 +100,8 @@ See [Account authentication](docs/authentication.md) for T11 email/password sess
 
 See [Marketplace role authorization](docs/role-authorization.md) for the T12 permission matrix, persisted seller ownership, first-admin bootstrap, admin role workflow, append-only audit, and focused verification commands.
 
+See [Buyer profile and shipping addresses](docs/account-management.md) for the T13 account endpoints, Vietnamese normalization, default-address locking/invariant, privacy boundary, checkout snapshot responsibility, and focused verification commands.
+
 ## Database workflows
 
 PostgreSQL persistence is owned by `apps/api`. The API and Prisma commands load the ignored root `.env` (with `apps/api/.env` as an optional higher-priority override); never commit credentials.

@@ -49,6 +49,7 @@
     "test:e2e:auth": "node scripts/homepage-e2e.mjs auth",
     "test:e2e:auth:update": "node scripts/homepage-e2e.mjs auth --update-snapshots",
     "test:e2e:auth:quick": "node scripts/quick-e2e.mjs auth",
+    "test:e2e:account:quick": "node scripts/quick-e2e.mjs account",
     "test:infra": "node --test scripts/infrastructure-smoke.test.mjs",
     "format": "prettier --write .",
     "format:check": "prettier --check ."

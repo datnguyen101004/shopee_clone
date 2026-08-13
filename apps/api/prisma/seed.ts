@@ -13,6 +13,7 @@ import {
   seedHomepageBanners,
   seedHomepageModules,
   seedShops,
+  seedShippingAddresses,
   seedUsers,
 } from './seed-data';
 
@@ -32,8 +33,36 @@ async function seedMarketplace() {
         update: {
           email: user.email,
           displayName: user.displayName,
+          phoneNumber: user.phoneNumber,
           passwordHash: user.passwordHash,
           status: UserStatus.ACTIVE,
+          deletedAt: null,
+        },
+      });
+    }
+
+    for (const userId of new Set(seedShippingAddresses.map(({ userId }) => userId))) {
+      await transaction.shippingAddress.updateMany({
+        where: { userId, isDefault: true, deletedAt: null },
+        data: { isDefault: false },
+      });
+    }
+    for (const address of seedShippingAddresses) {
+      await transaction.shippingAddress.upsert({
+        where: { id: address.id },
+        create: address,
+        update: {
+          userId: address.userId,
+          recipientName: address.recipientName,
+          phoneNumber: address.phoneNumber,
+          province: address.province,
+          district: address.district,
+          ward: address.ward,
+          addressLine: address.addressLine,
+          label: address.label,
+          isDefault: address.isDefault,
+          createdAt: address.createdAt,
+          updatedAt: address.updatedAt,
           deletedAt: null,
         },
       });

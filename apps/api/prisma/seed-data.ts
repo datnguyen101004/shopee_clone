@@ -3,13 +3,46 @@ export const seedUsers = [
     id: '00000000-0000-4000-8000-000000000001',
     email: 'an.nguyen@shopee-clone.local',
     displayName: 'An Nguyen',
+    phoneNumber: '0912345678',
     passwordHash: null,
   },
   {
     id: '00000000-0000-4000-8000-000000000002',
     email: 'binh.tran@shopee-clone.local',
     displayName: 'Binh Tran',
+    phoneNumber: null,
     passwordHash: null,
+  },
+] as const;
+
+export const seedShippingAddresses = [
+  {
+    id: '00000000-0000-4000-8000-000000000801',
+    userId: seedUsers[0].id,
+    recipientName: 'An Nguyen',
+    phoneNumber: '0912345678',
+    province: 'TP. Hồ Chí Minh',
+    district: 'Quận 1',
+    ward: 'Phường Bến Nghé',
+    addressLine: '12 Nguyễn Huệ',
+    label: 'Nhà riêng',
+    isDefault: true,
+    createdAt: new Date('2026-08-12T01:00:00.000Z'),
+    updatedAt: new Date('2026-08-12T01:00:00.000Z'),
+  },
+  {
+    id: '00000000-0000-4000-8000-000000000802',
+    userId: seedUsers[0].id,
+    recipientName: 'An Nguyen',
+    phoneNumber: '0912345678',
+    province: 'TP. Hồ Chí Minh',
+    district: 'Quận 3',
+    ward: 'Phường Võ Thị Sáu',
+    addressLine: '28 Võ Văn Tần',
+    label: 'Văn phòng',
+    isDefault: false,
+    createdAt: new Date('2026-08-12T01:05:00.000Z'),
+    updatedAt: new Date('2026-08-12T01:05:00.000Z'),
   },
 ] as const;
 
@@ -190,4 +223,5 @@ export const seedExpectedCounts = {
   homepageBanners: seedHomepageBanners.length,
   homepageCategories: 6,
   homepageProducts: 24,
+  shippingAddresses: seedShippingAddresses.length,
 } as const;

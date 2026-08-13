@@ -92,6 +92,7 @@ model User {
   id                  String               @id @default(uuid()) @db.Uuid
   email               String               @unique @db.VarChar(320)
   displayName         String               @map("display_name") @db.VarChar(120)
+  phoneNumber         String?              @map("phone_number") @db.VarChar(10)
   passwordHash        String?              @map("password_hash") @db.VarChar(255)
   status              UserStatus           @default(ACTIVE)
   createdAt           DateTime             @default(now()) @map("created_at") @db.Timestamptz(3)
@@ -105,10 +106,32 @@ model User {
   rolesGranted        UserRoleAssignment[] @relation("RoleAssignmentActor")
   roleAuditEvents     RoleAuditEvent[]     @relation("RoleAuditTarget")
   roleAuditActions    RoleAuditEvent[]     @relation("RoleAuditActor")
+  shippingAddresses   ShippingAddress[]
 
   @@index([status])
   @@index([deletedAt])
   @@map("users")
+}
+
+model ShippingAddress {
+  id            String    @id @default(uuid()) @db.Uuid
+  userId        String    @map("user_id") @db.Uuid
+  recipientName String    @map("recipient_name") @db.VarChar(120)
+  phoneNumber   String    @map("phone_number") @db.VarChar(10)
+  province      String    @db.VarChar(100)
+  district      String    @db.VarChar(100)
+  ward          String    @db.VarChar(100)
+  addressLine   String    @map("address_line") @db.VarChar(255)
+  label         String?   @db.VarChar(50)
+  isDefault     Boolean   @default(false) @map("is_default")
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt     DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt     DateTime? @map("deleted_at") @db.Timestamptz(3)
+  user          User      @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@index([userId, deletedAt, isDefault, createdAt, id])
+  @@index([deletedAt])
+  @@map("shipping_addresses")
 }
 
 model UserRoleAssignment {

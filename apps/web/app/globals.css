@@ -113,6 +113,13 @@
   font-size: 0.78rem;
   font-weight: 700;
 }
+.market-account > a {
+  padding-inline: 0.35rem;
+}
+.market-account > a:nth-child(2) {
+  font-weight: 600;
+  opacity: 0.9;
+}
 .market-account button {
   min-height: 36px;
   border: 1px solid #ffffff80;
@@ -1767,6 +1774,331 @@
 .operational-audit-list time {
   color: var(--sc-color-text-muted);
   font-size: 0.8rem;
+}
+
+.buyer-account-page {
+  min-height: 68vh;
+  padding-block: clamp(1.25rem, 4vw, 3rem) clamp(3rem, 7vw, 5rem);
+}
+.buyer-account-heading {
+  margin-bottom: 1.25rem;
+}
+.buyer-account-heading > span {
+  color: var(--sc-color-brand-700);
+  font-size: 0.75rem;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+}
+.buyer-account-heading h1 {
+  margin: 0.35rem 0;
+  font-size: clamp(1.6rem, 4vw, 2.35rem);
+}
+.buyer-account-heading p,
+.buyer-address-toolbar > div > span,
+.buyer-address-card p,
+.buyer-account-state p {
+  color: var(--sc-color-text-muted);
+}
+.buyer-account-layout {
+  display: grid;
+  grid-template-columns: minmax(190px, 0.28fr) minmax(0, 1fr);
+  align-items: start;
+  gap: 1.25rem;
+}
+.buyer-account-nav {
+  display: grid;
+  overflow: hidden;
+  border: 1px solid var(--sc-color-border);
+  border-radius: var(--sc-radius-md);
+  background: var(--sc-color-surface);
+  box-shadow: var(--sc-shadow-sm);
+}
+.buyer-account-nav a {
+  min-height: 48px;
+  padding: 0.85rem 1rem;
+  color: var(--sc-color-text);
+  font-weight: 700;
+  text-decoration: none;
+}
+.buyer-account-nav a + a {
+  border-top: 1px solid var(--sc-color-border);
+}
+.buyer-account-nav a:hover,
+.buyer-account-nav a:focus-visible {
+  background: var(--sc-color-surface-subtle);
+  color: var(--sc-color-brand-700);
+}
+.buyer-account-content {
+  display: grid;
+  min-width: 0;
+  gap: 1rem;
+}
+.buyer-account-card,
+.buyer-address-form-card,
+.buyer-address-card,
+.buyer-account-state {
+  padding: clamp(1rem, 3vw, 1.5rem);
+}
+.buyer-account-state {
+  display: grid;
+  place-items: center;
+  min-height: 220px;
+  gap: 0.75rem;
+  border: 1px solid var(--sc-color-border);
+  border-radius: var(--sc-radius-lg);
+  background: var(--sc-color-surface);
+  text-align: center;
+}
+.buyer-account-state h2,
+.buyer-account-state p {
+  margin: 0;
+}
+.buyer-account-state__spinner {
+  width: 34px;
+  height: 34px;
+  border: 3px solid var(--sc-color-border);
+  border-top-color: var(--sc-color-brand-600);
+  border-radius: 50%;
+  animation: account-spin 0.8s linear infinite;
+}
+@keyframes account-spin {
+  to {
+    transform: rotate(1turn);
+  }
+}
+.buyer-account-form,
+.buyer-address-form {
+  display: grid;
+  gap: 1rem;
+}
+.buyer-account-form > .sc-button {
+  justify-self: start;
+}
+.buyer-account-readonly {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+.buyer-account-readonly > div {
+  display: grid;
+  gap: 0.25rem;
+  padding: 0.8rem;
+  border-radius: var(--sc-radius-md);
+  background: var(--sc-color-surface-subtle);
+}
+.buyer-account-readonly span {
+  color: var(--sc-color-text-muted);
+  font-size: 0.78rem;
+}
+.buyer-account-message {
+  padding: 0.75rem 0.9rem;
+  border: 1px solid;
+  border-radius: var(--sc-radius-md);
+  font-size: 0.88rem;
+  font-weight: 700;
+}
+.buyer-account-message.is-success {
+  border-color: #54a668;
+  background: #effaf1;
+  color: #246b36;
+}
+.buyer-account-message.is-error {
+  border-color: #d95c4b;
+  background: #fff1ef;
+  color: #9d2818;
+}
+.buyer-address-toolbar,
+.buyer-address-card__heading,
+.buyer-address-form__actions,
+.buyer-address-card__actions,
+.buyer-address-delete-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+}
+.buyer-address-toolbar {
+  justify-content: space-between;
+}
+.buyer-address-toolbar h2,
+.buyer-address-form-card h2 {
+  margin: 0 0 0.2rem;
+}
+.buyer-address-list {
+  display: grid;
+  gap: 0.75rem;
+}
+.buyer-address-card {
+  display: grid;
+  gap: 0.75rem;
+}
+.buyer-address-card__heading {
+  justify-content: space-between;
+}
+.buyer-address-card__heading > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 0.8rem;
+}
+.buyer-address-card__heading span {
+  padding-left: 0.8rem;
+  border-left: 1px solid var(--sc-color-border);
+  color: var(--sc-color-text-muted);
+}
+.buyer-address-card__heading b {
+  padding: 0.25rem 0.5rem;
+  border: 1px solid var(--sc-color-brand-500);
+  border-radius: 0.25rem;
+  color: var(--sc-color-brand-700);
+  font-size: 0.72rem;
+}
+.buyer-address-card p,
+.buyer-address-card small {
+  margin: 0;
+}
+.buyer-address-card small {
+  justify-self: start;
+  padding: 0.25rem 0.5rem;
+  border-radius: 99px;
+  background: var(--sc-color-surface-subtle);
+}
+.buyer-address-form-card {
+  border: 1px solid var(--sc-color-brand-300, #ffc1b5);
+}
+.buyer-address-form__areas {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+.buyer-division-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  width: 100%;
+  min-height: var(--sc-target-min);
+  padding: 0.65rem 0.75rem;
+  border: 1px solid var(--sc-color-border-strong);
+  border-radius: var(--sc-radius-sm);
+  background: var(--sc-color-surface);
+  color: var(--sc-color-text);
+  text-align: left;
+  cursor: pointer;
+}
+.buyer-division-trigger span:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.buyer-division-trigger span[data-placeholder='true'] {
+  color: var(--sc-color-text-muted);
+}
+.buyer-division-trigger:disabled {
+  background: #eceef0;
+  color: var(--sc-color-text-muted);
+  cursor: not-allowed;
+}
+.buyer-division-field[data-invalid='true'] .buyer-division-trigger {
+  border-color: var(--sc-color-danger);
+  box-shadow: 0 0 0 1px var(--sc-color-danger);
+}
+.buyer-division-dialog {
+  width: min(92vw, 620px);
+}
+.buyer-division-dialog__search {
+  display: grid;
+  gap: 0.5rem;
+}
+.buyer-division-dialog__search label {
+  font-weight: 700;
+}
+.buyer-division-dialog__list {
+  display: grid;
+  max-height: min(50vh, 420px);
+  margin: 1rem 0 0;
+  padding: 0;
+  overflow-y: auto;
+  border: 1px solid var(--sc-color-border);
+  border-radius: var(--sc-radius-md);
+  list-style: none;
+}
+.buyer-division-dialog__list li + li {
+  border-top: 1px solid var(--sc-color-border);
+}
+.buyer-division-dialog__list button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  width: 100%;
+  min-height: 46px;
+  padding: 0.7rem 0.85rem;
+  border: 0;
+  background: var(--sc-color-surface);
+  color: var(--sc-color-text);
+  text-align: left;
+  cursor: pointer;
+}
+.buyer-division-dialog__list button:hover,
+.buyer-division-dialog__list button[aria-selected='true'] {
+  background: var(--sc-color-brand-50);
+  color: var(--sc-color-brand-700);
+}
+.buyer-division-dialog__empty {
+  margin: 1rem 0 0;
+  padding: 1rem;
+  border-radius: var(--sc-radius-md);
+  background: var(--sc-color-surface-subtle);
+  color: var(--sc-color-text-muted);
+  text-align: center;
+}
+.buyer-address-delete-actions {
+  justify-content: flex-end;
+}
+@media (max-width: 899px) {
+  .market-account > a:nth-child(2) {
+    display: none;
+  }
+  .buyer-account-layout {
+    grid-template-columns: 1fr;
+  }
+  .buyer-account-nav {
+    grid-template-columns: 1fr 1fr;
+  }
+  .buyer-account-nav a + a {
+    border-top: 0;
+    border-left: 1px solid var(--sc-color-border);
+  }
+}
+@media (max-width: 599px) {
+  .buyer-account-page {
+    padding-top: 0.75rem;
+  }
+  .buyer-account-readonly,
+  .buyer-address-form__areas {
+    grid-template-columns: 1fr;
+  }
+  .buyer-address-toolbar,
+  .buyer-address-card__heading {
+    align-items: flex-start;
+  }
+  .buyer-address-card__heading,
+  .buyer-address-toolbar {
+    flex-direction: column;
+  }
+  .buyer-address-toolbar > .sc-button,
+  .buyer-address-form__actions,
+  .buyer-address-form__actions > .sc-button {
+    width: 100%;
+  }
+  .buyer-address-form__actions {
+    display: grid;
+  }
+  .buyer-address-card__actions {
+    flex-wrap: wrap;
+  }
+  .buyer-address-card__actions > .sc-button {
+    flex: 1;
+  }
 }
 @media (max-width: 599px) {
   .operational-panel dl {

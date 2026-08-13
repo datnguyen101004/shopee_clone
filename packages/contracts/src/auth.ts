@@ -344,6 +344,8 @@ export function isResetPasswordRequest(value: unknown): value is ResetPasswordRe
 export function isSafeAuthReturnTo(value: unknown): value is string {
   return (
     value === '/' ||
+    value === '/account/profile' ||
+    value === '/account/addresses' ||
     (typeof value === 'string' &&
       /^\/products\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(value))
   );

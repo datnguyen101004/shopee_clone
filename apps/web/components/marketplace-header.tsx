@@ -94,10 +94,11 @@ export function MarketplaceHeader({
         <div className="market-actions">
           {account.status === 'authenticated' ? (
             <div className="market-account">
-              <span aria-label={`Tài khoản ${account.user.displayName}`}>
+              <Link href="/account/profile" aria-label={`Tài khoản ${account.user.displayName}`}>
                 <UserRound aria-hidden="true" />
                 <span>{account.user.displayName}</span>
-              </span>
+              </Link>
+              <Link href="/account/addresses">Địa chỉ</Link>
               <button type="button" onClick={onLogout}>
                 Đăng xuất
               </button>

@@ -33,6 +33,7 @@ function Probe() {
   return (
     <div>
       <output>{auth.state.status}</output>
+      <output>{auth.state.user?.displayName ?? 'No user'}</output>
       <button type="button" onClick={() => void auth.restore()}>
         Restore
       </button>
@@ -47,6 +48,9 @@ function Probe() {
       </button>
       <button type="button" onClick={() => void auth.authenticatedFetch('/protected')}>
         Fetch
+      </button>
+      <button type="button" onClick={() => auth.synchronizeDisplayName('Buyer Renamed')}>
+        Rename
       </button>
     </div>
   );
@@ -79,6 +83,8 @@ describe('AuthSessionProvider', () => {
     expect(refreshAccountSession).toHaveBeenCalledTimes(1);
     resolveSession(session);
     await waitFor(() => expect(screen.getByText('authenticated')).toBeInTheDocument());
+    await user.click(screen.getByRole('button', { name: 'Rename' }));
+    expect(screen.getByText('Buyer Renamed')).toBeInTheDocument();
     expect(storage).not.toHaveBeenCalled();
     storage.mockRestore();
   });

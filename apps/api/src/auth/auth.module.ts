@@ -56,6 +56,14 @@ import { SellerController } from './seller.controller';
     AuthService,
     AuthTokenService,
   ],
-  exports: [AuthGuard, RolesGuard, AuthService, MarketplaceOwnershipService],
+  exports: [
+    AUTH_CONFIG,
+    AuthGuard,
+    AuthOriginGuard,
+    AuthTokenService,
+    RolesGuard,
+    AuthService,
+    MarketplaceOwnershipService,
+  ],
 })
 export class AuthModule {}

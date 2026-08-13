@@ -37,6 +37,7 @@ interface AuthSessionContextValue {
   restore(): Promise<AuthSessionResponse | null>;
   completeGoogleSignIn(): Promise<AuthSessionResponse | null>;
   authenticatedFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response>;
+  synchronizeDisplayName(displayName: string): void;
 }
 
 const unavailable = async (): Promise<never> => {
@@ -51,6 +52,7 @@ const AuthSessionContext = createContext<AuthSessionContextValue>({
   restore: async () => null,
   completeGoogleSignIn: async () => null,
   authenticatedFetch: unavailable,
+  synchronizeDisplayName: () => undefined,
 });
 
 export function AuthSessionProvider({ children }: { children: ReactNode }) {
@@ -131,6 +133,14 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
     [restore],
   );
 
+  const synchronizeDisplayName = useCallback((displayName: string) => {
+    setState((current) =>
+      current.status === 'authenticated'
+        ? { ...current, user: { ...current.user, displayName } }
+        : current,
+    );
+  }, []);
+
   const value = useMemo(
     () => ({
       state,
@@ -140,8 +150,9 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
       restore,
       completeGoogleSignIn: restore,
       authenticatedFetch,
+      synchronizeDisplayName,
     }),
-    [authenticatedFetch, login, logout, register, restore, state],
+    [authenticatedFetch, login, logout, register, restore, state, synchronizeDisplayName],
   );
   return <AuthSessionContext.Provider value={value}>{children}</AuthSessionContext.Provider>;
 }

@@ -22,6 +22,7 @@ import {
   seedHomepageBanners,
   seedHomepageModules,
   seedShops,
+  seedShippingAddresses,
   seedUsers,
 } from './seed-data';
 import { assertSafeTestDatabaseUrl } from './test-database-url';
@@ -103,6 +104,7 @@ async function verifyDatabase(databaseUrl: string): Promise<void> {
       googleLoginAttempts: await prisma.googleLoginAttempt.count(),
       roleAssignments: await prisma.userRoleAssignment.count(),
       roleAuditEvents: await prisma.roleAuditEvent.count(),
+      shippingAddresses: await prisma.shippingAddress.count(),
     };
     assert.deepEqual(counts, {
       ...seedExpectedCounts,
@@ -195,6 +197,21 @@ async function verifyDatabase(databaseUrl: string): Promise<void> {
     assert(user.updatedAt instanceof Date);
     assert.equal(user.deletedAt, null);
     assert.equal(user.passwordHash, null);
+    assert.equal(user.phoneNumber, seedUsers[0].phoneNumber);
+
+    const shippingAddresses = await prisma.shippingAddress.findMany({
+      where: { userId: seedUsers[0].id, deletedAt: null },
+      orderBy: [{ isDefault: 'desc' }, { createdAt: 'asc' }, { id: 'asc' }],
+    });
+    assert.equal(shippingAddresses.length, seedShippingAddresses.length);
+    assert.equal(shippingAddresses[0]?.id, seedShippingAddresses[0].id);
+    assert.equal(shippingAddresses.filter(({ isDefault }) => isDefault).length, 1);
+    assert(shippingAddresses.every(({ phoneNumber }) => /^0[0-9]{9}$/.test(phoneNumber)));
+    assert(shippingAddresses.every(({ deletedAt }) => deletedAt === null));
+    assert.equal(
+      await prisma.shippingAddress.count({ where: { userId: seedUsers[1].id, deletedAt: null } }),
+      0,
+    );
 
     const roleAssignments = await prisma.userRoleAssignment.findMany({
       orderBy: [{ userId: 'asc' }, { role: 'asc' }],
@@ -358,10 +375,33 @@ async function verifyDatabase(databaseUrl: string): Promise<void> {
          ,'dataset_product_records_source_identity_not_blank'
          ,'dataset_product_records_source_id_fkey'
          ,'dataset_product_records_product_id_fkey'
+         ,'users_phone_number_format'
+         ,'shipping_addresses_phone_number_format'
+         ,'shipping_addresses_recipient_name_bounded'
+         ,'shipping_addresses_province_bounded'
+         ,'shipping_addresses_district_bounded'
+         ,'shipping_addresses_ward_bounded'
+         ,'shipping_addresses_address_line_bounded'
+         ,'shipping_addresses_label_bounded'
+         ,'shipping_addresses_deleted_not_default'
+         ,'shipping_addresses_valid_timestamps'
+         ,'shipping_addresses_user_id_fkey'
        )
        ORDER BY conname`,
     );
-    assert.equal(constraintRows.length, 48);
+    assert.equal(constraintRows.length, 59);
+
+    const accountIndexRows = await prisma.$queryRawUnsafe<Array<{ indexname: string }>>(
+      `SELECT indexname
+       FROM pg_indexes
+       WHERE indexname IN (
+         'shipping_addresses_user_id_deleted_at_is_default_created_at_id_idx',
+         'shipping_addresses_deleted_at_idx',
+         'shipping_addresses_active_order_idx',
+         'shipping_addresses_one_active_default_per_user'
+       )`,
+    );
+    assert.equal(accountIndexRows.length, 4);
 
     const googleIndexRows = await prisma.$queryRawUnsafe<Array<{ indexname: string }>>(
       `SELECT indexname
@@ -473,6 +513,51 @@ async function verifyDatabase(databaseUrl: string): Promise<void> {
           id: '00000000-0000-4000-8000-000000009006',
           email: 'UPPERCASE@example.com',
           displayName: 'Invalid Canonical Email',
+        },
+      }),
+    );
+
+    await expectDatabaseRejection('an invalid profile phone', () =>
+      prisma.user.update({
+        where: { id: seedUsers[0].id },
+        data: { phoneNumber: '+84 912 345 678' },
+      }),
+    );
+    await expectDatabaseRejection('a second active default address', () =>
+      prisma.shippingAddress.create({
+        data: {
+          id: '00000000-0000-4000-8000-000000009020',
+          userId: seedUsers[0].id,
+          recipientName: 'Default Conflict',
+          phoneNumber: '0987654321',
+          province: 'TP. Hồ Chí Minh',
+          district: 'Quận 5',
+          ward: 'Phường 1',
+          addressLine: '123 Đường Kiểm Thử',
+          label: null,
+          isDefault: true,
+        },
+      }),
+    );
+    await expectDatabaseRejection('a deleted address remaining default', () =>
+      prisma.shippingAddress.update({
+        where: { id: seedShippingAddresses[0].id },
+        data: { deletedAt: new Date() },
+      }),
+    );
+    await expectDatabaseRejection('an untrimmed shipping recipient', () =>
+      prisma.shippingAddress.create({
+        data: {
+          id: '00000000-0000-4000-8000-000000009021',
+          userId: seedUsers[1].id,
+          recipientName: ' Untrimmed Recipient ',
+          phoneNumber: '0987654321',
+          province: 'Hà Nội',
+          district: 'Quận Ba Đình',
+          ward: 'Phường Điện Biên',
+          addressLine: '123 Đường Kiểm Thử',
+          label: null,
+          isDefault: false,
         },
       }),
     );

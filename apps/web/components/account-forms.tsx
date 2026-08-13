@@ -36,9 +36,11 @@ function AccountSuccess({ children }: { children: string }) {
 export function LoginForm({
   intent,
   resetSucceeded = false,
+  returnTo = '/',
 }: {
   intent: ProductLoginIntent | null;
   resetSucceeded?: boolean;
+  returnTo?: string;
 }) {
   const router = useRouter();
   const { login } = useAuthSession();
@@ -64,7 +66,7 @@ export function LoginForm({
     setError('');
     try {
       await login({ email, password });
-      router.replace(intent?.returnTo ?? '/');
+      router.replace(intent?.returnTo ?? returnTo);
     } catch {
       setError('Không thể đăng nhập. Vui lòng kiểm tra thông tin và thử lại.');
       setPassword('');
@@ -87,7 +89,7 @@ export function LoginForm({
       ) : null}
       <a
         className="account-form__google"
-        href={googleSignInStartUrl(intent?.returnTo)}
+        href={googleSignInStartUrl(intent?.returnTo ?? returnTo)}
         aria-label="Tiếp tục với Google"
       >
         <span aria-hidden="true">G</span>

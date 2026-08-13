@@ -182,6 +182,12 @@ describe('authentication contracts', () => {
     };
     expect(parseGoogleSignInCompletion(completion)).toEqual(completion);
     expect(isGoogleSignInCompletion({ outcome: 'cancelled', returnTo: '/' })).toBe(true);
+    expect(isGoogleSignInCompletion({ outcome: 'success', returnTo: '/account/profile' })).toBe(
+      true,
+    );
+    expect(isGoogleSignInCompletion({ outcome: 'success', returnTo: '/account/addresses' })).toBe(
+      true,
+    );
     expect(
       isGoogleSignInCompletion({ outcome: 'success', returnTo: 'https://attacker.example' }),
     ).toBe(false);

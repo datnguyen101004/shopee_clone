@@ -7,6 +7,8 @@ import { Badge, Card } from '@shopee-clone/ui';
 import Link from 'next/link';
 
 import { MarketplaceProductImage } from '../marketplace-product-image';
+import { FavoriteButton } from '../engagement/favorite-button';
+import { FavoriteStateProvider } from '../engagement/favorite-state-provider';
 import {
   catalogSearchHref,
   replaceCatalogQuery,
@@ -60,6 +62,7 @@ function ProductCard({ product }: { product: CatalogProductCard }) {
           <span className="catalog-card__location">{product.shop.location}</span>
         </div>
       </Link>
+      <FavoriteButton productId={product.id} compact />
     </Card>
   );
 }
@@ -192,7 +195,7 @@ export function DiscoveryControls({
         }[query.sort];
 
   return (
-    <>
+    <FavoriteStateProvider productIds={response.items.map(({ id }) => id)}>
       <form
         className="catalog-discovery"
         action="/search"
@@ -309,7 +312,7 @@ export function DiscoveryControls({
         <span>Sắp xếp: {sortDescription}</span>
       </div>
       <ActiveFilters context={context} />
-    </>
+    </FavoriteStateProvider>
   );
 }
 

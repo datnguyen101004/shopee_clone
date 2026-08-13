@@ -99,6 +99,7 @@ export function MarketplaceHeader({
                 <span>{account.user.displayName}</span>
               </Link>
               <Link href="/account/addresses">Địa chỉ</Link>
+              <Link href="/account/favorites">Yêu thích</Link>
               <button type="button" onClick={onLogout}>
                 Đăng xuất
               </button>

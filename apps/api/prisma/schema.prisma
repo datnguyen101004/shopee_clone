@@ -89,24 +89,26 @@ enum RoleAuditSource {
 }
 
 model User {
-  id                  String               @id @default(uuid()) @db.Uuid
-  email               String               @unique @db.VarChar(320)
-  displayName         String               @map("display_name") @db.VarChar(120)
-  phoneNumber         String?              @map("phone_number") @db.VarChar(10)
-  passwordHash        String?              @map("password_hash") @db.VarChar(255)
-  status              UserStatus           @default(ACTIVE)
-  createdAt           DateTime             @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt           DateTime             @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
-  deletedAt           DateTime?            @map("deleted_at") @db.Timestamptz(3)
+  id                  String                  @id @default(uuid()) @db.Uuid
+  email               String                  @unique @db.VarChar(320)
+  displayName         String                  @map("display_name") @db.VarChar(120)
+  phoneNumber         String?                 @map("phone_number") @db.VarChar(10)
+  passwordHash        String?                 @map("password_hash") @db.VarChar(255)
+  status              UserStatus              @default(ACTIVE)
+  createdAt           DateTime                @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt           DateTime                @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt           DateTime?               @map("deleted_at") @db.Timestamptz(3)
   shop                Shop?
   authSessions        AuthSession[]
   passwordResetTokens PasswordResetToken[]
   externalIdentities  ExternalIdentity[]
-  roleAssignments     UserRoleAssignment[] @relation("RoleAssignmentTarget")
-  rolesGranted        UserRoleAssignment[] @relation("RoleAssignmentActor")
-  roleAuditEvents     RoleAuditEvent[]     @relation("RoleAuditTarget")
-  roleAuditActions    RoleAuditEvent[]     @relation("RoleAuditActor")
+  roleAssignments     UserRoleAssignment[]    @relation("RoleAssignmentTarget")
+  rolesGranted        UserRoleAssignment[]    @relation("RoleAssignmentActor")
+  roleAuditEvents     RoleAuditEvent[]        @relation("RoleAuditTarget")
+  roleAuditActions    RoleAuditEvent[]        @relation("RoleAuditActor")
   shippingAddresses   ShippingAddress[]
+  productFavorites    ProductFavorite[]
+  recentlyViewed      RecentlyViewedProduct[]
 
   @@index([status])
   @@index([deletedAt])
@@ -295,6 +297,8 @@ model Product {
   images                   ProductImage[]
   homepageEntries          HomepageModuleProduct[]
   datasetRecord            DatasetProductRecord?
+  favorites                ProductFavorite[]
+  recentlyViewedBy         RecentlyViewedProduct[]
 
   @@unique([shopId, slug])
   @@index([shopId, status])
@@ -302,6 +306,32 @@ model Product {
   @@index([status, createdAt, id])
   @@index([deletedAt])
   @@map("products")
+}
+
+model ProductFavorite {
+  userId      String   @map("user_id") @db.Uuid
+  productId   String   @map("product_id") @db.Uuid
+  favoritedAt DateTime @default(now()) @map("favorited_at") @db.Timestamptz(3)
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  product     Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@id([userId, productId])
+  @@index([userId, favoritedAt(sort: Desc), productId])
+  @@index([productId])
+  @@map("product_favorites")
+}
+
+model RecentlyViewedProduct {
+  userId       String   @map("user_id") @db.Uuid
+  productId    String   @map("product_id") @db.Uuid
+  lastViewedAt DateTime @default(now()) @map("last_viewed_at") @db.Timestamptz(3)
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  product      Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@id([userId, productId])
+  @@index([userId, lastViewedAt(sort: Desc), productId])
+  @@index([productId])
+  @@map("recently_viewed_products")
 }
 
 model DatasetSource {

@@ -17,7 +17,10 @@ describe('legacy Vietnamese administrative snapshot', () => {
       LEGACY_VIETNAM_PROVINCES.reduce((total, province) => total + province.districts.length, 0),
     ).toBe(696);
     expect(LEGACY_VIETNAM_PROVINCES.every((province) => province.districts.length > 0)).toBe(true);
-    const districts = LEGACY_VIETNAM_PROVINCES.flatMap((province) => province.districts);
+    const districts = LEGACY_VIETNAM_PROVINCES.reduce<Array<{ code: string; name: string }>>(
+      (items, province) => [...items, ...province.districts],
+      [],
+    );
     expect(new Set(districts.map((district) => district.code)).size).toBe(696);
     expect(
       LEGACY_VIETNAM_PROVINCES.every(

@@ -1,6 +1,7 @@
 import {
   HomepageModuleType,
   MarketplaceRole,
+  ProductStatus,
   RoleAuditAction,
   RoleAuditSource,
   ShopStatus,
@@ -14,6 +15,7 @@ import {
   seedHomepageModules,
   seedShops,
   seedShippingAddresses,
+  seedUnavailableEngagementProduct,
   seedUsers,
 } from './seed-data';
 
@@ -170,9 +172,104 @@ async function seedMarketplace() {
         update: banner,
       });
     }
+
+    await transaction.product.upsert({
+      where: { id: seedUnavailableEngagementProduct.id },
+      create: {
+        id: seedUnavailableEngagementProduct.id,
+        shopId: seedUnavailableEngagementProduct.shopId,
+        categoryId: seedUnavailableEngagementProduct.categoryId,
+        slug: seedUnavailableEngagementProduct.slug,
+        name: seedUnavailableEngagementProduct.name,
+        description: seedUnavailableEngagementProduct.description,
+        status: ProductStatus.ARCHIVED,
+      },
+      update: {
+        name: seedUnavailableEngagementProduct.name,
+        description: seedUnavailableEngagementProduct.description,
+        status: ProductStatus.ARCHIVED,
+        deletedAt: null,
+      },
+    });
+    await transaction.productImage.upsert({
+      where: { id: seedUnavailableEngagementProduct.image.id },
+      create: {
+        id: seedUnavailableEngagementProduct.image.id,
+        productId: seedUnavailableEngagementProduct.id,
+        url: seedUnavailableEngagementProduct.image.url,
+        altText: seedUnavailableEngagementProduct.image.altText,
+      },
+      update: {
+        url: seedUnavailableEngagementProduct.image.url,
+        altText: seedUnavailableEngagementProduct.image.altText,
+      },
+    });
   });
 
-  return importCanonicalDataset(prisma);
+  const summary = await importCanonicalDataset(prisma);
+  const availableProducts = await prisma.product.findMany({
+    where: { datasetRecord: { isActive: true } },
+    select: { id: true },
+    orderBy: [{ id: 'asc' }],
+    take: 3,
+  });
+  if (availableProducts.length < 3) {
+    throw new Error('At least three canonical products are required for engagement seed data.');
+  }
+
+  const favoriteFixtures = [
+    {
+      userId: seedUsers[0].id,
+      productId: availableProducts[0]!.id,
+      favoritedAt: new Date('2026-08-13T01:00:00.000Z'),
+    },
+    {
+      userId: seedUsers[0].id,
+      productId: seedUnavailableEngagementProduct.id,
+      favoritedAt: new Date('2026-08-13T01:05:00.000Z'),
+    },
+    {
+      userId: seedUsers[1].id,
+      productId: availableProducts[1]!.id,
+      favoritedAt: new Date('2026-08-13T01:10:00.000Z'),
+    },
+  ] as const;
+  const recentlyViewedFixtures = [
+    {
+      userId: seedUsers[0].id,
+      productId: availableProducts[0]!.id,
+      lastViewedAt: new Date('2026-08-13T02:00:00.000Z'),
+    },
+    {
+      userId: seedUsers[0].id,
+      productId: availableProducts[1]!.id,
+      lastViewedAt: new Date('2026-08-13T02:05:00.000Z'),
+    },
+    {
+      userId: seedUsers[1].id,
+      productId: availableProducts[2]!.id,
+      lastViewedAt: new Date('2026-08-13T02:10:00.000Z'),
+    },
+  ] as const;
+
+  await prisma.$transaction(async (transaction) => {
+    for (const favorite of favoriteFixtures) {
+      await transaction.productFavorite.upsert({
+        where: { userId_productId: { userId: favorite.userId, productId: favorite.productId } },
+        create: favorite,
+        update: { favoritedAt: favorite.favoritedAt },
+      });
+    }
+    for (const view of recentlyViewedFixtures) {
+      await transaction.recentlyViewedProduct.upsert({
+        where: { userId_productId: { userId: view.userId, productId: view.productId } },
+        create: view,
+        update: { lastViewedAt: view.lastViewedAt },
+      });
+    }
+  });
+
+  return summary;
 }
 
 seedMarketplace()

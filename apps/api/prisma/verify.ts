@@ -23,6 +23,7 @@ import {
   seedHomepageModules,
   seedShops,
   seedShippingAddresses,
+  seedUnavailableEngagementProduct,
   seedUsers,
 } from './seed-data';
 import { assertSafeTestDatabaseUrl } from './test-database-url';
@@ -105,6 +106,8 @@ async function verifyDatabase(databaseUrl: string): Promise<void> {
       roleAssignments: await prisma.userRoleAssignment.count(),
       roleAuditEvents: await prisma.roleAuditEvent.count(),
       shippingAddresses: await prisma.shippingAddress.count(),
+      productFavorites: await prisma.productFavorite.count(),
+      recentlyViewedProducts: await prisma.recentlyViewedProduct.count(),
     };
     assert.deepEqual(counts, {
       ...seedExpectedCounts,
@@ -211,6 +214,30 @@ async function verifyDatabase(databaseUrl: string): Promise<void> {
     assert.equal(
       await prisma.shippingAddress.count({ where: { userId: seedUsers[1].id, deletedAt: null } }),
       0,
+    );
+
+    const buyerOneFavorites = await prisma.productFavorite.findMany({
+      where: { userId: seedUsers[0].id },
+      orderBy: [{ favoritedAt: 'desc' }, { productId: 'asc' }],
+    });
+    assert.equal(buyerOneFavorites.length, 2);
+    assert.equal(buyerOneFavorites[0]?.productId, seedUnavailableEngagementProduct.id);
+    assert(
+      buyerOneFavorites.every(
+        (favorite, index, rows) =>
+          index === 0 || favorite.favoritedAt <= rows[index - 1]!.favoritedAt,
+      ),
+    );
+    assert.equal(await prisma.productFavorite.count({ where: { userId: seedUsers[1].id } }), 1);
+    const buyerOneHistory = await prisma.recentlyViewedProduct.findMany({
+      where: { userId: seedUsers[0].id },
+      orderBy: [{ lastViewedAt: 'desc' }, { productId: 'asc' }],
+    });
+    assert.equal(buyerOneHistory.length, 2);
+    assert(buyerOneHistory[0]!.lastViewedAt > buyerOneHistory[1]!.lastViewedAt);
+
+    await expectDatabaseRejection('a duplicate buyer-product favorite', () =>
+      prisma.productFavorite.create({ data: buyerOneFavorites[0]! }),
     );
 
     const roleAssignments = await prisma.userRoleAssignment.findMany({
@@ -402,6 +429,32 @@ async function verifyDatabase(databaseUrl: string): Promise<void> {
        )`,
     );
     assert.equal(accountIndexRows.length, 4);
+
+    const engagementIndexRows = await prisma.$queryRawUnsafe<Array<{ indexname: string }>>(
+      `SELECT indexname
+       FROM pg_indexes
+       WHERE indexname IN (
+         'product_favorites_user_id_favorited_at_product_id_idx',
+         'product_favorites_product_id_idx',
+         'recently_viewed_products_user_id_last_viewed_at_product_idx',
+         'recently_viewed_products_product_id_idx'
+       )`,
+    );
+    assert.equal(engagementIndexRows.length, 4);
+
+    const cascadeUserId = '00000000-0000-4000-8000-000000009010';
+    await prisma.user.create({
+      data: {
+        id: cascadeUserId,
+        email: 'engagement-cascade@shopee-clone.local',
+        displayName: 'Engagement Cascade Fixture',
+        productFavorites: { create: { productId: product.id } },
+        recentlyViewed: { create: { productId: product.id } },
+      },
+    });
+    await prisma.user.delete({ where: { id: cascadeUserId } });
+    assert.equal(await prisma.productFavorite.count({ where: { userId: cascadeUserId } }), 0);
+    assert.equal(await prisma.recentlyViewedProduct.count({ where: { userId: cascadeUserId } }), 0);
 
     const googleIndexRows = await prisma.$queryRawUnsafe<Array<{ indexname: string }>>(
       `SELECT indexname

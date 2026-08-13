@@ -26,6 +26,8 @@ export function AccountWorkspace({
         <nav className="buyer-account-nav" aria-label="Quản lý tài khoản">
           <Link href="/account/profile">Hồ sơ</Link>
           <Link href="/account/addresses">Địa chỉ nhận hàng</Link>
+          <Link href="/account/favorites">Sản phẩm yêu thích</Link>
+          <Link href="/account/recently-viewed">Sản phẩm đã xem</Link>
         </nav>
         <div className="buyer-account-content">{children}</div>
       </div>
@@ -39,7 +41,8 @@ export function ProtectedAccountState({
   children,
 }: {
   account: AuthSessionState;
-  returnTo: '/account/profile' | '/account/addresses';
+  returnTo:
+    '/account/profile' | '/account/addresses' | '/account/favorites' | '/account/recently-viewed';
   children: ReactNode;
 }) {
   if (account.status === 'loading') {

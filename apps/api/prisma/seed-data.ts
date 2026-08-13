@@ -211,17 +211,33 @@ export const seedHomepageBanners = [
   },
 ] as const;
 
+export const seedUnavailableEngagementProduct = {
+  id: '00000000-0000-4000-8000-000000000901',
+  shopId: seedShops[0].id,
+  categoryId: seedCategories[0].id,
+  slug: 'archived-engagement-fixture',
+  name: 'Sản phẩm mẫu đã ngừng bán',
+  description: 'Dữ liệu kiểm thử riêng tư cho danh sách yêu thích.',
+  image: {
+    id: '00000000-0000-4000-8000-000000000902',
+    url: '/media/placeholders/product-placeholder.svg',
+    altText: 'Sản phẩm đã ngừng bán',
+  },
+} as const;
+
 export const seedExpectedCounts = {
   users: seedUsers.length + 6,
   shops: seedShops.length + 6,
   categories: seedCategories.length + 6,
-  products: 1_377,
+  products: 1_378,
   variants: 1_377,
-  images: 1_377,
+  images: 1_378,
   inventory: 1_377,
   homepageModules: seedHomepageModules.length,
   homepageBanners: seedHomepageBanners.length,
   homepageCategories: 6,
   homepageProducts: 24,
   shippingAddresses: seedShippingAddresses.length,
+  productFavorites: 3,
+  recentlyViewedProducts: 3,
 } as const;

@@ -10,6 +10,8 @@ import Image from 'next/image';
 import Link from 'next/link';
 
 import { MarketplaceProductImage } from '../marketplace-product-image';
+import { FavoriteButton } from '../engagement/favorite-button';
+import { FavoriteStateProvider } from '../engagement/favorite-state-provider';
 
 const icons: Record<string, string> = { device: '⚡', phone: '📱', home: '🏠', kitchen: '🍳' };
 
@@ -117,6 +119,7 @@ function ProductCard({ product }: { product: HomepageProductSummary }) {
           ) : null}
         </div>
       </Link>
+      <FavoriteButton productId={product.id} compact />
     </Card>
   );
 }
@@ -145,18 +148,25 @@ function ProductSection({ module }: { module: HomepageProductModule }) {
 }
 
 export function HomepageModules({ modules }: { modules: HomepageModule[] }) {
+  const productIds = modules.flatMap((module) =>
+    'products' in module ? module.products.map(({ id }) => id) : [],
+  );
   return (
-    <Container className="home-flow">
-      {modules.map((module) => {
-        if (module.type === 'campaign-banner')
-          return <CampaignSection module={module} key={module.id} />;
-        if (module.type === 'category-shortcuts')
-          return <CategorySection module={module} key={module.id} />;
-        if (['flash-sale', 'top-selling', 'mall', 'daily-recommendations'].includes(module.type)) {
-          return <ProductSection module={module as HomepageProductModule} key={module.id} />;
-        }
-        return null;
-      })}
-    </Container>
+    <FavoriteStateProvider productIds={productIds}>
+      <Container className="home-flow">
+        {modules.map((module) => {
+          if (module.type === 'campaign-banner')
+            return <CampaignSection module={module} key={module.id} />;
+          if (module.type === 'category-shortcuts')
+            return <CategorySection module={module} key={module.id} />;
+          if (
+            ['flash-sale', 'top-selling', 'mall', 'daily-recommendations'].includes(module.type)
+          ) {
+            return <ProductSection module={module as HomepageProductModule} key={module.id} />;
+          }
+          return null;
+        })}
+      </Container>
+    </FavoriteStateProvider>
   );
 }

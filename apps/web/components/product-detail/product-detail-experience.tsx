@@ -4,6 +4,10 @@ import type { ProductDetailResponse } from '@shopee-clone/contracts';
 import Link from 'next/link';
 import { useMemo, useState } from 'react';
 
+import { FavoriteButton } from '../engagement/favorite-button';
+import { FavoriteStateProvider } from '../engagement/favorite-state-provider';
+import { RecentlyViewedRecorder } from '../engagement/recently-viewed-recorder';
+
 import {
   activeProductImage,
   canPurchase,
@@ -18,7 +22,7 @@ function formatCurrency(value: number): string {
   return `₫${new Intl.NumberFormat('vi-VN').format(value)}`;
 }
 
-export function ProductDetailExperience({ product }: { product: ProductDetailResponse }) {
+function ProductDetailInner({ product }: { product: ProductDetailResponse }) {
   const [selection, setSelection] = useState(() => initialProductDetailSelection(product));
   const selectedVariant = getVariant(product, selection.variantId);
   const image = activeProductImage(product, selection.activeImageId);
@@ -93,6 +97,8 @@ export function ProductDetailExperience({ product }: { product: ProductDetailRes
       </div>
 
       <div className="product-detail-offer__selection">
+        <RecentlyViewedRecorder productId={product.id} />
+        <FavoriteButton productId={product.id} />
         <div className="product-detail-price" aria-label="Giá sản phẩm">
           <strong>
             {selectedVariant ? formatCurrency(selectedVariant.priceMinor) : 'Liên hệ shop'}
@@ -211,5 +217,13 @@ export function ProductDetailExperience({ product }: { product: ProductDetailRes
         </div>
       </div>
     </section>
+  );
+}
+
+export function ProductDetailExperience({ product }: { product: ProductDetailResponse }) {
+  return (
+    <FavoriteStateProvider productIds={[product.id]}>
+      <ProductDetailInner product={product} />
+    </FavoriteStateProvider>
   );
 }

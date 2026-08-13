@@ -110,6 +110,23 @@ describe('catalog components', () => {
     ).not.toBeInTheDocument();
   });
 
+  it('supports a route-specific pagination builder without changing search behavior', () => {
+    render(
+      <CatalogPagination
+        response={response(2)}
+        pageHrefBuilder={(page) => `/shops/demo-shop?sort=newest&page=${page}`}
+      />,
+    );
+    expect(screen.getByLabelText('Trang trước')).toHaveAttribute(
+      'href',
+      '/shops/demo-shop?sort=newest&page=1',
+    );
+    expect(screen.getByLabelText('Trang sau')).toHaveAttribute(
+      'href',
+      '/shops/demo-shop?sort=newest&page=3',
+    );
+  });
+
   it('renders API-backed controls, selected state, summary, and removable filters', () => {
     const discovery = response();
     discovery.query = {

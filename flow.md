@@ -1,0 +1,363 @@
+# Flow các tính năng đã triển khai
+
+Tài liệu này mô tả trạng thái hiện tại của Shopee Clone sau TS01 và các task đến T15. Các sơ đồ tập trung vào luồng đang hoạt động trong code, không mô tả giỏ hàng, checkout, đơn hàng, thanh toán, chat hoặc vận chuyển như những tính năng đã hoàn thành.
+
+## 1. Tổng quan phạm vi
+
+| Nhóm               | Màn hình hoặc điểm vào                                       | Chức năng hiện có                                                                            |
+| ------------------ | ------------------------------------------------------------ | -------------------------------------------------------------------------------------------- |
+| Nền tảng giao diện | `/`, `/design-system`, layout storefront                     | Design system, header dùng chung, tìm kiếm, điều hướng danh mục, responsive và accessibility |
+| Trang chủ          | `/`                                                          | Banner chiến dịch, danh mục, flash sale, bán chạy, Mall và gợi ý hằng ngày từ API            |
+| Khám phá sản phẩm  | `/search`                                                    | Tìm kiếm, lọc, sắp xếp, phân trang và URL có thể chia sẻ                                     |
+| Chi tiết sản phẩm  | `/products/{productId}`                                      | Gallery, biến thể, giá, tồn kho, số lượng, shop, sản phẩm liên quan và purchase intent       |
+| Tài khoản          | `/login`, `/register`, `/forgot-password`, `/reset-password` | Email/password, Google OIDC, refresh session, logout và khôi phục mật khẩu                   |
+| Phân quyền         | `/seller`, `/admin` và API tương ứng                         | Buyer mặc định, seller theo quyền và ownership, admin quản lý role và audit                  |
+| Hồ sơ giao hàng    | `/account/profile`, `/account/addresses`                     | Hồ sơ, số điện thoại, CRUD địa chỉ và địa chỉ mặc định                                       |
+| Tương tác sản phẩm | `/account/favorites`, `/account/recently-viewed`             | Yêu thích và lịch sử xem gần đây riêng theo tài khoản                                        |
+| Gian hàng          | `/shops/{shopSlug}`                                          | Hồ sơ shop, catalog riêng, tìm kiếm/lọc/sắp xếp/phân trang và theo dõi shop                  |
+| Dữ liệu            | `asserts/*.json`, PostgreSQL                                 | Import 1.377 sản phẩm chuẩn hóa, idempotent, có provenance và dữ liệu sinh xác định          |
+
+## 2. Kiến trúc chạy ứng dụng
+
+```mermaid
+flowchart LR
+    subgraph client ["Client"]
+        browser["Trình duyệt người mua"]
+    end
+
+    subgraph gateway ["Frontend"]
+        nextWeb["Next.js storefront"]
+    end
+
+    subgraph service ["Backend"]
+        nestApi["NestJS API"]
+    end
+
+    subgraph datastore ["Persistence"]
+        postgres["PostgreSQL"]
+    end
+
+    subgraph external ["Dịch vụ ngoài"]
+        googleOidc["Google OpenID Connect"]
+    end
+
+    browser -->|"HTTP"| nextWeb
+    nextWeb -->|"REST /api/v1"| nestApi
+    nestApi -->|"Prisma read/write"| postgres
+    nestApi -.->|"Google: OAuth/OIDC"| googleOidc
+```
+
+`@shopee-clone/contracts` giữ kiểu dữ liệu và parser dùng chung giữa frontend và backend. Dữ liệu riêng tư và mọi phản hồi phụ thuộc phiên đều dùng `Cache-Control: no-store`.
+
+## 3. Hành trình khám phá sản phẩm công khai
+
+```mermaid
+flowchart LR
+    visitor(["Người mua truy cập"])
+    homepage["Trang chủ / "]
+    homeModules["Banner, danh mục, module sản phẩm"]
+    searchPage["Tìm kiếm /search"]
+    discovery["Lọc, sắp xếp, phân trang"]
+    productGrid["Danh sách sản phẩm"]
+    productDetail["Chi tiết /products/{id}"]
+    variant["Chọn biến thể và số lượng"]
+    shopPage["Gian hàng /shops/{slug}"]
+    shopCatalog["Catalog riêng của shop"]
+    purchaseIntent{"Mua ngay hoặc thêm giỏ?"}
+    loginHandoff["Chuyển đến /login với intent an toàn"]
+    currentBoundary(["Chưa tạo giỏ hoặc đơn hàng"])
+
+    visitor --> homepage
+    homepage -->|"GET /homepage"| homeModules
+    homepage --> searchPage
+    homeModules --> productDetail
+    searchPage -->|"GET /catalog/products"| discovery
+    discovery --> productGrid
+    productGrid --> productDetail
+    productDetail --> variant
+    productDetail -->|"Chọn tên shop"| shopPage
+    shopPage --> shopCatalog
+    shopCatalog --> productDetail
+    variant --> purchaseIntent
+    purchaseIntent --> loginHandoff
+    loginHandoff --> currentBoundary
+```
+
+Catalog chỉ trả sản phẩm đủ điều kiện hiển thị. Search hỗ trợ `q`, danh mục, khoảng giá, rating, vị trí shop, còn hàng, đang giảm giá và năm kiểu sắp xếp. Trang chi tiết chỉ tạo purchase intent nội bộ; chưa ghi giỏ hàng, giữ tồn kho hoặc tạo đơn.
+
+## 4. Vòng đời xác thực và session
+
+```mermaid
+stateDiagram-v2
+    direction LR
+
+    state "Khách" as guest
+    state "Xác thực email" as emailAuth
+    state "Xác thực Google" as googleAuth
+    state "Đã đăng nhập" as authenticated
+    state "Đang refresh" as refreshing
+    state "Khôi phục mật khẩu" as recovering
+
+    [*] --> guest
+    guest --> emailAuth: đăng ký hoặc đăng nhập
+    guest --> googleAuth: tiếp tục với Google
+    emailAuth --> authenticated: hợp lệ
+    emailAuth --> guest: thất bại
+    googleAuth --> authenticated: hợp lệ
+    googleAuth --> guest: hủy hoặc thất bại
+    authenticated --> refreshing: access token hết hạn
+    refreshing --> authenticated: rotate thành công
+    refreshing --> guest: cookie lỗi hoặc reuse
+    authenticated --> guest: đăng xuất
+    guest --> recovering: quên mật khẩu
+    recovering --> guest: reset hoàn tất
+```
+
+- Access token chỉ nằm trong React runtime memory.
+- Refresh token chỉ nằm trong cookie `HttpOnly`, được lưu ở database dưới dạng digest và rotate theo từng lần refresh.
+- Logout là idempotent; reset mật khẩu thu hồi các refresh session hiện có.
+- Browser không lưu token trong local storage hoặc session storage.
+
+### Đăng nhập Google và tạo session nội bộ
+
+```mermaid
+sequenceDiagram
+    title Đăng nhập Google OIDC
+    participant NguoiMua
+    participant WebApp
+    participant API
+    participant Google
+    participant PostgreSQL
+
+    NguoiMua->>WebApp: Chọn đăng nhập Google
+    WebApp->>API: GET /api/v1/auth/google/start
+    API->>PostgreSQL: Lưu transaction một lần
+    API-->>NguoiMua: 302 đến Google
+    NguoiMua->>Google: Đăng nhập và đồng ý
+    Google-->>NguoiMua: 302 callback với code và state
+    NguoiMua->>API: GET callback đã đăng ký
+    API->>Google: Đổi code và xác minh ID token
+    API->>PostgreSQL: Tìm hoặc tạo external identity
+    API->>PostgreSQL: Tạo refresh session nội bộ
+    API-->>NguoiMua: 302 /login/google/complete
+    NguoiMua->>WebApp: Mở trang hoàn tất
+    WebApp->>API: POST /api/v1/auth/refresh
+    API-->>WebApp: Access token runtime
+    WebApp-->>NguoiMua: Trở về returnTo an toàn
+```
+
+Google `sub` là định danh bên ngoài. Google access token, refresh token và ID token chỉ tồn tại tạm thời ở backend trong lúc xác minh rồi bị loại bỏ; ứng dụng chỉ duy trì session nội bộ. Email đã thuộc một tài khoản local nhưng chưa liên kết sẽ không được tự động gộp.
+
+## 5. Phân quyền buyer, seller và admin
+
+```mermaid
+flowchart LR
+    request(["Request được bảo vệ"])
+    validSession{"Session hợp lệ?"}
+    unauthorized(["401"])
+    loadAuthority["Đọc user và role hiện tại"]
+    scope{"Phạm vi request?"}
+    buyerAccess["Tài nguyên của buyer"]
+    sellerRole{"Có role seller?"}
+    shopOwnership{"Sở hữu shop hợp lệ?"}
+    sellerAccess["Trả shop an toàn"]
+    adminRole{"Có role admin?"}
+    adminAccess["Quản lý role và audit"]
+    forbidden(["403"])
+
+    request --> validSession
+    validSession -->|"Không"| unauthorized
+    validSession -->|"Có"| loadAuthority
+    loadAuthority --> scope
+    scope -->|"Account"| buyerAccess
+    scope -->|"Seller"| sellerRole
+    sellerRole -->|"Không"| forbidden
+    sellerRole -->|"Có"| shopOwnership
+    shopOwnership -->|"Không"| forbidden
+    shopOwnership -->|"Có"| sellerAccess
+    scope -->|"Admin"| adminRole
+    adminRole -->|"Không"| forbidden
+    adminRole -->|"Có"| adminAccess
+```
+
+JWT chỉ mang identity (`sub`, `sid`). Backend luôn đọc role và ownership mới nhất từ PostgreSQL, vì vậy thu hồi role có hiệu lực ngay ở request tiếp theo. Admin không tự động có quyền seller và hệ thống không nhận `ownerId` do browser gửi lên.
+
+## 6. Hồ sơ và địa chỉ giao hàng
+
+```mermaid
+flowchart LR
+    signedIn(["Buyer đã đăng nhập"])
+    profilePage["Trang hồ sơ"]
+    profileApi["GET hoặc PATCH /account/profile"]
+    addressPage["Trang địa chỉ"]
+    provincePopup["Popup 63 tỉnh/thành cũ"]
+    districtPopup["Popup quận/huyện phụ thuộc"]
+    addressAction{"Thao tác địa chỉ?"}
+    accountApi["Account API"]
+    userLock["Khóa user FOR UPDATE"]
+    ownerCheck["Kiểm tra ownership"]
+    mutation["Create, update, delete hoặc set default"]
+    defaultInvariant["Duy trì đúng một default"]
+    database[("PostgreSQL")]
+
+    signedIn --> profilePage
+    profilePage --> profileApi
+    profileApi --> database
+    signedIn --> addressPage
+    addressPage --> provincePopup
+    provincePopup --> districtPopup
+    districtPopup --> addressAction
+    addressAction --> accountApi
+    accountApi --> userLock
+    userLock --> ownerCheck
+    ownerCheck --> mutation
+    mutation --> defaultInvariant
+    defaultInvariant --> database
+```
+
+Khi đổi tỉnh, district không tương thích bị xóa. Địa chỉ đầu tiên tự trở thành mặc định; xóa địa chỉ mặc định sẽ chọn địa chỉ cũ nhất còn hoạt động. ID không tồn tại, đã xóa hoặc thuộc user khác đều trả cùng một lỗi `404` đã làm sạch.
+
+## 7. Yêu thích, xem gần đây và theo dõi shop
+
+```mermaid
+flowchart LR
+    surface(["Homepage, search, product hoặc shop"])
+    signedIn{"Đã đăng nhập?"}
+    login["/login với returnTo nội bộ"]
+    action{"Hành động?"}
+    favorite["PUT hoặc DELETE favorites"]
+    favoriteRule["Idempotent, giữ favoritedAt đầu tiên"]
+    favoritePage["/account/favorites"]
+    recent["PUT recently-viewed"]
+    recentRule["Đẩy lên mới nhất, giữ tối đa 100"]
+    recentPage["/account/recently-viewed"]
+    follow["PUT hoặc DELETE followed-shops"]
+    followRule["Idempotent và cập nhật follower count"]
+    shopView["Hiển thị trạng thái theo dõi"]
+    postgres[("PostgreSQL")]
+
+    surface --> signedIn
+    signedIn -->|"Không"| login
+    signedIn -->|"Có"| action
+    action -->|"Yêu thích"| favorite
+    favorite --> favoriteRule
+    favoriteRule --> postgres
+    favoriteRule --> favoritePage
+    action -->|"Mở chi tiết"| recent
+    recent --> recentRule
+    recentRule --> postgres
+    recentRule --> recentPage
+    action -->|"Theo dõi shop"| follow
+    follow --> followRule
+    followRule --> postgres
+    followRule --> shopView
+```
+
+Favorites vẫn giữ một projection tối thiểu cho sản phẩm về sau không còn công khai để buyer có thể xóa. Recently viewed loại sản phẩm không còn hiển thị khỏi items và totals. Mọi quan hệ đều được truy vấn theo user đang xác thực.
+
+### Trạng thái nút theo dõi shop
+
+```mermaid
+stateDiagram-v2
+    direction LR
+
+    state "Khôi phục session" as restoring
+    state "Khách" as guest
+    state "Đọc trạng thái" as loadingStatus
+    state "Chưa theo dõi" as unfollowed
+    state "Đã theo dõi" as followed
+    state "Đang follow" as pendingFollow
+    state "Đang unfollow" as pendingUnfollow
+    state "Bị chặn" as blocked
+
+    [*] --> restoring
+    restoring --> guest: không có session
+    restoring --> loadingStatus: đã xác thực
+    guest --> [*]: chuyển login an toàn
+    loadingStatus --> unfollowed: false
+    loadingStatus --> followed: true
+    unfollowed --> pendingFollow: nhấn theo dõi
+    pendingFollow --> followed: API thành công
+    pendingFollow --> unfollowed: lỗi và rollback
+    pendingFollow --> blocked: shop lỗi hoặc tự follow
+    followed --> pendingUnfollow: nhấn bỏ theo dõi
+    pendingUnfollow --> unfollowed: API thành công
+    pendingUnfollow --> followed: lỗi và rollback
+    blocked --> [*]
+```
+
+Frontend cập nhật lạc quan nhưng khóa thao tác lặp trong lúc request đang chạy. `404` chặn shop không công khai; `409` chặn owner tự theo dõi shop. Unfollow vẫn idempotent khi shop đã unavailable và không làm lộ follower count riêng tư.
+
+## 8. Luồng tải public shop storefront
+
+```mermaid
+sequenceDiagram
+    title Mở gian hàng từ chi tiết sản phẩm
+    participant NguoiMua
+    participant TrangSanPham
+    participant TrangShop
+    participant PublicAPI
+    participant Catalog
+    participant PostgreSQL
+
+    NguoiMua->>TrangSanPham: Mở chi tiết sản phẩm
+    TrangSanPham-->>NguoiMua: Hiển thị link shop
+    NguoiMua->>TrangShop: GET /shops/{shopSlug}
+    TrangShop->>PublicAPI: GET /api/v1/shops/{shopSlug}
+    PublicAPI->>PostgreSQL: Đọc shop và aggregate
+    PostgreSQL-->>PublicAPI: Profile công khai
+    PublicAPI-->>TrangShop: 200 no-store
+    TrangShop->>PublicAPI: GET /shops/{shopSlug}/products
+    PublicAPI->>Catalog: Áp displayability và query
+    Catalog->>PostgreSQL: Đọc sản phẩm và facets
+    PostgreSQL-->>Catalog: Catalog của shop
+    Catalog-->>PublicAPI: Page chuẩn hóa
+    PublicAPI-->>TrangShop: 200 no-store
+    TrangShop-->>NguoiMua: Render profile và sản phẩm
+```
+
+Shop không tồn tại, inactive, deleted hoặc slug không chuẩn đều dùng cùng presentation not-found. Rating shop được tính theo rating-count-weighted; danh mục và tổng sản phẩm chỉ tính sản phẩm công khai đủ điều kiện.
+
+## 9. Luồng import dataset và chạy local
+
+```mermaid
+flowchart LR
+    developer(["Developer"])
+    install["pnpm install"]
+    infrastructure["infra:up"]
+    migrate["db:migrate:deploy"]
+    seed["db:seed"]
+    sourceDocs["6 file asserts/*.json"]
+    validate["Validate manifest và checksum"]
+    validData{"Dataset hợp lệ?"}
+    reject(["Dừng trước khi ghi DB"])
+    normalize["Chuẩn hóa dataset-v1"]
+    transaction["Transactional upsert"]
+    provenance["Lưu provenance và fallback metadata"]
+    database[("PostgreSQL local")]
+    verify["db:verify và quick E2E"]
+
+    developer --> install
+    install --> infrastructure
+    infrastructure --> migrate
+    migrate --> seed
+    sourceDocs --> validate
+    seed --> validate
+    validate --> validData
+    validData -->|"Không"| reject
+    validData -->|"Có"| normalize
+    normalize --> transaction
+    transaction --> provenance
+    provenance --> database
+    database --> verify
+```
+
+Importer chạy local, không crawl mạng, không dùng dữ liệu ngẫu nhiên và an toàn khi chạy lặp. Ba giá thiếu và 952 rating thiếu được sinh xác định theo policy `dataset-v1`. Automatic GitHub Actions trigger hiện vẫn tạm tắt; các quality gate được chạy local hoặc manual dispatch.
+
+## 10. Các ranh giới chưa triển khai
+
+- `/cart` hiện chỉ là điểm điều hướng; chưa có cart persistence.
+- Purchase intent ở trang sản phẩm chưa tạo đơn, giữ tồn kho hoặc báo checkout thành công.
+- Chưa có checkout, voucher, thanh toán, shipment, order history, review body, chat hoặc notification realtime.
+- Seller mới có role/ownership boundary và safe shop projection, chưa có bộ công cụ quản lý gian hàng hoàn chỉnh.
+- Admin hiện tập trung vào role assignment/revocation và role audit, chưa phải dashboard vận hành marketplace đầy đủ.

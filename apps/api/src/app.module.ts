@@ -7,6 +7,7 @@ import { EngagementModule } from './engagement/engagement.module';
 import { HealthModule } from './health/health.module';
 import { HomepageModule } from './homepage/homepage.module';
 import { PrismaModule } from './prisma/prisma.module';
+import { ShopStorefrontModule } from './shop-storefront/shop-storefront.module';
 
 @Module({
   imports: [
@@ -17,6 +18,7 @@ import { PrismaModule } from './prisma/prisma.module';
     AuthModule,
     AccountModule,
     EngagementModule,
+    ShopStorefrontModule,
   ],
 })
 export class AppModule {}

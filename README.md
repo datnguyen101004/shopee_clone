@@ -104,6 +104,8 @@ See [Buyer profile and shipping addresses](docs/account-management.md) for the T
 
 See [Buyer favorites and recently viewed products](docs/buyer-engagement.md) for the T14 private engagement endpoints, concurrency and retention rules, account screens, privacy boundary, and focused verification commands.
 
+See [Public shop storefront and following](docs/shop-storefront.md) for the T15 shop profile/catalog, weighted aggregates, follow policy, privacy/cache boundary, screen checks, and pinned quick verification commands.
+
 ## Database workflows
 
 PostgreSQL persistence is owned by `apps/api`. The API and Prisma commands load the ignored root `.env` (with `apps/api/.env` as an optional higher-priority override); never commit credentials.

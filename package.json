@@ -51,6 +51,7 @@
     "test:e2e:auth:quick": "node scripts/quick-e2e.mjs auth",
     "test:e2e:account:quick": "node scripts/quick-e2e.mjs account",
     "test:e2e:engagement:quick": "node scripts/quick-e2e.mjs engagement",
+    "test:e2e:shop:quick": "node scripts/quick-e2e.mjs shop",
     "test:infra": "node --test scripts/infrastructure-smoke.test.mjs",
     "format": "prettier --write .",
     "format:check": "prettier --check ."

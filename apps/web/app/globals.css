@@ -2362,3 +2362,263 @@
     height: 76px;
   }
 }
+
+.shop-page {
+  display: grid;
+  gap: 1.25rem;
+  padding-block: 1rem 3rem;
+}
+.shop-breadcrumb {
+  display: flex;
+  gap: 0.5rem;
+  color: var(--sc-color-text-muted);
+  font-size: 0.875rem;
+}
+.shop-breadcrumb a,
+.shop-profile a,
+.shop-catalog a,
+.shop-page__failure a {
+  color: var(--sc-color-brand-700);
+}
+.shop-profile {
+  overflow: hidden;
+  border: 1px solid var(--sc-color-border);
+  border-radius: var(--sc-radius-lg);
+  background: var(--sc-color-surface);
+  box-shadow: var(--sc-shadow-sm);
+}
+.shop-profile__banner {
+  min-height: 132px;
+  background:
+    radial-gradient(circle at 78% 32%, #ffffff42 0 10%, transparent 11%),
+    linear-gradient(125deg, #ee4d2d, #ff7337 58%, #ffb18b);
+}
+.shop-profile__identity {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem 1.25rem;
+}
+.shop-profile__initial {
+  display: grid;
+  place-items: center;
+  width: 84px;
+  height: 84px;
+  margin-top: -56px;
+  border: 4px solid #fff;
+  border-radius: 50%;
+  background: var(--sc-color-brand-50);
+  color: var(--sc-color-brand-700);
+  font-size: 2rem;
+  font-weight: 900;
+  box-shadow: var(--sc-shadow-sm);
+}
+.shop-profile__identity h1 {
+  margin: 0.35rem 0 0.25rem;
+  font-size: clamp(1.35rem, 3vw, 2rem);
+}
+.shop-profile__identity p,
+.shop-profile__response-note {
+  margin: 0;
+  color: var(--sc-color-text-muted);
+}
+.shop-profile__metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin: 0;
+  border-block: 1px solid var(--sc-color-border);
+}
+.shop-profile__metrics div {
+  display: grid;
+  gap: 0.25rem;
+  padding: 1rem 1.25rem;
+  text-align: center;
+}
+.shop-profile__metrics div + div {
+  border-left: 1px solid var(--sc-color-border);
+}
+.shop-profile__metrics dt {
+  color: var(--sc-color-text-muted);
+  font-size: 0.8rem;
+}
+.shop-profile__metrics dd {
+  margin: 0;
+  color: var(--sc-color-brand-700);
+  font-weight: 800;
+}
+.shop-profile__response-note {
+  padding: 0.75rem 1.25rem;
+  font-size: 0.8rem;
+}
+.shop-follow-control {
+  display: grid;
+  justify-items: stretch;
+  gap: 0.35rem;
+  min-width: 190px;
+  text-align: center;
+}
+.shop-follow-control button,
+.shop-follow-control > a,
+.shop-catalog__controls button,
+.shop-catalog__controls > a,
+.shop-catalog__empty a,
+.shop-catalog__failure a,
+.shop-page__failure a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0.6rem 0.9rem;
+  border: 1px solid var(--sc-color-brand-500);
+  border-radius: var(--sc-radius-sm);
+  background: #fff;
+  color: var(--sc-color-brand-700);
+  font-weight: 700;
+  text-decoration: none;
+  cursor: pointer;
+}
+.shop-follow-control button[aria-pressed='true'] {
+  background: var(--sc-color-brand-50);
+}
+.shop-follow-control button:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+.shop-follow-control span {
+  color: var(--sc-color-text-muted);
+  font-size: 0.78rem;
+}
+.shop-follow-control p {
+  min-height: 1.1rem;
+  margin: 0;
+  color: #b42318;
+  font-size: 0.75rem;
+}
+.shop-catalog {
+  display: grid;
+  gap: 1rem;
+}
+.shop-catalog__heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+}
+.shop-catalog__heading h2,
+.shop-catalog__failure h2 {
+  margin: 0;
+}
+.shop-catalog__heading strong {
+  color: var(--sc-color-brand-700);
+}
+.shop-catalog__controls {
+  display: grid;
+  grid-template-columns: minmax(200px, 1.4fr) minmax(160px, 1fr) minmax(160px, 1fr) auto auto;
+  align-items: end;
+  gap: 0.75rem;
+  padding: 1rem;
+  border: 1px solid var(--sc-color-border);
+  border-radius: var(--sc-radius-md);
+  background: var(--sc-color-surface);
+}
+.shop-catalog__controls label {
+  display: grid;
+  gap: 0.4rem;
+  color: var(--sc-color-text-muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+.shop-catalog__controls input,
+.shop-catalog__controls select {
+  min-width: 0;
+  min-height: 44px;
+  padding: 0.6rem 0.7rem;
+  border: 1px solid var(--sc-color-border-strong);
+  border-radius: var(--sc-radius-sm);
+  background: #fff;
+  color: var(--sc-color-text);
+}
+.shop-catalog__active {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.shop-catalog__active span {
+  padding: 0.35rem 0.6rem;
+  border-radius: 999px;
+  background: var(--sc-color-brand-50);
+  color: var(--sc-color-brand-700);
+  font-size: 0.8rem;
+}
+.shop-catalog__empty,
+.shop-catalog__failure,
+.shop-page__failure {
+  display: grid;
+  justify-items: start;
+  gap: 0.75rem;
+  padding: 2rem;
+  border: 1px dashed var(--sc-color-border-strong);
+  border-radius: var(--sc-radius-lg);
+  background: var(--sc-color-surface);
+}
+.shop-catalog__empty h3,
+.shop-catalog__empty p,
+.shop-catalog__failure p,
+.shop-page__failure h1,
+.shop-page__failure p {
+  margin: 0;
+}
+.product-detail-context h2 a {
+  color: inherit;
+  text-decoration-color: var(--sc-color-brand-500);
+  text-underline-offset: 0.2em;
+}
+
+@media (max-width: 899px) {
+  .shop-catalog__controls {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .shop-profile__metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .shop-profile__metrics div:nth-child(3) {
+    border-left: 0;
+  }
+  .shop-profile__metrics div:nth-child(n + 3) {
+    border-top: 1px solid var(--sc-color-border);
+  }
+}
+
+@media (max-width: 599px) {
+  .shop-page {
+    padding-top: 0.5rem;
+  }
+  .shop-profile__banner {
+    min-height: 96px;
+  }
+  .shop-profile__identity {
+    grid-template-columns: auto minmax(0, 1fr);
+    padding-inline: 0.85rem;
+  }
+  .shop-profile__initial {
+    width: 66px;
+    height: 66px;
+    margin-top: -38px;
+  }
+  .shop-follow-control {
+    grid-column: 1 / -1;
+    width: 100%;
+  }
+  .shop-profile__metrics div,
+  .shop-profile__response-note {
+    padding: 0.75rem;
+  }
+  .shop-catalog__controls {
+    grid-template-columns: 1fr;
+  }
+  .shop-catalog__controls button,
+  .shop-catalog__controls > a {
+    width: 100%;
+  }
+}

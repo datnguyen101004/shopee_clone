@@ -129,7 +129,7 @@ const isCategory = (value: unknown): value is CatalogCategorySummary =>
 const isShop = (value: unknown): value is CatalogShopSummary =>
   isRecord(value) && isString(value.name) && isString(value.location);
 
-const isProduct = (value: unknown): value is CatalogProductCard => {
+export const isCatalogProductCard = (value: unknown): value is CatalogProductCard => {
   if (
     !isRecord(value) ||
     !isString(value.id) ||
@@ -187,7 +187,7 @@ export function isCatalogProductsResponse(value: unknown): value is CatalogProdu
     !isSafeNonNegativeInteger(pagination.totalItems) ||
     !isSafeNonNegativeInteger(pagination.totalPages) ||
     !Array.isArray(value.items) ||
-    !value.items.every(isProduct)
+    !value.items.every(isCatalogProductCard)
   ) {
     return false;
   }

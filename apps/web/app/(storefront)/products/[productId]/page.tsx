@@ -75,7 +75,11 @@ export default async function ProductDetailPage({
       <section className="product-detail-context" aria-label="Thông tin cửa hàng và giao hàng">
         <article>
           <span>SHOP</span>
-          <h2>{product.shop.name}</h2>
+          <h2>
+            <Link href={`/shops/${encodeURIComponent(product.shop.slug)}`}>
+              {product.shop.name}
+            </Link>
+          </h2>
           <p>
             {product.shop.location} · {formatNumber(product.shop.activeProductCount)} sản phẩm đang
             hoạt động

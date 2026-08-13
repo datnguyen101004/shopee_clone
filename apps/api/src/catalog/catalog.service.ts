@@ -4,9 +4,13 @@ import type {
   CatalogFacets,
   CatalogProductCard,
   CatalogProductsResponse,
+  PublicShopCatalogPage,
+  PublicShopCategoryFacet,
+  ShopCatalogQuery,
 } from '@shopee-clone/contracts';
 
 import { relevanceScore, normalizeDiscoveryText } from './catalog-discovery';
+import { CatalogPublicFacade, type PublicShopCatalogSummary } from './catalog-public.facade';
 import type { NormalizedCatalogQuery } from './catalog-query';
 import { CatalogRepository } from './catalog.repository';
 import { mapCatalogProductCard } from './catalog-presentation';
@@ -93,7 +97,7 @@ function buildFacets(
 function compareCandidates(
   left: DisplayableCatalogCandidate,
   right: DisplayableCatalogCandidate,
-  query: NormalizedCatalogQuery,
+  query: Pick<NormalizedCatalogQuery, 'q' | 'sort'>,
 ): number {
   let primary = 0;
   if (query.sort === 'relevance' && query.q) primary = right.relevance - left.relevance;
@@ -108,8 +112,58 @@ function compareCandidates(
 }
 
 @Injectable()
-export class CatalogService {
-  constructor(@Inject(CatalogRepository) private readonly repository: CatalogRepository) {}
+export class CatalogService extends CatalogPublicFacade {
+  constructor(@Inject(CatalogRepository) private readonly repository: CatalogRepository) {
+    super();
+  }
+
+  private async shopSnapshot(shopId: string): Promise<{
+    categories: ActiveCategory[];
+    displayable: DisplayableCatalogCandidate[];
+  }> {
+    const [categories, rawCandidates] = await Promise.all([
+      this.repository.findActiveCategories(),
+      this.repository.findCandidatesForShop(shopId),
+    ]);
+    return {
+      categories,
+      displayable: rawCandidates
+        .map(mapDisplayableCandidate)
+        .filter((candidate): candidate is DisplayableCatalogCandidate => candidate !== null),
+    };
+  }
+
+  private shopCategoryFacets(
+    candidates: DisplayableCatalogCandidate[],
+    categories: ActiveCategory[],
+  ): PublicShopCategoryFacet[] {
+    const categoryById = new Map(categories.map((category) => [category.id, category]));
+    const counts = new Map<string, number>();
+    for (const candidate of candidates) {
+      let category = categoryById.get(candidate.categoryId);
+      const counted = new Set<string>();
+      while (category && !counted.has(category.id)) {
+        counted.add(category.id);
+        counts.set(category.id, (counts.get(category.id) ?? 0) + 1);
+        category = category.parentId ? categoryById.get(category.parentId) : undefined;
+      }
+    }
+    return categories.flatMap((category) => {
+      const productCount = counts.get(category.id) ?? 0;
+      return productCount > 0
+        ? [
+            {
+              slug: category.slug,
+              name: category.name,
+              parentSlug: category.parentId
+                ? (categoryById.get(category.parentId)?.slug ?? null)
+                : null,
+              productCount,
+            },
+          ]
+        : [];
+    });
+  }
 
   async getProducts(query: NormalizedCatalogQuery): Promise<CatalogProductsResponse> {
     const [categories, rawCandidates] = await Promise.all([
@@ -172,6 +226,47 @@ export class CatalogService {
       },
       pagination: { page: query.page, pageSize: query.pageSize, totalItems, totalPages },
       facets,
+      items: filtered.slice(start, start + query.pageSize).map((candidate) => candidate.card),
+    };
+  }
+
+  async getShopSummary(shopId: string): Promise<PublicShopCatalogSummary> {
+    const { categories, displayable } = await this.shopSnapshot(shopId);
+    return {
+      products: displayable.map((candidate) => candidate.card),
+      categories: this.shopCategoryFacets(displayable, categories),
+    };
+  }
+
+  async getShopProducts(shopId: string, query: ShopCatalogQuery): Promise<PublicShopCatalogPage> {
+    const { categories, displayable } = await this.shopSnapshot(shopId);
+    const facets = this.shopCategoryFacets(displayable, categories);
+    const categoryIds = descendantIds(categories, query.category);
+    const filtered = displayable.filter((candidate) => {
+      if (query.q) {
+        const score = relevanceScore(
+          {
+            name: candidate.card.name,
+            description: candidate.description,
+            shopName: candidate.card.shop.name,
+            categoryName: candidate.card.category.name,
+          },
+          query.q,
+        );
+        if (score === null) return false;
+        candidate.relevance = score;
+      }
+      return categoryIds === null || categoryIds.has(candidate.categoryId);
+    });
+    filtered.sort((left, right) => compareCandidates(left, right, query));
+    const totalItems = filtered.length;
+    const totalPages = Math.ceil(totalItems / query.pageSize);
+    const start = (query.page - 1) * query.pageSize;
+    return {
+      shopId,
+      query: { q: query.q, category: query.category, sort: query.sort },
+      pagination: { page: query.page, pageSize: query.pageSize, totalItems, totalPages },
+      categories: facets,
       items: filtered.slice(start, start + query.pageSize).map((candidate) => candidate.card),
     };
   }

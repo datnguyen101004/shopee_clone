@@ -63,6 +63,19 @@ export const seedShops = [
   },
 ] as const;
 
+export const seedShopFollowers = [
+  {
+    userId: seedUsers[0].id,
+    shopId: seedShops[1].id,
+    followedAt: new Date('2026-08-14T03:00:00.000Z'),
+  },
+  {
+    userId: seedUsers[1].id,
+    shopId: seedShops[0].id,
+    followedAt: new Date('2026-08-14T03:05:00.000Z'),
+  },
+] as const;
+
 export const seedCategories = [
   {
     id: '00000000-0000-4000-8000-000000000201',
@@ -240,4 +253,5 @@ export const seedExpectedCounts = {
   shippingAddresses: seedShippingAddresses.length,
   productFavorites: 3,
   recentlyViewedProducts: 3,
+  shopFollowers: seedShopFollowers.length,
 } as const;

@@ -22,7 +22,7 @@ function formatNumber(value: number): string {
   return new Intl.NumberFormat('vi-VN').format(value);
 }
 
-function ProductCard({ product }: { product: CatalogProductCard }) {
+export function ProductCard({ product }: { product: CatalogProductCard }) {
   return (
     <Card className="catalog-card" data-testid="catalog-card">
       <Link href={product.href} className="catalog-card__link" aria-label={`Xem ${product.name}`}>
@@ -95,16 +95,21 @@ function pageNumbers(current: number, total: number): number[] {
 export function CatalogPagination({
   response,
   context,
+  pageHrefBuilder,
 }: {
-  response: CatalogProductsResponse;
-  context: CatalogRouteContext;
+  response: Pick<CatalogProductsResponse, 'pagination'>;
+  context?: CatalogRouteContext;
+  pageHrefBuilder?: (page: number) => string;
 }) {
   const { page, totalPages } = response.pagination;
   if (totalPages <= 1) return null;
   return (
     <nav className="catalog-pagination" aria-label="Phân trang sản phẩm">
       {page > 1 ? (
-        <Link href={catalogPageHref(context, page - 1)} aria-label="Trang trước">
+        <Link
+          href={pageHrefBuilder ? pageHrefBuilder(page - 1) : catalogPageHref(context!, page - 1)}
+          aria-label="Trang trước"
+        >
           ‹
         </Link>
       ) : (
@@ -118,13 +123,20 @@ export function CatalogPagination({
             {number}
           </span>
         ) : (
-          <Link key={number} href={catalogPageHref(context, number)} aria-label={`Trang ${number}`}>
+          <Link
+            key={number}
+            href={pageHrefBuilder ? pageHrefBuilder(number) : catalogPageHref(context!, number)}
+            aria-label={`Trang ${number}`}
+          >
             {number}
           </Link>
         ),
       )}
       {page < totalPages ? (
-        <Link href={catalogPageHref(context, page + 1)} aria-label="Trang sau">
+        <Link
+          href={pageHrefBuilder ? pageHrefBuilder(page + 1) : catalogPageHref(context!, page + 1)}
+          aria-label="Trang sau"
+        >
           ›
         </Link>
       ) : (
@@ -319,18 +331,20 @@ export function DiscoveryControls({
 export function CatalogContent({
   response,
   context,
+  pageHrefBuilder,
 }: {
-  response: CatalogProductsResponse;
-  context: CatalogRouteContext;
+  response: Pick<CatalogProductsResponse, 'items' | 'pagination'>;
+  context?: CatalogRouteContext;
+  pageHrefBuilder?: (page: number) => string;
 }) {
   return (
-    <>
+    <FavoriteStateProvider productIds={response.items.map(({ id }) => id)}>
       <div className="catalog-grid" aria-label="Danh sách sản phẩm">
         {response.items.map((product) => (
           <ProductCard key={product.id} product={product} />
         ))}
       </div>
-      <CatalogPagination response={response} context={context} />
-    </>
+      <CatalogPagination response={response} context={context} pageHrefBuilder={pageHrefBuilder} />
+    </FavoriteStateProvider>
   );
 }

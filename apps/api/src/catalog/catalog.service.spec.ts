@@ -103,6 +103,7 @@ describe('CatalogService', () => {
   const repository = {
     findActiveCategories: jest.fn(),
     findCandidates: jest.fn(),
+    findCandidatesForShop: jest.fn(),
   };
   const service = new CatalogService(repository as unknown as CatalogRepository);
 
@@ -251,5 +252,48 @@ describe('CatalogService', () => {
     ]);
     const response = await service.getProducts(query({ sort: 'relevance' }));
     expect(response.items.map((item) => item.id)).toEqual(['newer', 'older']);
+  });
+
+  it('reuses the canonical card projection and counts shop category ancestors', async () => {
+    repository.findActiveCategories.mockResolvedValue(categories);
+    repository.findCandidatesForShop.mockResolvedValue([
+      candidate({ id: 'product-1' }),
+      candidate({ id: 'hidden', variants: [] }),
+    ]);
+
+    const response = await service.getShopSummary('shop-1');
+
+    expect(repository.findCandidatesForShop).toHaveBeenCalledWith('shop-1');
+    expect(response.products.map((item) => item.id)).toEqual(['product-1']);
+    expect(response.categories).toEqual([
+      { slug: 'electronics', name: categories[0]!.name, parentSlug: null, productCount: 1 },
+      {
+        slug: 'phones',
+        name: categories[1]!.name,
+        parentSlug: 'electronics',
+        productCount: 1,
+      },
+    ]);
+  });
+
+  it('filters, sorts, and paginates only candidates belonging to the resolved shop', async () => {
+    repository.findActiveCategories.mockResolvedValue(categories);
+    repository.findCandidatesForShop.mockResolvedValue([
+      candidate({ id: 'older', name: 'Điện thoại cũ', createdAt: new Date('2026-08-10') }),
+      candidate({ id: 'newer', name: 'Điện thoại mới', createdAt: new Date('2026-08-12') }),
+    ]);
+
+    const response = await service.getShopProducts('shop-1', {
+      q: 'dien thoai',
+      category: 'electronics',
+      sort: 'relevance',
+      page: 2,
+      pageSize: 1,
+    });
+
+    expect(response.shopId).toBe('shop-1');
+    expect(response.pagination).toEqual({ page: 2, pageSize: 1, totalItems: 2, totalPages: 2 });
+    expect(response.items.map((item) => item.id)).toEqual(['older']);
+    expect(response.categories).toHaveLength(2);
   });
 });

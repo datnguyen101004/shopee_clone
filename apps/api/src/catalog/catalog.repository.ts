@@ -15,12 +15,13 @@ export class CatalogRepository {
     });
   }
 
-  findCandidates(categoryIds?: string[]) {
+  findCandidates(categoryIds?: string[], shopId?: string) {
     return this.prisma.product.findMany({
       where: {
         status: ProductStatus.ACTIVE,
         deletedAt: null,
         ...(categoryIds ? { categoryId: { in: categoryIds } } : {}),
+        ...(shopId ? { shopId } : {}),
         shop: { status: ShopStatus.ACTIVE, deletedAt: null },
         category: { isActive: true, deletedAt: null },
       },
@@ -36,6 +37,10 @@ export class CatalogRepository {
       },
       orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
     });
+  }
+
+  findCandidatesForShop(shopId: string) {
+    return this.findCandidates(undefined, shopId);
   }
 
   findPublicProduct(productId: string) {

@@ -3,7 +3,7 @@ import type { CatalogProductsResponse, ProductDetailResponse } from '@shopee-clo
 
 import { CatalogExceptionFilter } from './catalog-exception.filter';
 import { parseCatalogQuery } from './catalog-query';
-import { CatalogService } from './catalog.service';
+import { CatalogPublicFacade } from './catalog-public.facade';
 import { parseCatalogProductId } from './catalog-product-id';
 import { CatalogProductDetailService } from './catalog-product-detail.service';
 
@@ -11,7 +11,7 @@ import { CatalogProductDetailService } from './catalog-product-detail.service';
 @UseFilters(CatalogExceptionFilter)
 export class CatalogController {
   constructor(
-    @Inject(CatalogService) private readonly service: CatalogService,
+    @Inject(CatalogPublicFacade) private readonly service: CatalogPublicFacade,
     @Inject(CatalogProductDetailService)
     private readonly productDetailService: CatalogProductDetailService,
   ) {}

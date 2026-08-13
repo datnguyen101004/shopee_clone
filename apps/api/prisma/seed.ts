@@ -14,6 +14,7 @@ import {
   seedHomepageBanners,
   seedHomepageModules,
   seedShops,
+  seedShopFollowers,
   seedShippingAddresses,
   seedUnavailableEngagementProduct,
   seedUsers,
@@ -265,6 +266,13 @@ async function seedMarketplace() {
         where: { userId_productId: { userId: view.userId, productId: view.productId } },
         create: view,
         update: { lastViewedAt: view.lastViewedAt },
+      });
+    }
+    for (const follower of seedShopFollowers) {
+      await transaction.shopFollower.upsert({
+        where: { userId_shopId: { userId: follower.userId, shopId: follower.shopId } },
+        create: follower,
+        update: { followedAt: follower.followedAt },
       });
     }
   });

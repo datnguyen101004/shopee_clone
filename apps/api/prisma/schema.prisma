@@ -109,6 +109,7 @@ model User {
   shippingAddresses   ShippingAddress[]
   productFavorites    ProductFavorite[]
   recentlyViewed      RecentlyViewedProduct[]
+  followedShops       ShopFollower[]
 
   @@index([status])
   @@index([deletedAt])
@@ -239,17 +240,18 @@ model PasswordResetToken {
 }
 
 model Shop {
-  id        String     @id @default(uuid()) @db.Uuid
-  ownerId   String     @unique @map("owner_id") @db.Uuid
-  slug      String     @unique @db.VarChar(120)
-  name      String     @db.VarChar(160)
-  location  String     @default("Việt Nam") @db.VarChar(120)
-  status    ShopStatus @default(ACTIVE)
-  createdAt DateTime   @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt DateTime   @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
-  deletedAt DateTime?  @map("deleted_at") @db.Timestamptz(3)
-  owner     User       @relation(fields: [ownerId], references: [id], onDelete: Restrict)
+  id        String         @id @default(uuid()) @db.Uuid
+  ownerId   String         @unique @map("owner_id") @db.Uuid
+  slug      String         @unique @db.VarChar(120)
+  name      String         @db.VarChar(160)
+  location  String         @default("Việt Nam") @db.VarChar(120)
+  status    ShopStatus     @default(ACTIVE)
+  createdAt DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime       @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt DateTime?      @map("deleted_at") @db.Timestamptz(3)
+  owner     User           @relation(fields: [ownerId], references: [id], onDelete: Restrict)
   products  Product[]
+  followers ShopFollower[]
 
   @@index([status])
   @@index([deletedAt])
@@ -332,6 +334,19 @@ model RecentlyViewedProduct {
   @@index([userId, lastViewedAt(sort: Desc), productId])
   @@index([productId])
   @@map("recently_viewed_products")
+}
+
+model ShopFollower {
+  userId     String   @map("user_id") @db.Uuid
+  shopId     String   @map("shop_id") @db.Uuid
+  followedAt DateTime @default(now()) @map("followed_at") @db.Timestamptz(3)
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  shop       Shop     @relation(fields: [shopId], references: [id], onDelete: Cascade)
+
+  @@id([userId, shopId])
+  @@index([shopId, followedAt(sort: Desc), userId])
+  @@index([userId, followedAt(sort: Desc), shopId])
+  @@map("shop_followers")
 }
 
 model DatasetSource {

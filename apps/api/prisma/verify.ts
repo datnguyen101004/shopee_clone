@@ -22,6 +22,7 @@ import {
   seedHomepageBanners,
   seedHomepageModules,
   seedShops,
+  seedShopFollowers,
   seedShippingAddresses,
   seedUnavailableEngagementProduct,
   seedUsers,
@@ -108,6 +109,7 @@ async function verifyDatabase(databaseUrl: string): Promise<void> {
       shippingAddresses: await prisma.shippingAddress.count(),
       productFavorites: await prisma.productFavorite.count(),
       recentlyViewedProducts: await prisma.recentlyViewedProduct.count(),
+      shopFollowers: await prisma.shopFollower.count(),
     };
     assert.deepEqual(counts, {
       ...seedExpectedCounts,
@@ -236,8 +238,30 @@ async function verifyDatabase(databaseUrl: string): Promise<void> {
     assert.equal(buyerOneHistory.length, 2);
     assert(buyerOneHistory[0]!.lastViewedAt > buyerOneHistory[1]!.lastViewedAt);
 
+    const buyerOneFollowing = await prisma.shopFollower.findMany({
+      where: { userId: seedUsers[0].id },
+      orderBy: [{ followedAt: 'desc' }, { shopId: 'asc' }],
+    });
+    assert.equal(buyerOneFollowing.length, 1);
+    assert.equal(buyerOneFollowing[0]?.shopId, seedShops[1].id);
+    assert.equal(
+      buyerOneFollowing[0]?.followedAt.toISOString(),
+      seedShopFollowers[0].followedAt.toISOString(),
+    );
+    assert.equal(await prisma.shopFollower.count({ where: { userId: seedUsers[1].id } }), 1);
+    assert.equal(await prisma.shopFollower.count({ where: { shopId: seedShops[0].id } }), 1);
+    assert.equal(
+      await prisma.shopFollower.count({
+        where: { userId: seedUsers[0].id, shopId: seedShops[0].id },
+      }),
+      0,
+    );
+
     await expectDatabaseRejection('a duplicate buyer-product favorite', () =>
       prisma.productFavorite.create({ data: buyerOneFavorites[0]! }),
+    );
+    await expectDatabaseRejection('a duplicate buyer-shop follow', () =>
+      prisma.shopFollower.create({ data: buyerOneFollowing[0]! }),
     );
 
     const roleAssignments = await prisma.userRoleAssignment.findMany({
@@ -442,6 +466,28 @@ async function verifyDatabase(databaseUrl: string): Promise<void> {
     );
     assert.equal(engagementIndexRows.length, 4);
 
+    const shopFollowerIndexRows = await prisma.$queryRawUnsafe<Array<{ indexname: string }>>(
+      `SELECT indexname
+       FROM pg_indexes
+       WHERE indexname IN (
+         'shop_followers_shop_id_followed_at_user_id_idx',
+         'shop_followers_user_id_followed_at_shop_id_idx'
+       )`,
+    );
+    assert.equal(shopFollowerIndexRows.length, 2);
+
+    const shopFollowerConstraintRows = await prisma.$queryRawUnsafe<
+      Array<{ constraint_name: string }>
+    >(
+      `SELECT conname AS constraint_name
+       FROM pg_constraint
+       WHERE conname IN (
+         'shop_followers_user_id_fkey',
+         'shop_followers_shop_id_fkey'
+       )`,
+    );
+    assert.equal(shopFollowerConstraintRows.length, 2);
+
     const cascadeUserId = '00000000-0000-4000-8000-000000009010';
     await prisma.user.create({
       data: {
@@ -450,11 +496,35 @@ async function verifyDatabase(databaseUrl: string): Promise<void> {
         displayName: 'Engagement Cascade Fixture',
         productFavorites: { create: { productId: product.id } },
         recentlyViewed: { create: { productId: product.id } },
+        followedShops: { create: { shopId: seedShops[0].id } },
       },
     });
     await prisma.user.delete({ where: { id: cascadeUserId } });
     assert.equal(await prisma.productFavorite.count({ where: { userId: cascadeUserId } }), 0);
     assert.equal(await prisma.recentlyViewedProduct.count({ where: { userId: cascadeUserId } }), 0);
+    assert.equal(await prisma.shopFollower.count({ where: { userId: cascadeUserId } }), 0);
+
+    const cascadeShopOwnerId = '00000000-0000-4000-8000-000000009030';
+    const cascadeShopId = '00000000-0000-4000-8000-000000009031';
+    await prisma.user.create({
+      data: {
+        id: cascadeShopOwnerId,
+        email: 'shop-follower-cascade@shopee-clone.local',
+        displayName: 'Shop Follower Cascade Owner',
+      },
+    });
+    await prisma.shop.create({
+      data: {
+        id: cascadeShopId,
+        ownerId: cascadeShopOwnerId,
+        slug: 'shop-follower-cascade-fixture',
+        name: 'Shop Follower Cascade Fixture',
+        followers: { create: { userId: seedUsers[0].id } },
+      },
+    });
+    await prisma.shop.delete({ where: { id: cascadeShopId } });
+    assert.equal(await prisma.shopFollower.count({ where: { shopId: cascadeShopId } }), 0);
+    await prisma.user.delete({ where: { id: cascadeShopOwnerId } });
 
     const googleIndexRows = await prisma.$queryRawUnsafe<Array<{ indexname: string }>>(
       `SELECT indexname

@@ -44,6 +44,7 @@ describe('canonical product dataset', () => {
           slug: product.slug,
           sku: product.variant.sku,
           price: product.variant.priceMinor.toString(),
+          weightGrams: product.variant.weightGrams,
           rating: product.ratingAverageBasisPoints,
           fields: product.generatedFields,
           createdAt: product.createdAt.toISOString(),
@@ -57,6 +58,10 @@ describe('canonical product dataset', () => {
 
     const products = first.sources.flatMap((source) => source.products);
     expect(products.every(({ variant }) => variant.priceMinor > 0n)).toBe(true);
+    expect(
+      products.every(({ variant }) => variant.weightGrams >= 250 && variant.weightGrams <= 5_000),
+    ).toBe(true);
+    expect(new Set(products.map(({ variant }) => variant.weightGrams)).size).toBeGreaterThan(10);
     expect(
       products.every(
         ({ ratingAverageBasisPoints }) =>
@@ -120,6 +125,7 @@ describe('canonical product dataset', () => {
     expect(generated.description).toContain(generated.name);
     expect(generated.image.url).toBe('/media/products/product-placeholder.svg');
     expect(generated.variant.priceMinor).toBe(100n);
+    expect(generated.variant.weightGrams).toBeGreaterThanOrEqual(250);
     expect(generated.generatedFields.map(({ field }) => field)).toEqual(
       expect.arrayContaining([
         'name',
@@ -130,6 +136,7 @@ describe('canonical product dataset', () => {
         'soldCount',
         'image',
         'inventory',
+        'weightGrams',
       ]),
     );
   });

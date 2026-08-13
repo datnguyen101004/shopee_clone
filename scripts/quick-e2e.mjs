@@ -4,9 +4,17 @@ import path from 'node:path';
 
 const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const suite =
-  ['homepage', 'catalog', 'product', 'auth', 'account', 'engagement', 'shop', 'cart'].find(
-    (candidate) => process.argv.includes(candidate),
-  ) ?? 'homepage';
+  [
+    'homepage',
+    'catalog',
+    'product',
+    'auth',
+    'account',
+    'engagement',
+    'shop',
+    'cart',
+    'pricing',
+  ].find((candidate) => process.argv.includes(candidate)) ?? 'homepage';
 const webPort = Number(process.env.E2E_WEB_PORT ?? 3000);
 const apiPort = Number(process.env.PORT ?? 3001);
 const webUrl = `http://127.0.0.1:${webPort}`;

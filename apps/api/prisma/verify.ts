@@ -171,6 +171,7 @@ async function verifyDatabase(databaseUrl: string): Promise<void> {
     assert.equal(product.variants.length, 1);
     assert(product.variants.every((variant) => variant.inventory !== null));
     assert(product.variants.every((variant) => variant.status === VariantStatus.ACTIVE));
+    assert(product.variants.every((variant) => variant.weightGrams > 0));
     assert.equal(datasetRecord.source.checksum.length, 64);
     assert.equal(datasetRecord.source.recordCount > 0, true);
     assert.equal(datasetRecord.sourceIdentity.trim().length > 0, true);
@@ -193,6 +194,7 @@ async function verifyDatabase(databaseUrl: string): Promise<void> {
     );
     assert.equal(generatedFieldNames.filter((field) => field === 'priceMinor').length, 3);
     assert.equal(generatedFieldNames.filter((field) => field === 'rating').length, 952);
+    assert.equal(generatedFieldNames.filter((field) => field === 'weightGrams').length, 1_377);
 
     const user = await prisma.user.findUniqueOrThrow({ where: { id: seedUsers[0].id } });
     assert.equal(user.email, seedUsers[0].email);
@@ -353,6 +355,13 @@ async function verifyDatabase(databaseUrl: string): Promise<void> {
       ).size >= 4,
     );
     assert(
+      new Set(
+        datasetPlan.sources
+          .flatMap(({ products }) => products)
+          .map((item) => item.variant.weightGrams),
+      ).size >= 10,
+    );
+    assert(
       new Set(datasetPlan.sources.flatMap(({ products }) => products).map((item) => item.soldCount))
         .size >= 4,
     );
@@ -380,6 +389,7 @@ async function verifyDatabase(databaseUrl: string): Promise<void> {
        WHERE conname IN (
          'product_variants_price_minor_nonnegative',
          'product_variants_compare_at_price_minor_nonnegative',
+         'product_variants_weight_grams_check',
          'inventory_quantity_on_hand_nonnegative',
          'inventory_quantity_reserved_nonnegative',
          'inventory_reserved_not_above_on_hand'
@@ -440,7 +450,7 @@ async function verifyDatabase(databaseUrl: string): Promise<void> {
        )
        ORDER BY conname`,
     );
-    assert.equal(constraintRows.length, 59);
+    assert.equal(constraintRows.length, 60);
 
     const accountIndexRows = await prisma.$queryRawUnsafe<Array<{ indexname: string }>>(
       `SELECT indexname
@@ -854,6 +864,32 @@ async function verifyDatabase(databaseUrl: string): Promise<void> {
           name: 'Invalid Negative Compare Price',
           priceMinor: 1n,
           compareAtPriceMinor: -1n,
+        },
+      }),
+    );
+
+    await expectDatabaseRejection('a zero shipping weight', () =>
+      prisma.productVariant.create({
+        data: {
+          id: '00000000-0000-4000-8000-000000009018',
+          productId: product.id,
+          sku: 'INVALID-ZERO-WEIGHT',
+          name: 'Invalid Zero Weight',
+          priceMinor: 1n,
+          weightGrams: 0,
+        },
+      }),
+    );
+
+    await expectDatabaseRejection('an excessive shipping weight', () =>
+      prisma.productVariant.create({
+        data: {
+          id: '00000000-0000-4000-8000-000000009019',
+          productId: product.id,
+          sku: 'INVALID-EXCESSIVE-WEIGHT',
+          name: 'Invalid Excessive Weight',
+          priceMinor: 1n,
+          weightGrams: 1_000_001,
         },
       }),
     );

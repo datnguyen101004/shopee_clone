@@ -53,6 +53,7 @@
     "test:e2e:engagement:quick": "node scripts/quick-e2e.mjs engagement",
     "test:e2e:shop:quick": "node scripts/quick-e2e.mjs shop",
     "test:e2e:cart:quick": "node scripts/quick-e2e.mjs cart",
+    "test:e2e:pricing:quick": "node scripts/quick-e2e.mjs pricing",
     "test:infra": "node --test scripts/infrastructure-smoke.test.mjs",
     "format": "prettier --write .",
     "format:check": "prettier --check ."

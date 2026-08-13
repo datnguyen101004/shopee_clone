@@ -1,20 +1,15 @@
 import {
+  normalizeVietnameseAdministrativeName,
+  resolveLegacyVietnamProvince,
+} from '@shopee-clone/contracts';
+import {
   LEGACY_VIETNAM_PROVINCES,
   type LegacyDistrict,
   type LegacyProvince,
 } from './legacy-vietnam-administrative-divisions';
 
-const ADMINISTRATIVE_PREFIX = /^(?:thanh pho trung uong|thanh pho|tp|tinh|quan|huyen|thi xa)\s+/u;
-
 export function normalizeAdministrativeLookup(value: string): string {
-  return value
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/đ/gi, (character) => (character === 'Đ' ? 'D' : 'd'))
-    .toLocaleLowerCase('vi-VN')
-    .replace(/[^a-z0-9]+/g, ' ')
-    .trim()
-    .replace(ADMINISTRATIVE_PREFIX, '');
+  return normalizeVietnameseAdministrativeName(value).replace(/^(?:quan|huyen|thi xa)\s+/u, '');
 }
 
 function resolveUnique<T extends { name: string }>(items: readonly T[], value: string): T | null {
@@ -25,7 +20,10 @@ function resolveUnique<T extends { name: string }>(items: readonly T[], value: s
 }
 
 export function resolveLegacyProvince(value: string): LegacyProvince | null {
-  return resolveUnique(LEGACY_VIETNAM_PROVINCES, value);
+  const identity = resolveLegacyVietnamProvince(value);
+  return identity
+    ? (LEGACY_VIETNAM_PROVINCES.find((province) => province.code === identity.code) ?? null)
+    : null;
 }
 
 export function resolveLegacyDistrict(

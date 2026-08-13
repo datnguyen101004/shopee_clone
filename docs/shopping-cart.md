@@ -1,4 +1,4 @@
-# Authenticated multi-shop cart (T16)
+# Authenticated multi-shop cart and authoritative quote (T16–T17)
 
 T16 stores one cart per authenticated buyer in PostgreSQL and projects current product, shop,
 price, availability, stock, and purchase-limit facts. Anonymous browsing remains available, but no
@@ -34,11 +34,59 @@ authoritative cart plus any reconciliation adjustments.
 | `PUT` | `/api/v1/cart/items/{lineId}/selection` | Set one line with `{ selected }`. |
 | `PUT` | `/api/v1/cart/shops/{shopId}/selection` | Set every eligible line in one shop. |
 | `PUT` | `/api/v1/cart/selection` | Set every eligible line in the cart. |
+| `POST` | `/api/v1/cart/quote` | Calculate authoritative merchandise, mock shipping, and payable totals for `{ shippingAddressId, services? }`. |
 
 The API caps a line at the smallest current stock/purchase/platform limit, allows at most 100
 distinct variants, and returns typed adjustments when requested quantities cannot be accepted.
 Stale `If-Match` values return `409`; clients reload rather than replay against an unknown version.
 Cross-owner line identifiers use the same private not-found response as missing identifiers.
+
+## Authoritative pricing quote
+
+`POST /api/v1/cart/quote` is display-only and requires the current cart ETag in `If-Match`. The
+request may contain only an owned `shippingAddressId` and optional `{ shopId, service }` choices.
+It never accepts owner, cart, quantity, price, discount, shipping fee, or total fields. Unknown
+fields are rejected by the strict DTO boundary.
+
+Within one repeatable-read PostgreSQL transaction, the API verifies address ownership and cart
+version, then reloads the current selected product, variant, inventory, shop, price, compare-at
+price, and weight facts. Unavailable or insufficient-stock lines are excluded and reported without
+contributing money or weight. The operation does not write the cart, address, catalog, or quote.
+
+All monetary values are non-negative safe integers in VND, where one unit is one đồng. The rules
+use checked integer arithmetic:
+
+- list unit price is `max(current compare-at price, current selling price)`;
+- product discount is `(list unit price - selling price) × quantity`;
+- merchandise payable is `selling price × quantity`;
+- each shop payable is merchandise plus its one shipping fee;
+- the overall payable total is the exact sum of shop totals.
+
+Overflow, unsafe persistence values, or calculation failures return sanitized `503` Problem
+Details without partial totals. Invalid body/service data returns `400`; missing or foreign
+addresses return the same private `404`; stale or malformed cart ETags return `409`; normal shared
+browser-security and authentication failures remain `403`, `415`, `413`, or `401` as applicable.
+
+## `mock-v1` shipping
+
+Every selected shop becomes one independent shipment. The quote labels its provider as `MOCK` and
+offers these deterministic services:
+
+| Service | Base fee | Each started 500 g after the first 500 g | ETA |
+| --- | ---: | ---: | ---: |
+| `ECONOMY` | 15,000 VND | 3,000 VND | 4–6 days |
+| `STANDARD` | 22,000 VND | 4,000 VND | 2–4 days |
+| `EXPRESS` | 35,000 VND | 6,000 VND | 1–2 days |
+
+The omitted choice defaults to `STANDARD`. The zone surcharge is 0 VND within the same legacy
+province, 6,000 VND across provinces in the same north/central/south macro-region, and 12,000 VND
+across regions or for an unknown location. Origin and destination use the shared normalized legacy
+63-province catalog.
+
+`ProductVariant.weightGrams` is a required positive integer bounded at 1,000,000 g. Migration rows
+without a prior value receive 500 g. Canonical dataset rows without a valid source weight receive a
+deterministic stable fallback in 250 g steps from 250–5,000 g, recorded in generated-field metadata.
+Repeated imports therefore preserve the same weight.
 
 ## Frontend behavior
 
@@ -46,7 +94,16 @@ Cross-owner line identifiers use the same private not-found response as missing 
 - `/cart` shows a login-required screen to an anonymous buyer.
 - After email or Google authentication, `CartProvider` loads the account cart once.
 - Header count and cart controls update only from confirmed server responses.
+- `/cart` loads the default owned address, defaults each selected shop to `STANDARD`, and displays
+  line, shop, shipping, discount, and payable amounts only after validating the complete quote.
+- Address, service, or cart changes mark the old quote stale and abort/sequence older requests;
+  `409` reloads the cart before requoting. No-address and recoverable-error states invent no total.
 - Logging out clears the private projection and returns the header count to zero.
+
+The quote is not a reservation, signed price token, carrier promise, or order. Future checkout must
+reload the same authoritative facts and rerun the same versioned calculation seam before creating
+an order. T17 does not implement vouchers, real carrier integration, stock reservation, checkout,
+payment, or order creation.
 
 ## Browser mutation security
 
@@ -66,6 +123,7 @@ With the API and web app running locally:
 
 ```bash
 pnpm test:e2e:cart:quick
+pnpm test:e2e:pricing:quick
 ```
 
 The quick suite verifies anonymous login handoff and authenticated cart management with intercepted,

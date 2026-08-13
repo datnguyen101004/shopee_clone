@@ -29,6 +29,7 @@ export interface RawDatasetRecord {
   name?: JsonValue;
   price?: JsonValue;
   rating?: JsonValue;
+  weight_grams?: JsonValue;
   notes?: JsonValue;
   image_url?: JsonValue;
   product_url?: JsonValue;
@@ -77,6 +78,7 @@ export interface NormalizedDatasetProduct {
     name: string;
     priceMinor: bigint;
     compareAtPriceMinor: bigint | null;
+    weightGrams: number;
     quantityOnHand: number;
     quantityReserved: number;
   };

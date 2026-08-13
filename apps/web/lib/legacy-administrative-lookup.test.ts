@@ -1,4 +1,8 @@
 import {
+  LEGACY_VIETNAM_PROVINCE_REGIONS,
+  resolveLegacyVietnamProvince,
+} from '@shopee-clone/contracts';
+import {
   LEGACY_ADMINISTRATIVE_SNAPSHOT_DATE,
   LEGACY_VIETNAM_PROVINCES,
 } from './legacy-vietnam-administrative-divisions';
@@ -17,6 +21,13 @@ describe('legacy Vietnamese administrative snapshot', () => {
       LEGACY_VIETNAM_PROVINCES.reduce((total, province) => total + province.districts.length, 0),
     ).toBe(696);
     expect(LEGACY_VIETNAM_PROVINCES.every((province) => province.districts.length > 0)).toBe(true);
+    expect(LEGACY_VIETNAM_PROVINCE_REGIONS).toHaveLength(63);
+    expect(
+      LEGACY_VIETNAM_PROVINCES.every((province) => {
+        const shared = resolveLegacyVietnamProvince(province.name);
+        return shared?.code === province.code;
+      }),
+    ).toBe(true);
     const districts = LEGACY_VIETNAM_PROVINCES.reduce<Array<{ code: string; name: string }>>(
       (items, province) => [...items, ...province.districts],
       [],

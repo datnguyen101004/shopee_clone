@@ -188,6 +188,7 @@ async function importSource(
               name: product.variant.name,
               priceMinor: product.variant.priceMinor,
               compareAtPriceMinor: product.variant.compareAtPriceMinor,
+              weightGrams: product.variant.weightGrams,
               status: VariantStatus.ACTIVE,
               inventory: {
                 create: {
@@ -243,6 +244,7 @@ async function importSource(
                 name: product.variant.name,
                 priceMinor: product.variant.priceMinor,
                 compareAtPriceMinor: product.variant.compareAtPriceMinor,
+                weightGrams: product.variant.weightGrams,
                 status: VariantStatus.ACTIVE,
                 inventory: {
                   create: {
@@ -256,6 +258,7 @@ async function importSource(
                 name: product.variant.name,
                 priceMinor: product.variant.priceMinor,
                 compareAtPriceMinor: product.variant.compareAtPriceMinor,
+                weightGrams: product.variant.weightGrams,
                 status: VariantStatus.ACTIVE,
                 deletedAt: null,
                 inventory: {

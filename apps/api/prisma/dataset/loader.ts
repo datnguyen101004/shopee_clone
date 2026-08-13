@@ -65,7 +65,8 @@ function validateRecord(record: RawDatasetRecord, label: string): void {
   for (const key of ['name', 'notes', 'image_url', 'product_url', 'source_page'] as const) {
     assertOptionalString(record, key, label);
   }
-  for (const key of ['price', 'rating'] as const) assertOptionalNumber(record, key, label);
+  for (const key of ['price', 'rating', 'weight_grams'] as const)
+    assertOptionalNumber(record, key, label);
 
   if (
     record.id !== undefined &&
@@ -89,6 +90,14 @@ function validateRecord(record: RawDatasetRecord, label: string): void {
   }
   if (typeof record.rating === 'number' && (record.rating < 0 || record.rating > 5)) {
     throw new Error(`${label}.rating must be between zero and five.`);
+  }
+  if (
+    typeof record.weight_grams === 'number' &&
+    (!Number.isSafeInteger(record.weight_grams) ||
+      record.weight_grams < 1 ||
+      record.weight_grams > 1_000_000)
+  ) {
+    throw new Error(`${label}.weight_grams must be a positive safe integer up to 1000000.`);
   }
   for (const key of ['image_url', 'product_url', 'source_page'] as const) {
     const value = record[key];

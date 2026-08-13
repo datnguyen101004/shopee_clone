@@ -1,12 +1,19 @@
 'use client';
 
-import type { CartLine, CartShopGroup } from '@shopee-clone/contracts';
+import type {
+  CartLine,
+  CartShopGroup,
+  PricingQuoteLine,
+  PricingQuoteShop,
+} from '@shopee-clone/contracts';
 import { Container } from '@shopee-clone/ui';
 import Link from 'next/link';
 import { useState } from 'react';
 
 import { useAuthSession } from '../auth-session-provider';
+import { CartPricingPanel } from './cart-pricing-panel';
 import { useCart } from './cart-provider';
+import { useCartPricing } from './use-cart-pricing';
 
 function formatCurrency(value: number): string {
   return `${new Intl.NumberFormat('vi-VN').format(value)}₫`;
@@ -16,7 +23,7 @@ function ignoreRejected(operation: Promise<unknown>) {
   void operation.catch(() => undefined);
 }
 
-function CartLineRow({ line }: { line: CartLine }) {
+function CartLineRow({ line, pricingLine }: { line: CartLine; pricingLine?: PricingQuoteLine }) {
   const cart = useCart();
   const maximum = Math.max(1, line.maxPurchaseQuantity);
   const [draft, setDraft] = useState<string | null>(null);
@@ -69,7 +76,13 @@ function CartLineRow({ line }: { line: CartLine }) {
         ))}
       </div>
       <div className="cart-line__price">
-        <strong>{formatCurrency(line.unitPriceMinor)}</strong>
+        <strong>{formatCurrency(pricingLine?.sellingUnitPriceMinor ?? line.unitPriceMinor)}</strong>
+        {pricingLine && pricingLine.listUnitPriceMinor > pricingLine.sellingUnitPriceMinor ? (
+          <>
+            <del>{formatCurrency(pricingLine.listUnitPriceMinor)}</del>
+            <small>Giảm {formatCurrency(pricingLine.productDiscountMinor)}</small>
+          </>
+        ) : null}
         {line.previousUnitPriceMinor !== null ? (
           <del>{formatCurrency(line.previousUnitPriceMinor)}</del>
         ) : null}
@@ -110,7 +123,9 @@ function CartLineRow({ line }: { line: CartLine }) {
         </button>
         <small>Còn {line.availableQuantity}</small>
       </div>
-      <strong className="cart-line__subtotal">{formatCurrency(line.lineSubtotalMinor)}</strong>
+      <strong className="cart-line__subtotal">
+        {formatCurrency(pricingLine?.merchandiseSubtotalMinor ?? line.lineSubtotalMinor)}
+      </strong>
       <button
         className="cart-line__remove"
         type="button"
@@ -123,7 +138,7 @@ function CartLineRow({ line }: { line: CartLine }) {
   );
 }
 
-function ShopGroup({ group }: { group: CartShopGroup }) {
+function ShopGroup({ group, quotedShop }: { group: CartShopGroup; quotedShop?: PricingQuoteShop }) {
   const cart = useCart();
   const checked =
     group.eligibleLineCount > 0 && group.selectedEligibleLineCount === group.eligibleLineCount;
@@ -160,8 +175,21 @@ function ShopGroup({ group }: { group: CartShopGroup }) {
         <span>Thao tác</span>
       </div>
       {group.lines.map((line) => (
-        <CartLineRow key={line.id} line={line} />
+        <CartLineRow
+          key={line.id}
+          line={line}
+          pricingLine={quotedShop?.lines.find(({ lineId }) => lineId === line.id)}
+        />
       ))}
+      {quotedShop ? (
+        <footer className="cart-shop__pricing">
+          <span>Giá niêm yết: {formatCurrency(quotedShop.listSubtotalMinor)}</span>
+          <span>Giảm sản phẩm: −{formatCurrency(quotedShop.productDiscountMinor)}</span>
+          <span>Tiền hàng: {formatCurrency(quotedShop.merchandiseSubtotalMinor)}</span>
+          <span>Phí vận chuyển: {formatCurrency(quotedShop.shipping.shippingFeeMinor)}</span>
+          <strong>Tổng shop: {formatCurrency(quotedShop.payableTotalMinor)}</strong>
+        </footer>
+      ) : null}
     </section>
   );
 }
@@ -169,6 +197,8 @@ function ShopGroup({ group }: { group: CartShopGroup }) {
 export function CartScreen() {
   const cart = useCart();
   const auth = useAuthSession();
+  const currentCart = cart.state.cart;
+  const pricing = useCartPricing(currentCart, cart.refresh);
   const [checkoutMessage, setCheckoutMessage] = useState('');
 
   if (auth.state.status === 'guest' || cart.state.status === 'unauthenticated') {
@@ -196,7 +226,7 @@ export function CartScreen() {
     );
   }
 
-  const current = cart.state.cart;
+  const current = currentCart;
   if (!current) {
     return (
       <Container className="cart-page">
@@ -262,9 +292,19 @@ export function CartScreen() {
         ) : null}
       </div>
       <div className="cart-groups">
+        {pricing.status !== 'missing-address' ? (
+          <CartPricingPanel cart={current} pricing={pricing} />
+        ) : null}
         {current.groups.map((group) => (
-          <ShopGroup key={group.shop.id} group={group} />
+          <ShopGroup
+            key={group.shop.id}
+            group={group}
+            quotedShop={pricing.quote?.shops.find(({ shop }) => shop.id === group.shop.id)}
+          />
         ))}
+        {pricing.status === 'missing-address' ? (
+          <CartPricingPanel cart={current} pricing={pricing} />
+        ) : null}
       </div>
       <aside className="cart-summary" aria-label="Tổng kết giỏ hàng">
         <label className="cart-check">
@@ -277,14 +317,34 @@ export function CartScreen() {
           Chọn tất cả ({current.summary.distinctLineCount})
         </label>
         <div>
-          <span>Tổng cộng ({current.summary.selectedValidLineCount} sản phẩm)</span>
-          <strong>{formatCurrency(current.summary.selectedMerchandiseSubtotalMinor)}</strong>
-          <small>Phí vận chuyển, voucher và tồn kho sẽ được xác nhận khi thanh toán.</small>
+          {pricing.status === 'ready' && pricing.quote?.cartVersion === current.version ? (
+            <>
+              <span>Tổng thanh toán ({pricing.quote.summary.selectedLineCount} sản phẩm)</span>
+              <strong>{formatCurrency(pricing.quote.summary.payableTotalMinor)}</strong>
+              <small>
+                Tiền hàng {formatCurrency(pricing.quote.summary.merchandiseSubtotalMinor)} · Phí
+                ship {formatCurrency(pricing.quote.summary.shippingTotalMinor)} · Giảm sản phẩm{' '}
+                {formatCurrency(pricing.quote.summary.productDiscountMinor)}
+              </small>
+            </>
+          ) : (
+            <>
+              <span>Tổng thanh toán</span>
+              <strong>Chưa khả dụng</strong>
+              <small>Chờ máy chủ xác nhận giá hiện tại và phí vận chuyển.</small>
+            </>
+          )}
         </div>
         <button
           type="button"
-          disabled={current.summary.selectedValidLineCount === 0}
-          onClick={() => setCheckoutMessage('Thanh toán sẽ được triển khai ở T17.')}
+          disabled={
+            current.summary.selectedValidLineCount === 0 ||
+            pricing.status !== 'ready' ||
+            pricing.quote?.cartVersion !== current.version
+          }
+          onClick={() =>
+            setCheckoutMessage('Thanh toán COD và tạo đơn hàng sẽ được triển khai ở T19.')
+          }
         >
           Mua hàng
         </button>

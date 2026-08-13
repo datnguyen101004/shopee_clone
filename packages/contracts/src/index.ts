@@ -264,3 +264,35 @@ export type {
   UpdateCartQuantityRequest,
   UpdateCartSelectionRequest,
 } from './cart';
+export {
+  MOCK_SHIPPING_VERSION,
+  PRICING_CURRENCY,
+  PRICING_VERSION,
+  SHIPPING_SERVICES,
+  isPricingProblemDetails,
+  isPricingQuoteRequest,
+  isPricingQuoteResponse,
+  parsePricingProblemDetails,
+  parsePricingQuoteResponse,
+} from './pricing';
+export type {
+  MockShippingBreakdown,
+  PricingExclusionCode,
+  PricingProblemDetails,
+  PricingQuoteAddress,
+  PricingQuoteExclusion,
+  PricingQuoteLine,
+  PricingQuoteRequest,
+  PricingQuoteResponse,
+  PricingQuoteShop,
+  PricingQuoteSummary,
+  ShippingServiceCode,
+  ShippingZone,
+  ShopShippingServiceSelection,
+} from './pricing';
+export {
+  LEGACY_VIETNAM_PROVINCE_REGIONS,
+  normalizeVietnameseAdministrativeName,
+  resolveLegacyVietnamProvince,
+} from './vietnam-provinces';
+export type { LegacyVietnamProvinceIdentity, VietnamMacroRegion } from './vietnam-provinces';

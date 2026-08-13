@@ -141,6 +141,11 @@ function normalizeProduct(
   const originalPrice = parseOriginalPrice(notes);
   const compareAtPriceMinor =
     originalPrice !== null && originalPrice > priceMinor ? BigInt(originalPrice) : null;
+  const sourceWeightGrams = optionalNumber(record, 'weight_grams');
+  const weightGrams =
+    sourceWeightGrams ?? deterministicInteger('dataset-weight-grams', stableRecordKey, 1, 20) * 250;
+  if (sourceWeightGrams === null)
+    generatedFields.push(generated('weightGrams', 'stable-hash-250-to-5000-grams'));
   const productId = deterministicUuid(`dataset-product:${source.manifest.key}:${stableRecordKey}`);
   const productSlugBase = slugifyVietnamese(name).slice(0, 140) || 'san-pham';
   const productSlug = `${productSlugBase}-${digest}`;
@@ -176,6 +181,7 @@ function normalizeProduct(
       name: 'Mặc định',
       priceMinor: BigInt(priceMinor),
       compareAtPriceMinor,
+      weightGrams,
       quantityOnHand,
       quantityReserved: 0,
     },
@@ -209,6 +215,13 @@ function assertPlan(plan: CanonicalDatasetPlan): void {
         throw new Error('Invalid product name.');
       if (!product.slug || product.slug.length > 160) throw new Error('Invalid product slug.');
       if (product.variant.priceMinor <= 0n) throw new Error('Invalid product price.');
+      if (
+        !Number.isSafeInteger(product.variant.weightGrams) ||
+        product.variant.weightGrams < 1 ||
+        product.variant.weightGrams > 1_000_000
+      ) {
+        throw new Error('Invalid product weight.');
+      }
       if (product.variant.sku.length > 80) throw new Error('Invalid product SKU.');
       if (
         product.ratingAverageBasisPoints < 0 ||

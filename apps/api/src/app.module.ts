@@ -8,6 +8,7 @@ import { EngagementModule } from './engagement/engagement.module';
 import { HealthModule } from './health/health.module';
 import { HomepageModule } from './homepage/homepage.module';
 import { PrismaModule } from './prisma/prisma.module';
+import { PricingModule } from './pricing/pricing.module';
 import { ShopStorefrontModule } from './shop-storefront/shop-storefront.module';
 import { BrowserSecurityModule } from './security/browser-security.module';
 
@@ -18,6 +19,7 @@ import { BrowserSecurityModule } from './security/browser-security.module';
     HomepageModule,
     CatalogModule,
     CartModule,
+    PricingModule,
     AuthModule,
     BrowserSecurityModule,
     AccountModule,

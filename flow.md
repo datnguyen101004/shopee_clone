@@ -1,6 +1,6 @@
 # Flow các tính năng đã triển khai
 
-Tài liệu này mô tả trạng thái hiện tại của Shopee Clone sau TS01 và các task đến T16. Các sơ đồ tập trung vào luồng đang hoạt động trong code; checkout, đơn hàng, thanh toán, chat và vận chuyển vẫn chưa được triển khai.
+Tài liệu này mô tả trạng thái hiện tại của Shopee Clone sau TS01 và các task đến T17. Các sơ đồ tập trung vào luồng đang hoạt động trong code; checkout, đơn hàng, thanh toán, chat và vận chuyển thật vẫn chưa được triển khai.
 
 ## 1. Tổng quan phạm vi
 
@@ -400,7 +400,7 @@ Importer chạy local, không crawl mạng, không dùng dữ liệu ngẫu nhi�
 
 ## 10. Các ranh giới chưa triển khai
 
-- Giỏ hàng không giữ tồn kho, áp voucher, tính phí vận chuyển cuối cùng hoặc tạo đơn.
+- Báo giá giỏ hàng chỉ dùng phí vận chuyển mô phỏng để hiển thị; không giữ tồn kho, áp voucher, cam kết cước cuối cùng hoặc tạo đơn.
 - Purchase intent ở trang sản phẩm chưa báo checkout thành công.
 - Chưa có checkout, voucher, thanh toán, shipment, order history, review body, chat hoặc notification realtime.
 - Seller mới có role/ownership boundary và safe shop projection, chưa có bộ công cụ quản lý gian hàng hoàn chỉnh.
@@ -476,3 +476,44 @@ flowchart TD
 ```
 
 Rate limiter tổng quát chưa nằm trong T16; auth limiter hiện có được giữ nguyên.
+
+## 12. Báo giá có thẩm quyền và vận chuyển mô phỏng T17
+
+```mermaid
+flowchart TD
+    buyer(["Buyer đã đăng nhập mở /cart"])
+    cart["CartProvider tải cart và ETag"]
+    addresses["Tải địa chỉ thuộc tài khoản"]
+    hasAddress{"Có địa chỉ mặc định hoặc đã chọn?"}
+    addressHandoff["Thông báo cần địa chỉ → /account/addresses"]
+    services["Mặc định STANDARD cho từng shop được chọn"]
+    request["POST /api/v1/cart/quote<br/>address + services + If-Match"]
+    origin["Origin/media guard toàn ứng dụng"]
+    auth["AuthGuard resolve owner từ session"]
+    snapshot["Repeatable-read: kiểm tra address owner + cart version"]
+    version{"ETag còn hiện hành?"}
+    conflict["409 Problem Details"]
+    refresh["Reload cart và requote"]
+    facts["Đọc lại price, compare-at, stock, weight, shop hiện tại"]
+    eligibility["Loại line unavailable hoặc thiếu stock"]
+    grouping["Gộp 1 shipment cho mỗi shop"]
+    calculator["Pricing-v1 + mock-v1 calculators<br/>integer VND, zone, weight, ETA"]
+    validate["Web kiểm tra toàn bộ contract và phép cộng"]
+    display["Hiển thị line/shop/ship/discount/payable đã xác nhận"]
+    changed{"Address, service hoặc cart thay đổi?"}
+    stale["Đánh dấu stale + abort/sequence request cũ"]
+    checkoutBoundary["Display-only; checkout tương lai phải tính lại"]
+
+    buyer --> cart --> addresses --> hasAddress
+    hasAddress -->|"Không"| addressHandoff
+    hasAddress -->|"Có"| services --> request --> origin --> auth --> snapshot --> version
+    version -->|"Không"| conflict --> refresh --> request
+    version -->|"Có"| facts --> eligibility --> grouping --> calculator --> validate --> display --> changed
+    changed -->|"Có"| stale --> request
+    changed -->|"Không"| checkoutBoundary
+```
+
+Browser không gửi giá, số lượng, phí hoặc tổng tiền vào quote. Backend tính lại từ PostgreSQL bằng
+số nguyên VND và không ghi dữ liệu. Mỗi shop có một shipment `MOCK` với `ECONOMY`, `STANDARD` hoặc
+`EXPRESS`; surcharge dựa trên tỉnh/thành cũ và tổng trọng lượng variant. Response cũ không được ghi
+đè lựa chọn mới; đăng xuất xóa quote riêng tư khỏi bộ nhớ.

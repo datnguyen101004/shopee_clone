@@ -397,6 +397,7 @@ model ProductVariant {
   name                String         @db.VarChar(160)
   priceMinor          BigInt         @map("price_minor")
   compareAtPriceMinor BigInt?        @map("compare_at_price_minor")
+  weightGrams         Int            @default(500) @map("weight_grams")
   maxPurchaseQuantity Int?           @map("max_purchase_quantity")
   status              VariantStatus  @default(ACTIVE)
   createdAt           DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)

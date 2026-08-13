@@ -97,4 +97,30 @@ describe('HomepageModules', () => {
     expect(screen.getByRole('alert')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Thử lại' })).toHaveAttribute('href', '/');
   });
+
+  it('only applies decorative media overlays when a product image is missing', () => {
+    const productModule = {
+      ...modules[2]!,
+      products: [
+        product,
+        {
+          ...product,
+          id: 'product-2',
+          name: 'Sản phẩm có ảnh',
+          href: '/products/product-2',
+          imageUrl: '/media/products/product-placeholder.svg',
+          imageAlt: 'Ảnh sản phẩm có ảnh',
+        },
+      ],
+    } as HomepageModule;
+
+    render(<HomepageModules modules={[productModule]} />);
+
+    expect(screen.getByRole('img', { name: 'Ảnh Tai nghe' }).parentElement).toHaveClass(
+      'product-card__image--fallback',
+    );
+    expect(screen.getByRole('img', { name: 'Ảnh sản phẩm có ảnh' }).parentElement).not.toHaveClass(
+      'product-card__image--fallback',
+    );
+  });
 });

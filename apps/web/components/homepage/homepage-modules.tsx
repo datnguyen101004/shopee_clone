@@ -84,7 +84,9 @@ function ProductCard({ product }: { product: HomepageProductSummary }) {
   return (
     <Card className="product-card">
       <Link href={product.href} className="product-card__link" aria-label={`Xem ${product.name}`}>
-        <div className="product-card__image">
+        <div
+          className={`product-card__image${product.imageUrl ? '' : ' product-card__image--fallback'}`}
+        >
           {product.imageUrl ? (
             <MarketplaceProductImage
               src={product.imageUrl}

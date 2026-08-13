@@ -533,24 +533,24 @@
   overflow: hidden;
   background: #ef937d;
 }
-.product-card__image::before,
-.product-card__image::after {
+.product-card__image--fallback::before,
+.product-card__image--fallback::after {
   content: '';
   position: absolute;
   border-radius: 28% 72% 55% 45%;
   background: #ffffff99;
   transform: rotate(25deg);
 }
-.product-card__image::before {
+.product-card__image--fallback::before {
   width: 68%;
   aspect-ratio: 1;
 }
-.product-card__image::after {
+.product-card__image--fallback::after {
   width: 38%;
   aspect-ratio: 1;
   transform: translate(45%, 25%) rotate(-20deg);
 }
-.product-card__image > span {
+.product-card__image > .homepage-media-fallback {
   position: relative;
   z-index: 1;
   color: #ffffffdd;
@@ -1216,7 +1216,6 @@
 .product-card__image > .sc-badge {
   width: auto;
   height: auto;
-  color: #fff;
   font-size: 0.7rem;
   letter-spacing: normal;
   text-shadow: none;

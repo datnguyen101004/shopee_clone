@@ -32,6 +32,42 @@ export class ShopStorefrontRepository {
     });
   }
 
+  countFollowedShops(userId: string) {
+    return this.prisma.shopFollower.count({ where: { userId } });
+  }
+
+  followedShopPage(userId: string, skip: number, take: number) {
+    return this.prisma.shopFollower.findMany({
+      where: { userId },
+      orderBy: [{ followedAt: 'desc' }, { shopId: 'asc' }],
+      skip,
+      take,
+      select: {
+        shopId: true,
+        followedAt: true,
+        shop: {
+          select: {
+            id: true,
+            slug: true,
+            name: true,
+            location: true,
+            status: true,
+            deletedAt: true,
+          },
+        },
+      },
+    });
+  }
+
+  followerCounts(shopIds: string[]) {
+    if (shopIds.length === 0) return Promise.resolve([]);
+    return this.prisma.shopFollower.groupBy({
+      by: ['shopId'],
+      where: { shopId: { in: shopIds } },
+      _count: { _all: true },
+    });
+  }
+
   transaction<T>(work: (transaction: ShopStorefrontTransaction) => Promise<T>): Promise<T> {
     return this.prisma.$transaction(work);
   }

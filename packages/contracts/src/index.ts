@@ -22,6 +22,9 @@ export {
   parseCatalogProductsResponse,
 } from './catalog';
 export {
+  FOLLOWED_SHOPS_DEFAULT_PAGE,
+  FOLLOWED_SHOPS_DEFAULT_PAGE_SIZE,
+  FOLLOWED_SHOPS_MAX_PAGE_SIZE,
   SHOP_CATALOG_DEFAULT_PAGE,
   SHOP_CATALOG_DEFAULT_PAGE_SIZE,
   SHOP_CATALOG_MAX_PAGE_SIZE,
@@ -30,6 +33,7 @@ export {
   SHOP_SLUG_MAX_LENGTH,
   isCanonicalShopId,
   isCanonicalShopSlug,
+  isFollowedShopPage,
   isPublicShopCatalogPage,
   isPublicShopProfile,
   isShopFollowMutationResponse,
@@ -37,6 +41,8 @@ export {
   isShopStorefrontProblemDetails,
   parsePublicShopCatalogPage,
   parsePublicShopProfile,
+  parseFollowedShopPage,
+  parseFollowedShopPageQuery,
   parseShopCatalogQuery,
   parseShopFollowMutationResponse,
   parseShopFollowStateList,
@@ -44,6 +50,12 @@ export {
   parseShopStorefrontProblemDetails,
 } from './shop-storefront';
 export type {
+  AvailableFollowedShopItem,
+  AvailableFollowedShopSummary,
+  FollowedShopItem,
+  FollowedShopPage,
+  FollowedShopPageQuery,
+  FollowedShopPagination,
   PublicShopCatalogPage,
   PublicShopCategoryFacet,
   PublicShopProfile,
@@ -54,6 +66,8 @@ export type {
   ShopFollowState,
   ShopFollowStateList,
   ShopStorefrontProblemDetails,
+  UnavailableFollowedShopItem,
+  UnavailableFollowedShopSummary,
 } from './shop-storefront';
 export {
   ENGAGEMENT_DEFAULT_PAGE,

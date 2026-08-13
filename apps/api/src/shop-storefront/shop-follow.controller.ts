@@ -11,7 +11,11 @@ import {
   UseFilters,
   UseGuards,
 } from '@nestjs/common';
-import type { ShopFollowMutationResponse, ShopFollowStateList } from '@shopee-clone/contracts';
+import type {
+  FollowedShopPage,
+  ShopFollowMutationResponse,
+  ShopFollowStateList,
+} from '@shopee-clone/contracts';
 import {
   ApiBearerAuth,
   ApiOkResponse,
@@ -24,7 +28,7 @@ import {
 import { AuthGuard, type AuthenticatedRequest } from '../auth/auth.guard';
 import { AuthOriginGuard } from '../auth/auth-origin.guard';
 import { ShopStorefrontExceptionFilter } from './shop-storefront-exception.filter';
-import { parseShopId, parseShopStatusIds } from './shop-storefront-input';
+import { parseFollowedShopsQuery, parseShopId, parseShopStatusIds } from './shop-storefront-input';
 import { ShopStorefrontService } from './shop-storefront.service';
 
 @ApiTags('followed shops')
@@ -38,6 +42,84 @@ import { ShopStorefrontService } from './shop-storefront.service';
 @UseGuards(AuthOriginGuard, AuthGuard)
 export class ShopFollowController {
   constructor(@Inject(ShopStorefrontService) private readonly storefront: ShopStorefrontService) {}
+
+  @Get()
+  @Header('Cache-Control', 'no-store')
+  @ApiOperation({ summary: "List the authenticated buyer's followed shops" })
+  @ApiQuery({ name: 'page', required: false, minimum: 1, example: 1 })
+  @ApiQuery({ name: 'pageSize', required: false, minimum: 1, maximum: 48, example: 20 })
+  @ApiOkResponse({
+    description: 'Deterministic owner-scoped followed-shop page',
+    schema: {
+      type: 'object',
+      required: ['items', 'pagination'],
+      properties: {
+        items: {
+          type: 'array',
+          maxItems: 48,
+          items: {
+            oneOf: [
+              {
+                type: 'object',
+                required: ['availability', 'shopId', 'followedAt', 'shop'],
+                properties: {
+                  availability: { type: 'string', enum: ['available'] },
+                  shopId: { type: 'string', format: 'uuid' },
+                  followedAt: { type: 'string', format: 'date-time' },
+                  shop: {
+                    type: 'object',
+                    required: ['id', 'slug', 'name', 'href', 'location', 'followerCount'],
+                    properties: {
+                      id: { type: 'string', format: 'uuid' },
+                      slug: { type: 'string' },
+                      name: { type: 'string' },
+                      href: { type: 'string' },
+                      location: { type: 'string' },
+                      followerCount: { type: 'integer', minimum: 0 },
+                    },
+                  },
+                },
+              },
+              {
+                type: 'object',
+                required: ['availability', 'shopId', 'followedAt', 'shop'],
+                properties: {
+                  availability: { type: 'string', enum: ['unavailable'] },
+                  shopId: { type: 'string', format: 'uuid' },
+                  followedAt: { type: 'string', format: 'date-time' },
+                  shop: {
+                    type: 'object',
+                    required: ['id', 'name', 'href'],
+                    properties: {
+                      id: { type: 'string', format: 'uuid' },
+                      name: { type: 'string' },
+                      href: { type: 'string', nullable: true, example: null },
+                    },
+                  },
+                },
+              },
+            ],
+          },
+        },
+        pagination: {
+          type: 'object',
+          required: ['page', 'pageSize', 'totalItems', 'totalPages'],
+          properties: {
+            page: { type: 'integer', minimum: 1 },
+            pageSize: { type: 'integer', minimum: 1, maximum: 48 },
+            totalItems: { type: 'integer', minimum: 0 },
+            totalPages: { type: 'integer', minimum: 0 },
+          },
+        },
+      },
+    },
+  })
+  list(
+    @Req() request: AuthenticatedRequest,
+    @Query() query: Record<string, unknown>,
+  ): Promise<FollowedShopPage> {
+    return this.storefront.followedShops(request.authUser!.id, parseFollowedShopsQuery(query));
+  }
 
   @Get('status')
   @Header('Cache-Control', 'no-store')

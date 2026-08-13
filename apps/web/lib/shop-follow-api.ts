@@ -1,9 +1,15 @@
 import {
+  FOLLOWED_SHOPS_DEFAULT_PAGE,
+  FOLLOWED_SHOPS_DEFAULT_PAGE_SIZE,
+  FOLLOWED_SHOPS_MAX_PAGE_SIZE,
   SHOP_FOLLOW_MAX_STATUS_IDS,
   isCanonicalShopId,
+  parseFollowedShopPage,
   parseShopFollowMutationResponse,
   parseShopFollowStateList,
   parseShopStorefrontProblemDetails,
+  type FollowedShopPage,
+  type FollowedShopPageQuery,
   type ShopFollowMutationResponse,
   type ShopFollowStateList,
   type ShopStorefrontProblemDetails,
@@ -56,6 +62,36 @@ async function request(
     );
   }
   return response;
+}
+
+function followedShopsQuery({
+  page = FOLLOWED_SHOPS_DEFAULT_PAGE,
+  pageSize = FOLLOWED_SHOPS_DEFAULT_PAGE_SIZE,
+}: Partial<FollowedShopPageQuery> = {}): string {
+  if (
+    !Number.isSafeInteger(page) ||
+    page < 1 ||
+    !Number.isSafeInteger(pageSize) ||
+    pageSize < 1 ||
+    pageSize > FOLLOWED_SHOPS_MAX_PAGE_SIZE
+  ) {
+    throw new ShopFollowApiError('input');
+  }
+  return new URLSearchParams({ page: String(page), pageSize: String(pageSize) }).toString();
+}
+
+export async function getFollowedShops(
+  query: Partial<FollowedShopPageQuery>,
+  authenticatedFetch: AuthenticatedFetch,
+): Promise<FollowedShopPage> {
+  const response = await request(
+    `/api/v1/account/followed-shops?${followedShopsQuery(query)}`,
+    'GET',
+    authenticatedFetch,
+  );
+  const parsed = parseFollowedShopPage(await response.json());
+  if (!parsed) throw new ShopFollowApiError('contract', response.status);
+  return parsed;
 }
 
 export async function getShopFollowStatus(

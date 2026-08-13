@@ -28,6 +28,7 @@ export function AccountWorkspace({
           <Link href="/account/addresses">Địa chỉ nhận hàng</Link>
           <Link href="/account/favorites">Sản phẩm yêu thích</Link>
           <Link href="/account/recently-viewed">Sản phẩm đã xem</Link>
+          <Link href="/account/followed-shops">Shop đang theo dõi</Link>
         </nav>
         <div className="buyer-account-content">{children}</div>
       </div>
@@ -42,7 +43,11 @@ export function ProtectedAccountState({
 }: {
   account: AuthSessionState;
   returnTo:
-    '/account/profile' | '/account/addresses' | '/account/favorites' | '/account/recently-viewed';
+    | '/account/profile'
+    | '/account/addresses'
+    | '/account/favorites'
+    | '/account/recently-viewed'
+    | '/account/followed-shops';
   children: ReactNode;
 }) {
   if (account.status === 'loading') {

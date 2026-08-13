@@ -15,6 +15,9 @@ export const SHOP_FOLLOW_MAX_STATUS_IDS = CATALOG_MAX_PAGE_SIZE;
 export const SHOP_CATALOG_DEFAULT_PAGE = CATALOG_DEFAULT_PAGE;
 export const SHOP_CATALOG_DEFAULT_PAGE_SIZE = CATALOG_DEFAULT_PAGE_SIZE;
 export const SHOP_CATALOG_MAX_PAGE_SIZE = CATALOG_MAX_PAGE_SIZE;
+export const FOLLOWED_SHOPS_DEFAULT_PAGE = 1;
+export const FOLLOWED_SHOPS_DEFAULT_PAGE_SIZE = 20;
+export const FOLLOWED_SHOPS_MAX_PAGE_SIZE = CATALOG_MAX_PAGE_SIZE;
 
 export interface PublicShopResponseMetadata {
   responseRateBasisPoints: null;
@@ -78,6 +81,52 @@ export interface ShopFollowStateList {
 export interface ShopFollowMutationResponse extends ShopFollowState {
   followedAt: string | null;
   followerCount: number | null;
+}
+
+export interface FollowedShopPageQuery {
+  page: number;
+  pageSize: number;
+}
+
+export interface FollowedShopPagination extends FollowedShopPageQuery {
+  totalItems: number;
+  totalPages: number;
+}
+
+export interface AvailableFollowedShopSummary {
+  id: string;
+  slug: string;
+  name: string;
+  href: string;
+  location: string;
+  followerCount: number;
+}
+
+export interface UnavailableFollowedShopSummary {
+  id: string;
+  name: string;
+  href: null;
+}
+
+export interface AvailableFollowedShopItem {
+  availability: 'available';
+  shopId: string;
+  followedAt: string;
+  shop: AvailableFollowedShopSummary;
+}
+
+export interface UnavailableFollowedShopItem {
+  availability: 'unavailable';
+  shopId: string;
+  followedAt: string;
+  shop: UnavailableFollowedShopSummary;
+}
+
+export type FollowedShopItem = AvailableFollowedShopItem | UnavailableFollowedShopItem;
+
+export interface FollowedShopPage {
+  items: FollowedShopItem[];
+  pagination: FollowedShopPagination;
 }
 
 export interface ShopStorefrontProblemDetails {
@@ -275,6 +324,86 @@ export function isShopFollowMutationResponse(value: unknown): value is ShopFollo
     : value.followedAt === null;
 }
 
+function isFollowedShopPagination(value: unknown): value is FollowedShopPagination {
+  return (
+    isRecord(value) &&
+    hasExactKeys(value, ['page', 'pageSize', 'totalItems', 'totalPages']) &&
+    isPositiveInteger(value.page) &&
+    isPositiveInteger(value.pageSize) &&
+    value.pageSize <= FOLLOWED_SHOPS_MAX_PAGE_SIZE &&
+    isNonNegativeInteger(value.totalItems) &&
+    isNonNegativeInteger(value.totalPages) &&
+    value.totalPages === Math.ceil(value.totalItems / value.pageSize)
+  );
+}
+
+function isFollowedShopItem(value: unknown): value is FollowedShopItem {
+  if (
+    !isRecord(value) ||
+    !hasExactKeys(value, ['availability', 'shopId', 'followedAt', 'shop']) ||
+    !isCanonicalShopId(value.shopId) ||
+    !isCanonicalDateTime(value.followedAt) ||
+    !isRecord(value.shop) ||
+    value.shop.id !== value.shopId
+  ) {
+    return false;
+  }
+  if (value.availability === 'available') {
+    return (
+      hasExactKeys(value.shop, ['id', 'slug', 'name', 'href', 'location', 'followerCount']) &&
+      isCanonicalShopSlug(value.shop.slug) &&
+      isString(value.shop.name) &&
+      value.shop.href === `/shops/${value.shop.slug}` &&
+      isString(value.shop.location) &&
+      isNonNegativeInteger(value.shop.followerCount)
+    );
+  }
+  return (
+    value.availability === 'unavailable' &&
+    hasExactKeys(value.shop, ['id', 'name', 'href']) &&
+    isString(value.shop.name) &&
+    value.shop.href === null
+  );
+}
+
+function hasCanonicalFollowedShopOrder(items: FollowedShopItem[]): boolean {
+  return items.every((item, index) => {
+    const previous = items[index - 1];
+    if (!previous) return true;
+    if (previous.followedAt > item.followedAt) return true;
+    return previous.followedAt === item.followedAt && previous.shopId < item.shopId;
+  });
+}
+
+export function isFollowedShopPage(value: unknown): value is FollowedShopPage {
+  if (
+    !isRecord(value) ||
+    !hasExactKeys(value, ['items', 'pagination']) ||
+    !Array.isArray(value.items) ||
+    !value.items.every(isFollowedShopItem) ||
+    !isFollowedShopPagination(value.pagination)
+  ) {
+    return false;
+  }
+  const items = value.items as FollowedShopItem[];
+  const pagination = value.pagination as FollowedShopPagination;
+  if (
+    items.length > pagination.pageSize ||
+    new Set(items.map((item) => item.shopId)).size !== items.length ||
+    !hasCanonicalFollowedShopOrder(items)
+  ) {
+    return false;
+  }
+  const maximumItemsOnPage =
+    pagination.page > pagination.totalPages
+      ? 0
+      : Math.min(
+          pagination.pageSize,
+          pagination.totalItems - (pagination.page - 1) * pagination.pageSize,
+        );
+  return items.length <= maximumItemsOnPage;
+}
+
 function canonicalPositiveInteger(
   value: unknown,
   fallback: number,
@@ -334,6 +463,19 @@ export function parseShopFollowStatusIds(value: unknown): string[] | null {
   return values;
 }
 
+export function parseFollowedShopPageQuery(value: unknown): FollowedShopPageQuery | null {
+  if (!isRecord(value) || !hasExactKeys(value, [], ['page', 'pageSize'])) return null;
+  const page = canonicalPositiveInteger(value.page, FOLLOWED_SHOPS_DEFAULT_PAGE);
+  const pageSize = canonicalPositiveInteger(
+    value.pageSize,
+    FOLLOWED_SHOPS_DEFAULT_PAGE_SIZE,
+    FOLLOWED_SHOPS_MAX_PAGE_SIZE,
+  );
+  return page === null || pageSize === null || !Number.isSafeInteger((page - 1) * pageSize)
+    ? null
+    : { page, pageSize };
+}
+
 export function isShopStorefrontProblemDetails(
   value: unknown,
 ): value is ShopStorefrontProblemDetails {
@@ -372,6 +514,8 @@ export const parseShopFollowStateList = (value: unknown): ShopFollowStateList | 
 export const parseShopFollowMutationResponse = (
   value: unknown,
 ): ShopFollowMutationResponse | null => (isShopFollowMutationResponse(value) ? value : null);
+export const parseFollowedShopPage = (value: unknown): FollowedShopPage | null =>
+  isFollowedShopPage(value) ? value : null;
 export const parseShopStorefrontProblemDetails = (
   value: unknown,
 ): ShopStorefrontProblemDetails | null => (isShopStorefrontProblemDetails(value) ? value : null);

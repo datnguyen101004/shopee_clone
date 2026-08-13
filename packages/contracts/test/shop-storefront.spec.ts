@@ -1,11 +1,15 @@
 import {
+  FOLLOWED_SHOPS_DEFAULT_PAGE_SIZE,
+  FOLLOWED_SHOPS_MAX_PAGE_SIZE,
   SHOP_CATALOG_MAX_PAGE_SIZE,
   SHOP_FOLLOW_MAX_STATUS_IDS,
   isCanonicalShopSlug,
+  isFollowedShopPage,
   isPublicShopCatalogPage,
   isPublicShopProfile,
   isShopFollowMutationResponse,
   isShopFollowStateList,
+  parseFollowedShopPageQuery,
   parseShopCatalogQuery,
   parseShopFollowStatusIds,
 } from '../src';
@@ -181,6 +185,90 @@ describe('public shop storefront contracts', () => {
         isFollowing: true,
         followedAt: null,
         followerCount: 3,
+      }),
+    ).toBe(false);
+  });
+
+  it('parses strict followed-shop page defaults and bounds', () => {
+    expect(parseFollowedShopPageQuery({})).toEqual({
+      page: 1,
+      pageSize: FOLLOWED_SHOPS_DEFAULT_PAGE_SIZE,
+    });
+    expect(
+      parseFollowedShopPageQuery({ page: '2', pageSize: String(FOLLOWED_SHOPS_MAX_PAGE_SIZE) }),
+    ).toEqual({ page: 2, pageSize: FOLLOWED_SHOPS_MAX_PAGE_SIZE });
+    expect(parseFollowedShopPageQuery({ page: ['2'] })).toBeNull();
+    expect(parseFollowedShopPageQuery({ page: '0' })).toBeNull();
+    expect(parseFollowedShopPageQuery({ pageSize: '49' })).toBeNull();
+    expect(parseFollowedShopPageQuery({ extra: 'value' })).toBeNull();
+  });
+
+  it('validates ordered available and unavailable followed-shop pages', () => {
+    const page = {
+      items: [
+        {
+          availability: 'available',
+          shopId,
+          followedAt: timestamp,
+          shop: {
+            id: shopId,
+            slug: 'shop-mau',
+            name: 'Shop máº«u',
+            href: '/shops/shop-mau',
+            location: 'TP. Há»“ ChÃ­ Minh',
+            followerCount: 3,
+          },
+        },
+        {
+          availability: 'unavailable',
+          shopId: secondShopId,
+          followedAt: '2026-08-13T01:00:00.000Z',
+          shop: { id: secondShopId, name: 'Shop táº¡m dá»«ng', href: null },
+        },
+      ],
+      pagination: { page: 1, pageSize: 20, totalItems: 2, totalPages: 1 },
+    };
+    expect(isFollowedShopPage(page)).toBe(true);
+    expect(isFollowedShopPage({ ...page, ownerId: shopId })).toBe(false);
+    expect(
+      isFollowedShopPage({
+        ...page,
+        items: [
+          {
+            ...page.items[1],
+            shop: { ...page.items[1]!.shop, location: 'private' },
+          },
+        ],
+        pagination: { page: 1, pageSize: 20, totalItems: 1, totalPages: 1 },
+      }),
+    ).toBe(false);
+    expect(isFollowedShopPage({ ...page, items: [...page.items].reverse() })).toBe(false);
+  });
+
+  it('accepts canonical empty and out-of-range followed-shop pages', () => {
+    expect(
+      isFollowedShopPage({
+        items: [],
+        pagination: { page: 1, pageSize: 20, totalItems: 0, totalPages: 0 },
+      }),
+    ).toBe(true);
+    expect(
+      isFollowedShopPage({
+        items: [],
+        pagination: { page: 3, pageSize: 1, totalItems: 2, totalPages: 2 },
+      }),
+    ).toBe(true);
+    expect(
+      isFollowedShopPage({
+        items: [
+          {
+            availability: 'unavailable',
+            shopId,
+            followedAt: timestamp,
+            shop: { id: shopId, name: 'Shop máº«u', href: null },
+          },
+        ],
+        pagination: { page: 3, pageSize: 1, totalItems: 2, totalPages: 2 },
       }),
     ).toBe(false);
   });

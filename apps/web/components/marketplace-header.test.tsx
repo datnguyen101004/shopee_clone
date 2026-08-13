@@ -109,6 +109,10 @@ describe('StorefrontShell', () => {
       'href',
       '/account/addresses',
     );
+    expect(screen.getByRole('link', { name: 'Shop đang theo dõi' })).toHaveAttribute(
+      'href',
+      '/account/followed-shops',
+    );
     await user.click(screen.getByRole('button', { name: 'Đăng xuất' }));
     expect(onLogout).toHaveBeenCalledTimes(1);
   });

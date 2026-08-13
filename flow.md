@@ -1,21 +1,21 @@
 # Flow các tính năng đã triển khai
 
-Tài liệu này mô tả trạng thái hiện tại của Shopee Clone sau TS01 và các task đến T15. Các sơ đồ tập trung vào luồng đang hoạt động trong code, không mô tả giỏ hàng, checkout, đơn hàng, thanh toán, chat hoặc vận chuyển như những tính năng đã hoàn thành.
+Tài liệu này mô tả trạng thái hiện tại của Shopee Clone sau TS01 và các task đến T15.1. Các sơ đồ tập trung vào luồng đang hoạt động trong code, không mô tả giỏ hàng, checkout, đơn hàng, thanh toán, chat hoặc vận chuyển như những tính năng đã hoàn thành.
 
 ## 1. Tổng quan phạm vi
 
-| Nhóm               | Màn hình hoặc điểm vào                                       | Chức năng hiện có                                                                            |
-| ------------------ | ------------------------------------------------------------ | -------------------------------------------------------------------------------------------- |
-| Nền tảng giao diện | `/`, `/design-system`, layout storefront                     | Design system, header dùng chung, tìm kiếm, điều hướng danh mục, responsive và accessibility |
-| Trang chủ          | `/`                                                          | Banner chiến dịch, danh mục, flash sale, bán chạy, Mall và gợi ý hằng ngày từ API            |
-| Khám phá sản phẩm  | `/search`                                                    | Tìm kiếm, lọc, sắp xếp, phân trang và URL có thể chia sẻ                                     |
-| Chi tiết sản phẩm  | `/products/{productId}`                                      | Gallery, biến thể, giá, tồn kho, số lượng, shop, sản phẩm liên quan và purchase intent       |
-| Tài khoản          | `/login`, `/register`, `/forgot-password`, `/reset-password` | Email/password, Google OIDC, refresh session, logout và khôi phục mật khẩu                   |
-| Phân quyền         | `/seller`, `/admin` và API tương ứng                         | Buyer mặc định, seller theo quyền và ownership, admin quản lý role và audit                  |
-| Hồ sơ giao hàng    | `/account/profile`, `/account/addresses`                     | Hồ sơ, số điện thoại, CRUD địa chỉ và địa chỉ mặc định                                       |
-| Tương tác sản phẩm | `/account/favorites`, `/account/recently-viewed`             | Yêu thích và lịch sử xem gần đây riêng theo tài khoản                                        |
-| Gian hàng          | `/shops/{shopSlug}`                                          | Hồ sơ shop, catalog riêng, tìm kiếm/lọc/sắp xếp/phân trang và theo dõi shop                  |
-| Dữ liệu            | `asserts/*.json`, PostgreSQL                                 | Import 1.377 sản phẩm chuẩn hóa, idempotent, có provenance và dữ liệu sinh xác định          |
+| Nhóm               | Màn hình hoặc điểm vào                                                      | Chức năng hiện có                                                                            |
+| ------------------ | --------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| Nền tảng giao diện | `/`, `/design-system`, layout storefront                                    | Design system, header dùng chung, tìm kiếm, điều hướng danh mục, responsive và accessibility |
+| Trang chủ          | `/`                                                                         | Banner chiến dịch, danh mục, flash sale, bán chạy, Mall và gợi ý hằng ngày từ API            |
+| Khám phá sản phẩm  | `/search`                                                                   | Tìm kiếm, lọc, sắp xếp, phân trang và URL có thể chia sẻ                                     |
+| Chi tiết sản phẩm  | `/products/{productId}`                                                     | Gallery, biến thể, giá, tồn kho, số lượng, shop, sản phẩm liên quan và purchase intent       |
+| Tài khoản          | `/login`, `/register`, `/forgot-password`, `/reset-password`                | Email/password, Google OIDC, refresh session, logout và khôi phục mật khẩu                   |
+| Phân quyền         | `/seller`, `/admin` và API tương ứng                                        | Buyer mặc định, seller theo quyền và ownership, admin quản lý role và audit                  |
+| Hồ sơ giao hàng    | `/account/profile`, `/account/addresses`                                    | Hồ sơ, số điện thoại, CRUD địa chỉ và địa chỉ mặc định                                       |
+| Tương tác buyer    | `/account/favorites`, `/account/recently-viewed`, `/account/followed-shops` | Yêu thích, lịch sử xem gần đây và danh sách shop đang theo dõi riêng theo tài khoản          |
+| Gian hàng          | `/shops/{shopSlug}`                                                         | Hồ sơ shop, catalog riêng, tìm kiếm/lọc/sắp xếp/phân trang và theo dõi shop                  |
+| Dữ liệu            | `asserts/*.json`, PostgreSQL                                                | Import 1.377 sản phẩm chuẩn hóa, idempotent, có provenance và dữ liệu sinh xác định          |
 
 ## 2. Kiến trúc chạy ứng dụng
 
@@ -286,7 +286,48 @@ stateDiagram-v2
     blocked --> [*]
 ```
 
-Frontend cập nhật lạc quan nhưng khóa thao tác lặp trong lúc request đang chạy. `404` chặn shop không công khai; `409` chặn owner tự theo dõi shop. Unfollow vẫn idempotent khi shop đã unavailable và không làm lộ follower count riêng tư.
+Nút follow trên storefront cập nhật lạc quan nhưng khóa thao tác lặp trong lúc request đang chạy. `404` chặn shop không công khai; `409` chặn owner tự theo dõi shop. Unfollow vẫn idempotent khi shop đã unavailable và không làm lộ follower count riêng tư.
+
+### Danh sách shop đang theo dõi
+
+```mermaid
+flowchart TD
+    openList["Tài khoản → Shop đang theo dõi"]
+    session{"Session đã khôi phục?"}
+    login["/login với returnTo an toàn"]
+    listApi["GET /api/v1/account/followed-shops"]
+    relationshipRows["Đọc quan hệ theo followedAt DESC, shopId ASC"]
+    availability{"Shop còn công khai?"}
+    publicCard["Card có link, vị trí và follower count hiện tại"]
+    unavailableCard["Card tối thiểu: tên và trạng thái unavailable"]
+    action{"Bỏ theo dõi?"}
+    deleteApi["DELETE /api/v1/account/followed-shops/{shopId}"]
+    confirmed{"API xác nhận?"}
+    retain["Giữ card và thông báo thử lại"]
+    refetch["Refetch danh sách chuẩn từ server"]
+    pageFallback{"Trang hiện tại bị rỗng?"}
+    previousPage["Đi đến trang hợp lệ liền trước"]
+    restoreFocus["Khôi phục focus hợp lý"]
+
+    openList --> session
+    session -->|Không| login
+    session -->|Có| listApi
+    listApi --> relationshipRows
+    relationshipRows --> availability
+    availability -->|Có| publicCard
+    availability -->|Không| unavailableCard
+    publicCard --> action
+    unavailableCard --> action
+    action -->|Có| deleteApi
+    deleteApi --> confirmed
+    confirmed -->|Không| retain
+    confirmed -->|Có| refetch
+    refetch --> pageFallback
+    pageFallback -->|Có| previousPage
+    pageFallback -->|Không| restoreFocus
+```
+
+Danh sách được phân trang theo owner đang đăng nhập và luôn `no-store`. Shop inactive hoặc soft-deleted vẫn xuất hiện ở dạng tối thiểu để buyer có thể bỏ theo dõi; hard-delete dùng cascade nên quan hệ biến mất. Card chỉ bị loại sau khi DELETE thành công và frontend đã đọc lại dữ liệu có thẩm quyền từ backend.
 
 ## 8. Luồng tải public shop storefront
 

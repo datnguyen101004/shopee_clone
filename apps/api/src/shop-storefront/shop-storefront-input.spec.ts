@@ -1,5 +1,6 @@
 import { PublicShopNotFoundError, ShopStorefrontValidationError } from './shop-storefront.errors';
 import {
+  parseFollowedShopsQuery,
   parsePublicShopCatalogQuery,
   parsePublicShopSlug,
   parseShopId,
@@ -32,5 +33,17 @@ describe('shop storefront input', () => {
     );
     expect(() => parseShopId('not-a-uuid')).toThrow(ShopStorefrontValidationError);
     expect(() => parseShopStatusIds(`${shopId},${shopId}`)).toThrow(ShopStorefrontValidationError);
+  });
+
+  it('parses only bounded followed-shop pagination parameters', () => {
+    expect(parseFollowedShopsQuery({})).toEqual({ page: 1, pageSize: 20 });
+    expect(parseFollowedShopsQuery({ page: '2', pageSize: '48' })).toEqual({
+      page: 2,
+      pageSize: 48,
+    });
+    expect(() => parseFollowedShopsQuery({ page: ['2'] })).toThrow(ShopStorefrontValidationError);
+    expect(() => parseFollowedShopsQuery({ ownerId: 'private' })).toThrow(
+      ShopStorefrontValidationError,
+    );
   });
 });

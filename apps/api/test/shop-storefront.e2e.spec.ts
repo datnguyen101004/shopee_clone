@@ -40,6 +40,7 @@ describe('Shop storefront endpoints', () => {
     profile: jest.fn(),
     products: jest.fn(),
     status: jest.fn(),
+    followedShops: jest.fn(),
     follow: jest.fn(),
     unfollow: jest.fn(),
   };
@@ -63,6 +64,10 @@ describe('Shop storefront endpoints', () => {
     storefront.profile.mockResolvedValue({ id: shopId, slug: 'demo-shop' });
     storefront.products.mockResolvedValue({ shopId, items: [] });
     storefront.status.mockResolvedValue({ items: [{ shopId, isFollowing: false }] });
+    storefront.followedShops.mockResolvedValue({
+      items: [],
+      pagination: { page: 1, pageSize: 20, totalItems: 0, totalPages: 0 },
+    });
     storefront.follow.mockResolvedValue({
       shopId,
       isFollowing: true,
@@ -122,6 +127,24 @@ describe('Shop storefront endpoints', () => {
       .expect(400);
   });
 
+  it('lists followed shops with strict pagination, auth, and no-store', async () => {
+    await request(app.getHttpServer()).get('/api/v1/account/followed-shops').expect(401);
+    const response = await request(app.getHttpServer())
+      .get('/api/v1/account/followed-shops?page=2&pageSize=10')
+      .set(buyer())
+      .expect(200);
+    expect(response.headers['cache-control']).toBe('no-store');
+    expect(storefront.followedShops).toHaveBeenCalledWith(userId, { page: 2, pageSize: 10 });
+    await request(app.getHttpServer())
+      .get('/api/v1/account/followed-shops?page=1&page=2')
+      .set(buyer())
+      .expect(400);
+    await request(app.getHttpServer())
+      .get('/api/v1/account/followed-shops?ownerId=private')
+      .set(buyer())
+      .expect(400);
+  });
+
   it('enforces trusted origin and returns idempotent mutation confirmations', async () => {
     await request(app.getHttpServer())
       .put(`/api/v1/account/followed-shops/${shopId}`)
@@ -160,14 +183,21 @@ describe('Shop storefront endpoints', () => {
       .set('Origin', origin)
       .expect(503);
     expect(JSON.stringify(unavailable.body)).not.toContain(shopId);
+    storefront.followedShops.mockRejectedValueOnce(new Error(`query failed for ${shopId}`));
+    const listFailure = await request(app.getHttpServer())
+      .get('/api/v1/account/followed-shops')
+      .set(buyer())
+      .expect(503);
+    expect(JSON.stringify(listFailure.body)).not.toContain(shopId);
   });
 
-  it('publishes all four route shapes in OpenAPI', async () => {
+  it('publishes all five route shapes in OpenAPI', async () => {
     const document = await request(app.getHttpServer()).get('/api/docs-json').expect(200);
     expect(Object.keys(document.body.paths)).toEqual(
       expect.arrayContaining([
         '/api/v1/shops/{shopSlug}',
         '/api/v1/shops/{shopSlug}/products',
+        '/api/v1/account/followed-shops',
         '/api/v1/account/followed-shops/status',
         '/api/v1/account/followed-shops/{shopId}',
       ]),

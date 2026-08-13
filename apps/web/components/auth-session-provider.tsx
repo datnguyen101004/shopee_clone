@@ -37,6 +37,7 @@ interface AuthSessionContextValue {
   restore(): Promise<AuthSessionResponse | null>;
   completeGoogleSignIn(): Promise<AuthSessionResponse | null>;
   authenticatedFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response>;
+  sessionFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response>;
   synchronizeDisplayName(displayName: string): void;
 }
 
@@ -52,6 +53,7 @@ const AuthSessionContext = createContext<AuthSessionContextValue>({
   restore: async () => null,
   completeGoogleSignIn: async () => null,
   authenticatedFetch: unavailable,
+  sessionFetch: unavailable,
   synchronizeDisplayName: () => undefined,
 });
 
@@ -133,6 +135,12 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
     [restore],
   );
 
+  const sessionFetch = useCallback((input: RequestInfo | URL, init: RequestInit = {}) => {
+    const headers = new Headers(init.headers);
+    if (accessToken.current) headers.set('Authorization', `Bearer ${accessToken.current}`);
+    return fetch(input, { ...init, headers, credentials: 'include' });
+  }, []);
+
   const synchronizeDisplayName = useCallback((displayName: string) => {
     setState((current) =>
       current.status === 'authenticated'
@@ -150,9 +158,19 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
       restore,
       completeGoogleSignIn: restore,
       authenticatedFetch,
+      sessionFetch,
       synchronizeDisplayName,
     }),
-    [authenticatedFetch, login, logout, register, restore, state, synchronizeDisplayName],
+    [
+      authenticatedFetch,
+      login,
+      logout,
+      register,
+      restore,
+      sessionFetch,
+      state,
+      synchronizeDisplayName,
+    ],
   );
   return <AuthSessionContext.Provider value={value}>{children}</AuthSessionContext.Provider>;
 }

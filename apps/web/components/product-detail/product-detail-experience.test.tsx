@@ -96,15 +96,15 @@ describe('product detail interactions', () => {
   it('labels unavailable selections and disables purchase while retaining gallery controls', async () => {
     const user = userEvent.setup();
     render(<ProductDetailExperience product={product} />);
-    expect(screen.getByRole('link', { name: /Thêm vào giỏ hàng/ })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Thêm vào giỏ · Đăng nhập' })).toHaveAttribute(
       'href',
-      expect.stringContaining('intent=add-to-cart'),
+      expect.stringContaining('/login?intent=add-to-cart'),
     );
     await user.click(screen.getByRole('button', { name: /Silver/ }));
     expect(screen.getByText('SKU')).toBeVisible();
     expect(
       screen
-        .getAllByRole('button', { name: /Thêm vào giỏ hàng|Mua ngay/ })
+        .getAllByRole('button', { name: /Đang kiểm tra đăng nhập|Mua ngay/ })
         .every((button) => (button as HTMLButtonElement).disabled),
     ).toBe(true);
     await user.click(screen.getByRole('button', { name: 'Xem Phone' }));

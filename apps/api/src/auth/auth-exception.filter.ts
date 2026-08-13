@@ -21,6 +21,10 @@ import {
   RoleRequestError,
   RoleTargetUnavailableError,
 } from './auth.errors';
+import {
+  BrowserMutationSecurityError,
+  sendBrowserMutationProblem,
+} from '../security/browser-mutation.error';
 
 @Catch()
 export class AuthExceptionFilter implements ExceptionFilter {
@@ -28,6 +32,10 @@ export class AuthExceptionFilter implements ExceptionFilter {
     const response = host.switchToHttp().getResponse<Response>();
     const request = host.switchToHttp().getRequest<Request>();
     response.setHeader('Cache-Control', 'no-store');
+    if (exception instanceof BrowserMutationSecurityError) {
+      sendBrowserMutationProblem(response, exception);
+      return;
+    }
     if (exception instanceof AuthRateLimitedError) {
       response.setHeader('Retry-After', String(exception.retryAfterSeconds));
       this.problem(

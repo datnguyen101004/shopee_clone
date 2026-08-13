@@ -12,12 +12,20 @@ import {
   AccountInputError,
   AccountInvariantConflictError,
 } from './account.errors';
+import {
+  BrowserMutationSecurityError,
+  sendBrowserMutationProblem,
+} from '../security/browser-mutation.error';
 
 @Catch()
 export class AccountExceptionFilter implements ExceptionFilter {
   catch(exception: unknown, host: ArgumentsHost): void {
     const response = host.switchToHttp().getResponse<Response>();
     response.setHeader('Cache-Control', 'no-store');
+    if (exception instanceof BrowserMutationSecurityError) {
+      sendBrowserMutationProblem(response, exception);
+      return;
+    }
     if (exception instanceof AccountInputError || exception instanceof BadRequestException) {
       this.problem(
         response,

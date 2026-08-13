@@ -8,11 +8,19 @@ import {
   ShopSelfFollowConflictError,
   ShopStorefrontValidationError,
 } from './shop-storefront.errors';
+import {
+  BrowserMutationSecurityError,
+  sendBrowserMutationProblem,
+} from '../security/browser-mutation.error';
 
 @Catch()
 export class ShopStorefrontExceptionFilter implements ExceptionFilter {
   catch(exception: unknown, host: ArgumentsHost): void {
     const response = host.switchToHttp().getResponse<Response>();
+    if (exception instanceof BrowserMutationSecurityError) {
+      sendBrowserMutationProblem(response, exception);
+      return;
+    }
     if (exception instanceof ShopStorefrontValidationError) {
       response.status(400).type('application/problem+json').json({
         type: 'https://shopee-clone.local/problems/invalid-shop-request',

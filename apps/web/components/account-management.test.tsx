@@ -81,6 +81,7 @@ describe('account management experiences', () => {
         },
       },
       authenticatedFetch,
+      sessionFetch: vi.fn(),
       synchronizeDisplayName,
       login: vi.fn(),
       register: vi.fn(),

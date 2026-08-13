@@ -32,7 +32,7 @@ import { ForgotPasswordDto, LoginDto, RegisterDto, ResetPasswordDto } from './au
 import { AuthExceptionFilter } from './auth-exception.filter';
 import { RefreshSessionFailedError } from './auth.errors';
 import { AuthGuard, type AuthenticatedRequest } from './auth.guard';
-import { AuthOriginGuard, requestSource } from './auth-origin.guard';
+import { requestSource } from './auth-origin.guard';
 import { type AuthSessionResult, AuthService } from './auth.service';
 import { googleTransactionCookieOptions } from './google-auth-cookie';
 import { GoogleAuthService } from './google-auth.service';
@@ -55,7 +55,6 @@ function refreshCookie(request: Request, name: string): string | undefined {
 @ApiCookieAuth('sc_refresh')
 @Controller('auth')
 @UseFilters(AuthExceptionFilter)
-@UseGuards(AuthOriginGuard)
 export class AuthController {
   constructor(
     @Inject(AuthService)

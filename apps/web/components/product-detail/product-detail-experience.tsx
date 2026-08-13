@@ -7,6 +7,8 @@ import { useMemo, useState } from 'react';
 import { FavoriteButton } from '../engagement/favorite-button';
 import { FavoriteStateProvider } from '../engagement/favorite-state-provider';
 import { RecentlyViewedRecorder } from '../engagement/recently-viewed-recorder';
+import { useAuthSession } from '../auth-session-provider';
+import { useCart } from '../cart/cart-provider';
 
 import {
   activeProductImage,
@@ -23,13 +25,18 @@ function formatCurrency(value: number): string {
 }
 
 function ProductDetailInner({ product }: { product: ProductDetailResponse }) {
+  const auth = useAuthSession();
+  const cart = useCart();
   const [selection, setSelection] = useState(() => initialProductDetailSelection(product));
+  const [cartMessage, setCartMessage] = useState('');
   const selectedVariant = getVariant(product, selection.variantId);
   const image = activeProductImage(product, selection.activeImageId);
   const error = quantityError(selection.quantity, selectedVariant);
   const purchaseReady = canPurchase(selection.quantity, selectedVariant);
   const liveMessage =
-    error ?? (selectedVariant ? `Đã chọn ${selectedVariant.name}.` : 'Chưa có biến thể để chọn.');
+    cartMessage ||
+    error ||
+    (selectedVariant ? `Đã chọn ${selectedVariant.name}.` : 'Chưa có biến thể để chọn.');
   const handoffs = useMemo(
     () =>
       selectedVariant && purchaseReady
@@ -45,6 +52,26 @@ function ProductDetailInner({ product }: { product: ProductDetailResponse }) {
         : null,
     [product, purchaseReady, selectedVariant, selection.quantity],
   );
+
+  async function handleAddToCart() {
+    if (
+      auth.state.status !== 'authenticated' ||
+      !selectedVariant ||
+      !purchaseReady ||
+      cart.pending ||
+      cart.state.status !== 'ready'
+    )
+      return;
+    setCartMessage('');
+    try {
+      const result = await cart.addItem(selectedVariant.id, Number(selection.quantity));
+      setCartMessage(
+        result.adjustments[0]?.message ?? `Đã thêm ${selection.quantity} sản phẩm vào giỏ hàng.`,
+      );
+    } catch {
+      setCartMessage('Không thể thêm vào giỏ hàng. Vui lòng thử lại.');
+    }
+  }
 
   return (
     <section className="product-detail-offer" aria-label="Lựa chọn sản phẩm">
@@ -200,15 +227,32 @@ function ProductDetailInner({ product }: { product: ProductDetailResponse }) {
           </p>
         ) : null}
         <div className="product-detail-purchase">
-          {handoffs ? (
-            <Link href={handoffs.add}>Thêm vào giỏ hàng · Đăng nhập</Link>
+          {handoffs && auth.state.status === 'guest' ? (
+            <Link href={handoffs.add}>Thêm vào giỏ · Đăng nhập</Link>
           ) : (
-            <button type="button" disabled>
-              Thêm vào giỏ hàng
+            <button
+              type="button"
+              disabled={
+                !handoffs ||
+                auth.state.status !== 'authenticated' ||
+                cart.pending ||
+                cart.state.status !== 'ready'
+              }
+              onClick={() => void handleAddToCart()}
+            >
+              {auth.state.status === 'loading' || cart.state.status === 'loading'
+                ? 'Đang kiểm tra đăng nhập…'
+                : cart.pending
+                  ? 'Đang thêm…'
+                  : 'Thêm vào giỏ hàng'}
             </button>
           )}
           {handoffs ? (
-            <Link href={handoffs.buy}>Mua ngay · Đăng nhập</Link>
+            <Link href={auth.state.status === 'authenticated' ? '/cart' : handoffs.buy}>
+              {auth.state.status === 'authenticated'
+                ? 'Mua ngay · Xem giỏ hàng'
+                : 'Mua ngay · Đăng nhập'}
+            </Link>
           ) : (
             <button type="button" disabled>
               Mua ngay

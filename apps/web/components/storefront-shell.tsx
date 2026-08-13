@@ -5,6 +5,7 @@ import Link from 'next/link';
 import type { ReactNode } from 'react';
 
 import { useAuthSession } from './auth-session-provider';
+import { useCart } from './cart/cart-provider';
 import {
   MarketplaceCategoryNavigation,
   MarketplaceHeader,
@@ -24,6 +25,7 @@ function StorefrontFooter() {
 export function StorefrontShell({ children }: { children: ReactNode }) {
   const navigation = useMarketplaceNavigation();
   const auth = useAuthSession();
+  const cart = useCart();
   return (
     <PageShell
       header={
@@ -32,6 +34,11 @@ export function StorefrontShell({ children }: { children: ReactNode }) {
           onCategoriesToggle={navigation.toggleCategories}
           menuButtonRef={navigation.menuButtonRef}
           account={auth.state}
+          cartCount={
+            auth.state.status === 'authenticated'
+              ? (cart.state.cart?.summary.distinctLineCount ?? 0)
+              : 0
+          }
           onLogout={() => void auth.logout()}
         />
       }

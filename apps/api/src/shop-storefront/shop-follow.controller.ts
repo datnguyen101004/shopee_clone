@@ -26,7 +26,6 @@ import {
 } from '@nestjs/swagger';
 
 import { AuthGuard, type AuthenticatedRequest } from '../auth/auth.guard';
-import { AuthOriginGuard } from '../auth/auth-origin.guard';
 import { ShopStorefrontExceptionFilter } from './shop-storefront-exception.filter';
 import { parseFollowedShopsQuery, parseShopId, parseShopStatusIds } from './shop-storefront-input';
 import { ShopStorefrontService } from './shop-storefront.service';
@@ -39,7 +38,7 @@ import { ShopStorefrontService } from './shop-storefront.service';
 @ApiResponse({ status: 503, description: 'Follow persistence is temporarily unavailable' })
 @Controller('account/followed-shops')
 @UseFilters(ShopStorefrontExceptionFilter)
-@UseGuards(AuthOriginGuard, AuthGuard)
+@UseGuards(AuthGuard)
 export class ShopFollowController {
   constructor(@Inject(ShopStorefrontService) private readonly storefront: ShopStorefrontService) {}
 

@@ -22,7 +22,6 @@ import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 
 import { AuthExceptionFilter } from './auth-exception.filter';
 import { AuthGuard, type AuthenticatedRequest } from './auth.guard';
-import { AuthOriginGuard } from './auth-origin.guard';
 import { RequireRoles, RolesGuard } from './role-authorization.guard';
 import { RoleAuthorizationService } from './role-authorization.service';
 // DTO classes must remain runtime values for Nest validation metadata.
@@ -33,7 +32,7 @@ import { GrantRoleDto, RevokeRoleDto, RoleAuditQueryDto } from './role.dto';
 @ApiBearerAuth()
 @Controller('admin')
 @UseFilters(AuthExceptionFilter)
-@UseGuards(AuthOriginGuard, AuthGuard, RolesGuard)
+@UseGuards(AuthGuard, RolesGuard)
 @RequireRoles('admin')
 export class AdminRoleController {
   constructor(

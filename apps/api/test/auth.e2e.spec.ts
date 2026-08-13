@@ -128,13 +128,14 @@ describe('Authentication endpoints', () => {
       .set('Origin', 'https://attacker.example')
       .send({ email: 'buyer@example.com', password: 'wrong password' })
       .expect(403);
-    expect(denied.body.type).toContain('authentication-origin-denied');
+    expect(denied.body.type).toContain('browser-origin-denied');
   });
 
   it('maps login failures uniformly and redacts internal error details', async () => {
     auth.login.mockRejectedValueOnce(new AuthenticationFailedError());
     const response = await request(app.getHttpServer())
       .post('/api/v1/auth/login')
+      .set('Origin', 'http://localhost:3000')
       .send({ email: 'missing@example.com', password: 'postgres://user:secret@database' })
       .expect(401);
     expect(response.body).toMatchObject({ status: 401, title: 'Authentication failed' });
@@ -146,6 +147,7 @@ describe('Authentication endpoints', () => {
     auth.login.mockRejectedValueOnce(new AuthRateLimitedError(37));
     const limited = await request(app.getHttpServer())
       .post('/api/v1/auth/login')
+      .set('Origin', 'http://localhost:3000')
       .send({ email: 'buyer@example.com', password: 'wrong password' })
       .expect(429);
     expect(limited.headers['retry-after']).toBe('37');
@@ -154,6 +156,7 @@ describe('Authentication endpoints', () => {
     auth.login.mockRejectedValueOnce(new Error('postgres://user:secret@database'));
     const unavailable = await request(app.getHttpServer())
       .post('/api/v1/auth/login')
+      .set('Origin', 'http://localhost:3000')
       .send({ email: 'buyer@example.com', password: 'another secret' })
       .expect(503);
     expect(unavailable.body).toMatchObject({ status: 503, title: 'Authentication unavailable' });
@@ -164,6 +167,7 @@ describe('Authentication endpoints', () => {
   it('rotates and clears refresh cookies without accepting a response-body refresh secret', async () => {
     const refreshed = await request(app.getHttpServer())
       .post('/api/v1/auth/refresh')
+      .set('Origin', 'http://localhost:3000')
       .set('Cookie', `sc_refresh=${'z'.repeat(43)}`)
       .expect(200);
     expect(auth.refresh).toHaveBeenCalledWith('z'.repeat(43));
@@ -171,6 +175,7 @@ describe('Authentication endpoints', () => {
 
     const loggedOut = await request(app.getHttpServer())
       .post('/api/v1/auth/logout')
+      .set('Origin', 'http://localhost:3000')
       .set('Cookie', `sc_refresh=${'z'.repeat(43)}`)
       .expect(204);
     expect(auth.logout).toHaveBeenCalledWith('z'.repeat(43));
@@ -186,12 +191,14 @@ describe('Authentication endpoints', () => {
 
     const forgot = await request(app.getHttpServer())
       .post('/api/v1/auth/forgot-password')
+      .set('Origin', 'http://localhost:3000')
       .send({ email: 'unknown@example.com' })
       .expect(202);
     expect(forgot.body.message).toContain('If the account is eligible');
 
     await request(app.getHttpServer())
       .post('/api/v1/auth/reset-password')
+      .set('Origin', 'http://localhost:3000')
       .send({ token: 'a'.repeat(43), password: 'Replacement passphrase 2026' })
       .expect(204);
   });

@@ -13,7 +13,7 @@ export class AuthOriginGuard implements CanActivate {
     const request = context.switchToHttp().getRequest<Request>();
     if (['GET', 'HEAD', 'OPTIONS'].includes(request.method)) return true;
     const origin = request.headers.origin;
-    if (origin === undefined || this.config.allowedOrigins.includes(origin)) return true;
+    if (typeof origin === 'string' && this.config.allowedOrigins.includes(origin)) return true;
     throw new AuthOriginDeniedError();
   }
 }

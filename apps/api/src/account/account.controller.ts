@@ -25,7 +25,6 @@ import {
 } from '@nestjs/swagger';
 
 import { AuthGuard, type AuthenticatedRequest } from '../auth/auth.guard';
-import { AuthOriginGuard } from '../auth/auth-origin.guard';
 // DTO classes must remain runtime values for Nest validation metadata.
 // eslint-disable-next-line @typescript-eslint/consistent-type-imports
 import {
@@ -46,7 +45,7 @@ import { AccountService } from './account.service';
 @ApiResponse({ status: 503, description: 'Account persistence is temporarily unavailable' })
 @Controller('account')
 @UseFilters(AccountExceptionFilter)
-@UseGuards(AuthOriginGuard, AuthGuard)
+@UseGuards(AuthGuard)
 export class AccountController {
   constructor(@Inject(AccountService) private readonly account: AccountService) {}
 

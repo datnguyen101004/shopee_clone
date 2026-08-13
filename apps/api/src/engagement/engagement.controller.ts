@@ -21,7 +21,6 @@ import type {
 import { ApiBearerAuth, ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
 
 import { AuthGuard, type AuthenticatedRequest } from '../auth/auth.guard';
-import { AuthOriginGuard } from '../auth/auth-origin.guard';
 import { EngagementExceptionFilter } from './engagement-exception.filter';
 import {
   parseEngagementPagination,
@@ -38,7 +37,7 @@ import { EngagementService } from './engagement.service';
 @ApiResponse({ status: 503, description: 'Engagement persistence is temporarily unavailable' })
 @Controller('account')
 @UseFilters(EngagementExceptionFilter)
-@UseGuards(AuthOriginGuard, AuthGuard)
+@UseGuards(AuthGuard)
 export class EngagementController {
   constructor(@Inject(EngagementService) private readonly engagement: EngagementService) {}
 

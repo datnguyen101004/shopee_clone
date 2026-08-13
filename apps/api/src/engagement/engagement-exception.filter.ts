@@ -8,11 +8,19 @@ import {
   EngagementProductNotFoundError,
   EngagementValidationError,
 } from './engagement.errors';
+import {
+  BrowserMutationSecurityError,
+  sendBrowserMutationProblem,
+} from '../security/browser-mutation.error';
 
 @Catch()
 export class EngagementExceptionFilter implements ExceptionFilter {
   catch(exception: unknown, host: ArgumentsHost): void {
     const response = host.switchToHttp().getResponse<Response>();
+    if (exception instanceof BrowserMutationSecurityError) {
+      sendBrowserMutationProblem(response, exception);
+      return;
+    }
     if (exception instanceof EngagementValidationError) {
       response.status(400).type('application/problem+json').json({
         type: 'https://shopee-clone.local/problems/invalid-engagement-request',

@@ -7,6 +7,7 @@ import { refreshCookieOptions } from './auth-cookie';
 import { requestSource } from './auth-origin.guard';
 import { expiredGoogleTransactionCookieOptions } from './google-auth-cookie';
 import { GoogleAuthService } from './google-auth.service';
+import { ExternalRequest } from '../security/external-request.decorator';
 
 function queryString(value: unknown): string | undefined {
   return typeof value === 'string' ? value : undefined;
@@ -27,6 +28,7 @@ export class GoogleAuthCallbackController {
   ) {}
 
   @Get('login/oauth2/code/google')
+  @ExternalRequest('google-oauth-callback')
   @Header('Cache-Control', 'no-store')
   @Header('Referrer-Policy', 'no-referrer')
   @ApiOperation({ summary: 'Consume the exact registered Google OAuth callback' })

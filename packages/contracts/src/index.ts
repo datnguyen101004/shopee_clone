@@ -235,3 +235,32 @@ export type {
   CatalogShopSummary,
   CatalogSort,
 } from './catalog';
+export {
+  CART_MAX_LINES,
+  CART_MAX_QUANTITY,
+  isCartMutationResponse,
+  isCartProblemDetails,
+  isCartResponse,
+  parseCartMutationResponse,
+  parseCartProblemDetails,
+  parseCartResponse,
+} from './cart';
+export type {
+  AddCartItemRequest,
+  CartAdjustment,
+  CartAdjustmentCode,
+  CartIssueCode,
+  CartLine,
+  CartLineIssue,
+  CartMutationResponse,
+  CartOwnerKind,
+  CartProblemDetails,
+  CartProductSummary,
+  CartResponse,
+  CartShopGroup,
+  CartShopSummary,
+  CartSummary,
+  CartVariantSummary,
+  UpdateCartQuantityRequest,
+  UpdateCartSelectionRequest,
+} from './cart';

@@ -52,6 +52,16 @@ For fast homepage iteration, first run `pnpm dev` against an already migrated an
 
 GitHub Actions automatic push and pull-request triggers are temporarily disabled. The workflow remains available through manual dispatch; run local quality gates before pushing until automatic CI is restored.
 
+## Persistent cart (T16)
+
+Cart endpoints require a valid account access session; there are no cart-specific secrets or guest
+cleanup jobs. Keep `AUTH_COOKIE_SECURE=false` for local HTTP; production must use HTTPS and `true`.
+Run `pnpm test:e2e:cart:quick` for browser iteration against already-running services without writing
+to the development database.
+
+See [Authenticated multi-shop cart](./shopping-cart.md) for endpoints, version headers, login
+handoff, ownership, and security boundaries.
+
 ## Product discovery (T08–T09)
 
 `GET /api/v1/catalog/products` is an anonymous, no-store discovery endpoint. It accepts `q`, `category`, `minPrice`, `maxPrice`, `rating` (whole stars `1`–`5`), `location`, `availability=in-stock`, `promotion=discounted`, `sort`, `page` (default `1`), and `pageSize` (default `12`, maximum `48`). Sort values are `relevance`, `newest`, `best-selling`, `price-asc`, and `price-desc`. With a keyword the default is relevance; without one it is newest, including explicit relevance fallback. Malformed or repeated supported parameters return sanitized Problem Details; unknown but safe category/location values return zero matches with usable facets.

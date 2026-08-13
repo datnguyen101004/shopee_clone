@@ -1,6 +1,6 @@
 # Flow các tính năng đã triển khai
 
-Tài liệu này mô tả trạng thái hiện tại của Shopee Clone sau TS01 và các task đến T15.1. Các sơ đồ tập trung vào luồng đang hoạt động trong code, không mô tả giỏ hàng, checkout, đơn hàng, thanh toán, chat hoặc vận chuyển như những tính năng đã hoàn thành.
+Tài liệu này mô tả trạng thái hiện tại của Shopee Clone sau TS01 và các task đến T16. Các sơ đồ tập trung vào luồng đang hoạt động trong code; checkout, đơn hàng, thanh toán, chat và vận chuyển vẫn chưa được triển khai.
 
 ## 1. Tổng quan phạm vi
 
@@ -65,7 +65,8 @@ flowchart LR
     shopCatalog["Catalog riêng của shop"]
     purchaseIntent{"Mua ngay hoặc thêm giỏ?"}
     loginHandoff["Chuyển đến /login với intent an toàn"]
-    currentBoundary(["Chưa tạo giỏ hoặc đơn hàng"])
+    persistentCart["Giỏ hàng server-side /cart"]
+    currentBoundary(["Chưa tạo đơn hàng"])
 
     visitor --> homepage
     homepage -->|"GET /homepage"| homeModules
@@ -79,11 +80,13 @@ flowchart LR
     shopPage --> shopCatalog
     shopCatalog --> productDetail
     variant --> purchaseIntent
-    purchaseIntent --> loginHandoff
-    loginHandoff --> currentBoundary
+    purchaseIntent -->|"Thêm vào giỏ"| persistentCart
+    purchaseIntent -->|"Mua ngay khi là khách"| loginHandoff
+    loginHandoff --> persistentCart
+    persistentCart --> currentBoundary
 ```
 
-Catalog chỉ trả sản phẩm đủ điều kiện hiển thị. Search hỗ trợ `q`, danh mục, khoảng giá, rating, vị trí shop, còn hàng, đang giảm giá và năm kiểu sắp xếp. Trang chi tiết chỉ tạo purchase intent nội bộ; chưa ghi giỏ hàng, giữ tồn kho hoặc tạo đơn.
+Catalog chỉ trả sản phẩm đủ điều kiện hiển thị. Search hỗ trợ `q`, danh mục, khoảng giá, rating, vị trí shop, còn hàng, đang giảm giá và năm kiểu sắp xếp. Trang chi tiết ghi lựa chọn biến thể/số lượng vào giỏ server-side; chưa giữ tồn kho hoặc tạo đơn.
 
 ## 4. Vòng đời xác thực và session
 
@@ -397,8 +400,79 @@ Importer chạy local, không crawl mạng, không dùng dữ liệu ngẫu nhi�
 
 ## 10. Các ranh giới chưa triển khai
 
-- `/cart` hiện chỉ là điểm điều hướng; chưa có cart persistence.
-- Purchase intent ở trang sản phẩm chưa tạo đơn, giữ tồn kho hoặc báo checkout thành công.
+- Giỏ hàng không giữ tồn kho, áp voucher, tính phí vận chuyển cuối cùng hoặc tạo đơn.
+- Purchase intent ở trang sản phẩm chưa báo checkout thành công.
 - Chưa có checkout, voucher, thanh toán, shipment, order history, review body, chat hoặc notification realtime.
 - Seller mới có role/ownership boundary và safe shop projection, chưa có bộ công cụ quản lý gian hàng hoàn chỉnh.
 - Admin hiện tập trung vào role assignment/revocation và role audit, chưa phải dashboard vận hành marketplace đầy đủ.
+
+## 11. Giỏ hàng đa shop yêu cầu đăng nhập
+
+### Đăng nhập trước khi thêm hoặc quản lý giỏ hàng
+
+```mermaid
+flowchart LR
+    buyer(["Người mua"])
+    entry["Chi tiết sản phẩm hoặc /cart"]
+    auth{"Đã đăng nhập?"}
+    login["/login + safe returnTo"]
+    restore["Khôi phục session email/Google"]
+    api["Cart API + bearer token"]
+    cart[("User Cart + CartLine PostgreSQL")]
+    projection["Projection giá/tồn kho/shop hiện tại"]
+    screen["Header count + /cart đa shop"]
+    mutate["Quantity, select line/shop/all, remove"]
+    conflict{"Version còn mới?"}
+    reload["GET /api/v1/cart"]
+
+    buyer --> entry --> auth
+    auth -->|"Chưa"| login --> restore --> entry
+    auth -->|"Rồi"| api --> cart --> projection --> screen --> mutate --> conflict
+    conflict -->|"Có"| cart
+    conflict -->|"409 stale"| reload --> projection
+```
+
+Mọi endpoint `/api/v1/cart/**` yêu cầu bearer session hợp lệ và chỉ lấy owner từ tài khoản đã xác
+thực. Khách không gọi Cart API, header hiển thị 0 và `/cart` cung cấp login handoff. Không có guest
+cookie, guest cart, merge endpoint hoặc cleanup job. Khi đăng xuất, `CartProvider` xóa ngay projection
+riêng tư khỏi bộ nhớ. Mọi mutation trả lại toàn bộ projection đã xác nhận và các điều chỉnh số
+lượng/giá có kiểu rõ ràng.
+
+### Chính sách xác thực cho các phase tiếp theo
+
+```mermaid
+flowchart TD
+    feature["Tính năng mới"] --> private{"Có lưu/đọc state riêng của user hoặc thực hiện private action?"}
+    private -->|"Không"| public["Cho phép public: home, search, category, product, shop"]
+    private -->|"Có"| require["Bắt đăng nhập mặc định"]
+    require --> scoped["Resolve owner từ session + authorization theo resource"]
+    scoped --> protected["Cart, checkout, order, address, voucher riêng, review, follow, chat, seller/admin"]
+```
+
+Một task sau chỉ được mở hành động user-scoped cho khách khi OpenSpec của task đó định nghĩa rõ mô
+hình identity, privacy, abuse và CSRF riêng.
+
+### Bảo vệ mutation toàn ứng dụng
+
+```mermaid
+flowchart TD
+    request["Unsafe browser request"]
+    origin{"Origin khớp allowlist tuyệt đối?"}
+    media{"Không override method; JSON hợp lệ; body <= 100 KiB?"}
+    class{"Security class của route?"}
+    ordinary["Chạy guard rồi mới vào domain service"]
+    oauth["Google callback có state/OIDC verifier"]
+    webhook["Provider webhook có signature verifier"]
+    deny["403/413/415 Problem Details đã làm sạch"]
+
+    request --> origin
+    origin -->|"Không"| deny
+    origin -->|"Có"| media
+    media -->|"Không"| deny
+    media -->|"Có"| class
+    class -->|"Ordinary"| ordinary
+    class -->|"Google OAuth"| oauth
+    class -->|"Signed webhook"| webhook
+```
+
+Rate limiter tổng quát chưa nằm trong T16; auth limiter hiện có được giữ nguyên.

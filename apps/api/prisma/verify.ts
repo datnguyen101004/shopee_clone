@@ -117,6 +117,11 @@ async function verifyDatabase(databaseUrl: string): Promise<void> {
       voucherUserUsages: await prisma.voucherUserUsage.count(),
       voucherConsumptions: await prisma.voucherConsumption.count(),
       voucherRedemptions: await prisma.voucherRedemption.count(),
+      purchases: await prisma.purchase.count(),
+      shopOrders: await prisma.shopOrder.count(),
+      orderLines: await prisma.orderLine.count(),
+      purchaseVouchers: await prisma.purchaseVoucher.count(),
+      purchaseVoucherAllocations: await prisma.purchaseVoucherAllocation.count(),
     };
     assert.deepEqual(counts, {
       ...seedExpectedCounts,
@@ -124,6 +129,11 @@ async function verifyDatabase(databaseUrl: string): Promise<void> {
       passwordResetTokens: 0,
       externalIdentities: 0,
       googleLoginAttempts: 0,
+      purchases: 0,
+      shopOrders: 0,
+      orderLines: 0,
+      purchaseVouchers: 0,
+      purchaseVoucherAllocations: 0,
       roleAssignments:
         seedUsers.length +
         new Set(seedShops.map(({ ownerId }) => ownerId)).size +
@@ -277,20 +287,13 @@ async function verifyDatabase(databaseUrl: string): Promise<void> {
     const voucherUsages = await prisma.voucherUserUsage.findMany();
     assert.equal(voucherUsages.length, 2);
     assert(voucherUsages.every(({ usedCount }) => usedCount === 1));
-    const consumptions = await prisma.voucherConsumption.findMany({
-      include: { redemptions: true },
-    });
-    assert.equal(consumptions.length, 2);
-    assert(consumptions.every(({ voucherSetDigest }) => /^[0-9a-f]{64}$/.test(voucherSetDigest)));
-    assert(consumptions.every(({ redemptions }) => redemptions.length === 1));
-    for (const consumption of consumptions) {
-      const redemption = consumption.redemptions[0]!;
-      assert.equal(redemption.discountMinor, 10_000n);
-      assert.equal(
-        redemption.discountMinor,
-        redemption.merchandiseDiscountMinor + redemption.shippingDiscountMinor,
-      );
-    }
+    assert.equal(await prisma.voucherConsumption.count(), 0);
+    assert.equal(await prisma.voucherRedemption.count(), 0);
+    assert.equal(await prisma.purchase.count(), 0);
+    assert.equal(await prisma.shopOrder.count(), 0);
+    assert.equal(await prisma.orderLine.count(), 0);
+    assert.equal(await prisma.purchaseVoucher.count(), 0);
+    assert.equal(await prisma.purchaseVoucherAllocation.count(), 0);
     assert.equal(
       await prisma.shopFollower.count({
         where: { userId: seedUsers[0].id, shopId: seedShops[0].id },

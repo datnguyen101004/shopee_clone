@@ -6,10 +6,13 @@ import type {
   PricingQuoteLine,
   PricingQuoteShop,
 } from '@shopee-clone/contracts';
+import { CHECKOUT_DRAFT_VERSION } from '@shopee-clone/contracts';
 import { Container } from '@shopee-clone/ui';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
+import { writeCheckoutDraft } from '../../lib/checkout-draft';
 import { useAuthSession } from '../auth-session-provider';
 import { CartPricingPanel } from './cart-pricing-panel';
 import { useCart } from './cart-provider';
@@ -255,6 +258,7 @@ export function CartScreen() {
   const auth = useAuthSession();
   const currentCart = cart.state.cart;
   const pricing = useCartPricing(currentCart, cart.refresh);
+  const router = useRouter();
   const [checkoutMessage, setCheckoutMessage] = useState('');
 
   if (auth.state.status === 'guest' || cart.state.status === 'unauthenticated') {
@@ -403,9 +407,22 @@ export function CartScreen() {
             pricing.status !== 'ready' ||
             pricing.quote?.cartVersion !== current.version
           }
-          onClick={() =>
-            setCheckoutMessage('Thanh toán COD và tạo đơn hàng sẽ được triển khai ở T19.')
-          }
+          onClick={() => {
+            if (pricing.status !== 'ready' || !pricing.quote || !pricing.selectedAddressId) {
+              setCheckoutMessage('Hãy chờ máy chủ xác nhận giá trước khi thanh toán.');
+              return;
+            }
+            writeCheckoutDraft(window.sessionStorage, {
+              version: CHECKOUT_DRAFT_VERSION,
+              cartVersion: current.version,
+              shippingAddressId: pricing.selectedAddressId,
+              services: Object.entries(pricing.services)
+                .map(([shopId, service]) => ({ shopId, service }))
+                .sort((left, right) => left.shopId.localeCompare(right.shopId)),
+              ...(Object.keys(pricing.vouchers).length ? { vouchers: pricing.vouchers } : {}),
+            });
+            router.push('/checkout');
+          }}
         >
           Mua hàng
         </button>

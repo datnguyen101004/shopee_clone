@@ -1,5 +1,6 @@
 import {
   CART_MAX_QUANTITY,
+  type CheckoutAddressSnapshot,
   type PricingQuoteExclusion,
   type PricingQuoteResponse,
   type ShopShippingServiceSelection,
@@ -40,6 +41,8 @@ const quoteCartSelect = {
       variant: {
         select: {
           id: true,
+          name: true,
+          sku: true,
           status: true,
           deletedAt: true,
           priceMinor: true,
@@ -50,9 +53,15 @@ const quoteCartSelect = {
           product: {
             select: {
               id: true,
+              name: true,
               status: true,
               deletedAt: true,
               category: { select: { isActive: true, deletedAt: true } },
+              images: {
+                orderBy: [{ sortOrder: 'asc' as const }, { id: 'asc' as const }],
+                take: 1,
+                select: { url: true },
+              },
               shop: {
                 select: {
                   id: true,
@@ -72,6 +81,25 @@ const quoteCartSelect = {
 } satisfies Prisma.CartSelect;
 
 type QuoteCart = Prisma.CartGetPayload<{ select: typeof quoteCartSelect }>;
+
+export interface PricingCheckoutLineFact {
+  lineId: string;
+  productName: string;
+  productImageUrl: string | null;
+  variantName: string;
+  variantSku: string;
+}
+
+export interface PricingCheckoutFacts {
+  address: CheckoutAddressSnapshot;
+  lines: PricingCheckoutLineFact[];
+}
+
+export interface PricingCalculationResult {
+  quote: PricingQuoteResponse;
+  applied: AppliedVoucherSnapshot[];
+  facts: PricingCheckoutFacts;
+}
 
 @Injectable()
 export class PricingQuoteService {
@@ -128,10 +156,19 @@ export class PricingQuoteService {
       vouchers?: VoucherCodeSelection;
       evaluatedAt: Date;
     },
-  ): Promise<{ quote: PricingQuoteResponse; applied: AppliedVoucherSnapshot[] }> {
+  ): Promise<PricingCalculationResult> {
     const address = await transaction.shippingAddress.findFirst({
       where: { id: input.shippingAddressId, userId: input.userId, deletedAt: null },
-      select: { id: true, province: true, district: true },
+      select: {
+        id: true,
+        recipientName: true,
+        phoneNumber: true,
+        province: true,
+        district: true,
+        ward: true,
+        addressLine: true,
+        label: true,
+      },
     });
     if (!address) throw new PricingAddressNotFoundError();
 
@@ -142,7 +179,7 @@ export class PricingQuoteService {
     const version = cart?.version ?? 0;
     if (version !== input.expectedVersion) throw new PricingConflictError();
 
-    const { lines, exclusions } = this.currentFacts(cart);
+    const { lines, exclusions, snapshots } = this.currentFacts(cart);
     const selectedShopIds = new Set(lines.map((line) => line.shop.id));
     const seen = new Set<string>();
     for (const selection of input.services) {
@@ -158,7 +195,11 @@ export class PricingQuoteService {
     const baseQuote = this.calculator.calculate({
       cartVersion: version,
       evaluatedAt: input.evaluatedAt,
-      address,
+      address: {
+        id: address.id,
+        province: address.province,
+        district: address.district,
+      },
       lines,
       exclusions,
       services: input.services,
@@ -168,7 +209,28 @@ export class PricingQuoteService {
       input.userId,
       input.vouchers,
     );
-    return this.voucherCalculator.apply(baseQuote, input.vouchers, definitions, input.evaluatedAt);
+    const calculated = this.voucherCalculator.apply(
+      baseQuote,
+      input.vouchers,
+      definitions,
+      input.evaluatedAt,
+    );
+    return {
+      ...calculated,
+      facts: {
+        address: {
+          id: address.id,
+          recipientName: address.recipientName,
+          phoneNumber: address.phoneNumber,
+          province: address.province,
+          district: address.district,
+          ward: address.ward,
+          addressLine: address.addressLine,
+          label: address.label,
+        },
+        lines: snapshots,
+      },
+    };
   }
 
   private async loadVoucherDefinitions(
@@ -220,9 +282,11 @@ export class PricingQuoteService {
   private currentFacts(cart: QuoteCart | null): {
     lines: AuthoritativePricingLine[];
     exclusions: PricingQuoteExclusion[];
+    snapshots: PricingCheckoutLineFact[];
   } {
     const lines: AuthoritativePricingLine[] = [];
     const exclusions: PricingQuoteExclusion[] = [];
+    const snapshots: PricingCheckoutLineFact[] = [];
     for (const row of cart?.lines ?? []) {
       const { variant } = row;
       const { product } = variant;
@@ -271,7 +335,14 @@ export class PricingQuoteService {
         compareAtUnitPriceMinor: variant.compareAtPriceMinor,
         shop: { id: shop.id, slug: shop.slug, name: shop.name, location: shop.location },
       });
+      snapshots.push({
+        lineId: row.id,
+        productName: product.name,
+        productImageUrl: product.images[0]?.url ?? null,
+        variantName: variant.name,
+        variantSku: variant.sku,
+      });
     }
-    return { lines, exclusions };
+    return { lines, exclusions, snapshots };
   }
 }

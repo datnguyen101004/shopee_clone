@@ -103,6 +103,39 @@ enum VoucherBenefitType {
   @@map("voucher_benefit_type")
 }
 
+enum PurchasePaymentMethod {
+  COD @map("cod")
+
+  @@map("purchase_payment_method")
+}
+
+enum PurchasePaymentStatus {
+  UNPAID @map("unpaid")
+
+  @@map("purchase_payment_status")
+}
+
+enum ShopOrderStatus {
+  PENDING_CONFIRMATION @map("pending_confirmation")
+
+  @@map("shop_order_status")
+}
+
+enum PurchaseVoucherSlot {
+  PLATFORM      @map("platform")
+  SHOP          @map("shop")
+  FREE_SHIPPING @map("free_shipping")
+
+  @@map("purchase_voucher_slot")
+}
+
+enum VoucherAllocationKind {
+  MERCHANDISE @map("merchandise")
+  SHIPPING    @map("shipping")
+
+  @@map("voucher_allocation_kind")
+}
+
 model User {
   id                  String                  @id @default(uuid()) @db.Uuid
   email               String                  @unique @db.VarChar(320)
@@ -129,6 +162,7 @@ model User {
   voucherUsages       VoucherUserUsage[]
   voucherConsumptions VoucherConsumption[]
   voucherRedemptions  VoucherRedemption[]
+  purchases           Purchase[]
 
   @@index([status])
   @@index([deletedAt])
@@ -259,19 +293,21 @@ model PasswordResetToken {
 }
 
 model Shop {
-  id        String         @id @default(uuid()) @db.Uuid
-  ownerId   String         @unique @map("owner_id") @db.Uuid
-  slug      String         @unique @db.VarChar(120)
-  name      String         @db.VarChar(160)
-  location  String         @default("Việt Nam") @db.VarChar(120)
-  status    ShopStatus     @default(ACTIVE)
-  createdAt DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt DateTime       @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
-  deletedAt DateTime?      @map("deleted_at") @db.Timestamptz(3)
-  owner     User           @relation(fields: [ownerId], references: [id], onDelete: Restrict)
-  products  Product[]
-  followers ShopFollower[]
-  vouchers  Voucher[]
+  id               String            @id @default(uuid()) @db.Uuid
+  ownerId          String            @unique @map("owner_id") @db.Uuid
+  slug             String            @unique @db.VarChar(120)
+  name             String            @db.VarChar(160)
+  location         String            @default("Việt Nam") @db.VarChar(120)
+  status           ShopStatus        @default(ACTIVE)
+  createdAt        DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt        DateTime          @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt        DateTime?         @map("deleted_at") @db.Timestamptz(3)
+  owner            User              @relation(fields: [ownerId], references: [id], onDelete: Restrict)
+  products         Product[]
+  followers        ShopFollower[]
+  vouchers         Voucher[]
+  orders           ShopOrder[]
+  purchaseVouchers PurchaseVoucher[]
 
   @@index([status])
   @@index([deletedAt])
@@ -322,6 +358,7 @@ model Product {
   favorites                ProductFavorite[]
   recentlyViewedBy         RecentlyViewedProduct[]
   voucherScopes            VoucherProductScope[]
+  orderLines               OrderLine[]
 
   @@unique([shopId, slug])
   @@index([shopId, status])
@@ -427,6 +464,7 @@ model ProductVariant {
   inventory           Inventory?
   images              ProductImage[] @relation("VariantGalleryMedia")
   cartLines           CartLine[]
+  orderLines          OrderLine[]
 
   @@unique([productId, id])
   @@index([productId, status])
@@ -495,6 +533,7 @@ model Voucher {
   productScopes         VoucherProductScope[]
   userUsages            VoucherUserUsage[]
   redemptions           VoucherRedemption[]
+  purchaseSnapshots     PurchaseVoucher[]
 
   @@index([shopId, isEnabled, startsAt, endsAt])
   @@index([isEnabled, startsAt, endsAt])
@@ -534,9 +573,157 @@ model VoucherConsumption {
   createdAt         DateTime            @default(now()) @map("created_at") @db.Timestamptz(3)
   user              User                @relation(fields: [userId], references: [id], onDelete: Restrict)
   redemptions       VoucherRedemption[]
+  purchase          Purchase            @relation(fields: [purchaseReference], references: [id], onDelete: Restrict)
 
   @@index([userId, createdAt, id])
   @@map("voucher_consumptions")
+}
+
+model Purchase {
+  id                              String                @id @default(uuid()) @db.Uuid
+  buyerId                         String                @map("buyer_id") @db.Uuid
+  idempotencyKey                  String                @map("idempotency_key") @db.Uuid
+  requestDigest                   String                @map("request_digest") @db.Char(64)
+  checkoutFingerprint             String                @map("checkout_fingerprint") @db.Char(64)
+  sourceCartVersion               Int                   @map("source_cart_version")
+  currency                        String                @default("VND") @db.VarChar(3)
+  paymentMethod                   PurchasePaymentMethod @default(COD) @map("payment_method")
+  paymentStatus                   PurchasePaymentStatus @default(UNPAID) @map("payment_status")
+  addressSnapshot                 Json                  @map("address_snapshot") @db.JsonB
+  listSubtotalMinor               BigInt                @map("list_subtotal_minor")
+  productDiscountMinor            BigInt                @map("product_discount_minor")
+  merchandiseSubtotalMinor        BigInt                @map("merchandise_subtotal_minor")
+  shippingTotalMinor              BigInt                @map("shipping_total_minor")
+  shopVoucherDiscountMinor        BigInt                @map("shop_voucher_discount_minor")
+  platformVoucherDiscountMinor    BigInt                @map("platform_voucher_discount_minor")
+  merchandiseVoucherDiscountMinor BigInt                @map("merchandise_voucher_discount_minor")
+  shippingVoucherDiscountMinor    BigInt                @map("shipping_voucher_discount_minor")
+  voucherDiscountMinor            BigInt                @map("voucher_discount_minor")
+  shippingPayableMinor            BigInt                @map("shipping_payable_minor")
+  payableTotalMinor               BigInt                @map("payable_total_minor")
+  createdAt                       DateTime              @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt                       DateTime              @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  buyer                           User                  @relation(fields: [buyerId], references: [id], onDelete: Restrict)
+  orders                          ShopOrder[]
+  vouchers                        PurchaseVoucher[]
+  voucherConsumption              VoucherConsumption?
+
+  @@unique([buyerId, idempotencyKey])
+  @@index([buyerId, createdAt(sort: Desc), id])
+  @@index([createdAt, id])
+  @@map("purchases")
+}
+
+model ShopOrder {
+  id                              String                      @id @default(uuid()) @db.Uuid
+  purchaseId                      String                      @map("purchase_id") @db.Uuid
+  shopId                          String                      @map("shop_id") @db.Uuid
+  status                          ShopOrderStatus             @default(PENDING_CONFIRMATION)
+  paymentStatus                   PurchasePaymentStatus       @default(UNPAID) @map("payment_status")
+  shopSnapshot                    Json                        @map("shop_snapshot") @db.JsonB
+  note                            String                      @default("") @db.VarChar(500)
+  shippingSnapshot                Json                        @map("shipping_snapshot") @db.JsonB
+  listSubtotalMinor               BigInt                      @map("list_subtotal_minor")
+  productDiscountMinor            BigInt                      @map("product_discount_minor")
+  merchandiseSubtotalMinor        BigInt                      @map("merchandise_subtotal_minor")
+  shopVoucherDiscountMinor        BigInt                      @map("shop_voucher_discount_minor")
+  platformVoucherDiscountMinor    BigInt                      @map("platform_voucher_discount_minor")
+  merchandiseVoucherDiscountMinor BigInt                      @map("merchandise_voucher_discount_minor")
+  shippingVoucherDiscountMinor    BigInt                      @map("shipping_voucher_discount_minor")
+  voucherDiscountMinor            BigInt                      @map("voucher_discount_minor")
+  shippingPayableMinor            BigInt                      @map("shipping_payable_minor")
+  payableTotalMinor               BigInt                      @map("payable_total_minor")
+  createdAt                       DateTime                    @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt                       DateTime                    @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  purchase                        Purchase                    @relation(fields: [purchaseId], references: [id], onDelete: Restrict)
+  shop                            Shop                        @relation(fields: [shopId], references: [id], onDelete: Restrict)
+  lines                           OrderLine[]
+  voucherAllocations              PurchaseVoucherAllocation[]
+
+  @@unique([purchaseId, shopId])
+  @@index([shopId, createdAt(sort: Desc), id])
+  @@index([purchaseId, id])
+  @@map("shop_orders")
+}
+
+model OrderLine {
+  id                              String                      @id @default(uuid()) @db.Uuid
+  orderId                         String                      @map("order_id") @db.Uuid
+  sourceCartLineId                String                      @map("source_cart_line_id") @db.Uuid
+  productId                       String                      @map("product_id") @db.Uuid
+  variantId                       String                      @map("variant_id") @db.Uuid
+  productName                     String                      @map("product_name") @db.VarChar(240)
+  productImageUrl                 String?                     @map("product_image_url") @db.Text
+  variantName                     String                      @map("variant_name") @db.VarChar(160)
+  variantSku                      String                      @map("variant_sku") @db.VarChar(80)
+  quantity                        Int
+  unitWeightGrams                 Int                         @map("unit_weight_grams")
+  shipmentWeightGrams             Int                         @map("shipment_weight_grams")
+  listUnitPriceMinor              BigInt                      @map("list_unit_price_minor")
+  sellingUnitPriceMinor           BigInt                      @map("selling_unit_price_minor")
+  listSubtotalMinor               BigInt                      @map("list_subtotal_minor")
+  productDiscountMinor            BigInt                      @map("product_discount_minor")
+  merchandiseSubtotalMinor        BigInt                      @map("merchandise_subtotal_minor")
+  shopVoucherDiscountMinor        BigInt                      @map("shop_voucher_discount_minor")
+  platformVoucherDiscountMinor    BigInt                      @map("platform_voucher_discount_minor")
+  merchandiseVoucherDiscountMinor BigInt                      @map("merchandise_voucher_discount_minor")
+  payableMerchandiseMinor         BigInt                      @map("payable_merchandise_minor")
+  createdAt                       DateTime                    @default(now()) @map("created_at") @db.Timestamptz(3)
+  order                           ShopOrder                   @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  product                         Product                     @relation(fields: [productId], references: [id], onDelete: Restrict)
+  variant                         ProductVariant              @relation(fields: [variantId], references: [id], onDelete: Restrict)
+  voucherAllocations              PurchaseVoucherAllocation[]
+
+  @@unique([orderId, sourceCartLineId])
+  @@index([productId, createdAt, id])
+  @@index([variantId, createdAt, id])
+  @@index([sourceCartLineId])
+  @@map("order_lines")
+}
+
+model PurchaseVoucher {
+  id                       String                      @id @default(uuid()) @db.Uuid
+  purchaseId               String                      @map("purchase_id") @db.Uuid
+  voucherId                String                      @map("voucher_id") @db.Uuid
+  redemptionId             String?                     @unique @map("redemption_id") @db.Uuid
+  shopId                   String?                     @map("shop_id") @db.Uuid
+  code                     String                      @db.VarChar(32)
+  name                     String                      @db.VarChar(160)
+  issuer                   VoucherIssuer
+  benefitType              VoucherBenefitType          @map("benefit_type")
+  slot                     PurchaseVoucherSlot
+  merchandiseDiscountMinor BigInt                      @map("merchandise_discount_minor")
+  shippingDiscountMinor    BigInt                      @map("shipping_discount_minor")
+  discountMinor            BigInt                      @map("discount_minor")
+  createdAt                DateTime                    @default(now()) @map("created_at") @db.Timestamptz(3)
+  purchase                 Purchase                    @relation(fields: [purchaseId], references: [id], onDelete: Restrict)
+  voucher                  Voucher                     @relation(fields: [voucherId], references: [id], onDelete: Restrict)
+  redemption               VoucherRedemption?          @relation(fields: [redemptionId], references: [id], onDelete: Restrict)
+  shop                     Shop?                       @relation(fields: [shopId], references: [id], onDelete: Restrict)
+  allocations              PurchaseVoucherAllocation[]
+
+  @@unique([purchaseId, voucherId])
+  @@index([voucherId, createdAt, id])
+  @@index([shopId, createdAt, id])
+  @@map("purchase_vouchers")
+}
+
+model PurchaseVoucherAllocation {
+  id                String                @id @default(uuid()) @db.Uuid
+  purchaseVoucherId String                @map("purchase_voucher_id") @db.Uuid
+  shopOrderId       String                @map("shop_order_id") @db.Uuid
+  orderLineId       String?               @map("order_line_id") @db.Uuid
+  kind              VoucherAllocationKind
+  amountMinor       BigInt                @map("amount_minor")
+  createdAt         DateTime              @default(now()) @map("created_at") @db.Timestamptz(3)
+  purchaseVoucher   PurchaseVoucher       @relation(fields: [purchaseVoucherId], references: [id], onDelete: Restrict)
+  shopOrder         ShopOrder             @relation(fields: [shopOrderId], references: [id], onDelete: Restrict)
+  orderLine         OrderLine?            @relation(fields: [orderLineId], references: [id], onDelete: Restrict)
+
+  @@index([purchaseVoucherId, shopOrderId, orderLineId])
+  @@index([shopOrderId, createdAt, id])
+  @@index([orderLineId])
+  @@map("purchase_voucher_allocations")
 }
 
 model VoucherRedemption {
@@ -551,6 +738,7 @@ model VoucherRedemption {
   consumption              VoucherConsumption @relation(fields: [consumptionId], references: [id], onDelete: Restrict)
   voucher                  Voucher            @relation(fields: [voucherId], references: [id], onDelete: Restrict)
   user                     User               @relation(fields: [userId], references: [id], onDelete: Restrict)
+  purchaseVoucher          PurchaseVoucher?
 
   @@unique([consumptionId, voucherId])
   @@index([voucherId, createdAt, id])

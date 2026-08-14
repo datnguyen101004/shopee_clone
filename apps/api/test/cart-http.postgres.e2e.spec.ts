@@ -1,3 +1,4 @@
+import { parsePricingQuoteResponse } from '@shopee-clone/contracts';
 import type { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
@@ -439,6 +440,7 @@ databaseTest('Authenticated cart HTTP and browser security with isolated Postgre
       .expect(200);
     expect(quoted.headers['cache-control']).toBe('private, no-store');
     expect(quoted.headers.etag).toBe(added.headers.etag);
+    expect(parsePricingQuoteResponse(quoted.body)).not.toBeNull();
     expect(quoted.body).toMatchObject({
       pricingVersion: 'pricing-v2',
       voucherVersion: 'voucher-v1',

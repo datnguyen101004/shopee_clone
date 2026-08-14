@@ -1,3 +1,5 @@
+import { isPricingQuoteResponse } from '@shopee-clone/contracts';
+
 import { ProductStatus, ShopStatus, VariantStatus } from '../generated/prisma/enums';
 import type { PrismaService } from '../prisma/prisma.service';
 import type { SystemUtcClock } from '../vouchers/utc-clock';
@@ -25,6 +27,8 @@ function fixtureCart() {
         quantity: 2,
         variant: {
           id: '00000000-0000-4000-8000-000000000006',
+          name: 'Fixture variant',
+          sku: 'FIXTURE-SKU',
           status: VariantStatus.ACTIVE,
           deletedAt: null,
           priceMinor: 90_000n,
@@ -34,9 +38,11 @@ function fixtureCart() {
           inventory: { quantityOnHand: 10, quantityReserved: 0 },
           product: {
             id: '00000000-0000-4000-8000-000000000007',
+            name: 'Fixture product',
             status: ProductStatus.ACTIVE,
             deletedAt: null,
             category: { isActive: true, deletedAt: null },
+            images: [{ url: '/media/products/fixture.webp' }],
             shop: {
               id: shopId,
               slug: 'fixture-shop',
@@ -55,13 +61,20 @@ function fixtureCart() {
 function serviceWith(options?: { address?: unknown; cart?: unknown; vouchers?: unknown[] }) {
   const transaction = {
     shippingAddress: {
-      findFirst: jest
-        .fn()
-        .mockResolvedValue(
-          options && 'address' in options
-            ? options.address
-            : { id: addressId, province: 'Hà Nội', district: 'Ba Đình' },
-        ),
+      findFirst: jest.fn().mockResolvedValue(
+        options && 'address' in options
+          ? options.address
+          : {
+              id: addressId,
+              recipientName: 'Fixture Buyer',
+              phoneNumber: '0900000000',
+              province: 'Hà Nội',
+              district: 'Ba Đình',
+              ward: 'Phúc Xá',
+              addressLine: '1 Hồng Hà',
+              label: null,
+            },
+      ),
     },
     cart: {
       findUnique: jest
@@ -86,6 +99,12 @@ function serviceWith(options?: { address?: unknown; cart?: unknown; vouchers?: u
 describe('pricing quote orchestration', () => {
   it('loads authoritative selected facts and performs no persistence write', async () => {
     const quote = await serviceWith().quote(userId, 2, addressId, []);
+    expect(isPricingQuoteResponse(quote)).toBe(true);
+    expect(quote.address).toEqual({
+      id: addressId,
+      province: 'Hà Nội',
+      district: 'Ba Đình',
+    });
     expect(quote.cartVersion).toBe(2);
     expect(quote.shops[0]?.lines[0]).toMatchObject({
       sellingUnitPriceMinor: 90_000,

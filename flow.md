@@ -413,7 +413,7 @@ Importer chạy local, không crawl mạng, không dùng dữ liệu ngẫu nhi�
 
 - Báo giá giỏ hàng dùng phí vận chuyển mô phỏng và preview voucher; không giữ tồn kho, giữ lượt voucher, cam kết cước cuối cùng hoặc tạo đơn.
 - Purchase intent ở trang sản phẩm chưa báo checkout thành công.
-- Chưa có checkout, thanh toán, shipment, order history, review body, chat hoặc notification realtime.
+- Đã có checkout COD và trang xác nhận snapshot; chưa có thanh toán online, shipment thật, order history đầy đủ, review body, chat hoặc notification realtime.
 - Seller mới có role/ownership boundary và safe shop projection, chưa có bộ công cụ quản lý gian hàng hoàn chỉnh.
 - Admin hiện tập trung vào role assignment/revocation và role audit, chưa phải dashboard vận hành marketplace đầy đủ.
 
@@ -565,3 +565,59 @@ Mã hợp lệ về cấu trúc nhưng không đủ điều kiện vẫn trả q
 field tiền, mã trùng hoặc slot trùng bị từ chối ở contract/DTO. T18 chỉ cung cấp preview và seam nội
 bộ cho T19. Không có endpoint consume công khai; checkout phải sở hữu transaction và dùng cùng kết
 quả tính lại có thẩm quyền trước khi ghi order, usage counter và redemption audit.
+
+## 14. Checkout COD đa shop và purchase snapshot T19
+
+```mermaid
+flowchart TD
+    buyer(["Buyer đã đăng nhập"])
+    cart["/cart có quote hiện hành"]
+    draft["sessionStorage draft v1<br/>chỉ ID, service và voucher code"]
+    checkout["/checkout tải cart + address"]
+    preview["POST /api/v1/checkout/preview<br/>If-Match cart version"]
+    recalc["RepeatableRead: pricing-v2 + voucher-v1 + mock-v1"]
+    blockers{"Có blocker?"}
+    review["Hiển thị snapshot, ETA, voucher và tổng từ server"]
+    edit{"Đổi address/service/note?"}
+    stale["Đánh dấu stale + hủy response cũ"]
+    key["Tạo/reuse UUID idempotency theo submit intent"]
+    confirm["POST /api/v1/checkout/cod<br/>fingerprint + If-Match + Idempotency-Key"]
+    lock["Serializable + advisory intent lock + cart FOR UPDATE"]
+    replay{"Đã có buyer + key?"}
+    digest{"Request digest giống?"}
+    existing["200 replay purchase cũ"]
+    keyConflict["409 idempotency conflict"]
+    rebuild["Tính lại checkout và so fingerprint"]
+    changed{"Preview còn khớp?"}
+    reviewAgain["409 preview changed<br/>buyer xem tổng mới"]
+    write["Ghi Purchase + 1 ShopOrder/shop + OrderLine snapshots"]
+    voucher["Consume voucher + usage/redemption"]
+    cleanup["Xóa đúng line đã mua + tăng cart version một lần"]
+    commit{"Commit thành công?"}
+    rollback["Rollback toàn bộ graph, voucher và cart"]
+    success["201 purchaseReference"]
+    result["/checkout/success/:reference"]
+    ownerGet["GET owner-scoped committed snapshot"]
+    missing["404 giống nhau cho missing/foreign"]
+
+    buyer --> cart --> draft --> checkout --> preview --> recalc --> blockers
+    blockers -->|"Có"| review
+    blockers -->|"Không"| review --> edit
+    edit -->|"Có"| stale --> preview
+    edit -->|"Không"| key --> confirm --> lock --> replay
+    replay -->|"Có"| digest
+    digest -->|"Giống"| existing --> result
+    digest -->|"Khác"| keyConflict
+    replay -->|"Chưa"| rebuild --> changed
+    changed -->|"Không"| reviewAgain --> review
+    changed -->|"Có"| write --> voucher --> cleanup --> commit
+    commit -->|"Không"| rollback
+    commit -->|"Có"| success --> result --> ownerGet
+    ownerGet -->|"Không thuộc buyer"| missing
+```
+
+Fingerprint loại `evaluatedAt` nhưng bao gồm cart version, full address, line/product/variant snapshot,
+service, shipping, note, voucher allocations và toàn bộ phép cộng tiền. Hai request đồng thời cùng intent
+hội tụ về một purchase; serialization conflict PostgreSQL `40001` được retry có giới hạn. Trang kết quả
+chỉ đọc snapshot đã commit nên catalog thay đổi sau đó không làm đổi nội dung đơn. T19 kiểm tra tồn kho
+lúc confirm nhưng chưa reserve hoặc decrement tồn kho; no-oversell giữa nhiều buyer thuộc T24.

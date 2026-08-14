@@ -285,6 +285,6 @@ export const seedExpectedCounts = {
   vouchers: 8,
   voucherProductScopes: 1,
   voucherUserUsages: 2,
-  voucherConsumptions: 2,
-  voucherRedemptions: 2,
+  voucherConsumptions: 0,
+  voucherRedemptions: 0,
 } as const;

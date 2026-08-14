@@ -4,6 +4,7 @@ import { AccountModule } from './account/account.module';
 import { AuthModule } from './auth/auth.module';
 import { CatalogModule } from './catalog/catalog.module';
 import { CartModule } from './cart/cart.module';
+import { CheckoutModule } from './checkout/checkout.module';
 import { EngagementModule } from './engagement/engagement.module';
 import { HealthModule } from './health/health.module';
 import { HomepageModule } from './homepage/homepage.module';
@@ -19,6 +20,7 @@ import { BrowserSecurityModule } from './security/browser-security.module';
     HomepageModule,
     CatalogModule,
     CartModule,
+    CheckoutModule,
     PricingModule,
     AuthModule,
     BrowserSecurityModule,

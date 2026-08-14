@@ -20,6 +20,7 @@ export interface VoucherConsumptionResult {
   consumptionId: string | null;
   created: boolean;
   redemptionCount: number;
+  redemptions: { id: string; voucherId: string }[];
 }
 
 interface LockedVoucher {
@@ -85,7 +86,7 @@ export class VoucherConsumptionService {
     }
     const ordered = validateApplied(input.applied);
     if (ordered.length === 0) {
-      return { consumptionId: null, created: false, redemptionCount: 0 };
+      return { consumptionId: null, created: false, redemptionCount: 0, redemptions: [] };
     }
     const digest = voucherSetDigest(input.userId, ordered);
     const proposedId = randomUUID();
@@ -120,6 +121,9 @@ export class VoucherConsumptionService {
         consumptionId: consumption.id,
         created: false,
         redemptionCount: consumption.redemptions.length,
+        redemptions: consumption.redemptions
+          .map(({ id, voucherId }) => ({ id, voucherId }))
+          .sort((left, right) => left.voucherId.localeCompare(right.voucherId)),
       };
     }
 
@@ -206,6 +210,16 @@ export class VoucherConsumptionService {
         discountMinor: BigInt(item.discountMinor),
       })),
     });
-    return { consumptionId: consumption.id, created: true, redemptionCount: ordered.length };
+    const redemptions = await transaction.voucherRedemption.findMany({
+      where: { consumptionId: consumption.id },
+      select: { id: true, voucherId: true },
+      orderBy: { voucherId: 'asc' },
+    });
+    return {
+      consumptionId: consumption.id,
+      created: true,
+      redemptionCount: redemptions.length,
+      redemptions,
+    };
   }
 }

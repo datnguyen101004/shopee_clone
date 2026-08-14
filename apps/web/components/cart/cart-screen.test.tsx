@@ -8,6 +8,8 @@ import { useCart } from './cart-provider';
 import { CartScreen } from './cart-screen';
 import { useCartPricing } from './use-cart-pricing';
 
+const push = vi.fn();
+vi.mock('next/navigation', () => ({ useRouter: () => ({ push }) }));
 vi.mock('../auth-session-provider', () => ({ useAuthSession: vi.fn() }));
 vi.mock('./cart-provider', () => ({ useCart: vi.fn() }));
 vi.mock('./use-cart-pricing', () => ({ useCartPricing: vi.fn() }));
@@ -66,6 +68,7 @@ describe('multi-shop cart screen', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    window.sessionStorage.clear();
     for (const callback of [selectLine, selectShop, selectAll, updateQuantity, removeItem]) {
       callback.mockResolvedValue({ cart, adjustments: [] });
     }
@@ -215,6 +218,17 @@ describe('multi-shop cart screen', () => {
     expect(screen.getByText('222.000₫')).toBeVisible();
     expect(screen.getByText(/Giảm 40.000₫/)).toBeVisible();
     expect(screen.getByRole('button', { name: 'Mua hàng' })).toBeEnabled();
+  });
+
+  it('stores an ID-only draft and navigates to checkout', async () => {
+    const user = userEvent.setup();
+    render(<CartScreen />);
+    await user.click(screen.getByRole('button', { name: 'Mua hàng' }));
+    expect(push).toHaveBeenCalledWith('/checkout');
+    const draft = window.sessionStorage.getItem('shopee-clone.checkout-draft') ?? '';
+    expect(draft).toContain('00000000-0000-4000-8000-000000000050');
+    expect(draft).not.toContain('Buyer');
+    expect(draft).not.toContain('222000');
   });
 
   it('wires line quantity, selection and removal controls to authoritative actions', async () => {

@@ -22,8 +22,8 @@ describe('deterministic voucher seed fixtures', () => {
       vouchers: 8,
       voucherProductScopes: 1,
       voucherUserUsages: 2,
-      voucherConsumptions: 2,
-      voucherRedemptions: 2,
+      voucherConsumptions: 0,
+      voucherRedemptions: 0,
       products: 1_378,
       variants: 1_377,
     });
@@ -45,7 +45,7 @@ describe('deterministic voucher seed fixtures', () => {
     }
     expect(source).toContain('voucherProductScope.deleteMany');
     expect(source).toContain('voucherUserUsage.upsert');
-    expect(source).toContain('voucherConsumption.upsert');
-    expect(source).toContain('voucherRedemption.upsert');
+    expect(source).toContain('voucherConsumption.deleteMany');
+    expect(source).toContain('voucherRedemption.deleteMany');
   });
 });

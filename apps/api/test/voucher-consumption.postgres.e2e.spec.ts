@@ -53,6 +53,7 @@ databaseTest('transaction-owned voucher consumption with PostgreSQL', () => {
       where: { voucherId: { in: [voucherA, voucherB, raceVoucher] } },
     });
     await prisma.voucherConsumption.deleteMany({ where: { userId: { in: [userA, userB] } } });
+    await prisma.purchase.deleteMany({ where: { id: { in: [purchaseA, purchaseB, purchaseC] } } });
     await prisma.voucherUserUsage.deleteMany({
       where: { voucherId: { in: [voucherA, voucherB, raceVoucher] } },
     });
@@ -94,6 +95,30 @@ databaseTest('transaction-owned voucher consumption with PostgreSQL', () => {
         endsAt: new Date('2999-01-01T00:00:00.000Z'),
         isEnabled: true,
         usedCount: 0,
+      })),
+    });
+    await prisma.purchase.createMany({
+      data: [
+        { id: purchaseA, buyerId: userA, idempotencyKey: purchaseA },
+        { id: purchaseB, buyerId: userA, idempotencyKey: purchaseB },
+        { id: purchaseC, buyerId: userB, idempotencyKey: purchaseC },
+      ].map((purchase) => ({
+        ...purchase,
+        requestDigest: '1'.repeat(64),
+        checkoutFingerprint: '2'.repeat(64),
+        sourceCartVersion: 0,
+        addressSnapshot: { id: purchase.id },
+        listSubtotalMinor: 0n,
+        productDiscountMinor: 0n,
+        merchandiseSubtotalMinor: 0n,
+        shippingTotalMinor: 0n,
+        shopVoucherDiscountMinor: 0n,
+        platformVoucherDiscountMinor: 0n,
+        merchandiseVoucherDiscountMinor: 0n,
+        shippingVoucherDiscountMinor: 0n,
+        voucherDiscountMinor: 0n,
+        shippingPayableMinor: 0n,
+        payableTotalMinor: 0n,
       })),
     });
   });

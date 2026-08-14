@@ -448,62 +448,26 @@ async function seedMarketplace() {
         update: { usedCount: usage.usedCount },
       });
     }
-    const consumptionFixtures = [
-      {
-        id: seedVoucherFixtureIds.exhaustedConsumption,
-        purchaseReference: seedVoucherFixtureIds.exhaustedPurchase,
-        userId: seedUsers[1].id,
-        voucherSetDigest: 'a'.repeat(64),
-        voucherId: seedVoucherFixtureIds.exhausted,
-        redemptionId: seedVoucherFixtureIds.exhaustedRedemption,
+    await transaction.voucherRedemption.deleteMany({
+      where: {
+        id: {
+          in: [
+            seedVoucherFixtureIds.exhaustedRedemption,
+            seedVoucherFixtureIds.buyerUsedRedemption,
+          ],
+        },
       },
-      {
-        id: seedVoucherFixtureIds.buyerUsedConsumption,
-        purchaseReference: seedVoucherFixtureIds.buyerUsedPurchase,
-        userId: seedUsers[0].id,
-        voucherSetDigest: 'b'.repeat(64),
-        voucherId: seedVoucherFixtureIds.buyerUsed,
-        redemptionId: seedVoucherFixtureIds.buyerUsedRedemption,
+    });
+    await transaction.voucherConsumption.deleteMany({
+      where: {
+        id: {
+          in: [
+            seedVoucherFixtureIds.exhaustedConsumption,
+            seedVoucherFixtureIds.buyerUsedConsumption,
+          ],
+        },
       },
-    ] as const;
-    for (const consumption of consumptionFixtures) {
-      await transaction.voucherConsumption.upsert({
-        where: { purchaseReference: consumption.purchaseReference },
-        create: {
-          id: consumption.id,
-          purchaseReference: consumption.purchaseReference,
-          userId: consumption.userId,
-          voucherSetDigest: consumption.voucherSetDigest,
-        },
-        update: {
-          userId: consumption.userId,
-          voucherSetDigest: consumption.voucherSetDigest,
-        },
-      });
-      await transaction.voucherRedemption.upsert({
-        where: {
-          consumptionId_voucherId: {
-            consumptionId: consumption.id,
-            voucherId: consumption.voucherId,
-          },
-        },
-        create: {
-          id: consumption.redemptionId,
-          consumptionId: consumption.id,
-          voucherId: consumption.voucherId,
-          userId: consumption.userId,
-          merchandiseDiscountMinor: 10_000n,
-          shippingDiscountMinor: 0n,
-          discountMinor: 10_000n,
-        },
-        update: {
-          userId: consumption.userId,
-          merchandiseDiscountMinor: 10_000n,
-          shippingDiscountMinor: 0n,
-          discountMinor: 10_000n,
-        },
-      });
-    }
+    });
     for (const favorite of favoriteFixtures) {
       await transaction.productFavorite.upsert({
         where: { userId_productId: { userId: favorite.userId, productId: favorite.productId } },

@@ -6,10 +6,14 @@ import {
   LEGACY_VIETNAM_PROVINCES,
   type LegacyDistrict,
   type LegacyProvince,
+  type LegacyWard,
 } from './legacy-vietnam-administrative-divisions';
 
 export function normalizeAdministrativeLookup(value: string): string {
-  return normalizeVietnameseAdministrativeName(value).replace(/^(?:quan|huyen|thi xa)\s+/u, '');
+  return normalizeVietnameseAdministrativeName(value).replace(
+    /^(?:quan|huyen|thi xa|phuong|xa|thi tran)\s+/u,
+    '',
+  );
 }
 
 function resolveUnique<T extends { name: string }>(items: readonly T[], value: string): T | null {
@@ -31,6 +35,10 @@ export function resolveLegacyDistrict(
   value: string,
 ): LegacyDistrict | null {
   return province ? resolveUnique(province.districts, value) : null;
+}
+
+export function resolveLegacyWard(wards: readonly LegacyWard[], value: string): LegacyWard | null {
+  return resolveUnique(wards, value);
 }
 
 export function matchesAdministrativeSearch(name: string, query: string): boolean {

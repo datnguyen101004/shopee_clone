@@ -1,5 +1,5 @@
 import {
-  isPricingQuoteRequest,
+  parsePricingQuoteRequest,
   parsePricingProblemDetails,
   parsePricingQuoteResponse,
   type PricingProblemDetails,
@@ -31,7 +31,8 @@ export async function getPricingQuote(
   authenticatedFetch: AuthenticatedFetch,
   signal?: AbortSignal,
 ): Promise<PricingQuoteResponse> {
-  if (!isPricingQuoteRequest(input) || !Number.isSafeInteger(cartVersion) || cartVersion < 0) {
+  const parsedInput = parsePricingQuoteRequest(input);
+  if (!parsedInput || !Number.isSafeInteger(cartVersion) || cartVersion < 0) {
     throw new PricingApiError('input');
   }
   let response: Response;
@@ -43,7 +44,7 @@ export async function getPricingQuote(
         'Content-Type': 'application/json',
         'If-Match': `"cart-${cartVersion}"`,
       },
-      body: JSON.stringify(input),
+      body: JSON.stringify(parsedInput),
       cache: 'no-store',
       signal,
     });

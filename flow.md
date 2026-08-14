@@ -1,6 +1,6 @@
 # Flow các tính năng đã triển khai
 
-Tài liệu này mô tả trạng thái hiện tại của Shopee Clone sau TS01 và các task đến T17. Các sơ đồ tập trung vào luồng đang hoạt động trong code; checkout, đơn hàng, thanh toán, chat và vận chuyển thật vẫn chưa được triển khai.
+Tài liệu này mô tả trạng thái hiện tại của Shopee Clone sau TS01 và các task đến T18. Các sơ đồ tập trung vào luồng đang hoạt động trong code; checkout, đơn hàng, thanh toán, chat và vận chuyển thật vẫn chưa được triển khai.
 
 ## 1. Tổng quan phạm vi
 
@@ -195,6 +195,10 @@ flowchart LR
     addressPage["Trang địa chỉ"]
     provincePopup["Popup 63 tỉnh/thành cũ"]
     districtPopup["Popup quận/huyện phụ thuộc"]
+    wardKind{"Quận/huyện có tổ chức cấp xã?"}
+    wardChunk["Tải lười snapshot 10.035 phường/xã"]
+    wardPopup["Popup phường/xã phụ thuộc"]
+    noWardSentinel["Tự chọn sentinel không có cấp xã"]
     addressAction{"Thao tác địa chỉ?"}
     accountApi["Account API"]
     userLock["Khóa user FOR UPDATE"]
@@ -209,7 +213,12 @@ flowchart LR
     signedIn --> addressPage
     addressPage --> provincePopup
     provincePopup --> districtPopup
-    districtPopup --> addressAction
+    districtPopup --> wardKind
+    wardKind -->|"Có"| wardChunk
+    wardChunk --> wardPopup
+    wardPopup --> addressAction
+    wardKind -->|"Không: 5 huyện đặc thù"| noWardSentinel
+    noWardSentinel --> addressAction
     addressAction --> accountApi
     accountApi --> userLock
     userLock --> ownerCheck
@@ -218,7 +227,9 @@ flowchart LR
     defaultInvariant --> database
 ```
 
-Khi đổi tỉnh, district không tương thích bị xóa. Địa chỉ đầu tiên tự trở thành mặc định; xóa địa chỉ mặc định sẽ chọn địa chỉ cũ nhất còn hoạt động. ID không tồn tại, đã xóa hoặc thuộc user khác đều trả cùng một lỗi `404` đã làm sạch.
+Khi đổi tỉnh, cả district và ward không tương thích bị xóa; khi đổi district, ward bị xóa. Chọn lại cùng cấp cha giữ lựa chọn con, còn giá trị cũ ngoài snapshot được bảo toàn cho tới khi người dùng chủ động đổi cấp cha. Ward snapshot chỉ được tải từ asset nội bộ sau khi nhận diện district; browser không gọi NSO ở runtime. Năm huyện `Bạch Long Vĩ`, `Cồn Cỏ`, `Hoàng Sa`, `Lý Sơn` và `Côn Đảo` tự dùng sentinel `Không có đơn vị hành chính cấp xã`. API tiếp tục lưu province/district/ward dạng chuỗi.
+
+Địa chỉ đầu tiên tự trở thành mặc định; xóa địa chỉ mặc định sẽ chọn địa chỉ cũ nhất còn hoạt động. ID không tồn tại, đã xóa hoặc thuộc user khác đều trả cùng một lỗi `404` đã làm sạch.
 
 ## 7. Yêu thích, xem gần đây và theo dõi shop
 
@@ -400,9 +411,9 @@ Importer chạy local, không crawl mạng, không dùng dữ liệu ngẫu nhi�
 
 ## 10. Các ranh giới chưa triển khai
 
-- Báo giá giỏ hàng chỉ dùng phí vận chuyển mô phỏng để hiển thị; không giữ tồn kho, áp voucher, cam kết cước cuối cùng hoặc tạo đơn.
+- Báo giá giỏ hàng dùng phí vận chuyển mô phỏng và preview voucher; không giữ tồn kho, giữ lượt voucher, cam kết cước cuối cùng hoặc tạo đơn.
 - Purchase intent ở trang sản phẩm chưa báo checkout thành công.
-- Chưa có checkout, voucher, thanh toán, shipment, order history, review body, chat hoặc notification realtime.
+- Chưa có checkout, thanh toán, shipment, order history, review body, chat hoặc notification realtime.
 - Seller mới có role/ownership boundary và safe shop projection, chưa có bộ công cụ quản lý gian hàng hoàn chỉnh.
 - Admin hiện tập trung vào role assignment/revocation và role audit, chưa phải dashboard vận hành marketplace đầy đủ.
 
@@ -497,7 +508,7 @@ flowchart TD
     facts["Đọc lại price, compare-at, stock, weight, shop hiện tại"]
     eligibility["Loại line unavailable hoặc thiếu stock"]
     grouping["Gộp 1 shipment cho mỗi shop"]
-    calculator["Pricing-v1 + mock-v1 calculators<br/>integer VND, zone, weight, ETA"]
+    calculator["Pricing-v2 + voucher-v1 + mock-v1<br/>integer VND, zone, weight, ETA"]
     validate["Web kiểm tra toàn bộ contract và phép cộng"]
     display["Hiển thị line/shop/ship/discount/payable đã xác nhận"]
     changed{"Address, service hoặc cart thay đổi?"}
@@ -517,3 +528,40 @@ Browser không gửi giá, số lượng, phí hoặc tổng tiền vào quote. 
 số nguyên VND và không ghi dữ liệu. Mỗi shop có một shipment `MOCK` với `ECONOMY`, `STANDARD` hoặc
 `EXPRESS`; surcharge dựa trên tỉnh/thành cũ và tổng trọng lượng variant. Response cũ không được ghi
 đè lựa chọn mới; đăng xuất xóa quote riêng tư khỏi bộ nhớ.
+
+## 13. Preview voucher T18 và transaction checkout tương lai T19
+
+```mermaid
+flowchart TD
+    buyer(["Buyer đã đăng nhập ở /cart"])
+    select["Nhập mã shop, Shopee hoặc miễn phí vận chuyển"]
+    apply["Bấm Áp dụng"]
+    quote["POST /api/v1/cart/quote<br/>address + services + vouchers + If-Match"]
+    snapshot["Repeatable-read snapshot<br/>cart, catalog, address, shipping, voucher, usage"]
+    normalize["Chuẩn hóa code uppercase và kiểm tra cấu trúc"]
+    eligibility["Enabled + [startsAt, endsAt) + scope<br/>minimum spend + global/buyer limits"]
+    rejected["REJECTED + lý do ổn định<br/>không tạo discount"]
+    stack["Shop theo thứ tự → platform → free shipping"]
+    allocation["Integer VND + largest remainder<br/>đối soát line/shop/summary"]
+    display["Web validate pricing-v2/voucher-v1<br/>hiển thị số tiền từ server"]
+    previewBoundary["Preview read-only<br/>không reserve hoặc consume"]
+    t19["T19 checkout transaction"]
+    recalc["Tính lại và khóa usage theo voucher ID"]
+    consume["consumeInTransaction<br/>purchase reference idempotent"]
+    commit{"Order và mọi redemption cùng commit?"}
+    success["Commit order + counters + audit"]
+    rollback["Rollback toàn bộ"]
+
+    buyer --> select --> apply --> quote --> normalize --> snapshot --> eligibility
+    eligibility -->|"Không hợp lệ"| rejected --> display
+    eligibility -->|"Hợp lệ"| stack --> allocation --> display --> previewBoundary
+    previewBoundary -.->|"Consumer tương lai, không phải màn hình T18"| t19
+    t19 --> recalc --> consume --> commit
+    commit -->|"Có"| success
+    commit -->|"Không"| rollback
+```
+
+Mã hợp lệ về cấu trúc nhưng không đủ điều kiện vẫn trả quote `200` cùng lý do an toàn; request có
+field tiền, mã trùng hoặc slot trùng bị từ chối ở contract/DTO. T18 chỉ cung cấp preview và seam nội
+bộ cho T19. Không có endpoint consume công khai; checkout phải sở hữu transaction và dùng cùng kết
+quả tính lại có thẩm quyền trước khi ghi order, usage counter và redemption audit.

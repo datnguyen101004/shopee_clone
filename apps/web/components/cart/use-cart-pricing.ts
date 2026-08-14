@@ -5,6 +5,7 @@ import type {
   PricingQuoteResponse,
   ShippingAddress,
   ShippingServiceCode,
+  VoucherCodeSelection,
 } from '@shopee-clone/contracts';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
@@ -20,10 +21,14 @@ export interface CartPricingState {
   addresses: ShippingAddress[];
   selectedAddressId: string;
   services: Record<string, ShippingServiceCode>;
+  vouchers: VoucherCodeSelection;
   quote: PricingQuoteResponse | null;
   message: string;
   setAddress(addressId: string): void;
   setService(shopId: string, service: ShippingServiceCode): void;
+  setPlatformVoucher(code: string | null): void;
+  setShopVoucher(shopId: string, code: string | null): void;
+  setFreeShippingVoucher(code: string | null): void;
   retry(): void;
 }
 
@@ -36,6 +41,7 @@ export function useCartPricing(
   const [addresses, setAddresses] = useState<ShippingAddress[]>([]);
   const [selectedAddressId, setSelectedAddressId] = useState('');
   const [serviceChoices, setServiceChoices] = useState<Record<string, ShippingServiceCode>>({});
+  const [voucherChoices, setVoucherChoices] = useState<VoucherCodeSelection>({});
   const [quote, setQuote] = useState<PricingQuoteResponse | null>(null);
   const [message, setMessage] = useState('');
   const [retryGeneration, setRetryGeneration] = useState(0);
@@ -49,6 +55,7 @@ export function useCartPricing(
       setAddresses([]);
       setSelectedAddressId('');
       setServiceChoices({});
+      setVoucherChoices({});
       setQuote(null);
       setMessage('');
       setStatus('idle');
@@ -100,6 +107,28 @@ export function useCartPricing(
     .map((shopId) => `${shopId}:${services[shopId] ?? 'STANDARD'}`)
     .join('|');
 
+  const vouchers = useMemo<VoucherCodeSelection>(() => {
+    const selectedShopSet = new Set(selectedShopIds);
+    const shopCodes = (voucherChoices.shopCodes ?? [])
+      .filter(({ shopId }) => selectedShopSet.has(shopId))
+      .sort((left, right) => left.shopId.localeCompare(right.shopId));
+    return {
+      ...(voucherChoices.platformCode ? { platformCode: voucherChoices.platformCode } : {}),
+      ...(shopCodes.length ? { shopCodes } : {}),
+      ...(voucherChoices.freeShippingCode
+        ? { freeShippingCode: voucherChoices.freeShippingCode }
+        : {}),
+    };
+  }, [selectedShopIds, voucherChoices]);
+
+  const voucherSignature = [
+    vouchers.platformCode ?? '',
+    ...(vouchers.shopCodes ?? []).map(({ shopId, code }) => `${shopId}:${code}`),
+    vouchers.freeShippingCode ?? '',
+  ]
+    .filter(Boolean)
+    .join('|');
+
   useEffect(() => {
     if (
       auth.state.status !== 'authenticated' ||
@@ -122,7 +151,11 @@ export function useCartPricing(
       service: services[shopId] ?? 'STANDARD',
     }));
     void getPricingQuote(
-      { shippingAddressId: selectedAddressId, services: serviceSelections },
+      {
+        shippingAddressId: selectedAddressId,
+        services: serviceSelections,
+        ...(voucherSignature ? { vouchers } : {}),
+      },
       cartResponse.version,
       auth.sessionFetch,
       controller.signal,
@@ -157,6 +190,7 @@ export function useCartPricing(
     selectedAddressId,
     selectedShopIds,
     serviceSignature,
+    voucherSignature,
     retryGeneration,
   ]);
 
@@ -165,11 +199,38 @@ export function useCartPricing(
     addresses,
     selectedAddressId,
     services,
+    vouchers,
     quote,
     message,
     setAddress: setSelectedAddressId,
     setService(shopId, service) {
       setServiceChoices((current) => ({ ...current, [shopId]: service }));
+    },
+    setPlatformVoucher(code) {
+      setVoucherChoices((current) => {
+        const next = { ...current };
+        if (code) next.platformCode = code;
+        else delete next.platformCode;
+        return next;
+      });
+    },
+    setShopVoucher(shopId, code) {
+      setVoucherChoices((current) => {
+        const shopCodes = (current.shopCodes ?? []).filter((item) => item.shopId !== shopId);
+        if (code) shopCodes.push({ shopId, code });
+        const next = { ...current };
+        if (shopCodes.length) next.shopCodes = shopCodes;
+        else delete next.shopCodes;
+        return next;
+      });
+    },
+    setFreeShippingVoucher(code) {
+      setVoucherChoices((current) => {
+        const next = { ...current };
+        if (code) next.freeShippingCode = code;
+        else delete next.freeShippingCode;
+        return next;
+      });
     },
     retry() {
       setRetryGeneration((current) => current + 1);

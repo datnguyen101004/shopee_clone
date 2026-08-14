@@ -14,6 +14,8 @@ import { useAuthSession } from '../auth-session-provider';
 import { CartPricingPanel } from './cart-pricing-panel';
 import { useCart } from './cart-provider';
 import { useCartPricing } from './use-cart-pricing';
+import type { CartPricingState } from './use-cart-pricing';
+import { VoucherCodeControl } from './voucher-code-control';
 
 function formatCurrency(value: number): string {
   return `${new Intl.NumberFormat('vi-VN').format(value)}₫`;
@@ -83,6 +85,9 @@ function CartLineRow({ line, pricingLine }: { line: CartLine; pricingLine?: Pric
             <small>Giảm {formatCurrency(pricingLine.productDiscountMinor)}</small>
           </>
         ) : null}
+        {pricingLine && pricingLine.merchandiseVoucherDiscountMinor > 0 ? (
+          <small>Mã giảm giá: −{formatCurrency(pricingLine.merchandiseVoucherDiscountMinor)}</small>
+        ) : null}
         {line.previousUnitPriceMinor !== null ? (
           <del>{formatCurrency(line.previousUnitPriceMinor)}</del>
         ) : null}
@@ -138,7 +143,15 @@ function CartLineRow({ line, pricingLine }: { line: CartLine; pricingLine?: Pric
   );
 }
 
-function ShopGroup({ group, quotedShop }: { group: CartShopGroup; quotedShop?: PricingQuoteShop }) {
+function ShopGroup({
+  group,
+  quotedShop,
+  pricing,
+}: {
+  group: CartShopGroup;
+  quotedShop?: PricingQuoteShop;
+  pricing: CartPricingState;
+}) {
   const cart = useCart();
   const checked =
     group.eligibleLineCount > 0 && group.selectedEligibleLineCount === group.eligibleLineCount;
@@ -181,15 +194,58 @@ function ShopGroup({ group, quotedShop }: { group: CartShopGroup; quotedShop?: P
           pricingLine={quotedShop?.lines.find(({ lineId }) => lineId === line.id)}
         />
       ))}
+      <div className="cart-shop__voucher">
+        <VoucherCodeControl
+          label={`Mã giảm giá của ${group.shop.name}`}
+          appliedCode={
+            pricing.vouchers.shopCodes?.find(({ shopId }) => shopId === group.shop.id)?.code
+          }
+          result={pricing.quote?.vouchers.find(
+            ({ slot, shopId }) => slot === 'SHOP' && shopId === group.shop.id,
+          )}
+          pending={pricing.status === 'loading' || pricing.status === 'stale'}
+          onApply={(code) => pricing.setShopVoucher(group.shop.id, code)}
+        />
+      </div>
       {quotedShop ? (
         <footer className="cart-shop__pricing">
           <span>Giá niêm yết: {formatCurrency(quotedShop.listSubtotalMinor)}</span>
           <span>Giảm sản phẩm: −{formatCurrency(quotedShop.productDiscountMinor)}</span>
           <span>Tiền hàng: {formatCurrency(quotedShop.merchandiseSubtotalMinor)}</span>
-          <span>Phí vận chuyển: {formatCurrency(quotedShop.shipping.shippingFeeMinor)}</span>
+          <span>Giảm mã shop: −{formatCurrency(quotedShop.shopVoucherDiscountMinor)}</span>
+          <span>Giảm mã Shopee: −{formatCurrency(quotedShop.platformVoucherDiscountMinor)}</span>
+          <span>Phí vận chuyển: {formatCurrency(quotedShop.shippingPayableMinor)}</span>
           <strong>Tổng shop: {formatCurrency(quotedShop.payableTotalMinor)}</strong>
         </footer>
       ) : null}
+    </section>
+  );
+}
+
+function CartVoucherPanel({ pricing }: { pricing: CartPricingState }) {
+  const pending = pricing.status === 'loading' || pricing.status === 'stale';
+  return (
+    <section className="cart-vouchers" aria-labelledby="cart-vouchers-title">
+      <header>
+        <p>ƯU ĐÃI</p>
+        <h2 id="cart-vouchers-title">Mã giảm giá</h2>
+      </header>
+      <div className="cart-vouchers__controls">
+        <VoucherCodeControl
+          label="Mã Shopee"
+          appliedCode={pricing.vouchers.platformCode}
+          result={pricing.quote?.vouchers.find(({ slot }) => slot === 'PLATFORM')}
+          pending={pending}
+          onApply={pricing.setPlatformVoucher}
+        />
+        <VoucherCodeControl
+          label="Mã miễn phí vận chuyển"
+          appliedCode={pricing.vouchers.freeShippingCode}
+          result={pricing.quote?.vouchers.find(({ slot }) => slot === 'FREE_SHIPPING')}
+          pending={pending}
+          onApply={pricing.setFreeShippingVoucher}
+        />
+      </div>
     </section>
   );
 }
@@ -300,12 +356,14 @@ export function CartScreen() {
             key={group.shop.id}
             group={group}
             quotedShop={pricing.quote?.shops.find(({ shop }) => shop.id === group.shop.id)}
+            pricing={pricing}
           />
         ))}
         {pricing.status === 'missing-address' ? (
           <CartPricingPanel cart={current} pricing={pricing} />
         ) : null}
       </div>
+      <CartVoucherPanel pricing={pricing} />
       <aside className="cart-summary" aria-label="Tổng kết giỏ hàng">
         <label className="cart-check">
           <input
@@ -322,9 +380,12 @@ export function CartScreen() {
               <span>Tổng thanh toán ({pricing.quote.summary.selectedLineCount} sản phẩm)</span>
               <strong>{formatCurrency(pricing.quote.summary.payableTotalMinor)}</strong>
               <small>
-                Tiền hàng {formatCurrency(pricing.quote.summary.merchandiseSubtotalMinor)} · Phí
-                ship {formatCurrency(pricing.quote.summary.shippingTotalMinor)} · Giảm sản phẩm{' '}
-                {formatCurrency(pricing.quote.summary.productDiscountMinor)}
+                Tiền hàng {formatCurrency(pricing.quote.summary.merchandiseSubtotalMinor)} · Giảm
+                sản phẩm {formatCurrency(pricing.quote.summary.productDiscountMinor)} · Mã shop{' '}
+                {formatCurrency(pricing.quote.summary.shopVoucherDiscountMinor)} · Mã Shopee{' '}
+                {formatCurrency(pricing.quote.summary.platformVoucherDiscountMinor)} · Mã vận chuyển{' '}
+                {formatCurrency(pricing.quote.summary.shippingVoucherDiscountMinor)} · Phí ship{' '}
+                {formatCurrency(pricing.quote.summary.shippingPayableMinor)}
               </small>
             </>
           ) : (

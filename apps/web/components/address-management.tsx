@@ -159,19 +159,11 @@ function AddressForm({
           <LegacyAdministrativeDivisionFields
             initialProvince={initial?.province}
             initialDistrict={initial?.district}
+            initialWard={initial?.ward}
             provinceError={errors.province}
             districtError={errors.district}
+            wardError={errors.ward}
             disabled={pending}
-          />
-          <InputField
-            id="address-ward"
-            name="ward"
-            label="Phường/Xã"
-            defaultValue={initial?.ward ?? ''}
-            autoComplete="address-level3"
-            maxLength={ACCOUNT_AREA_MAX_LENGTH}
-            error={errors.ward}
-            required
           />
         </div>
         <TextareaField

@@ -13,6 +13,8 @@ import {
   ShopStatus,
   UserStatus,
   VariantStatus,
+  VoucherBenefitType,
+  VoucherIssuer,
 } from '../src/generated/prisma/enums';
 import { PrismaService } from '../src/prisma/prisma.service';
 
@@ -22,6 +24,14 @@ const bearer = 'Bearer valid.cart.session';
 const addressId = '00000000-0000-4000-8000-000000009972';
 const foreignUserId = '00000000-0000-4000-8000-000000009973';
 const foreignAddressId = '00000000-0000-4000-8000-000000009974';
+const voucherIds = {
+  shop: '00000000-0000-4000-8000-000000009981',
+  platform: '00000000-0000-4000-8000-000000009982',
+  shipping: '00000000-0000-4000-8000-000000009983',
+  expired: '00000000-0000-4000-8000-000000009984',
+  exhausted: '00000000-0000-4000-8000-000000009985',
+  buyerUsed: '00000000-0000-4000-8000-000000009986',
+} as const;
 
 interface CatalogFixtureSnapshot {
   variantId: string;
@@ -45,6 +55,7 @@ databaseTest('Authenticated cart HTTP and browser security with isolated Postgre
   let secondVariantId: string;
   let firstShopId: string;
   let secondShopId: string;
+  let firstProductId: string;
   let catalogSnapshots: CatalogFixtureSnapshot[] = [];
 
   beforeAll(async () => {
@@ -138,7 +149,9 @@ databaseTest('Authenticated cart HTTP and browser security with isolated Postgre
         weightGrams: true,
         maxPurchaseQuantity: true,
         inventory: { select: { quantityOnHand: true, quantityReserved: true } },
-        product: { select: { shop: { select: { id: true, location: true } } } },
+        product: {
+          select: { id: true, shop: { select: { id: true, location: true } } },
+        },
       },
     });
     const first = candidates[0];
@@ -152,6 +165,7 @@ databaseTest('Authenticated cart HTTP and browser security with isolated Postgre
     secondVariantId = second.id;
     firstShopId = first.product.shop.id;
     secondShopId = second.product.shop.id;
+    firstProductId = first.product.id;
     catalogSnapshots = [first, second].map((candidate) => ({
       variantId: candidate.id,
       priceMinor: candidate.priceMinor,
@@ -163,6 +177,96 @@ databaseTest('Authenticated cart HTTP and browser security with isolated Postgre
       shopId: candidate.product.shop.id,
       shopLocation: candidate.product.shop.location,
     }));
+    await prisma.voucherUserUsage.deleteMany({
+      where: { voucherId: { in: Object.values(voucherIds) } },
+    });
+    await prisma.voucherProductScope.deleteMany({
+      where: { voucherId: { in: Object.values(voucherIds) } },
+    });
+    await prisma.voucher.deleteMany({ where: { id: { in: Object.values(voucherIds) } } });
+    const active = {
+      startsAt: new Date('2020-01-01T00:00:00.000Z'),
+      endsAt: new Date('2999-01-01T00:00:00.000Z'),
+      isEnabled: true,
+      minimumSpendMinor: 0n,
+      perBuyerLimit: 1,
+    } as const;
+    await prisma.voucher.createMany({
+      data: [
+        {
+          ...active,
+          id: voucherIds.shop,
+          code: 'T18-SHOP-10K',
+          name: 'T18 shop 10K',
+          issuer: VoucherIssuer.SHOP,
+          shopId: firstShopId,
+          benefitType: VoucherBenefitType.FIXED_AMOUNT,
+          fixedAmountMinor: 10_000n,
+          usageLimit: 100,
+        },
+        {
+          ...active,
+          id: voucherIds.platform,
+          code: 'T18-PLATFORM-10',
+          name: 'T18 platform 10%',
+          issuer: VoucherIssuer.PLATFORM,
+          benefitType: VoucherBenefitType.PERCENTAGE,
+          percentageBasisPoints: 1_000,
+          maximumDiscountMinor: 50_000n,
+          usageLimit: 100,
+        },
+        {
+          ...active,
+          id: voucherIds.shipping,
+          code: 'T18-FREESHIP-20K',
+          name: 'T18 freeship 20K',
+          issuer: VoucherIssuer.PLATFORM,
+          benefitType: VoucherBenefitType.FREE_SHIPPING,
+          maximumDiscountMinor: 20_000n,
+          usageLimit: 100,
+        },
+        {
+          ...active,
+          id: voucherIds.expired,
+          code: 'T18-EXPIRED-10K',
+          name: 'T18 expired',
+          issuer: VoucherIssuer.PLATFORM,
+          benefitType: VoucherBenefitType.FIXED_AMOUNT,
+          fixedAmountMinor: 10_000n,
+          startsAt: new Date('2019-01-01T00:00:00.000Z'),
+          endsAt: new Date('2020-01-01T00:00:00.000Z'),
+          usageLimit: 100,
+        },
+        {
+          ...active,
+          id: voucherIds.exhausted,
+          code: 'T18-EXHAUSTED-10K',
+          name: 'T18 exhausted',
+          issuer: VoucherIssuer.PLATFORM,
+          benefitType: VoucherBenefitType.FIXED_AMOUNT,
+          fixedAmountMinor: 10_000n,
+          usageLimit: 1,
+          usedCount: 1,
+        },
+        {
+          ...active,
+          id: voucherIds.buyerUsed,
+          code: 'T18-BUYER-USED',
+          name: 'T18 buyer used',
+          issuer: VoucherIssuer.PLATFORM,
+          benefitType: VoucherBenefitType.FIXED_AMOUNT,
+          fixedAmountMinor: 10_000n,
+          usageLimit: 100,
+          usedCount: 1,
+        },
+      ],
+    });
+    await prisma.voucherProductScope.create({
+      data: { voucherId: voucherIds.shop, productId: firstProductId },
+    });
+    await prisma.voucherUserUsage.create({
+      data: { voucherId: voucherIds.buyerUsed, userId, usedCount: 1 },
+    });
   });
 
   async function restoreCatalogFixtures() {
@@ -200,6 +304,13 @@ databaseTest('Authenticated cart HTTP and browser security with isolated Postgre
   afterAll(async () => {
     if (prisma) {
       await prisma.cart.deleteMany({ where: { userId } });
+      await prisma.voucherUserUsage.deleteMany({
+        where: { voucherId: { in: Object.values(voucherIds) } },
+      });
+      await prisma.voucherProductScope.deleteMany({
+        where: { voucherId: { in: Object.values(voucherIds) } },
+      });
+      await prisma.voucher.deleteMany({ where: { id: { in: Object.values(voucherIds) } } });
       if (catalogSnapshots.length > 0) await restoreCatalogFixtures();
       await prisma.shippingAddress.deleteMany({
         where: { id: { in: [addressId, foreignAddressId] } },
@@ -329,10 +440,12 @@ databaseTest('Authenticated cart HTTP and browser security with isolated Postgre
     expect(quoted.headers['cache-control']).toBe('private, no-store');
     expect(quoted.headers.etag).toBe(added.headers.etag);
     expect(quoted.body).toMatchObject({
-      pricingVersion: 'pricing-v1',
+      pricingVersion: 'pricing-v2',
+      voucherVersion: 'voucher-v1',
       shippingVersion: 'mock-v1',
       currency: 'VND',
       cartVersion: added.body.cart.version,
+      vouchers: [],
     });
     expect(quoted.body.shops[0].lines[0]).toMatchObject({
       sellingUnitPriceMinor: Number(variant.priceMinor),
@@ -444,6 +557,12 @@ databaseTest('Authenticated cart HTTP and browser security with isolated Postgre
       productDiscountMinor: 20_000,
       merchandiseSubtotalMinor: 230_000,
       shippingTotalMinor: 59_000,
+      shopVoucherDiscountMinor: 0,
+      platformVoucherDiscountMinor: 0,
+      merchandiseVoucherDiscountMinor: 0,
+      shippingVoucherDiscountMinor: 0,
+      voucherDiscountMinor: 0,
+      shippingPayableMinor: 59_000,
       payableTotalMinor: 289_000,
     });
     expect(
@@ -488,7 +607,7 @@ databaseTest('Authenticated cart HTTP and browser security with isolated Postgre
       .set('If-Match', secondAdded.headers.etag as string)
       .send({ ...quoteBody, services: [...quoteBody.services].reverse() })
       .expect(200);
-    expect(reordered.body).toEqual(quoted.body);
+    expect({ ...reordered.body, evaluatedAt: quoted.body.evaluatedAt }).toEqual(quoted.body);
     expect(
       await prisma.cart.findUniqueOrThrow({
         where: { userId },
@@ -551,5 +670,134 @@ databaseTest('Authenticated cart HTTP and browser security with isolated Postgre
       .set('If-Match', '"cart-0"')
       .send({ shippingAddressId: '00000000-0000-4000-8000-000000009999' })
       .expect(404);
+  });
+
+  it('previews stacked vouchers read-only and returns stable rejection reasons', async () => {
+    const firstAdded = await request(app.getHttpServer())
+      .post('/api/v1/cart/items')
+      .set('Authorization', bearer)
+      .set('Origin', 'http://localhost:3000')
+      .set('If-Match', '"cart-0"')
+      .send({ variantId, quantity: 2 })
+      .expect(200);
+    const secondAdded = await request(app.getHttpServer())
+      .post('/api/v1/cart/items')
+      .set('Authorization', bearer)
+      .set('Origin', 'http://localhost:3000')
+      .set('If-Match', firstAdded.headers.etag as string)
+      .send({ variantId: secondVariantId, quantity: 1 })
+      .expect(200);
+    const before = {
+      vouchers: await prisma.voucher.findMany({
+        where: { id: { in: Object.values(voucherIds) } },
+        orderBy: { id: 'asc' },
+        select: { id: true, usedCount: true, updatedAt: true },
+      }),
+      usages: await prisma.voucherUserUsage.findMany({
+        where: { voucherId: { in: Object.values(voucherIds) } },
+        orderBy: { voucherId: 'asc' },
+      }),
+      redemptions: await prisma.voucherRedemption.count({
+        where: { voucherId: { in: Object.values(voucherIds) } },
+      }),
+    };
+    const body = {
+      shippingAddressId: addressId,
+      vouchers: {
+        platformCode: ' t18-platform-10 ',
+        shopCodes: [{ shopId: firstShopId, code: 't18-shop-10k' }],
+        freeShippingCode: 't18-freeship-20k',
+      },
+    };
+    const quoted = await request(app.getHttpServer())
+      .post('/api/v1/cart/quote')
+      .set('Authorization', bearer)
+      .set('Origin', 'http://localhost:3000')
+      .set('If-Match', secondAdded.headers.etag as string)
+      .send(body)
+      .expect(200);
+    expect(quoted.body.vouchers).toEqual([
+      expect.objectContaining({ code: 'T18-SHOP-10K', status: 'APPLIED' }),
+      expect.objectContaining({ code: 'T18-PLATFORM-10', status: 'APPLIED' }),
+      expect.objectContaining({ code: 'T18-FREESHIP-20K', status: 'APPLIED' }),
+    ]);
+    expect(quoted.body.summary).toMatchObject({
+      shopVoucherDiscountMinor: 10_000,
+      shippingVoucherDiscountMinor: 20_000,
+    });
+    expect(quoted.body.summary.platformVoucherDiscountMinor).toBeGreaterThan(0);
+    expect(quoted.body.summary.payableTotalMinor).toBe(
+      quoted.body.summary.merchandiseSubtotalMinor +
+        quoted.body.summary.shippingTotalMinor -
+        quoted.body.summary.voucherDiscountMinor,
+    );
+    await request(app.getHttpServer())
+      .post('/api/v1/cart/quote')
+      .set('Authorization', bearer)
+      .set('Origin', 'http://localhost:3000')
+      .set('If-Match', secondAdded.headers.etag as string)
+      .send(body)
+      .expect(200);
+    const after = {
+      vouchers: await prisma.voucher.findMany({
+        where: { id: { in: Object.values(voucherIds) } },
+        orderBy: { id: 'asc' },
+        select: { id: true, usedCount: true, updatedAt: true },
+      }),
+      usages: await prisma.voucherUserUsage.findMany({
+        where: { voucherId: { in: Object.values(voucherIds) } },
+        orderBy: { voucherId: 'asc' },
+      }),
+      redemptions: await prisma.voucherRedemption.count({
+        where: { voucherId: { in: Object.values(voucherIds) } },
+      }),
+    };
+    expect(after).toEqual(before);
+
+    const cases = [
+      [{ platformCode: 'UNKNOWN-CODE' }, 'NOT_FOUND'],
+      [{ platformCode: 'T18-EXPIRED-10K' }, 'EXPIRED'],
+      [{ platformCode: 'T18-EXHAUSTED-10K' }, 'GLOBAL_LIMIT_REACHED'],
+      [{ platformCode: 'T18-BUYER-USED' }, 'BUYER_LIMIT_REACHED'],
+      [{ platformCode: 'T18-FREESHIP-20K' }, 'TYPE_MISMATCH'],
+      [{ shopCodes: [{ shopId: secondShopId, code: 'T18-SHOP-10K' }] }, 'SCOPE_MISMATCH'],
+    ] as const;
+    for (const [vouchers, reason] of cases) {
+      const response = await request(app.getHttpServer())
+        .post('/api/v1/cart/quote')
+        .set('Authorization', bearer)
+        .set('Origin', 'http://localhost:3000')
+        .set('If-Match', secondAdded.headers.etag as string)
+        .send({ shippingAddressId: addressId, vouchers })
+        .expect(200);
+      expect(response.body.vouchers[0]).toMatchObject({
+        status: 'REJECTED',
+        rejectionReason: reason,
+        discountMinor: 0,
+      });
+    }
+    await request(app.getHttpServer())
+      .post('/api/v1/cart/quote')
+      .set('Authorization', bearer)
+      .set('Origin', 'http://localhost:3000')
+      .set('If-Match', secondAdded.headers.etag as string)
+      .send({
+        shippingAddressId: addressId,
+        vouchers: {
+          platformCode: 'T18-PLATFORM-10',
+          freeShippingCode: 't18-platform-10',
+        },
+      })
+      .expect(400);
+    await request(app.getHttpServer())
+      .post('/api/v1/cart/quote')
+      .set('Authorization', bearer)
+      .set('Origin', 'http://localhost:3000')
+      .set('If-Match', secondAdded.headers.etag as string)
+      .send({
+        shippingAddressId: addressId,
+        vouchers: { platformCode: 'T18-PLATFORM-10', discountMinor: 50_000 },
+      })
+      .expect(400);
   });
 });

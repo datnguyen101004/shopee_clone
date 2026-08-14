@@ -145,6 +145,91 @@
   text-decoration: none;
   cursor: pointer;
 }
+.cart-vouchers {
+  display: grid;
+  gap: 1rem;
+  padding: 1rem 1.25rem;
+  border: 1px solid var(--sc-color-border);
+  border-radius: var(--sc-radius-md);
+  background: var(--sc-color-surface);
+}
+.cart-vouchers header p,
+.cart-vouchers header h2 {
+  margin: 0;
+}
+.cart-vouchers header p {
+  color: var(--sc-color-brand-700);
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+.cart-vouchers__controls {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+.cart-shop__voucher {
+  padding: 0.85rem 1rem;
+  border-top: 1px solid var(--sc-color-border);
+}
+.voucher-control {
+  display: grid;
+  gap: 0.4rem;
+  min-width: 0;
+}
+.voucher-control label {
+  display: grid;
+  gap: 0.4rem;
+  color: var(--sc-color-text-muted);
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+.voucher-control__entry {
+  display: grid;
+  grid-template-columns: minmax(120px, 1fr) auto auto;
+  gap: 0.45rem;
+}
+.voucher-control input,
+.voucher-control button {
+  min-height: 44px;
+  border-radius: var(--sc-radius-sm);
+}
+.voucher-control input {
+  min-width: 0;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid var(--sc-color-border-strong);
+  color: var(--sc-color-text);
+  text-transform: uppercase;
+}
+.voucher-control input:focus-visible,
+.voucher-control button:focus-visible {
+  outline: 3px solid #ee4d2d2b;
+  outline-offset: 1px;
+}
+.voucher-control button {
+  padding: 0.55rem 0.8rem;
+  border: 1px solid var(--sc-color-brand-500);
+  background: var(--sc-color-brand-600);
+  color: #fff;
+  font-weight: 800;
+  cursor: pointer;
+}
+.voucher-control button:disabled {
+  cursor: wait;
+  opacity: 0.55;
+}
+.voucher-control .voucher-control__remove {
+  background: #fff;
+  color: var(--sc-color-brand-700);
+}
+.voucher-control__message {
+  min-height: 1.2rem;
+  color: #067647;
+  font-size: 0.76rem;
+  line-height: 1.45;
+}
+.voucher-control__message.is-error {
+  color: #b42318;
+}
 .cart-shop__pricing {
   display: flex;
   align-items: center;
@@ -356,6 +441,9 @@
 }
 
 @media (max-width: 899px) {
+  .cart-vouchers__controls {
+    grid-template-columns: 1fr;
+  }
   .cart-shop__labels {
     display: none;
   }
@@ -406,6 +494,12 @@
 }
 
 @media (max-width: 599px) {
+  .voucher-control__entry {
+    grid-template-columns: 1fr 1fr;
+  }
+  .voucher-control__entry input {
+    grid-column: 1 / -1;
+  }
   .cart-pricing > header,
   .cart-pricing__shop,
   .cart-pricing--required {
@@ -2466,6 +2560,30 @@
   border-color: var(--sc-color-danger);
   box-shadow: 0 0 0 1px var(--sc-color-danger);
 }
+.buyer-division-field[data-readonly='true'] .buyer-division-trigger {
+  opacity: 1;
+}
+.buyer-division-field__status {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 0.35rem;
+  color: var(--sc-color-text-muted);
+  font-size: 0.78rem;
+}
+.buyer-division-field__status.is-error {
+  color: var(--sc-color-danger);
+}
+.buyer-division-field__status button {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: 700;
+  text-decoration: underline;
+  cursor: pointer;
+}
 .buyer-division-dialog {
   width: min(92vw, 620px);
 }
@@ -2541,6 +2659,9 @@
   .buyer-account-readonly,
   .buyer-address-form__areas {
     grid-template-columns: 1fr;
+  }
+  .buyer-division-dialog__list {
+    max-height: 45vh;
   }
   .buyer-address-toolbar,
   .buyer-address-card__heading {

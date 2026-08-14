@@ -1,5 +1,7 @@
 import { ProductStatus, ShopStatus, VariantStatus } from '../generated/prisma/enums';
 import type { PrismaService } from '../prisma/prisma.service';
+import type { SystemUtcClock } from '../vouchers/utc-clock';
+import { VoucherPricingCalculator } from '../vouchers/voucher-pricing.calculator';
 import { CommercePricingCalculator } from './commerce-pricing.calculator';
 import { MockShippingCalculator } from './mock-shipping.calculator';
 import {
@@ -50,7 +52,7 @@ function fixtureCart() {
   };
 }
 
-function serviceWith(options?: { address?: unknown; cart?: unknown }) {
+function serviceWith(options?: { address?: unknown; cart?: unknown; vouchers?: unknown[] }) {
   const transaction = {
     shippingAddress: {
       findFirst: jest
@@ -66,6 +68,7 @@ function serviceWith(options?: { address?: unknown; cart?: unknown }) {
         .fn()
         .mockResolvedValue(options && 'cart' in options ? options.cart : fixtureCart()),
     },
+    voucher: { findMany: jest.fn().mockResolvedValue(options?.vouchers ?? []) },
   };
   const prisma = {
     $transaction: jest.fn(async (work: (client: typeof transaction) => unknown) =>
@@ -75,6 +78,8 @@ function serviceWith(options?: { address?: unknown; cart?: unknown }) {
   return new PricingQuoteService(
     prisma,
     new CommercePricingCalculator(new MockShippingCalculator()),
+    new VoucherPricingCalculator(),
+    { now: () => new Date('2026-08-14T05:00:00.000Z') } as SystemUtcClock,
   );
 }
 
@@ -123,5 +128,41 @@ describe('pricing quote orchestration', () => {
     await expect(
       serviceWith({ cart: null }).quote(userId, 1, addressId, []),
     ).rejects.toBeInstanceOf(PricingConflictError);
+  });
+
+  it('reloads current definitions and returns mixed applied and rejected evidence', async () => {
+    const active = {
+      id: '00000000-0000-4000-8000-000000000020',
+      code: 'PLATFORM-10',
+      name: 'Sàn giảm 10%',
+      issuer: 'PLATFORM',
+      shopId: null,
+      benefitType: 'PERCENTAGE',
+      fixedAmountMinor: null,
+      percentageBasisPoints: 1_000,
+      maximumDiscountMinor: 50_000n,
+      minimumSpendMinor: 100_000n,
+      startsAt: new Date('2020-01-01T00:00:00.000Z'),
+      endsAt: new Date('2999-01-01T00:00:00.000Z'),
+      isEnabled: true,
+      usageLimit: 100,
+      usedCount: 0,
+      perBuyerLimit: 1,
+      productScopes: [],
+      userUsages: [],
+    };
+    const quote = await serviceWith({ vouchers: [active] }).quote(userId, 2, addressId, [], {
+      platformCode: 'PLATFORM-10',
+      freeShippingCode: 'UNKNOWN-CODE',
+    });
+    expect(quote.vouchers).toEqual([
+      expect.objectContaining({ code: 'PLATFORM-10', status: 'APPLIED', discountMinor: 18_000 }),
+      expect.objectContaining({
+        code: 'UNKNOWN-CODE',
+        status: 'REJECTED',
+        rejectionReason: 'NOT_FOUND',
+      }),
+    ]);
+    expect(quote.summary.platformVoucherDiscountMinor).toBe(18_000);
   });
 });

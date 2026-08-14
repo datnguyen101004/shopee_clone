@@ -26,6 +26,18 @@ vi.mock('../lib/account-api', () => ({
 }));
 vi.mock('./auth-session-provider', () => ({ useAuthSession: vi.fn() }));
 
+const loadLegacyWards = vi.hoisted(() => vi.fn());
+
+vi.mock('../lib/legacy-vietnam-ward-loader', () => ({ loadLegacyWards }));
+
+const wardFixtures = {
+  '001': [
+    { code: '00001', name: 'Phường Phúc Xá' },
+    { code: '00004', name: 'Phường Trúc Bạch' },
+  ],
+  '760': [{ code: '26740', name: 'Phường Bến Nghé' }],
+} as const;
+
 const profile: BuyerProfile = {
   id: '00000000-0000-4000-8000-000000000001',
   email: 'buyer@example.test',
@@ -69,6 +81,9 @@ describe('account management experiences', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    loadLegacyWards.mockImplementation(
+      async (districtCode: keyof typeof wardFixtures) => wardFixtures[districtCode] ?? [],
+    );
     vi.mocked(useAuthSession).mockReturnValue({
       state: {
         status: 'authenticated',
@@ -151,11 +166,19 @@ describe('account management experiences', () => {
 
     const editButtons = screen.getAllByRole('button', { name: 'Sửa' });
     await user.click(editButtons[0]!);
-    const ward = screen.getByRole('textbox', { name: 'Phường/Xã' });
-    await user.clear(ward);
-    await user.type(ward, 'Truc Bach');
+    const wardTrigger = screen.getByRole('button', { name: 'Phường/Xã' });
+    await waitFor(() => expect(wardTrigger).toBeEnabled());
+    await user.click(wardTrigger);
+    await user.type(screen.getByLabelText('Tìm kiếm phường/xã'), 'truc bach');
+    await user.click(screen.getByRole('option', { name: 'Phường Trúc Bạch' }));
     await user.click(screen.getByRole('button', { name: 'Lưu địa chỉ' }));
-    await waitFor(() => expect(updateShippingAddress).toHaveBeenCalledTimes(1));
+    await waitFor(() =>
+      expect(updateShippingAddress).toHaveBeenCalledWith(
+        addresses[0]!.id,
+        expect.objectContaining({ ward: 'Phường Trúc Bạch' }),
+        authenticatedFetch,
+      ),
+    );
 
     await user.click(screen.getAllByRole('button', { name: 'Xóa' })[0]!);
     expect(screen.getByRole('dialog', { name: 'Xóa địa chỉ này?' })).toBeInTheDocument();
@@ -165,7 +188,7 @@ describe('account management experiences', () => {
     );
   });
 
-  it('selects legacy province and district in searchable dependent popups', async () => {
+  it('creates an address by selecting legacy province, district, and ward popups', async () => {
     const user = userEvent.setup();
     render(<AddressManagement />);
     await screen.findByText('Nguyen Van A');
@@ -173,7 +196,9 @@ describe('account management experiences', () => {
 
     const provinceTrigger = screen.getByLabelText('Tỉnh/Thành phố');
     const districtTrigger = screen.getByLabelText('Quận/Huyện');
+    const wardTrigger = screen.getByLabelText('Phường/Xã');
     expect(districtTrigger).toBeDisabled();
+    expect(wardTrigger).toBeDisabled();
 
     await user.click(provinceTrigger);
     expect(screen.getByRole('dialog', { name: 'Chọn tỉnh/thành phố' })).toBeInTheDocument();
@@ -197,9 +222,13 @@ describe('account management experiences', () => {
     await user.type(screen.getByLabelText('Tìm kiếm quận/huyện'), 'ba dinh');
     await user.click(screen.getByRole('option', { name: 'Quận Ba Đình' }));
 
+    await waitFor(() => expect(wardTrigger).toBeEnabled());
+    await user.click(wardTrigger);
+    await user.type(screen.getByLabelText('Tìm kiếm phường/xã'), 'phuc xa');
+    await user.click(screen.getByRole('option', { name: 'Phường Phúc Xá' }));
+
     await user.type(screen.getByLabelText('Họ và tên người nhận'), 'Nguyen Van C');
     await user.type(screen.getByLabelText('Số điện thoại'), '0912 345 678');
-    await user.type(screen.getByLabelText('Phường/Xã'), 'Phúc Xá');
     await user.type(screen.getByLabelText('Địa chỉ cụ thể'), '12 Hàng Than');
     await user.click(screen.getAllByRole('button', { name: 'Thêm địa chỉ' })[1]!);
 
@@ -208,10 +237,12 @@ describe('account management experiences', () => {
         expect.objectContaining({
           province: 'Thành phố Hà Nội',
           district: 'Quận Ba Đình',
+          ward: 'Phường Phúc Xá',
         }),
         authenticatedFetch,
       ),
     );
+    await waitFor(() => expect(getShippingAddresses).toHaveBeenCalledTimes(2));
   });
 
   it('shows restoration and guest states with a safe internal return path', () => {

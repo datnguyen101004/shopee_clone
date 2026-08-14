@@ -23,11 +23,15 @@ Browser mutations also use the existing trusted-Origin policy. Bodies are strict
 
 The shared helpers give the web immediate guidance, but NestJS and PostgreSQL remain authoritative.
 
-### Legacy province and district picker
+### Legacy three-level administrative picker
 
-The web form uses searchable popups for province/city and district. Its frontend-only snapshot comes from the National Statistics Office `DMDVHC` service for `2025-06-30`: 63 province-level units and 696 dependent district-level units immediately before the 2025 consolidation. Search is case- and accent-insensitive. Selecting a different province clears an incompatible district; ward/commune remains a validated text field.
+The web form uses searchable popups for province/city, district, and ward/commune. Its frontend-only snapshot comes from the National Statistics Office `DMDVHC` service for `2025-06-30`: 63 province-level units, 696 district-level units, and 10,035 ward-level units under 691 districts immediately before the 2025 consolidation. The generated ward artifact is loaded only after the form recognizes a district; the browser never calls the NSO service at runtime.
+
+Search is case- and accent-insensitive. Selecting a different province clears district and ward; selecting a different district clears ward. Re-selecting the same parent preserves its valid child. The five districts without a commune level (`Bạch Long Vĩ`, `Cồn Cỏ`, `Hoàng Sa`, `Lý Sơn`, and `Côn Đảo`) automatically use the explicit string `Không có đơn vị hành chính cấp xã`, keeping the existing required `ward` contract without inventing a fake administrative unit.
 
 Administrative codes are lookup metadata only. The unchanged account API and PostgreSQL model continue to store human-readable strings, so this legacy picker does not couple checkout data to the snapshot and can later coexist with a post-2025 address adapter. Existing abbreviated or unaccented values are resolved for editing but are not silently rewritten before the user submits the form.
+
+To verify in the browser, sign in and open `http://localhost:3000/account/addresses`, choose **Thêm địa chỉ**, then select a province, district, and ward. The ward trigger remains disabled until the district is known, supports unaccented search, and shows a retry action if its local chunk cannot load. Editing an existing address preserves an unrecognized legacy ward until its province or district is changed.
 
 ## Default-address invariant and lock order
 
@@ -67,5 +71,7 @@ npx --yes pnpm@10.34.5 test:e2e:account:quick
 npx --yes pnpm@10.34.5 test:e2e:auth:quick
 npx --yes pnpm@10.34.5 test:e2e:homepage:quick
 ```
+
+The committed ward snapshot can be regenerated explicitly with `npx --yes pnpm@10.34.5 data:generate:legacy-wards`. This maintenance command requires network access to NSO; application build and runtime do not.
 
 `db:verify` is destructive only to the guarded `TEST_DATABASE_URL` whose database name must end in `_test`. Account quick E2E stubs only non-mutating reads and never changes the local development database.

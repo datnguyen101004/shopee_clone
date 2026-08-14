@@ -238,6 +238,34 @@ export const seedUnavailableEngagementProduct = {
   },
 } as const;
 
+export const seedVoucherFixtureIds = {
+  platformFixed: '00000000-0000-4000-8000-000000001001',
+  platformPercentage: '00000000-0000-4000-8000-000000001002',
+  shopPercentage: '00000000-0000-4000-8000-000000001003',
+  freeShipping: '00000000-0000-4000-8000-000000001004',
+  expired: '00000000-0000-4000-8000-000000001005',
+  future: '00000000-0000-4000-8000-000000001006',
+  exhausted: '00000000-0000-4000-8000-000000001007',
+  buyerUsed: '00000000-0000-4000-8000-000000001008',
+  exhaustedConsumption: '00000000-0000-4000-8000-000000001101',
+  buyerUsedConsumption: '00000000-0000-4000-8000-000000001102',
+  exhaustedPurchase: '00000000-0000-4000-8000-000000001201',
+  buyerUsedPurchase: '00000000-0000-4000-8000-000000001202',
+  exhaustedRedemption: '00000000-0000-4000-8000-000000001301',
+  buyerUsedRedemption: '00000000-0000-4000-8000-000000001302',
+} as const;
+
+export const seedVoucherCodes = {
+  platformFixed: 'PLATFORM-50K',
+  platformPercentage: 'PLATFORM-10',
+  shopPercentage: 'SHOP-15',
+  freeShipping: 'FREESHIP-30K',
+  expired: 'EXPIRED-10K',
+  future: 'FUTURE-10K',
+  exhausted: 'EXHAUSTED-10K',
+  buyerUsed: 'USED-10K',
+} as const;
+
 export const seedExpectedCounts = {
   users: seedUsers.length + 6,
   shops: seedShops.length + 6,
@@ -254,4 +282,9 @@ export const seedExpectedCounts = {
   productFavorites: 3,
   recentlyViewedProducts: 3,
   shopFollowers: seedShopFollowers.length,
+  vouchers: 8,
+  voucherProductScopes: 1,
+  voucherUserUsages: 2,
+  voucherConsumptions: 2,
+  voucherRedemptions: 2,
 } as const;

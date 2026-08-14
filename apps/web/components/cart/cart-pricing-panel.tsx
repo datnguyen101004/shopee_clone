@@ -100,7 +100,14 @@ export function CartPricingPanel({
                 <span>
                   MOCK · {quotedShop.shipping.estimatedDaysMin}–
                   {quotedShop.shipping.estimatedDaysMax} ngày ·{' '}
-                  {money(quotedShop.shipping.shippingFeeMinor)}
+                  {quotedShop.shippingVoucherDiscountMinor > 0 ? (
+                    <>
+                      <del>{money(quotedShop.shipping.shippingFeeMinor)}</del>{' '}
+                      {money(quotedShop.shippingPayableMinor)}
+                    </>
+                  ) : (
+                    money(quotedShop.shippingPayableMinor)
+                  )}
                 </span>
               ) : (
                 <span>Đang chờ báo giá…</span>

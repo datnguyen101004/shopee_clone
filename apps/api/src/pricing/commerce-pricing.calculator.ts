@@ -2,6 +2,7 @@ import {
   PRICING_CURRENCY,
   PRICING_VERSION,
   MOCK_SHIPPING_VERSION,
+  VOUCHER_VERSION,
   type PricingQuoteAddress,
   type PricingQuoteExclusion,
   type PricingQuoteLine,
@@ -39,6 +40,7 @@ export interface AuthoritativePricingLine {
 
 export interface AuthoritativePricingSnapshot {
   cartVersion: number;
+  evaluatedAt: Date;
   address: PricingQuoteAddress;
   lines: readonly AuthoritativePricingLine[];
   exclusions: readonly PricingQuoteExclusion[];
@@ -70,6 +72,10 @@ function pricingLine(input: AuthoritativePricingLine): PricingQuoteLine {
     listSubtotalMinor,
     productDiscountMinor: checkedSubtract(listSubtotalMinor, merchandiseSubtotalMinor),
     merchandiseSubtotalMinor,
+    shopVoucherDiscountMinor: 0,
+    platformVoucherDiscountMinor: 0,
+    merchandiseVoucherDiscountMinor: 0,
+    payableMerchandiseMinor: merchandiseSubtotalMinor,
   };
 }
 
@@ -123,6 +129,12 @@ export class CommercePricingCalculator {
           listSubtotalMinor,
           productDiscountMinor,
           merchandiseSubtotalMinor,
+          shopVoucherDiscountMinor: 0,
+          platformVoucherDiscountMinor: 0,
+          merchandiseVoucherDiscountMinor: 0,
+          shippingVoucherDiscountMinor: 0,
+          voucherDiscountMinor: 0,
+          shippingPayableMinor: shipping.shippingFeeMinor,
           payableTotalMinor: checkedAdd(merchandiseSubtotalMinor, shipping.shippingFeeMinor),
         };
       });
@@ -130,11 +142,14 @@ export class CommercePricingCalculator {
     const allLines = shops.flatMap((shop) => shop.lines);
     return {
       pricingVersion: PRICING_VERSION,
+      voucherVersion: VOUCHER_VERSION,
       shippingVersion: MOCK_SHIPPING_VERSION,
       currency: PRICING_CURRENCY,
+      evaluatedAt: snapshot.evaluatedAt.toISOString(),
       cartVersion: snapshot.cartVersion,
       address: snapshot.address,
       shops,
+      vouchers: [],
       exclusions: [...snapshot.exclusions].sort((left, right) =>
         left.lineId.localeCompare(right.lineId),
       ),
@@ -145,6 +160,12 @@ export class CommercePricingCalculator {
         productDiscountMinor: checkedAdd(...shops.map((shop) => shop.productDiscountMinor)),
         merchandiseSubtotalMinor: checkedAdd(...shops.map((shop) => shop.merchandiseSubtotalMinor)),
         shippingTotalMinor: checkedAdd(...shops.map((shop) => shop.shipping.shippingFeeMinor)),
+        shopVoucherDiscountMinor: 0,
+        platformVoucherDiscountMinor: 0,
+        merchandiseVoucherDiscountMinor: 0,
+        shippingVoucherDiscountMinor: 0,
+        voucherDiscountMinor: 0,
+        shippingPayableMinor: checkedAdd(...shops.map((shop) => shop.shipping.shippingFeeMinor)),
         payableTotalMinor: checkedAdd(...shops.map((shop) => shop.payableTotalMinor)),
       },
     };

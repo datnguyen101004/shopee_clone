@@ -40,4 +40,4 @@ pnpm test:e2e:product       # isolated Docker, migration, seed, PostgreSQL and b
 
 ## Deliberate T10 non-goals
 
-Color/size option axes, image uploads, checkout, address-aware rates, vouchers, reservations, review bodies, real order-derived sales, realtime stock, and personalized recommendations belong to later roadmap tasks. Authentication and persistent carts were delivered by T11/T16.
+Color/size option axes, image uploads, checkout, reservations, review bodies, real order-derived sales, realtime stock, and personalized recommendations belong to later roadmap tasks. Authentication, persistent carts, address-aware mock rates, and voucher preview were delivered by T11/T16–T18.

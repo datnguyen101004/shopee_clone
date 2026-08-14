@@ -10,6 +10,7 @@ import { MockShippingCalculator } from './mock-shipping.calculator';
 const calculator = new CommercePricingCalculator(new MockShippingCalculator());
 const snapshot: AuthoritativePricingSnapshot = {
   cartVersion: 3,
+  evaluatedAt: new Date('2026-08-14T05:00:00.000Z'),
   address: {
     id: '00000000-0000-4000-8000-000000000001',
     province: 'Thành phố Hồ Chí Minh',

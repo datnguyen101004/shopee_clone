@@ -88,6 +88,21 @@ enum RoleAuditSource {
   @@map("role_audit_source")
 }
 
+enum VoucherIssuer {
+  PLATFORM @map("platform")
+  SHOP     @map("shop")
+
+  @@map("voucher_issuer")
+}
+
+enum VoucherBenefitType {
+  FIXED_AMOUNT  @map("fixed_amount")
+  PERCENTAGE    @map("percentage")
+  FREE_SHIPPING @map("free_shipping")
+
+  @@map("voucher_benefit_type")
+}
+
 model User {
   id                  String                  @id @default(uuid()) @db.Uuid
   email               String                  @unique @db.VarChar(320)
@@ -111,6 +126,9 @@ model User {
   recentlyViewed      RecentlyViewedProduct[]
   followedShops       ShopFollower[]
   cart                Cart?
+  voucherUsages       VoucherUserUsage[]
+  voucherConsumptions VoucherConsumption[]
+  voucherRedemptions  VoucherRedemption[]
 
   @@index([status])
   @@index([deletedAt])
@@ -253,6 +271,7 @@ model Shop {
   owner     User           @relation(fields: [ownerId], references: [id], onDelete: Restrict)
   products  Product[]
   followers ShopFollower[]
+  vouchers  Voucher[]
 
   @@index([status])
   @@index([deletedAt])
@@ -302,6 +321,7 @@ model Product {
   datasetRecord            DatasetProductRecord?
   favorites                ProductFavorite[]
   recentlyViewedBy         RecentlyViewedProduct[]
+  voucherScopes            VoucherProductScope[]
 
   @@unique([shopId, slug])
   @@index([shopId, status])
@@ -450,6 +470,92 @@ model CartLine {
   @@index([cartId, createdAt, id])
   @@index([variantId])
   @@map("cart_lines")
+}
+
+model Voucher {
+  id                    String                @id @default(uuid()) @db.Uuid
+  code                  String                @unique @db.VarChar(32)
+  name                  String                @db.VarChar(160)
+  issuer                VoucherIssuer
+  shopId                String?               @map("shop_id") @db.Uuid
+  benefitType           VoucherBenefitType    @map("benefit_type")
+  fixedAmountMinor      BigInt?               @map("fixed_amount_minor")
+  percentageBasisPoints Int?                  @map("percentage_basis_points")
+  maximumDiscountMinor  BigInt?               @map("maximum_discount_minor")
+  minimumSpendMinor     BigInt                @default(0) @map("minimum_spend_minor")
+  startsAt              DateTime              @map("starts_at") @db.Timestamptz(3)
+  endsAt                DateTime              @map("ends_at") @db.Timestamptz(3)
+  isEnabled             Boolean               @default(true) @map("is_enabled")
+  usageLimit            Int                   @map("usage_limit")
+  perBuyerLimit         Int                   @map("per_buyer_limit")
+  usedCount             Int                   @default(0) @map("used_count")
+  createdAt             DateTime              @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt             DateTime              @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  shop                  Shop?                 @relation(fields: [shopId], references: [id], onDelete: Restrict)
+  productScopes         VoucherProductScope[]
+  userUsages            VoucherUserUsage[]
+  redemptions           VoucherRedemption[]
+
+  @@index([shopId, isEnabled, startsAt, endsAt])
+  @@index([isEnabled, startsAt, endsAt])
+  @@map("vouchers")
+}
+
+model VoucherProductScope {
+  voucherId String  @map("voucher_id") @db.Uuid
+  productId String  @map("product_id") @db.Uuid
+  voucher   Voucher @relation(fields: [voucherId], references: [id], onDelete: Cascade)
+  product   Product @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  @@id([voucherId, productId])
+  @@index([productId, voucherId])
+  @@map("voucher_product_scopes")
+}
+
+model VoucherUserUsage {
+  voucherId String   @map("voucher_id") @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  usedCount Int      @default(0) @map("used_count")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  voucher   Voucher  @relation(fields: [voucherId], references: [id], onDelete: Restrict)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@id([voucherId, userId])
+  @@index([userId, voucherId])
+  @@map("voucher_user_usages")
+}
+
+model VoucherConsumption {
+  id                String              @id @default(uuid()) @db.Uuid
+  purchaseReference String              @unique @map("purchase_reference") @db.Uuid
+  userId            String              @map("user_id") @db.Uuid
+  voucherSetDigest  String              @map("voucher_set_digest") @db.Char(64)
+  createdAt         DateTime            @default(now()) @map("created_at") @db.Timestamptz(3)
+  user              User                @relation(fields: [userId], references: [id], onDelete: Restrict)
+  redemptions       VoucherRedemption[]
+
+  @@index([userId, createdAt, id])
+  @@map("voucher_consumptions")
+}
+
+model VoucherRedemption {
+  id                       String             @id @default(uuid()) @db.Uuid
+  consumptionId            String             @map("consumption_id") @db.Uuid
+  voucherId                String             @map("voucher_id") @db.Uuid
+  userId                   String             @map("user_id") @db.Uuid
+  merchandiseDiscountMinor BigInt             @map("merchandise_discount_minor")
+  shippingDiscountMinor    BigInt             @map("shipping_discount_minor")
+  discountMinor            BigInt             @map("discount_minor")
+  createdAt                DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
+  consumption              VoucherConsumption @relation(fields: [consumptionId], references: [id], onDelete: Restrict)
+  voucher                  Voucher            @relation(fields: [voucherId], references: [id], onDelete: Restrict)
+  user                     User               @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@unique([consumptionId, voucherId])
+  @@index([voucherId, createdAt, id])
+  @@index([userId, createdAt, id])
+  @@map("voucher_redemptions")
 }
 
 model ProductImage {

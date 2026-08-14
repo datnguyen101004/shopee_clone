@@ -45,12 +45,15 @@ const cart: CartResponse = {
 
 function quote(payable: number): PricingQuoteResponse {
   return {
-    pricingVersion: 'pricing-v1',
+    pricingVersion: 'pricing-v2',
+    voucherVersion: 'voucher-v1',
     shippingVersion: 'mock-v1',
     currency: 'VND',
+    evaluatedAt: '2026-08-14T00:00:00.000Z',
     cartVersion: 4,
     address: { id: addressId, province: 'Hà Nội', district: 'Ba Đình' },
     shops: [],
+    vouchers: [],
     exclusions: [],
     summary: {
       selectedLineCount: 0,
@@ -59,6 +62,12 @@ function quote(payable: number): PricingQuoteResponse {
       productDiscountMinor: 0,
       merchandiseSubtotalMinor: 0,
       shippingTotalMinor: payable,
+      shopVoucherDiscountMinor: 0,
+      platformVoucherDiscountMinor: 0,
+      merchandiseVoucherDiscountMinor: 0,
+      shippingVoucherDiscountMinor: 0,
+      voucherDiscountMinor: 0,
+      shippingPayableMinor: payable,
       payableTotalMinor: payable,
     },
   };
@@ -147,5 +156,41 @@ describe('cart pricing coordination', () => {
     const missing = renderHook(() => useCartPricing(cart, refresh));
     await waitFor(() => expect(missing.result.current.status).toBe('missing-address'));
     expect(missing.result.current.quote).toBeNull();
+  });
+
+  it('applies and removes complete selections while pruning a shop no longer selected', async () => {
+    vi.mocked(getPricingQuote).mockResolvedValue(quote(22_000));
+    const { result, rerender } = renderHook(
+      ({ currentCart }) => useCartPricing(currentCart, refresh),
+      { initialProps: { currentCart: cart } },
+    );
+    await waitFor(() => expect(getPricingQuote).toHaveBeenCalledTimes(1));
+
+    act(() => {
+      result.current.setPlatformVoucher('PLATFORM-10');
+      result.current.setShopVoucher(shopId, 'SHOP-15');
+      result.current.setFreeShippingVoucher('FREESHIP-30K');
+    });
+    await waitFor(() => expect(getPricingQuote).toHaveBeenCalledTimes(2));
+    expect(vi.mocked(getPricingQuote).mock.calls.at(-1)?.[0].vouchers).toEqual({
+      platformCode: 'PLATFORM-10',
+      shopCodes: [{ shopId, code: 'SHOP-15' }],
+      freeShippingCode: 'FREESHIP-30K',
+    });
+
+    act(() => result.current.setPlatformVoucher(null));
+    await waitFor(() => expect(getPricingQuote).toHaveBeenCalledTimes(3));
+    expect(result.current.vouchers.platformCode).toBeUndefined();
+
+    const withoutSelectedShop: CartResponse = {
+      ...cart,
+      groups: cart.groups.map((group) => ({ ...group, selectedEligibleLineCount: 0 })),
+      summary: { ...cart.summary, selectedValidLineCount: 0, selectedValidQuantity: 0 },
+    };
+    rerender({ currentCart: withoutSelectedShop });
+    await waitFor(() => expect(result.current.vouchers.shopCodes).toBeUndefined());
+    expect(vi.mocked(getPricingQuote).mock.calls.at(-1)?.[0].vouchers).toEqual({
+      freeShippingCode: 'FREESHIP-30K',
+    });
   });
 });

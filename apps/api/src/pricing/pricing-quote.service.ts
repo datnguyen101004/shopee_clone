@@ -3,17 +3,24 @@ import {
   type PricingQuoteExclusion,
   type PricingQuoteResponse,
   type ShopShippingServiceSelection,
+  type VoucherCodeSelection,
 } from '@shopee-clone/contracts';
 import { Inject, Injectable } from '@nestjs/common';
 
 import type { Prisma } from '../generated/prisma/client';
 import { ProductStatus, ShopStatus, VariantStatus } from '../generated/prisma/enums';
 import { PrismaService } from '../prisma/prisma.service';
+import { SystemUtcClock } from '../vouchers/utc-clock';
+import {
+  VoucherPricingCalculator,
+  type AppliedVoucherSnapshot,
+  type VoucherDefinitionSnapshot,
+} from '../vouchers/voucher-pricing.calculator';
 import {
   CommercePricingCalculator,
   type AuthoritativePricingLine,
 } from './commerce-pricing.calculator';
-import { UnsafePricingArithmeticError } from './money';
+import { UnsafePricingArithmeticError, checkedMoneyFromBigInt } from './money';
 import {
   PricingAddressNotFoundError,
   PricingConflictError,
@@ -71,6 +78,9 @@ export class PricingQuoteService {
   constructor(
     @Inject(PrismaService) private readonly prisma: PrismaService,
     @Inject(CommercePricingCalculator) private readonly calculator: CommercePricingCalculator,
+    @Inject(VoucherPricingCalculator)
+    private readonly voucherCalculator: VoucherPricingCalculator,
+    @Inject(SystemUtcClock) private readonly clock: SystemUtcClock,
   ) {}
 
   async quote(
@@ -78,41 +88,21 @@ export class PricingQuoteService {
     expectedVersion: number,
     shippingAddressId: string,
     services: readonly ShopShippingServiceSelection[],
+    vouchers?: VoucherCodeSelection,
   ): Promise<PricingQuoteResponse> {
     try {
       return await this.prisma.$transaction(
-        async (transaction) => {
-          const address = await transaction.shippingAddress.findFirst({
-            where: { id: shippingAddressId, userId, deletedAt: null },
-            select: { id: true, province: true, district: true },
-          });
-          if (!address) throw new PricingAddressNotFoundError();
-
-          const cart = await transaction.cart.findUnique({
-            where: { userId },
-            select: quoteCartSelect,
-          });
-          const version = cart?.version ?? 0;
-          if (version !== expectedVersion) throw new PricingConflictError();
-
-          const { lines, exclusions } = this.currentFacts(cart);
-          const selectedShopIds = new Set(lines.map((line) => line.shop.id));
-          const seen = new Set<string>();
-          for (const selection of services) {
-            if (seen.has(selection.shopId) || !selectedShopIds.has(selection.shopId)) {
-              throw new PricingValidationError(['services']);
-            }
-            seen.add(selection.shopId);
-          }
-
-          return this.calculator.calculate({
-            cartVersion: version,
-            address,
-            lines,
-            exclusions,
-            services,
-          });
-        },
+        async (transaction) =>
+          (
+            await this.calculateInTransaction(transaction, {
+              userId,
+              expectedVersion,
+              shippingAddressId,
+              services,
+              vouchers,
+              evaluatedAt: this.clock.now(),
+            })
+          ).quote,
         { isolationLevel: 'RepeatableRead' },
       );
     } catch (error) {
@@ -126,6 +116,105 @@ export class PricingQuoteService {
       if (error instanceof UnsafePricingArithmeticError) throw new PricingUnavailableError();
       throw new PricingUnavailableError();
     }
+  }
+
+  async calculateInTransaction(
+    transaction: Prisma.TransactionClient,
+    input: {
+      userId: string;
+      expectedVersion: number;
+      shippingAddressId: string;
+      services: readonly ShopShippingServiceSelection[];
+      vouchers?: VoucherCodeSelection;
+      evaluatedAt: Date;
+    },
+  ): Promise<{ quote: PricingQuoteResponse; applied: AppliedVoucherSnapshot[] }> {
+    const address = await transaction.shippingAddress.findFirst({
+      where: { id: input.shippingAddressId, userId: input.userId, deletedAt: null },
+      select: { id: true, province: true, district: true },
+    });
+    if (!address) throw new PricingAddressNotFoundError();
+
+    const cart = await transaction.cart.findUnique({
+      where: { userId: input.userId },
+      select: quoteCartSelect,
+    });
+    const version = cart?.version ?? 0;
+    if (version !== input.expectedVersion) throw new PricingConflictError();
+
+    const { lines, exclusions } = this.currentFacts(cart);
+    const selectedShopIds = new Set(lines.map((line) => line.shop.id));
+    const seen = new Set<string>();
+    for (const selection of input.services) {
+      if (seen.has(selection.shopId) || !selectedShopIds.has(selection.shopId)) {
+        throw new PricingValidationError(['services']);
+      }
+      seen.add(selection.shopId);
+    }
+    for (const selection of input.vouchers?.shopCodes ?? []) {
+      if (!selectedShopIds.has(selection.shopId)) throw new PricingValidationError(['vouchers']);
+    }
+
+    const baseQuote = this.calculator.calculate({
+      cartVersion: version,
+      evaluatedAt: input.evaluatedAt,
+      address,
+      lines,
+      exclusions,
+      services: input.services,
+    });
+    const definitions = await this.loadVoucherDefinitions(
+      transaction,
+      input.userId,
+      input.vouchers,
+    );
+    return this.voucherCalculator.apply(baseQuote, input.vouchers, definitions, input.evaluatedAt);
+  }
+
+  private async loadVoucherDefinitions(
+    transaction: Prisma.TransactionClient,
+    userId: string,
+    selection?: VoucherCodeSelection,
+  ): Promise<VoucherDefinitionSnapshot[]> {
+    const codes = [
+      selection?.platformCode,
+      ...(selection?.shopCodes ?? []).map(({ code }) => code),
+      selection?.freeShippingCode,
+    ].filter((code): code is string => Boolean(code));
+    if (codes.length === 0) return [];
+    const definitions = await transaction.voucher.findMany({
+      where: { code: { in: codes } },
+      include: {
+        productScopes: { select: { productId: true } },
+        userUsages: { where: { userId }, select: { usedCount: true } },
+      },
+    });
+    return definitions.map((definition) => ({
+      id: definition.id,
+      code: definition.code,
+      name: definition.name,
+      issuer: definition.issuer,
+      shopId: definition.shopId,
+      benefitType: definition.benefitType,
+      fixedAmountMinor:
+        definition.fixedAmountMinor === null
+          ? null
+          : checkedMoneyFromBigInt(definition.fixedAmountMinor),
+      percentageBasisPoints: definition.percentageBasisPoints,
+      maximumDiscountMinor:
+        definition.maximumDiscountMinor === null
+          ? null
+          : checkedMoneyFromBigInt(definition.maximumDiscountMinor),
+      minimumSpendMinor: checkedMoneyFromBigInt(definition.minimumSpendMinor),
+      startsAt: definition.startsAt,
+      endsAt: definition.endsAt,
+      isEnabled: definition.isEnabled,
+      usageLimit: definition.usageLimit,
+      usedCount: definition.usedCount,
+      perBuyerLimit: definition.perBuyerLimit,
+      buyerUsedCount: definition.userUsages[0]?.usedCount ?? 0,
+      productIds: definition.productScopes.map(({ productId }) => productId),
+    }));
   }
 
   private currentFacts(cart: QuoteCart | null): {

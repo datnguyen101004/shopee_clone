@@ -6,7 +6,13 @@ import {
   RoleAuditSource,
   ShopStatus,
   UserStatus,
+  VoucherBenefitType,
+  VoucherIssuer,
 } from '../src/generated/prisma/enums';
+import {
+  assertVoucherProductScopeConsistency,
+  canonicalizeVoucherDefinition,
+} from '../src/vouchers/voucher-definition';
 import { createPrismaClient } from './create-prisma-client';
 import { importCanonicalDataset } from './dataset/importer';
 import {
@@ -18,6 +24,8 @@ import {
   seedShippingAddresses,
   seedUnavailableEngagementProduct,
   seedUsers,
+  seedVoucherCodes,
+  seedVoucherFixtureIds,
 } from './seed-data';
 
 const databaseUrl = process.env.DATABASE_URL;
@@ -210,7 +218,7 @@ async function seedMarketplace() {
   const summary = await importCanonicalDataset(prisma);
   const availableProducts = await prisma.product.findMany({
     where: { datasetRecord: { isActive: true } },
-    select: { id: true },
+    select: { id: true, shopId: true },
     orderBy: [{ id: 'asc' }],
     take: 3,
   });
@@ -253,7 +261,249 @@ async function seedMarketplace() {
     },
   ] as const;
 
+  const activeFrom = new Date('2020-01-01T00:00:00.000Z');
+  const activeUntil = new Date('2999-01-01T00:00:00.000Z');
+  const voucherDefinitions = [
+    {
+      id: seedVoucherFixtureIds.platformFixed,
+      code: seedVoucherCodes.platformFixed,
+      name: 'Sàn giảm 50K',
+      issuer: VoucherIssuer.PLATFORM,
+      shopId: null,
+      benefitType: VoucherBenefitType.FIXED_AMOUNT,
+      fixedAmountMinor: 50_000n,
+      percentageBasisPoints: null,
+      maximumDiscountMinor: null,
+      minimumSpendMinor: 200_000n,
+      startsAt: activeFrom,
+      endsAt: activeUntil,
+      isEnabled: true,
+      usageLimit: 1_000,
+      perBuyerLimit: 1,
+      usedCount: 0,
+    },
+    {
+      id: seedVoucherFixtureIds.platformPercentage,
+      code: seedVoucherCodes.platformPercentage,
+      name: 'Sàn giảm 10%',
+      issuer: VoucherIssuer.PLATFORM,
+      shopId: null,
+      benefitType: VoucherBenefitType.PERCENTAGE,
+      fixedAmountMinor: null,
+      percentageBasisPoints: 1_000,
+      maximumDiscountMinor: 100_000n,
+      minimumSpendMinor: 100_000n,
+      startsAt: activeFrom,
+      endsAt: activeUntil,
+      isEnabled: true,
+      usageLimit: 1_000,
+      perBuyerLimit: 1,
+      usedCount: 0,
+    },
+    {
+      id: seedVoucherFixtureIds.shopPercentage,
+      code: seedVoucherCodes.shopPercentage,
+      name: 'Shop giảm 15%',
+      issuer: VoucherIssuer.SHOP,
+      shopId: availableProducts[0]!.shopId,
+      benefitType: VoucherBenefitType.PERCENTAGE,
+      fixedAmountMinor: null,
+      percentageBasisPoints: 1_500,
+      maximumDiscountMinor: 60_000n,
+      minimumSpendMinor: 50_000n,
+      startsAt: activeFrom,
+      endsAt: activeUntil,
+      isEnabled: true,
+      usageLimit: 500,
+      perBuyerLimit: 1,
+      usedCount: 0,
+    },
+    {
+      id: seedVoucherFixtureIds.freeShipping,
+      code: seedVoucherCodes.freeShipping,
+      name: 'Miễn phí vận chuyển 30K',
+      issuer: VoucherIssuer.PLATFORM,
+      shopId: null,
+      benefitType: VoucherBenefitType.FREE_SHIPPING,
+      fixedAmountMinor: null,
+      percentageBasisPoints: null,
+      maximumDiscountMinor: 30_000n,
+      minimumSpendMinor: 100_000n,
+      startsAt: activeFrom,
+      endsAt: activeUntil,
+      isEnabled: true,
+      usageLimit: 1_000,
+      perBuyerLimit: 1,
+      usedCount: 0,
+    },
+    {
+      id: seedVoucherFixtureIds.expired,
+      code: seedVoucherCodes.expired,
+      name: 'Voucher đã hết hạn',
+      issuer: VoucherIssuer.PLATFORM,
+      shopId: null,
+      benefitType: VoucherBenefitType.FIXED_AMOUNT,
+      fixedAmountMinor: 10_000n,
+      percentageBasisPoints: null,
+      maximumDiscountMinor: null,
+      minimumSpendMinor: 0n,
+      startsAt: new Date('2019-01-01T00:00:00.000Z'),
+      endsAt: new Date('2020-01-01T00:00:00.000Z'),
+      isEnabled: true,
+      usageLimit: 100,
+      perBuyerLimit: 1,
+      usedCount: 0,
+    },
+    {
+      id: seedVoucherFixtureIds.future,
+      code: seedVoucherCodes.future,
+      name: 'Voucher chưa bắt đầu',
+      issuer: VoucherIssuer.PLATFORM,
+      shopId: null,
+      benefitType: VoucherBenefitType.FIXED_AMOUNT,
+      fixedAmountMinor: 10_000n,
+      percentageBasisPoints: null,
+      maximumDiscountMinor: null,
+      minimumSpendMinor: 0n,
+      startsAt: new Date('2998-01-01T00:00:00.000Z'),
+      endsAt: new Date('2999-01-01T00:00:00.000Z'),
+      isEnabled: true,
+      usageLimit: 100,
+      perBuyerLimit: 1,
+      usedCount: 0,
+    },
+    {
+      id: seedVoucherFixtureIds.exhausted,
+      code: seedVoucherCodes.exhausted,
+      name: 'Voucher đã hết lượt',
+      issuer: VoucherIssuer.PLATFORM,
+      shopId: null,
+      benefitType: VoucherBenefitType.FIXED_AMOUNT,
+      fixedAmountMinor: 10_000n,
+      percentageBasisPoints: null,
+      maximumDiscountMinor: null,
+      minimumSpendMinor: 0n,
+      startsAt: activeFrom,
+      endsAt: activeUntil,
+      isEnabled: true,
+      usageLimit: 1,
+      perBuyerLimit: 1,
+      usedCount: 1,
+    },
+    {
+      id: seedVoucherFixtureIds.buyerUsed,
+      code: seedVoucherCodes.buyerUsed,
+      name: 'Voucher người mua đã dùng',
+      issuer: VoucherIssuer.PLATFORM,
+      shopId: null,
+      benefitType: VoucherBenefitType.FIXED_AMOUNT,
+      fixedAmountMinor: 10_000n,
+      percentageBasisPoints: null,
+      maximumDiscountMinor: null,
+      minimumSpendMinor: 0n,
+      startsAt: activeFrom,
+      endsAt: activeUntil,
+      isEnabled: true,
+      usageLimit: 100,
+      perBuyerLimit: 1,
+      usedCount: 1,
+    },
+  ] as const;
+  for (const voucher of voucherDefinitions) canonicalizeVoucherDefinition(voucher);
+  assertVoucherProductScopeConsistency(voucherDefinitions[2], [availableProducts[0]!]);
+
   await prisma.$transaction(async (transaction) => {
+    for (const voucher of voucherDefinitions) {
+      await transaction.voucher.upsert({
+        where: { id: voucher.id },
+        create: voucher,
+        update: voucher,
+      });
+    }
+    await transaction.voucherProductScope.deleteMany({
+      where: { voucherId: { in: voucherDefinitions.map(({ id }) => id) } },
+    });
+    await transaction.voucherProductScope.create({
+      data: {
+        voucherId: seedVoucherFixtureIds.shopPercentage,
+        productId: availableProducts[0]!.id,
+      },
+    });
+    const usageFixtures = [
+      {
+        voucherId: seedVoucherFixtureIds.exhausted,
+        userId: seedUsers[1].id,
+        usedCount: 1,
+      },
+      {
+        voucherId: seedVoucherFixtureIds.buyerUsed,
+        userId: seedUsers[0].id,
+        usedCount: 1,
+      },
+    ] as const;
+    for (const usage of usageFixtures) {
+      await transaction.voucherUserUsage.upsert({
+        where: { voucherId_userId: { voucherId: usage.voucherId, userId: usage.userId } },
+        create: usage,
+        update: { usedCount: usage.usedCount },
+      });
+    }
+    const consumptionFixtures = [
+      {
+        id: seedVoucherFixtureIds.exhaustedConsumption,
+        purchaseReference: seedVoucherFixtureIds.exhaustedPurchase,
+        userId: seedUsers[1].id,
+        voucherSetDigest: 'a'.repeat(64),
+        voucherId: seedVoucherFixtureIds.exhausted,
+        redemptionId: seedVoucherFixtureIds.exhaustedRedemption,
+      },
+      {
+        id: seedVoucherFixtureIds.buyerUsedConsumption,
+        purchaseReference: seedVoucherFixtureIds.buyerUsedPurchase,
+        userId: seedUsers[0].id,
+        voucherSetDigest: 'b'.repeat(64),
+        voucherId: seedVoucherFixtureIds.buyerUsed,
+        redemptionId: seedVoucherFixtureIds.buyerUsedRedemption,
+      },
+    ] as const;
+    for (const consumption of consumptionFixtures) {
+      await transaction.voucherConsumption.upsert({
+        where: { purchaseReference: consumption.purchaseReference },
+        create: {
+          id: consumption.id,
+          purchaseReference: consumption.purchaseReference,
+          userId: consumption.userId,
+          voucherSetDigest: consumption.voucherSetDigest,
+        },
+        update: {
+          userId: consumption.userId,
+          voucherSetDigest: consumption.voucherSetDigest,
+        },
+      });
+      await transaction.voucherRedemption.upsert({
+        where: {
+          consumptionId_voucherId: {
+            consumptionId: consumption.id,
+            voucherId: consumption.voucherId,
+          },
+        },
+        create: {
+          id: consumption.redemptionId,
+          consumptionId: consumption.id,
+          voucherId: consumption.voucherId,
+          userId: consumption.userId,
+          merchandiseDiscountMinor: 10_000n,
+          shippingDiscountMinor: 0n,
+          discountMinor: 10_000n,
+        },
+        update: {
+          userId: consumption.userId,
+          merchandiseDiscountMinor: 10_000n,
+          shippingDiscountMinor: 0n,
+          discountMinor: 10_000n,
+        },
+      });
+    }
     for (const favorite of favoriteFixtures) {
       await transaction.productFavorite.upsert({
         where: { userId_productId: { userId: favorite.userId, productId: favorite.productId } },

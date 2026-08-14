@@ -199,6 +199,10 @@ function buildQuote(
           listSubtotalMinor: listSubtotal,
           productDiscountMinor: listSubtotal - merchandiseSubtotal,
           merchandiseSubtotalMinor: merchandiseSubtotal,
+          shopVoucherDiscountMinor: 0,
+          platformVoucherDiscountMinor: 0,
+          merchandiseVoucherDiscountMinor: 0,
+          payableMerchandiseMinor: merchandiseSubtotal,
         },
       ],
       shipping: {
@@ -220,6 +224,12 @@ function buildQuote(
       listSubtotalMinor: listSubtotal,
       productDiscountMinor: listSubtotal - merchandiseSubtotal,
       merchandiseSubtotalMinor: merchandiseSubtotal,
+      shopVoucherDiscountMinor: 0,
+      platformVoucherDiscountMinor: 0,
+      merchandiseVoucherDiscountMinor: 0,
+      shippingVoucherDiscountMinor: 0,
+      voucherDiscountMinor: 0,
+      shippingPayableMinor: shippingFee,
       payableTotalMinor: merchandiseSubtotal + shippingFee,
     };
   });
@@ -228,12 +238,15 @@ function buildQuote(
   const merchandiseSubtotal = sum(shops.map((shop) => shop.merchandiseSubtotalMinor));
   const shippingTotal = sum(shops.map((shop) => shop.shipping.shippingFeeMinor));
   return {
-    pricingVersion: 'pricing-v1',
+    pricingVersion: 'pricing-v2',
+    voucherVersion: 'voucher-v1',
     shippingVersion: 'mock-v1',
     currency: 'VND',
+    evaluatedAt: '2026-08-14T00:00:00.000Z',
     cartVersion: cart.version,
     address: { id: address.id, province: address.province, district: address.district },
     shops,
+    vouchers: [],
     exclusions: [],
     summary: {
       selectedLineCount: 2,
@@ -242,6 +255,12 @@ function buildQuote(
       productDiscountMinor: listSubtotal - merchandiseSubtotal,
       merchandiseSubtotalMinor: merchandiseSubtotal,
       shippingTotalMinor: shippingTotal,
+      shopVoucherDiscountMinor: 0,
+      platformVoucherDiscountMinor: 0,
+      merchandiseVoucherDiscountMinor: 0,
+      shippingVoucherDiscountMinor: 0,
+      voucherDiscountMinor: 0,
+      shippingPayableMinor: shippingTotal,
       payableTotalMinor: merchandiseSubtotal + shippingTotal,
     },
   };

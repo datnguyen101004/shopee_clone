@@ -26,6 +26,8 @@ import {
   seedShippingAddresses,
   seedUnavailableEngagementProduct,
   seedUsers,
+  seedVoucherCodes,
+  seedVoucherFixtureIds,
 } from './seed-data';
 import { assertSafeTestDatabaseUrl } from './test-database-url';
 
@@ -110,6 +112,11 @@ async function verifyDatabase(databaseUrl: string): Promise<void> {
       productFavorites: await prisma.productFavorite.count(),
       recentlyViewedProducts: await prisma.recentlyViewedProduct.count(),
       shopFollowers: await prisma.shopFollower.count(),
+      vouchers: await prisma.voucher.count(),
+      voucherProductScopes: await prisma.voucherProductScope.count(),
+      voucherUserUsages: await prisma.voucherUserUsage.count(),
+      voucherConsumptions: await prisma.voucherConsumption.count(),
+      voucherRedemptions: await prisma.voucherRedemption.count(),
     };
     assert.deepEqual(counts, {
       ...seedExpectedCounts,
@@ -252,6 +259,38 @@ async function verifyDatabase(databaseUrl: string): Promise<void> {
     );
     assert.equal(await prisma.shopFollower.count({ where: { userId: seedUsers[1].id } }), 1);
     assert.equal(await prisma.shopFollower.count({ where: { shopId: seedShops[0].id } }), 1);
+
+    const vouchers = await prisma.voucher.findMany({
+      include: { productScopes: { include: { product: { select: { shopId: true } } } } },
+      orderBy: { code: 'asc' },
+    });
+    assert.deepEqual(
+      vouchers.map(({ code }) => code).sort(),
+      Object.values(seedVoucherCodes).sort(),
+    );
+    const scopedVoucher = vouchers.find(({ id }) => id === seedVoucherFixtureIds.shopPercentage);
+    assert(scopedVoucher);
+    assert.equal(scopedVoucher.productScopes.length, 1);
+    assert.equal(scopedVoucher.productScopes[0]?.product.shopId, scopedVoucher.shopId);
+    assert.equal(vouchers.find(({ id }) => id === seedVoucherFixtureIds.exhausted)?.usedCount, 1);
+    assert.equal(vouchers.find(({ id }) => id === seedVoucherFixtureIds.buyerUsed)?.usedCount, 1);
+    const voucherUsages = await prisma.voucherUserUsage.findMany();
+    assert.equal(voucherUsages.length, 2);
+    assert(voucherUsages.every(({ usedCount }) => usedCount === 1));
+    const consumptions = await prisma.voucherConsumption.findMany({
+      include: { redemptions: true },
+    });
+    assert.equal(consumptions.length, 2);
+    assert(consumptions.every(({ voucherSetDigest }) => /^[0-9a-f]{64}$/.test(voucherSetDigest)));
+    assert(consumptions.every(({ redemptions }) => redemptions.length === 1));
+    for (const consumption of consumptions) {
+      const redemption = consumption.redemptions[0]!;
+      assert.equal(redemption.discountMinor, 10_000n);
+      assert.equal(
+        redemption.discountMinor,
+        redemption.merchandiseDiscountMinor + redemption.shippingDiscountMinor,
+      );
+    }
     assert.equal(
       await prisma.shopFollower.count({
         where: { userId: seedUsers[0].id, shopId: seedShops[0].id },

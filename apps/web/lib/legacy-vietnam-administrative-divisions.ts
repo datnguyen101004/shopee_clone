@@ -1,5 +1,18 @@
 export const LEGACY_ADMINISTRATIVE_SNAPSHOT_DATE = '2025-06-30';
 export const LEGACY_ADMINISTRATIVE_SOURCE = 'https://danhmuchanhchinh.nso.gov.vn/DMDVHC.asmx';
+export const LEGACY_NO_WARD_SENTINEL = 'Không có đơn vị hành chính cấp xã';
+export const LEGACY_NO_WARD_DISTRICT_CODES = ['318', '471', '498', '536', '755'] as const;
+
+const LEGACY_NO_WARD_DISTRICT_CODE_SET = new Set<string>(LEGACY_NO_WARD_DISTRICT_CODES);
+
+export function isLegacyNoWardDistrict(districtCode: string): boolean {
+  return LEGACY_NO_WARD_DISTRICT_CODE_SET.has(districtCode);
+}
+
+export type LegacyWard = Readonly<{
+  code: string;
+  name: string;
+}>;
 
 export type LegacyDistrict = Readonly<{
   code: string;

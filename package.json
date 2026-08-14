@@ -31,6 +31,7 @@
     "db:import:dataset": "pnpm --filter @shopee-clone/api db:import:dataset",
     "db:reset": "pnpm --filter @shopee-clone/api db:reset",
     "db:verify": "pnpm --filter @shopee-clone/api db:verify",
+    "data:generate:legacy-wards": "node scripts/generate-legacy-vietnam-wards.mjs",
     "build": "turbo run build",
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
@@ -54,6 +55,7 @@
     "test:e2e:shop:quick": "node scripts/quick-e2e.mjs shop",
     "test:e2e:cart:quick": "node scripts/quick-e2e.mjs cart",
     "test:e2e:pricing:quick": "node scripts/quick-e2e.mjs pricing",
+    "test:e2e:vouchers:quick": "node scripts/quick-e2e.mjs vouchers",
     "test:infra": "node --test scripts/infrastructure-smoke.test.mjs",
     "format": "prettier --write .",
     "format:check": "prettier --check ."

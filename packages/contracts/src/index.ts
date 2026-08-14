@@ -273,6 +273,7 @@ export {
   isPricingQuoteRequest,
   isPricingQuoteResponse,
   parsePricingProblemDetails,
+  parsePricingQuoteRequest,
   parsePricingQuoteResponse,
 } from './pricing';
 export type {
@@ -290,6 +291,25 @@ export type {
   ShippingZone,
   ShopShippingServiceSelection,
 } from './pricing';
+export {
+  VOUCHER_BENEFIT_TYPES,
+  VOUCHER_CODE_PATTERN,
+  VOUCHER_ISSUERS,
+  VOUCHER_REJECTION_REASONS,
+  VOUCHER_SLOTS,
+  VOUCHER_VERSION,
+  normalizeVoucherCode,
+} from './vouchers';
+export type {
+  ShopVoucherCodeSelection,
+  VoucherBenefitType,
+  VoucherCodeSelection,
+  VoucherDiscountAllocation,
+  VoucherIssuer,
+  VoucherRejectionReason,
+  VoucherSelectionResult,
+  VoucherSlot,
+} from './vouchers';
 export {
   LEGACY_VIETNAM_PROVINCE_REGIONS,
   normalizeVietnameseAdministrativeName,

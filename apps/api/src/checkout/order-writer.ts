@@ -80,6 +80,19 @@ export class OrderWriter {
           payableTotalMinor: money(shop.payableTotalMinor),
         },
       });
+      await transaction.orderTimelineEvent.create({
+        data: {
+          id: randomUUID(),
+          orderId,
+          previousStatus: null,
+          status: 'PENDING_CONFIRMATION',
+          orderVersion: 0,
+          actorType: 'SYSTEM',
+          actorUserId: null,
+          reasonCode: 'ORDER_CREATED',
+          reasonNote: null,
+        },
+      });
       for (const line of [...shop.lines].sort((left, right) =>
         left.lineId.localeCompare(right.lineId),
       )) {

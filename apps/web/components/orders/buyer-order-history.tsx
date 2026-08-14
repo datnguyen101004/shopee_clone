@@ -1,0 +1,468 @@
+'use client';
+
+import {
+  ORDER_CANCELLATION_REASON_CODES,
+  ORDER_LIST_FILTERS,
+  type BuyerOrderDetailResponse,
+  type BuyerOrderListFilter,
+  type BuyerOrderSummary,
+  type OrderCancellationReasonCode,
+  type ShopOrderStatus,
+} from '@shopee-clone/contracts';
+import { Card } from '@shopee-clone/ui';
+import Link from 'next/link';
+import { useCallback, useEffect, useRef, useState } from 'react';
+
+import { buyerOrdersHref } from '../../lib/order-history-query';
+import {
+  cancelBuyerOrder,
+  getBuyerOrderDetail,
+  getBuyerOrders,
+  OrderHistoryApiError,
+} from '../../lib/order-history-api';
+import { useAuthSession } from '../auth-session-provider';
+import {
+  AccountLoadFailure,
+  AccountWorkspace,
+  ProtectedAccountState,
+} from '../protected-account-state';
+
+const statusLabels: Record<ShopOrderStatus, string> = {
+  PENDING_CONFIRMATION: 'Chờ xác nhận',
+  AWAITING_PICKUP: 'Chờ lấy hàng',
+  SHIPPING: 'Đang giao',
+  DELIVERED: 'Đã giao',
+  CANCELLED: 'Đã hủy',
+  RETURN_REQUESTED: 'Đang yêu cầu trả hàng',
+  RETURNED: 'Đã trả hàng',
+  REFUNDED: 'Đã hoàn tiền',
+};
+
+const filterLabels: Record<BuyerOrderListFilter, string> = {
+  ALL: 'Tất cả',
+  PENDING_CONFIRMATION: 'Chờ xác nhận',
+  AWAITING_PICKUP: 'Chờ lấy hàng',
+  SHIPPING: 'Đang giao',
+  DELIVERED: 'Đã giao',
+  CANCELLED: 'Đã hủy',
+  RETURN_REFUND: 'Trả hàng / Hoàn tiền',
+};
+
+const reasonLabels: Record<OrderCancellationReasonCode, string> = {
+  CHANGE_ADDRESS: 'Muốn thay đổi địa chỉ nhận hàng',
+  CHANGE_PRODUCT: 'Muốn thay đổi sản phẩm hoặc phân loại',
+  FOUND_BETTER_PRICE: 'Tìm thấy mức giá tốt hơn',
+  NO_LONGER_NEEDED: 'Không còn nhu cầu mua',
+  OTHER: 'Lý do khác',
+};
+
+const actorLabels = {
+  SYSTEM: 'Hệ thống',
+  BUYER: 'Bạn',
+  SELLER: 'Người bán',
+  ADMIN: 'Quản trị viên',
+} as const;
+const money = (value: number) => `${new Intl.NumberFormat('vi-VN').format(value)}₫`;
+const dateTime = (value: string) =>
+  new Intl.DateTimeFormat('vi-VN', {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  }).format(new Date(value));
+
+function OrderCard({ order }: { order: BuyerOrderSummary }) {
+  return (
+    <Card className="buyer-order-card">
+      <header>
+        <Link href={`/shops/${order.shop.slug}`}>{order.shop.name}</Link>
+        <strong className={`buyer-order-status is-${order.status.toLowerCase()}`}>
+          {statusLabels[order.status]}
+        </strong>
+      </header>
+      <div className="buyer-order-card__lines">
+        {order.lines.map((line) => (
+          <article key={line.lineId}>
+            {line.productImageUrl ? (
+              <img src={line.productImageUrl} alt="" />
+            ) : (
+              <span aria-hidden="true">SP</span>
+            )}
+            <div>
+              <strong>{line.productName}</strong>
+              <small>
+                {line.variantName} · x{line.quantity}
+              </small>
+            </div>
+            <b>{money(line.payableMerchandiseMinor)}</b>
+          </article>
+        ))}
+      </div>
+      <footer>
+        <span>Đặt lúc {dateTime(order.createdAt)}</span>
+        <div>
+          <span>Thành tiền</span>
+          <strong>{money(order.payableTotalMinor)}</strong>
+          <Link href={`/account/orders/${order.orderReference}`}>Xem chi tiết</Link>
+        </div>
+      </footer>
+    </Card>
+  );
+}
+
+export function BuyerOrderListScreen({ filter }: { filter: BuyerOrderListFilter | null }) {
+  const auth = useAuthSession();
+  const userId = auth.state.status === 'authenticated' ? auth.state.user.id : null;
+  const [items, setItems] = useState<BuyerOrderSummary[]>([]);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [failed, setFailed] = useState(false);
+
+  const load = useCallback(
+    async (cursor: string | null, append: boolean, signal?: AbortSignal) => {
+      if (!userId || !filter) return;
+      setLoading(true);
+      setFailed(false);
+      try {
+        const result = await getBuyerOrders(filter, cursor, auth.authenticatedFetch, signal);
+        setItems((current) => (append ? [...current, ...result.items] : result.items));
+        setNextCursor(result.page.nextCursor);
+      } catch (error) {
+        if (error instanceof OrderHistoryApiError && error.kind === 'aborted') return;
+        setFailed(true);
+      } finally {
+        if (!signal?.aborted) setLoading(false);
+      }
+    },
+    [auth.authenticatedFetch, filter, userId],
+  );
+
+  useEffect(() => {
+    if (!userId || !filter) return;
+    const controller = new AbortController();
+    queueMicrotask(() => void load(null, false, controller.signal));
+    return () => controller.abort();
+  }, [filter, load, userId]);
+
+  return (
+    <AccountWorkspace
+      title="Đơn mua"
+      description="Theo dõi trạng thái và xem lại thông tin đã chốt khi đặt hàng."
+    >
+      <ProtectedAccountState account={auth.state} returnTo="/account/orders">
+        {!filter ? (
+          <section className="buyer-account-state">
+            <h2>Đường dẫn chưa hợp lệ</h2>
+            <p>Bộ lọc đơn hàng không được hỗ trợ.</p>
+            <Link href="/account/orders">Xem tất cả đơn mua</Link>
+          </section>
+        ) : (
+          <>
+            <nav className="buyer-order-tabs" aria-label="Lọc trạng thái đơn hàng">
+              {ORDER_LIST_FILTERS.map((item) => (
+                <Link
+                  key={item}
+                  href={buyerOrdersHref(item)}
+                  aria-current={filter === item ? 'page' : undefined}
+                >
+                  {filterLabels[item]}
+                </Link>
+              ))}
+            </nav>
+            {loading && items.length === 0 ? (
+              <section className="buyer-account-state" aria-busy="true">
+                <h2>Đang tải đơn mua…</h2>
+              </section>
+            ) : null}
+            {failed && items.length === 0 ? (
+              <AccountLoadFailure onRetry={() => void load(null, false)} />
+            ) : null}
+            {!loading && !failed && items.length === 0 ? (
+              <section className="buyer-account-state">
+                <h2>Chưa có đơn phù hợp</h2>
+                <p>Đơn hàng mới sẽ xuất hiện tại đây sau khi đặt hàng thành công.</p>
+                <Link href="/">Tiếp tục mua sắm</Link>
+              </section>
+            ) : null}
+            {items.length > 0 ? (
+              <div className="buyer-orders" aria-busy={loading}>
+                {failed ? (
+                  <p className="engagement-inline-error" role="alert">
+                    Chưa thể tải thêm đơn. Vui lòng thử lại.
+                  </p>
+                ) : null}
+                {items.map((order) => (
+                  <OrderCard key={order.orderReference} order={order} />
+                ))}
+                {nextCursor ? (
+                  <button
+                    type="button"
+                    disabled={loading}
+                    onClick={() => void load(nextCursor, true)}
+                  >
+                    {loading ? 'Đang tải…' : 'Xem thêm'}
+                  </button>
+                ) : null}
+              </div>
+            ) : null}
+          </>
+        )}
+      </ProtectedAccountState>
+    </AccountWorkspace>
+  );
+}
+
+function CancellationModal({
+  pending,
+  onClose,
+  onConfirm,
+}: {
+  pending: boolean;
+  onClose(): void;
+  onConfirm(reason: OrderCancellationReasonCode, note: string): void;
+}) {
+  const [reason, setReason] = useState<OrderCancellationReasonCode>('CHANGE_ADDRESS');
+  const [note, setNote] = useState('');
+  const invalid = reason === 'OTHER' && !note.trim();
+  return (
+    <div
+      className="buyer-order-modal"
+      role="presentation"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget && !pending) onClose();
+      }}
+    >
+      <section role="dialog" aria-modal="true" aria-labelledby="cancel-order-title">
+        <h2 id="cancel-order-title">Hủy đơn hàng</h2>
+        <p>Chọn lý do để xác nhận. Thao tác này không thể hoàn tác.</p>
+        <label>
+          Lý do
+          <select
+            value={reason}
+            disabled={pending}
+            onChange={(event) => setReason(event.target.value as OrderCancellationReasonCode)}
+          >
+            {ORDER_CANCELLATION_REASON_CODES.map((code) => (
+              <option value={code} key={code}>
+                {reasonLabels[code]}
+              </option>
+            ))}
+          </select>
+        </label>
+        {reason === 'OTHER' ? (
+          <label>
+            Mô tả lý do
+            <textarea
+              maxLength={500}
+              value={note}
+              disabled={pending}
+              onChange={(event) => setNote(event.target.value)}
+            />
+          </label>
+        ) : null}
+        {invalid ? <p role="alert">Vui lòng nhập lý do hủy đơn.</p> : null}
+        <footer>
+          <button type="button" disabled={pending} onClick={onClose}>
+            Giữ đơn hàng
+          </button>
+          <button
+            type="button"
+            disabled={pending || invalid}
+            onClick={() => onConfirm(reason, note)}
+          >
+            {pending ? 'Đang hủy…' : 'Xác nhận hủy'}
+          </button>
+        </footer>
+      </section>
+    </div>
+  );
+}
+
+export function BuyerOrderDetailScreen({ orderReference }: { orderReference: string }) {
+  const auth = useAuthSession();
+  const userId = auth.state.status === 'authenticated' ? auth.state.user.id : null;
+  const [detail, setDetail] = useState<BuyerOrderDetailResponse | null>(null);
+  const [state, setState] = useState<'loading' | 'ready' | 'not-found' | 'error'>('loading');
+  const [cancelOpen, setCancelOpen] = useState(false);
+  const [cancelPending, setCancelPending] = useState(false);
+  const [notice, setNotice] = useState('');
+  const cancelKey = useRef<string | null>(null);
+  const submitting = useRef(false);
+
+  const load = useCallback(
+    async (signal?: AbortSignal) => {
+      if (!userId) return;
+      setState('loading');
+      try {
+        const result = await getBuyerOrderDetail(orderReference, auth.authenticatedFetch, signal);
+        setDetail(result);
+        setState('ready');
+      } catch (error) {
+        if (error instanceof OrderHistoryApiError && error.kind === 'aborted') return;
+        setState(
+          error instanceof OrderHistoryApiError && error.status === 404 ? 'not-found' : 'error',
+        );
+      }
+    },
+    [auth.authenticatedFetch, orderReference, userId],
+  );
+
+  useEffect(() => {
+    if (!userId) return;
+    const controller = new AbortController();
+    queueMicrotask(() => void load(controller.signal));
+    return () => controller.abort();
+  }, [load, userId]);
+
+  async function cancel(reasonCode: OrderCancellationReasonCode, reasonNote: string) {
+    if (!detail || submitting.current) return;
+    submitting.current = true;
+    setCancelPending(true);
+    setNotice('');
+    cancelKey.current ??= crypto.randomUUID();
+    try {
+      const result = await cancelBuyerOrder(
+        detail.order.orderReference,
+        detail.order.version,
+        cancelKey.current,
+        { reasonCode, ...(reasonNote.trim() ? { reasonNote } : {}) },
+        auth.authenticatedFetch,
+      );
+      setDetail(result);
+      setCancelOpen(false);
+      cancelKey.current = null;
+      setNotice('Đơn hàng đã được hủy.');
+    } catch (error) {
+      if (error instanceof OrderHistoryApiError && error.status === 409) {
+        setCancelOpen(false);
+        cancelKey.current = null;
+        await load();
+        setNotice('Trạng thái đơn đã thay đổi. Thông tin mới nhất đã được tải lại.');
+      } else {
+        setNotice('Chưa thể hủy đơn. Vui lòng thử lại với cùng yêu cầu.');
+      }
+    } finally {
+      submitting.current = false;
+      setCancelPending(false);
+    }
+  }
+
+  return (
+    <AccountWorkspace
+      title="Chi tiết đơn hàng"
+      description="Thông tin được lưu tại thời điểm bạn xác nhận mua hàng."
+    >
+      <ProtectedAccountState account={auth.state} returnTo={`/account/orders/${orderReference}`}>
+        {state === 'loading' ? (
+          <section className="buyer-account-state" aria-busy="true">
+            <h2>Đang tải chi tiết đơn…</h2>
+          </section>
+        ) : null}
+        {state === 'error' ? <AccountLoadFailure onRetry={() => void load()} /> : null}
+        {state === 'not-found' ? (
+          <section className="buyer-account-state">
+            <h2>Không tìm thấy đơn hàng</h2>
+            <p>Đơn không tồn tại hoặc không thuộc tài khoản này.</p>
+            <Link href="/account/orders">Về danh sách đơn mua</Link>
+          </section>
+        ) : null}
+        {detail && state === 'ready' ? (
+          <div className="buyer-order-detail">
+            {notice ? (
+              <p className="buyer-order-notice" role="status">
+                {notice}
+              </p>
+            ) : null}
+            <header className="buyer-order-detail__heading">
+              <div>
+                <small>Mã đơn</small>
+                <strong>{detail.order.orderReference}</strong>
+                <small>Mã giao dịch {detail.order.purchaseReference}</small>
+              </div>
+              <strong className={`buyer-order-status is-${detail.order.status.toLowerCase()}`}>
+                {statusLabels[detail.order.status]}
+              </strong>
+            </header>
+            <Card className="buyer-order-detail__card">
+              <h2>Địa chỉ nhận hàng</h2>
+              <strong>
+                {detail.address.recipientName} · {detail.address.phoneNumber}
+              </strong>
+              <p>
+                {detail.address.addressLine}, {detail.address.ward}, {detail.address.district},{' '}
+                {detail.address.province}
+              </p>
+            </Card>
+            <Card className="buyer-order-detail__card">
+              <h2>{detail.order.shop.name}</h2>
+              {detail.order.lines.map((line) => (
+                <article className="buyer-order-detail__line" key={line.lineId}>
+                  {line.productImageUrl ? (
+                    <img src={line.productImageUrl} alt="" />
+                  ) : (
+                    <span aria-hidden="true">SP</span>
+                  )}
+                  <div>
+                    <strong>{line.productName}</strong>
+                    <small>
+                      {line.variantName} · x{line.quantity}
+                    </small>
+                  </div>
+                  <b>{money(line.payableMerchandiseMinor)}</b>
+                </article>
+              ))}
+              <dl className="buyer-order-totals">
+                <div>
+                  <dt>Tiền hàng</dt>
+                  <dd>{money(detail.order.merchandiseSubtotalMinor)}</dd>
+                </div>
+                <div>
+                  <dt>Phí vận chuyển</dt>
+                  <dd>{money(detail.order.shipping.shippingFeeMinor)}</dd>
+                </div>
+                <div>
+                  <dt>Giảm giá</dt>
+                  <dd>-{money(detail.order.voucherDiscountMinor)}</dd>
+                </div>
+                <div>
+                  <dt>Thành tiền</dt>
+                  <dd>{money(detail.order.payableTotalMinor)}</dd>
+                </div>
+              </dl>
+            </Card>
+            <Card className="buyer-order-detail__card">
+              <h2>Hành trình đơn hàng</h2>
+              <ol className="buyer-order-timeline">
+                {detail.timeline.map((event) => (
+                  <li key={event.id}>
+                    <span aria-hidden="true" />
+                    <div>
+                      <strong>{statusLabels[event.status]}</strong>
+                      <small>
+                        {actorLabels[event.actorType]} · {dateTime(event.occurredAt)}
+                      </small>
+                      {event.reasonNote ? <p>{event.reasonNote}</p> : null}
+                    </div>
+                  </li>
+                ))}
+              </ol>
+            </Card>
+            <div className="buyer-order-detail__actions">
+              <Link href="/account/orders">Về đơn mua</Link>
+              {detail.order.cancellation.allowed ? (
+                <button type="button" onClick={() => setCancelOpen(true)}>
+                  Hủy đơn hàng
+                </button>
+              ) : null}
+            </div>
+          </div>
+        ) : null}
+        {cancelOpen ? (
+          <CancellationModal
+            pending={cancelPending}
+            onClose={() => setCancelOpen(false)}
+            onConfirm={(reason, note) => void cancel(reason, note)}
+          />
+        ) : null}
+      </ProtectedAccountState>
+    </AccountWorkspace>
+  );
+}

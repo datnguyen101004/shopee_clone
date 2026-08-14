@@ -1,0 +1,133 @@
+import {
+  type BuyerOrderDetailResponse,
+  type BuyerOrderListQuery,
+  type BuyerOrderListResponse,
+  type CancelOrderRequest,
+} from '@shopee-clone/contracts';
+import { Inject, Injectable } from '@nestjs/common';
+
+import { Prisma } from '../generated/prisma/client';
+import { PrismaService } from '../prisma/prisma.service';
+import {
+  cancellationRequestDigest,
+  decodeOrderCursor,
+  encodeOrderCursor,
+  orderDigestsEqual,
+} from './order-canonical';
+import {
+  OrderHistoryUnavailableError,
+  OrderHistoryValidationError,
+  OrderIdempotencyConflictError,
+  OrderNotFoundError,
+  OrderStaleConflictError,
+  OrderTransitionConflictError,
+} from './order-history.errors';
+import { OrderHistoryProjector } from './order-history.projector';
+import { OrderHistoryRepository } from './order-history.repository';
+import { OrderLifecycleService } from './order-lifecycle.service';
+
+@Injectable()
+export class OrderHistoryService {
+  constructor(
+    @Inject(PrismaService) private readonly prisma: PrismaService,
+    @Inject(OrderHistoryRepository) private readonly repository: OrderHistoryRepository,
+    @Inject(OrderHistoryProjector) private readonly projector: OrderHistoryProjector,
+    @Inject(OrderLifecycleService) private readonly lifecycle: OrderLifecycleService,
+  ) {}
+
+  async list(userId: string, query: BuyerOrderListQuery): Promise<BuyerOrderListResponse> {
+    const cursor = query.cursor ? decodeOrderCursor(query.cursor, query.filter) : null;
+    if (query.cursor && !cursor) throw new OrderHistoryValidationError(['cursor']);
+    const rows = await this.repository.list(userId, query, cursor);
+    const hasMore = rows.length > query.limit;
+    const page = rows.slice(0, query.limit);
+    const last = page.at(-1);
+    const nextCursor =
+      hasMore && last
+        ? encodeOrderCursor(query.filter, { createdAt: last.createdAt, id: last.id })
+        : null;
+    return this.projector.list(page, query.limit, nextCursor);
+  }
+
+  async detail(userId: string, orderReference: string): Promise<BuyerOrderDetailResponse> {
+    const graph = await this.repository.detail(userId, orderReference);
+    if (!graph) throw new OrderNotFoundError();
+    return this.projector.detail(graph);
+  }
+
+  async cancel(
+    userId: string,
+    orderReference: string,
+    expectedVersion: number,
+    idempotencyKey: string,
+    input: CancelOrderRequest,
+  ): Promise<BuyerOrderDetailResponse> {
+    const digest = cancellationRequestDigest(userId, orderReference, expectedVersion, input);
+    try {
+      return await this.prisma.$transaction(
+        async (transaction) => {
+          const locked = await transaction.$queryRaw<{ id: string }[]>(Prisma.sql`
+          SELECT so."id"
+          FROM "shop_orders" so
+          INNER JOIN "purchases" p ON p."id" = so."purchase_id"
+          WHERE so."id" = ${orderReference}::uuid
+            AND p."buyer_id" = ${userId}::uuid
+          FOR UPDATE OF so
+        `);
+          if (!locked[0]) throw new OrderNotFoundError();
+
+          const replay = await transaction.orderTimelineEvent.findFirst({
+            where: { orderId: orderReference, idempotencyKey },
+            select: { requestDigest: true },
+          });
+          if (replay) {
+            if (!replay.requestDigest || !orderDigestsEqual(replay.requestDigest, digest)) {
+              throw new OrderIdempotencyConflictError();
+            }
+            const replayGraph = await this.repository.detail(userId, orderReference, transaction);
+            if (!replayGraph) throw new OrderNotFoundError();
+            return this.projector.detail(replayGraph);
+          }
+
+          const current = await transaction.shopOrder.findUnique({
+            where: { id: orderReference },
+            select: { status: true, version: true },
+          });
+          if (!current) throw new OrderNotFoundError();
+          if (current.version !== expectedVersion) {
+            throw new OrderStaleConflictError(current.version);
+          }
+          if (current.status !== 'PENDING_CONFIRMATION') {
+            throw new OrderTransitionConflictError(current.version);
+          }
+          await this.lifecycle.transition(transaction, {
+            orderId: orderReference,
+            currentStatus: current.status,
+            targetStatus: 'CANCELLED',
+            expectedVersion,
+            actorType: 'BUYER',
+            actorUserId: userId,
+            reasonCode: input.reasonCode,
+            reasonNote: input.reasonNote ?? null,
+            idempotencyKey,
+            requestDigest: digest,
+          });
+          const updated = await this.repository.detail(userId, orderReference, transaction);
+          if (!updated) throw new OrderNotFoundError();
+          return this.projector.detail(updated);
+        },
+        { isolationLevel: 'ReadCommitted', maxWait: 5_000, timeout: 15_000 },
+      );
+    } catch (error) {
+      if (
+        error instanceof OrderNotFoundError ||
+        error instanceof OrderStaleConflictError ||
+        error instanceof OrderTransitionConflictError ||
+        error instanceof OrderIdempotencyConflictError ||
+        error instanceof OrderHistoryUnavailableError
+      )
+        throw error;
+      throw new OrderHistoryUnavailableError();
+    }
+  }
+}

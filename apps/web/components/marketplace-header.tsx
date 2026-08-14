@@ -101,6 +101,7 @@ export function MarketplaceHeader({
               <Link href="/account/addresses">Địa chỉ</Link>
               <Link href="/account/favorites">Yêu thích</Link>
               <Link href="/account/followed-shops">Shop đang theo dõi</Link>
+              <Link href="/account/orders">Đơn mua</Link>
               <button type="button" onClick={onLogout}>
                 Đăng xuất
               </button>

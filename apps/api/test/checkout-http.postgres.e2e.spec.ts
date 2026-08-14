@@ -71,6 +71,9 @@ databaseTest('authenticated COD checkout HTTP with PostgreSQL', () => {
       await prisma.orderLine.deleteMany({
         where: { order: { purchaseId: { in: purchaseIds } } },
       });
+      await prisma.orderTimelineEvent.deleteMany({
+        where: { order: { purchaseId: { in: purchaseIds } } },
+      });
       await prisma.shopOrder.deleteMany({ where: { purchaseId: { in: purchaseIds } } });
       await prisma.purchase.deleteMany({ where: { id: { in: purchaseIds } } });
     }
@@ -291,6 +294,9 @@ databaseTest('authenticated COD checkout HTTP with PostgreSQL', () => {
       created.body.purchase.orders.flatMap((order: { lines: unknown[] }) => order.lines),
     ).toHaveLength(2);
     expect(await prisma.purchase.count({ where: { buyerId } })).toBe(1);
+    expect(
+      await prisma.orderTimelineEvent.count({ where: { order: { purchase: { buyerId } } } }),
+    ).toBe(2);
     expect(await prisma.voucherConsumption.count({ where: { userId: buyerId } })).toBe(1);
     expect(
       await prisma.cart.findUniqueOrThrow({ where: { id: cartId }, select: { version: true } }),

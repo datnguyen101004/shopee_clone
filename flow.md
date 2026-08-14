@@ -1,6 +1,6 @@
 # Flow các tính năng đã triển khai
 
-Tài liệu này mô tả trạng thái hiện tại của Shopee Clone sau TS01 và các task đến T18. Các sơ đồ tập trung vào luồng đang hoạt động trong code; checkout, đơn hàng, thanh toán, chat và vận chuyển thật vẫn chưa được triển khai.
+Tài liệu này mô tả trạng thái hiện tại của Shopee Clone sau TS01 và các task đến T20. Các sơ đồ tập trung vào luồng đang hoạt động trong code; checkout COD, order history và hủy đơn đã có, còn thanh toán online, chat và vận chuyển thật chưa được triển khai.
 
 ## 1. Tổng quan phạm vi
 
@@ -413,7 +413,7 @@ Importer chạy local, không crawl mạng, không dùng dữ liệu ngẫu nhi�
 
 - Báo giá giỏ hàng dùng phí vận chuyển mô phỏng và preview voucher; không giữ tồn kho, giữ lượt voucher, cam kết cước cuối cùng hoặc tạo đơn.
 - Purchase intent ở trang sản phẩm chưa báo checkout thành công.
-- Đã có checkout COD và trang xác nhận snapshot; chưa có thanh toán online, shipment thật, order history đầy đủ, review body, chat hoặc notification realtime.
+- Đã có checkout COD, order history theo shop, timeline và hủy đơn chờ xác nhận; chưa có thanh toán online, shipment thật, seller fulfillment, return/refund workflow, review body, chat hoặc notification realtime.
 - Seller mới có role/ownership boundary và safe shop projection, chưa có bộ công cụ quản lý gian hàng hoàn chỉnh.
 - Admin hiện tập trung vào role assignment/revocation và role audit, chưa phải dashboard vận hành marketplace đầy đủ.
 
@@ -621,3 +621,61 @@ service, shipping, note, voucher allocations và toàn bộ phép cộng tiền.
 hội tụ về một purchase; serialization conflict PostgreSQL `40001` được retry có giới hạn. Trang kết quả
 chỉ đọc snapshot đã commit nên catalog thay đổi sau đó không làm đổi nội dung đơn. T19 kiểm tra tồn kho
 lúc confirm nhưng chưa reserve hoặc decrement tồn kho; no-oversell giữa nhiều buyer thuộc T24.
+
+## 15. Order history, lifecycle timeline và hủy đơn T20
+
+```mermaid
+flowchart TD
+    buyer(["Buyer đã đăng nhập"])
+    list["/account/orders + status filter"]
+    listApi["GET /api/v1/account/orders<br/>opaque cursor + owner SQL"]
+    snapshots["ShopOrder + committed snapshots"]
+    cards["Order cards theo từng shop"]
+    detail["/account/orders/:orderReference"]
+    detailApi["GET owner detail + ETag + timeline"]
+    allowed{"Server cho phép hủy?"}
+    modal["Chọn reason + giữ một UUID retry"]
+    cancel["POST /cancel<br/>If-Match + Idempotency-Key"]
+    guard["Origin + Auth + strict parser"]
+    lock["Lock ShopOrder thuộc buyer"]
+    replay{"Key đã tồn tại?"}
+    digest{"Digest giống?"}
+    original["200 kết quả đã commit"]
+    keyConflict["409 idempotency conflict"]
+    version{"Version hiện hành<br/>và còn pending?"}
+    stale["409 + web refresh detail"]
+    update["CANCELLED + version increment"]
+    event["Append BUYER timeline event"]
+    commit["Atomic commit + updated detail"]
+
+    buyer --> list --> listApi --> snapshots --> cards --> detail --> detailApi --> allowed
+    allowed -->|"Không"| detail
+    allowed -->|"Có"| modal --> cancel --> guard --> lock --> replay
+    replay -->|"Có"| digest
+    digest -->|"Giống"| original --> detail
+    digest -->|"Khác"| keyConflict
+    replay -->|"Chưa"| version
+    version -->|"Không"| stale --> detailApi
+    version -->|"Có"| update --> event --> commit --> detail
+```
+
+```mermaid
+stateDiagram-v2
+    [*] --> PENDING_CONFIRMATION
+    PENDING_CONFIRMATION --> AWAITING_PICKUP
+    PENDING_CONFIRMATION --> CANCELLED: Buyer hoặc internal actor
+    AWAITING_PICKUP --> SHIPPING
+    AWAITING_PICKUP --> CANCELLED: Internal actor tương lai
+    SHIPPING --> DELIVERED
+    DELIVERED --> RETURN_REQUESTED
+    RETURN_REQUESTED --> RETURNED
+    RETURN_REQUESTED --> REFUNDED
+    RETURNED --> REFUNDED
+    CANCELLED --> [*]
+    REFUNDED --> [*]
+```
+
+Mỗi transition tăng `ShopOrder.version` đúng một lần và ghi một `OrderTimelineEvent` trong cùng
+transaction. Buyer chỉ có command hủy ở `PENDING_CONFIRMATION`; các cạnh seller/return được lưu trong
+state machine để task sau tái sử dụng nhưng T20 chưa mở endpoint tương ứng. List/detail chỉ dùng snapshot
+T19 và filter ownership trong PostgreSQL, nên reference missing và foreign cùng trả `404` không liệt kê.

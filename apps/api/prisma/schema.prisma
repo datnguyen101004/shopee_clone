@@ -117,8 +117,24 @@ enum PurchasePaymentStatus {
 
 enum ShopOrderStatus {
   PENDING_CONFIRMATION @map("pending_confirmation")
+  AWAITING_PICKUP      @map("awaiting_pickup")
+  SHIPPING             @map("shipping")
+  DELIVERED            @map("delivered")
+  CANCELLED            @map("cancelled")
+  RETURN_REQUESTED     @map("return_requested")
+  RETURNED             @map("returned")
+  REFUNDED             @map("refunded")
 
   @@map("shop_order_status")
+}
+
+enum OrderTimelineActor {
+  SYSTEM @map("system")
+  BUYER  @map("buyer")
+  SELLER @map("seller")
+  ADMIN  @map("admin")
+
+  @@map("order_timeline_actor")
 }
 
 enum PurchaseVoucherSlot {
@@ -163,6 +179,7 @@ model User {
   voucherConsumptions VoucherConsumption[]
   voucherRedemptions  VoucherRedemption[]
   purchases           Purchase[]
+  orderTimelineEvents OrderTimelineEvent[]    @relation("OrderTimelineActorUser")
 
   @@index([status])
   @@index([deletedAt])
@@ -619,6 +636,7 @@ model ShopOrder {
   purchaseId                      String                      @map("purchase_id") @db.Uuid
   shopId                          String                      @map("shop_id") @db.Uuid
   status                          ShopOrderStatus             @default(PENDING_CONFIRMATION)
+  version                         Int                         @default(0)
   paymentStatus                   PurchasePaymentStatus       @default(UNPAID) @map("payment_status")
   shopSnapshot                    Json                        @map("shop_snapshot") @db.JsonB
   note                            String                      @default("") @db.VarChar(500)
@@ -639,11 +657,37 @@ model ShopOrder {
   shop                            Shop                        @relation(fields: [shopId], references: [id], onDelete: Restrict)
   lines                           OrderLine[]
   voucherAllocations              PurchaseVoucherAllocation[]
+  timelineEvents                  OrderTimelineEvent[]
 
   @@unique([purchaseId, shopId])
   @@index([shopId, createdAt(sort: Desc), id])
   @@index([purchaseId, id])
+  @@index([status, createdAt(sort: Desc), id(sort: Desc)])
+  @@index([createdAt(sort: Desc), id(sort: Desc)])
   @@map("shop_orders")
+}
+
+model OrderTimelineEvent {
+  id             String             @id @default(uuid()) @db.Uuid
+  orderId        String             @map("order_id") @db.Uuid
+  previousStatus ShopOrderStatus?   @map("previous_status")
+  status         ShopOrderStatus
+  orderVersion   Int                @map("order_version")
+  actorType      OrderTimelineActor @map("actor_type")
+  actorUserId    String?            @map("actor_user_id") @db.Uuid
+  reasonCode     String             @map("reason_code") @db.VarChar(80)
+  reasonNote     String?            @map("reason_note") @db.VarChar(500)
+  idempotencyKey String?            @map("idempotency_key") @db.Uuid
+  requestDigest  String?            @map("request_digest") @db.Char(64)
+  occurredAt     DateTime           @default(now()) @map("occurred_at") @db.Timestamptz(3)
+  order          ShopOrder          @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  actorUser      User?              @relation("OrderTimelineActorUser", fields: [actorUserId], references: [id], onDelete: Restrict)
+
+  @@unique([orderId, orderVersion])
+  @@unique([orderId, idempotencyKey])
+  @@index([orderId, occurredAt, id])
+  @@index([actorUserId, occurredAt, id])
+  @@map("order_timeline_events")
 }
 
 model OrderLine {

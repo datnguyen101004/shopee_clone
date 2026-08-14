@@ -2,6 +2,410 @@
   padding-block: 0.45rem 0.8rem;
 }
 
+/* T20 buyer order history, lifecycle timeline, and cancellation */
+.buyer-order-tabs {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(8rem, 1fr));
+  overflow-x: auto;
+  border-bottom: 1px solid var(--sc-color-border, #e5e7eb);
+  background: #fff;
+}
+
+.buyer-order-tabs a {
+  padding: 1rem 0.75rem;
+  color: #4b5563;
+  text-align: center;
+  white-space: nowrap;
+  border-bottom: 2px solid transparent;
+}
+
+.buyer-order-tabs a[aria-current='page'] {
+  color: #d73211;
+  border-bottom-color: #d73211;
+  font-weight: 700;
+}
+
+.buyer-orders {
+  display: grid;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.buyer-orders > button {
+  justify-self: center;
+  min-width: 10rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid #d73211;
+  border-radius: 0.35rem;
+  color: #d73211;
+  background: #fff;
+  font-weight: 700;
+}
+
+.buyer-order-card {
+  overflow: hidden;
+  padding: 0;
+}
+
+.buyer-order-card > header,
+.buyer-order-card > footer,
+.buyer-order-detail__heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1.25rem;
+}
+
+.buyer-order-card > header {
+  border-bottom: 1px solid #eef0f3;
+}
+
+.buyer-order-card > header a {
+  color: #111827;
+  font-weight: 800;
+}
+
+.buyer-order-status {
+  color: #d73211;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+}
+
+.buyer-order-status.is-cancelled,
+.buyer-order-status.is-refunded,
+.buyer-order-status.is-returned {
+  color: #64748b;
+}
+
+.buyer-order-status.is-delivered {
+  color: #078648;
+}
+
+.buyer-order-card__lines {
+  padding: 0 1.25rem;
+}
+
+.buyer-order-card__lines article,
+.buyer-order-detail__line {
+  display: grid;
+  grid-template-columns: 4.5rem minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.85rem;
+  padding: 1rem 0;
+  border-bottom: 1px solid #eef0f3;
+}
+
+.buyer-order-card__lines img,
+.buyer-order-card__lines article > span,
+.buyer-order-detail__line img,
+.buyer-order-detail__line > span {
+  width: 4.5rem;
+  aspect-ratio: 1;
+  object-fit: contain;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.35rem;
+  display: grid;
+  place-items: center;
+  color: #64748b;
+  background: #f8fafc;
+}
+
+.buyer-order-card__lines article > div,
+.buyer-order-detail__line > div {
+  display: grid;
+  gap: 0.3rem;
+}
+
+.buyer-order-card__lines small,
+.buyer-order-detail__line small,
+.buyer-order-card > footer > span {
+  color: #64748b;
+}
+
+.buyer-order-card > footer {
+  align-items: flex-end;
+  background: #fffdfc;
+}
+
+.buyer-order-card > footer > div {
+  display: flex;
+  align-items: baseline;
+  gap: 0.75rem;
+}
+
+.buyer-order-card > footer strong {
+  color: #d73211;
+  font-size: 1.25rem;
+}
+
+.buyer-order-card > footer a,
+.buyer-order-detail__actions a,
+.buyer-order-detail__actions button {
+  padding: 0.65rem 1rem;
+  border: 1px solid #d73211;
+  border-radius: 0.35rem;
+  color: #fff;
+  background: #d73211;
+  font-weight: 700;
+}
+
+.buyer-order-detail {
+  display: grid;
+  gap: 1rem;
+}
+
+.buyer-order-notice {
+  margin: 0;
+  padding: 0.8rem 1rem;
+  border: 1px solid #fed7aa;
+  color: #9a3412;
+  background: #fff7ed;
+}
+
+.buyer-order-detail__heading {
+  border-bottom: 1px solid #e5e7eb;
+  background: #fff;
+}
+
+.buyer-order-detail__heading > div {
+  display: grid;
+  gap: 0.25rem;
+  min-width: 0;
+}
+
+.buyer-order-detail__heading > div strong,
+.buyer-order-detail__heading > div small {
+  overflow-wrap: anywhere;
+}
+
+.buyer-order-detail__heading small {
+  color: #64748b;
+}
+
+.buyer-order-detail__card {
+  padding: 1.25rem;
+}
+
+.buyer-order-detail__card h2 {
+  margin: 0 0 1rem;
+  font-size: 1.1rem;
+}
+
+.buyer-order-detail__card > p {
+  margin-bottom: 0;
+  color: #475569;
+}
+
+.buyer-order-totals {
+  display: grid;
+  justify-content: end;
+  min-width: min(100%, 24rem);
+  margin: 1rem 0 0 auto;
+}
+
+.buyer-order-totals > div {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 3rem;
+  padding: 0.45rem 0;
+}
+
+.buyer-order-totals dt,
+.buyer-order-totals dd {
+  margin: 0;
+}
+
+.buyer-order-totals > div:last-child {
+  color: #d73211;
+  font-size: 1.15rem;
+  font-weight: 800;
+}
+
+.buyer-order-timeline {
+  display: grid;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.buyer-order-timeline li {
+  display: grid;
+  grid-template-columns: 1rem 1fr;
+  gap: 1rem;
+  min-height: 4.5rem;
+}
+
+.buyer-order-timeline li > span {
+  position: relative;
+  width: 0.8rem;
+  height: 0.8rem;
+  margin-top: 0.25rem;
+  border: 2px solid #d73211;
+  border-radius: 50%;
+  background: #fff;
+}
+
+.buyer-order-timeline li:not(:last-child) > span::after {
+  position: absolute;
+  top: 0.75rem;
+  left: 50%;
+  width: 2px;
+  height: 3.5rem;
+  content: '';
+  background: #fed7aa;
+  transform: translateX(-50%);
+}
+
+.buyer-order-timeline li > div {
+  display: grid;
+  align-content: start;
+  gap: 0.25rem;
+}
+
+.buyer-order-timeline small {
+  color: #64748b;
+}
+
+.buyer-order-timeline p {
+  margin: 0;
+}
+
+.buyer-order-detail__actions {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  padding: 1rem;
+  border-top: 1px solid #e5e7eb;
+  background: rgb(255 255 255 / 96%);
+}
+
+.buyer-order-detail__actions a {
+  color: #d73211;
+  background: #fff;
+}
+
+.buyer-order-detail__actions button {
+  cursor: pointer;
+}
+
+.buyer-order-modal {
+  position: fixed;
+  z-index: 100;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background: rgb(15 23 42 / 58%);
+}
+
+.buyer-order-modal > section {
+  display: grid;
+  gap: 1rem;
+  width: min(100%, 32rem);
+  padding: 1.5rem;
+  border-radius: 0.5rem;
+  background: #fff;
+  box-shadow: 0 1.5rem 4rem rgb(15 23 42 / 25%);
+}
+
+.buyer-order-modal h2,
+.buyer-order-modal p {
+  margin: 0;
+}
+
+.buyer-order-modal label {
+  display: grid;
+  gap: 0.4rem;
+  font-weight: 700;
+}
+
+.buyer-order-modal select,
+.buyer-order-modal textarea {
+  width: 100%;
+  padding: 0.75rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 0.35rem;
+  font: inherit;
+}
+
+.buyer-order-modal textarea {
+  min-height: 6rem;
+  resize: vertical;
+}
+
+.buyer-order-modal [role='alert'] {
+  color: #b91c1c;
+}
+
+.buyer-order-modal footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+}
+
+.buyer-order-modal button {
+  padding: 0.7rem 1rem;
+  border: 1px solid #d73211;
+  border-radius: 0.35rem;
+  color: #d73211;
+  background: #fff;
+  font-weight: 700;
+}
+
+.buyer-order-modal button:last-child {
+  color: #fff;
+  background: #d73211;
+}
+
+.buyer-order-modal button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+@media (max-width: 700px) {
+  .buyer-order-card > footer,
+  .buyer-order-card > footer > div,
+  .buyer-order-detail__heading {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .buyer-order-card__lines article,
+  .buyer-order-detail__line {
+    grid-template-columns: 3.5rem minmax(0, 1fr);
+  }
+
+  .buyer-order-card__lines img,
+  .buyer-order-card__lines article > span,
+  .buyer-order-detail__line img,
+  .buyer-order-detail__line > span {
+    width: 3.5rem;
+  }
+
+  .buyer-order-card__lines article > b,
+  .buyer-order-detail__line > b {
+    grid-column: 2;
+  }
+
+  .buyer-order-totals {
+    width: 100%;
+  }
+
+  .buyer-order-detail__actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .buyer-order-detail__actions a,
+  .buyer-order-detail__actions button {
+    text-align: center;
+  }
+}
+
 /* T19 checkout and immutable purchase confirmation */
 .checkout-page {
   display: grid;
@@ -1763,6 +2167,9 @@
     white-space: nowrap;
   }
   .market-account > a:first-child span {
+    display: none;
+  }
+  .market-account > a:not(:first-child) {
     display: none;
   }
   .market-search {

@@ -102,6 +102,8 @@ See [Marketplace role authorization](docs/role-authorization.md) for the T12 per
 
 See [Buyer profile and shipping addresses](docs/account-management.md) for the T13 account endpoints, Vietnamese normalization, default-address locking/invariant, privacy boundary, checkout snapshot responsibility, and focused verification commands.
 
+See [Buyer order lifecycle](docs/order-history.md) for T20 order-list/detail endpoints, lifecycle transitions, timeline auditing, retry-safe cancellation, account screens, and focused verification commands.
+
 See [Buyer favorites and recently viewed products](docs/buyer-engagement.md) for the T14 private engagement endpoints, concurrency and retention rules, account screens, privacy boundary, and focused verification commands.
 
 See [Public shop storefront and following](docs/shop-storefront.md) for the T15 shop profile/catalog, weighted aggregates, follow policy, privacy/cache boundary, screen checks, and pinned quick verification commands.

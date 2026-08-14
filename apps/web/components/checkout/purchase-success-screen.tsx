@@ -123,7 +123,7 @@ export function PurchaseSuccessScreen({ purchaseReference }: { purchaseReference
       </section>
       <div className="purchase-success__actions">
         <Link href="/">Tiếp tục mua sắm</Link>
-        <Link href="/cart">Xem giỏ hàng</Link>
+        <Link href="/account/orders">Xem đơn mua</Link>
       </div>
     </Container>
   );

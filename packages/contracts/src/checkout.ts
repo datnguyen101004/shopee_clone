@@ -29,7 +29,16 @@ export const CHECKOUT_BLOCKER_CODES = [
 ] as const;
 export const PURCHASE_PAYMENT_METHODS = ['COD'] as const;
 export const PURCHASE_PAYMENT_STATUSES = ['UNPAID'] as const;
-export const SHOP_ORDER_STATUSES = ['PENDING_CONFIRMATION'] as const;
+export const SHOP_ORDER_STATUSES = [
+  'PENDING_CONFIRMATION',
+  'AWAITING_PICKUP',
+  'SHIPPING',
+  'DELIVERED',
+  'CANCELLED',
+  'RETURN_REQUESTED',
+  'RETURNED',
+  'REFUNDED',
+] as const;
 
 export type CheckoutBlockerCode = (typeof CHECKOUT_BLOCKER_CODES)[number];
 export type PurchasePaymentMethod = (typeof PURCHASE_PAYMENT_METHODS)[number];
@@ -152,6 +161,7 @@ const canonicalUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]
 const problemType = /^https:\/\/shopee-clone\.local\/problems\/[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const problemStatuses = new Set([400, 401, 403, 404, 409, 413, 415, 503]);
 const blockerCodes = new Set<string>(CHECKOUT_BLOCKER_CODES);
+const shopOrderStatuses = new Set<string>(SHOP_ORDER_STATUSES);
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -580,7 +590,8 @@ function isOrder(value: unknown): value is PurchaseShopOrder {
       'payableTotalMinor',
     ]) ||
     !isUuid(value.orderReference) ||
-    value.status !== 'PENDING_CONFIRMATION' ||
+    typeof value.status !== 'string' ||
+    !shopOrderStatuses.has(value.status) ||
     value.paymentStatus !== 'UNPAID'
   ) {
     return false;

@@ -659,6 +659,27 @@ flowchart TD
     version -->|"Có"| update --> event --> commit --> detail
 ```
 
+## 16. Đánh giá xác thực T21
+
+```mermaid
+flowchart TD
+    buyer["Buyer mở đơn DELIVERED"] --> capability["GET order detail: review capability theo từng line"]
+    capability --> eligible{"Line chưa được review?"}
+    eligible -->|Không| existing["Hiện trạng đã đánh giá, không tạo bản ghi thứ hai"]
+    eligible -->|Có| stage["POST review-media multipart: xác thực ảnh, owner, hạn 24 giờ"]
+    stage --> create["POST review với Idempotency-Key"]
+    create --> ownership["Transaction kiểm tra buyer + order line + DELIVERED"]
+    ownership --> attach["Attach media STAGED của chính buyer"]
+    attach --> aggregate["Tính lại rating product và shop từ VISIBLE reviews"]
+    aggregate --> public["GET public review list: cursor + filter sao"]
+    public --> edit["PATCH author review với If-Match review version"]
+    edit --> stale{"ETag còn mới?"}
+    stale -->|Không| reload["409, tải canonical review rồi giữ form để retry"]
+    stale -->|Có| aggregate
+```
+
+Review chỉ gắn với một `OrderLine` đã giao và không public dữ liệu đơn hàng, email, địa chỉ, storage key hay trạng thái staging. Ảnh chỉ public sau khi được attach; ảnh staged hết hạn có cleanup command ở local storage. `HIDDEN` đã có persistence/audit boundary cho moderation sau này, vì thế không xuất hiện trong list public hay aggregate.
+
 ```mermaid
 stateDiagram-v2
     [*] --> PENDING_CONFIRMATION

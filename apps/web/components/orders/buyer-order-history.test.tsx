@@ -3,6 +3,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import { cancelBuyerOrder, getBuyerOrderDetail, getBuyerOrders } from '../../lib/order-history-api';
+import { createProductReview } from '../../lib/reviews-api';
 import { useAuthSession } from '../auth-session-provider';
 import { BuyerOrderDetailScreen, BuyerOrderListScreen } from './buyer-order-history';
 
@@ -13,6 +14,13 @@ vi.mock('../../lib/order-history-api', () => ({
   cancelBuyerOrder: vi.fn(),
 }));
 vi.mock('../auth-session-provider', () => ({ useAuthSession: vi.fn() }));
+vi.mock('../../lib/reviews-api', () => ({
+  ReviewsApiError: class ReviewsApiError extends Error {},
+  createProductReview: vi.fn(),
+  getAuthorProductReview: vi.fn(),
+  stageReviewMedia: vi.fn(),
+  updateProductReview: vi.fn(),
+}));
 
 const id = (suffix: string) => `00000000-0000-4000-8000-${suffix.padStart(12, '0')}`;
 const order: BuyerOrderSummary = {
@@ -201,5 +209,29 @@ describe('buyer order-history screens', () => {
     });
     await waitFor(() => expect(screen.getByText('Đơn hàng đã được hủy.')).toBeInTheDocument());
     expect(screen.queryByRole('button', { name: 'Hủy đơn hàng' })).not.toBeInTheDocument();
+  });
+
+  it('only exposes a review action for an eligible delivered line and preserves a stable create flow', async () => {
+    const delivered = {
+      ...detail,
+      order: {
+        ...order,
+        status: 'DELIVERED' as const,
+        cancellation: { allowed: false, reasonCodes: [] },
+        lines: [{ ...order.lines[0]!, review: { state: 'ELIGIBLE' as const, reviewId: null } }],
+      },
+    };
+    vi.mocked(getBuyerOrderDetail).mockResolvedValue(delivered);
+    vi.mocked(createProductReview).mockResolvedValue({
+      review: { id: id('11'), orderLineId: id('4'), rating: 5, text: 'Tốt', authorName: 'Buyer', verifiedPurchase: true, media: [], updatedAt: '2026-08-15T00:00:00.000Z', visibility: 'VISIBLE', version: 0 },
+      etag: '"review-0"',
+    });
+    const user = userEvent.setup();
+    render(<BuyerOrderDetailScreen orderReference={order.orderReference} />);
+    await user.click(await screen.findByRole('button', { name: 'Đánh giá' }));
+    await user.type(screen.getByLabelText('Nhận xét (không bắt buộc)'), 'Tốt');
+    await user.click(screen.getByRole('button', { name: 'Gửi đánh giá' }));
+    await waitFor(() => expect(createProductReview).toHaveBeenCalledTimes(1));
+    expect(screen.getByText('Đánh giá đã được lưu. Tải lại chi tiết đơn để xem trạng thái mới.')).toBeInTheDocument();
   });
 });

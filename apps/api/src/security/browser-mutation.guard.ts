@@ -9,6 +9,8 @@ import { EXTERNAL_REQUEST_CLASS, type ExternalRequestClass } from './external-re
 
 const unsafeMethods = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 const maximumBodyBytes = 100 * 1024;
+// Multipart adds a boundary and part headers around the permitted 5 MiB file.
+const maximumReviewMediaRequestBytes = 5 * 1024 * 1024 + 64 * 1024;
 const overrideHeaders = ['x-http-method-override', 'x-method-override', 'x-http-method'] as const;
 
 function canonicalOrigin(value: string): string | null {
@@ -69,7 +71,9 @@ export class BrowserMutationGuard implements CanActivate {
 
     const contentLength = request.headers['content-length'];
     const bodyBytes = typeof contentLength === 'string' ? Number(contentLength) : 0;
-    if (Number.isFinite(bodyBytes) && bodyBytes > maximumBodyBytes) {
+    const isReviewMediaUpload =
+      request.method === 'POST' && /\/api\/v1\/account\/review-media$/.test((request.originalUrl ?? '').split('?')[0] ?? '');
+    if (Number.isFinite(bodyBytes) && bodyBytes > (isReviewMediaUpload ? maximumReviewMediaRequestBytes : maximumBodyBytes)) {
       throw new BrowserMutationSecurityError(
         413,
         'mutation-body-too-large',
@@ -82,7 +86,7 @@ export class BrowserMutationGuard implements CanActivate {
       request.headers['transfer-encoding'] !== undefined ||
       (Number.isFinite(bodyBytes) && bodyBytes > 0);
     const contentType = request.headers['content-type']?.split(';', 1)[0]?.trim().toLowerCase();
-    if (hasBody && contentType !== 'application/json') {
+    if (hasBody && contentType !== 'application/json' && !(isReviewMediaUpload && contentType === 'multipart/form-data')) {
       throw new BrowserMutationSecurityError(
         415,
         'mutation-media-type-unsupported',

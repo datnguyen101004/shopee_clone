@@ -21,6 +21,7 @@ import {
   OrderHistoryApiError,
 } from '../../lib/order-history-api';
 import { useAuthSession } from '../auth-session-provider';
+import { createProductReview, getAuthorProductReview, stageReviewMedia, updateProductReview, ReviewsApiError } from '../../lib/reviews-api';
 import {
   AccountLoadFailure,
   AccountWorkspace,
@@ -106,6 +107,56 @@ function OrderCard({ order }: { order: BuyerOrderSummary }) {
       </footer>
     </Card>
   );
+}
+
+function ReviewAction({ orderReference, line }: { orderReference: string; line: BuyerOrderSummary['lines'][number] }) {
+  const auth = useAuthSession();
+  const [open, setOpen] = useState(false);
+  const [rating, setRating] = useState(5);
+  const [text, setText] = useState('');
+  const [message, setMessage] = useState('');
+  const [existing, setExisting] = useState<{ id: string; etag: string; mediaIds: string[] } | null>(null);
+  const [files, setFiles] = useState<File[]>([]);
+  const [pending, setPending] = useState(false);
+  const key = useRef<string | null>(null);
+  if (!line.review || line.review.state === 'INELIGIBLE') return null;
+  async function submit() {
+    if (pending) return;
+    setPending(true);
+    setMessage('');
+    try {
+      const stagedMediaIds = await Promise.all(files.map((file) => stageReviewMedia(file, auth.authenticatedFetch)));
+      const mediaIds = existing ? [...existing.mediaIds, ...stagedMediaIds] : stagedMediaIds;
+      if (existing) {
+        await updateProductReview(existing.id, { rating: rating as 1 | 2 | 3 | 4 | 5, ...(text.trim() ? { text } : {}), ...(mediaIds.length ? { mediaIds } : {}) }, existing.etag, auth.authenticatedFetch);
+        setMessage('Đánh giá đã được cập nhật.'); setOpen(false);
+        return;
+      }
+      key.current ??= crypto.randomUUID();
+      await createProductReview(orderReference, line.lineId, { rating: rating as 1 | 2 | 3 | 4 | 5, ...(text.trim() ? { text } : {}), ...(mediaIds.length ? { mediaIds } : {}) }, key.current, auth.authenticatedFetch);
+      key.current = null; setMessage('Đánh giá đã được lưu. Tải lại chi tiết đơn để xem trạng thái mới.'); setOpen(false);
+    } catch (error) {
+      if (error instanceof ReviewsApiError && error.status === 409 && existing) {
+        try {
+          const latest = await getAuthorProductReview(existing.id, auth.authenticatedFetch);
+          setExisting({ id: latest.review.id, etag: latest.etag, mediaIds: latest.review.media.map((media) => media.id) });
+          setMessage('Đánh giá đã thay đổi ở phiên khác. Đã tải phiên bản mới; nội dung bạn nhập vẫn được giữ để gửi lại.');
+        } catch { setMessage('Đánh giá đã thay đổi. Vui lòng tải lại trang trước khi thử lại.'); }
+      } else setMessage(error instanceof ReviewsApiError && error.status === 409 ? 'Đánh giá đã tồn tại. Tải lại chi tiết đơn.' : 'Chưa thể lưu đánh giá. Nội dung của bạn vẫn được giữ để thử lại.');
+    } finally { setPending(false); }
+  }
+  async function openEdit() {
+    if (!line.review?.reviewId) return;
+    try {
+      const result = await getAuthorProductReview(line.review.reviewId, auth.authenticatedFetch);
+      setExisting({ id: result.review.id, etag: result.etag, mediaIds: result.review.media.map((media) => media.id) }); setRating(result.review.rating); setText(result.review.text ?? ''); setOpen(true); setMessage(result.review.visibility === 'HIDDEN' ? 'Đánh giá này hiện đang bị ẩn với người xem công khai.' : '');
+    } catch { setMessage('Không thể tải đánh giá hiện tại. Vui lòng thử lại.'); }
+  }
+  return <div className="buyer-review-action">
+    {line.review.state === 'REVIEWED' ? <button type="button" onClick={() => void openEdit()}>Sửa đánh giá</button> : <button type="button" onClick={() => setOpen((value) => !value)}>{open ? 'Đóng' : 'Đánh giá'}</button>}
+    {open ? <form onSubmit={(event) => { event.preventDefault(); void submit(); }}><fieldset><legend>Chọn số sao</legend>{[1, 2, 3, 4, 5].map((value) => <label key={value}><input disabled={pending} type="radio" name={`rating-${line.lineId}`} checked={rating === value} onChange={() => setRating(value)} />{value} sao</label>)}</fieldset><label>Nhận xét (không bắt buộc)<textarea disabled={pending} maxLength={1000} value={text} onChange={(event) => setText(event.target.value)} /></label><label>Ảnh đánh giá (JPEG, PNG hoặc WebP; tối đa 6 ảnh, 5 MiB/ảnh)<input disabled={pending} type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={(event) => setFiles(Array.from(event.target.files ?? []).slice(0, Math.max(0, 6 - (existing?.mediaIds.length ?? 0))))} /></label><button disabled={pending} type="submit">{pending ? 'Đang gửi…' : 'Gửi đánh giá'}</button></form> : null}
+    {message ? <p role="status">{message}</p> : null}
+  </div>;
 }
 
 export function BuyerOrderListScreen({ filter }: { filter: BuyerOrderListFilter | null }) {
@@ -407,6 +458,7 @@ export function BuyerOrderDetailScreen({ orderReference }: { orderReference: str
                     </small>
                   </div>
                   <b>{money(line.payableMerchandiseMinor)}</b>
+                  <ReviewAction orderReference={detail.order.orderReference} line={line} />
                 </article>
               ))}
               <dl className="buyer-order-totals">

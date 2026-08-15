@@ -7,12 +7,12 @@ import type { OrderCursorPosition } from './order-canonical';
 
 export const buyerOrderSummaryInclude = {
   purchase: { select: { id: true } },
-  lines: { orderBy: [{ sourceCartLineId: 'asc' as const }, { id: 'asc' as const }] },
+  lines: { orderBy: [{ sourceCartLineId: 'asc' as const }, { id: 'asc' as const }], include: { review: { select: { id: true } } } },
 } satisfies Prisma.ShopOrderInclude;
 
 export const buyerOrderDetailInclude = {
   purchase: { select: { id: true, addressSnapshot: true, currency: true } },
-  lines: { orderBy: [{ sourceCartLineId: 'asc' as const }, { id: 'asc' as const }] },
+  lines: { orderBy: [{ sourceCartLineId: 'asc' as const }, { id: 'asc' as const }], include: { review: { select: { id: true } } } },
   timelineEvents: { orderBy: [{ orderVersion: 'asc' as const }, { id: 'asc' as const }] },
   voucherAllocations: {
     orderBy: [

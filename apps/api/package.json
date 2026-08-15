@@ -22,7 +22,9 @@
     "db:import:dataset": "tsx prisma/import-dataset.ts",
     "db:reset": "prisma migrate reset",
     "db:verify": "tsx prisma/verify.ts",
-    "auth:roles:bootstrap-admin": "tsx scripts/bootstrap-admin.ts"
+    "auth:roles:bootstrap-admin": "tsx scripts/bootstrap-admin.ts",
+    "reviews:media:cleanup": "tsx scripts/cleanup-review-media.ts",
+    "reviews:aggregates:repair": "tsx scripts/repair-review-aggregates.ts"
   },
   "dependencies": {
     "@nestjs/common": "11.1.29",

@@ -13,6 +13,7 @@ import { PrismaModule } from './prisma/prisma.module';
 import { PricingModule } from './pricing/pricing.module';
 import { ShopStorefrontModule } from './shop-storefront/shop-storefront.module';
 import { BrowserSecurityModule } from './security/browser-security.module';
+import { ReviewsModule } from './reviews/reviews.module';
 
 @Module({
   imports: [
@@ -29,6 +30,7 @@ import { BrowserSecurityModule } from './security/browser-security.module';
     AccountModule,
     EngagementModule,
     ShopStorefrontModule,
+    ReviewsModule,
   ],
 })
 export class AppModule {}

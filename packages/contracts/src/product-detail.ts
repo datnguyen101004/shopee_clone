@@ -34,6 +34,8 @@ export interface ProductDetailShop {
   name: string;
   location: string;
   activeProductCount: number;
+  ratingAverageBasisPoints?: number;
+  ratingCount?: number;
 }
 
 export interface ProductShippingPreview {
@@ -174,6 +176,8 @@ export function isProductDetailResponse(value: unknown): value is ProductDetailR
     !isString(value.shop.name) ||
     !isString(value.shop.location) ||
     !isSafeNonNegativeInteger(value.shop.activeProductCount) ||
+    !(value.shop.ratingAverageBasisPoints === undefined || (isSafeNonNegativeInteger(value.shop.ratingAverageBasisPoints) && value.shop.ratingAverageBasisPoints <= 500)) ||
+    !(value.shop.ratingCount === undefined || isSafeNonNegativeInteger(value.shop.ratingCount)) ||
     !isRecord(value.shippingPreview) ||
     !isString(value.shippingPreview.origin) ||
     !isString(value.shippingPreview.destinationLabel) ||

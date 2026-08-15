@@ -80,4 +80,19 @@ describe('BrowserMutationGuard', () => {
       ),
     ).toThrow('mutation-method-override-denied');
   });
+
+  it('allows multipart overhead for a permitted review image, while retaining the request cap', () => {
+    const upload = (contentLength: number) => context({
+      method: 'POST',
+      originalUrl: '/api/v1/account/review-media',
+      headers: {
+        origin: 'http://localhost:3000',
+        'content-length': String(contentLength),
+        'content-type': 'multipart/form-data; boundary=review-upload',
+      },
+      query: {},
+    } as Partial<Request>);
+    expect(guard.canActivate(upload(5 * 1024 * 1024 + 2048))).toBe(true);
+    expect(() => guard.canActivate(upload(5 * 1024 * 1024 + 64 * 1024 + 1))).toThrow('mutation-body-too-large');
+  });
 });

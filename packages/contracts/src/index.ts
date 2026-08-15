@@ -379,6 +379,7 @@ export {
 export type {
   BuyerOrderCancellationCapability,
   BuyerOrderDetailResponse,
+  BuyerOrderLine,
   BuyerOrderListFilter,
   BuyerOrderListQuery,
   BuyerOrderListResponse,
@@ -397,3 +398,39 @@ export {
   resolveLegacyVietnamProvince,
 } from './vietnam-provinces';
 export type { LegacyVietnamProvinceIdentity, VietnamMacroRegion } from './vietnam-provinces';
+export {
+  REVIEW_MEDIA_MAX_ITEMS,
+  REVIEW_PAGE_DEFAULT_LIMIT,
+  REVIEW_PAGE_MAX_LIMIT,
+  REVIEW_RATINGS,
+  REVIEW_TEXT_MAX_LENGTH,
+  REVIEW_VERSION,
+  formatReviewVersionEtag,
+  isAuthorProductReview,
+  isReviewEligibility,
+  isReviewMediaStageResponse,
+  isPublicProductReviewPage,
+  normalizeReviewText,
+  parseCreateProductReviewRequest,
+  parseAuthorProductReview,
+  parseProductReviewProblemDetails,
+  parseProductReviewQuery,
+  parsePublicProductReviewPage,
+  parseReviewIdempotencyKey,
+  parseReviewVersionEtag,
+  parseUpdateProductReviewRequest,
+} from './reviews';
+export type {
+  AuthorProductReview,
+  CreateProductReviewRequest,
+  ProductReviewProblemDetails,
+  ProductReviewSummary,
+  PublicProductReview,
+  PublicProductReviewPage,
+  ReviewEligibility,
+  ReviewMedia,
+  ReviewMediaStageResponse,
+  ReviewRating,
+  ReviewVisibility,
+  UpdateProductReviewRequest,
+} from './reviews';

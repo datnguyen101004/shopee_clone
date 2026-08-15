@@ -28,6 +28,18 @@ function safeSum(values: number[]): number {
   return total;
 }
 
+function safeRatingAggregate(ratingAverageBasisPoints: number, ratingCount: number): void {
+  if (
+    !Number.isSafeInteger(ratingAverageBasisPoints) ||
+    !Number.isSafeInteger(ratingCount) ||
+    ratingAverageBasisPoints < 0 ||
+    ratingAverageBasisPoints > 500 ||
+    ratingCount < 0
+  ) {
+    throw new ShopStorefrontAggregateError();
+  }
+}
+
 @Injectable()
 export class ShopStorefrontService {
   constructor(
@@ -48,10 +60,7 @@ export class ShopStorefrontService {
       this.catalog.getShopSummary(shop.id),
       this.repository.countFollowers(shop.id),
     ]);
-    const ratingCount = safeSum(summary.products.map((product) => product.ratingCount));
-    const weightedRating = safeSum(
-      summary.products.map((product) => product.ratingAverageBasisPoints * product.ratingCount),
-    );
+    safeRatingAggregate(shop.ratingAverageBasisPoints, shop.ratingCount);
     return {
       id: shop.id,
       slug: shop.slug,
@@ -59,8 +68,8 @@ export class ShopStorefrontService {
       location: shop.location,
       joinedAt: shop.createdAt.toISOString(),
       activeProductCount: summary.products.length,
-      ratingAverageBasisPoints: ratingCount === 0 ? 0 : Math.round(weightedRating / ratingCount),
-      ratingCount,
+      ratingAverageBasisPoints: shop.ratingAverageBasisPoints,
+      ratingCount: shop.ratingCount,
       soldCount: safeSum(summary.products.map((product) => product.soldCount)),
       followerCount,
       responseMetadata: {

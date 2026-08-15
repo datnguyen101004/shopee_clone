@@ -120,10 +120,7 @@ export default async function ShopStorefrontPage({ params, searchParams }: ShopP
           </div>
           <div>
             <dt>Đánh giá</dt>
-            <dd>
-              ★ {(shop.ratingAverageBasisPoints / 100).toFixed(1)} ({formatNumber(shop.ratingCount)}
-              )
-            </dd>
+            <dd>{shop.ratingCount === 0 ? 'Chưa có đánh giá' : `★ ${(shop.ratingAverageBasisPoints / 100).toFixed(1)} (${formatNumber(shop.ratingCount)})`}</dd>
           </div>
           <div>
             <dt>Đã bán</dt>

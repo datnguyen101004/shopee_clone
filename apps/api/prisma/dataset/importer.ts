@@ -177,8 +177,9 @@ async function importSource(
           name: product.name,
           description: product.description,
           status: ProductStatus.ACTIVE,
-          ratingAverageBasisPoints: product.ratingAverageBasisPoints,
-          ratingCount: product.ratingCount,
+          // Ratings are exclusively derived from visible verified reviews (T21).
+          ratingAverageBasisPoints: 0,
+          ratingCount: 0,
           soldCount: product.soldCount,
           createdAt: product.createdAt,
           variants: {
@@ -230,8 +231,7 @@ async function importSource(
           name: product.name,
           description: product.description,
           status: ProductStatus.ACTIVE,
-          ratingAverageBasisPoints: product.ratingAverageBasisPoints,
-          ratingCount: product.ratingCount,
+          // Dataset re-import must never overwrite review-derived projections.
           soldCount: product.soldCount,
           createdAt: product.createdAt,
           deletedAt: null,

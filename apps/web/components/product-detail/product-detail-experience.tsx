@@ -9,6 +9,7 @@ import { FavoriteStateProvider } from '../engagement/favorite-state-provider';
 import { RecentlyViewedRecorder } from '../engagement/recently-viewed-recorder';
 import { useAuthSession } from '../auth-session-provider';
 import { useCart } from '../cart/cart-provider';
+import { ProductReviews } from './product-reviews';
 
 import {
   activeProductImage,
@@ -74,6 +75,7 @@ function ProductDetailInner({ product }: { product: ProductDetailResponse }) {
   }
 
   return (
+    <>
     <section className="product-detail-offer" aria-label="Lựa chọn sản phẩm">
       <div className="product-detail-gallery">
         <div className="product-detail-gallery__main" aria-live="polite">
@@ -261,6 +263,8 @@ function ProductDetailInner({ product }: { product: ProductDetailResponse }) {
         </div>
       </div>
     </section>
+    <ProductReviews product={product} />
+    </>
   );
 }
 

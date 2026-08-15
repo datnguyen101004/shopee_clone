@@ -17,6 +17,7 @@ const suite =
     'vouchers',
     'checkout',
     'orders',
+    'reviews',
   ].find((candidate) => process.argv.includes(candidate)) ?? 'homepage';
 const webPort = Number(process.env.E2E_WEB_PORT ?? 3000);
 const apiPort = Number(process.env.PORT ?? 3001);

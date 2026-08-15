@@ -44,16 +44,15 @@ describe('ShopStorefrontService', () => {
       name: 'Demo Shop',
       location: 'Hà Nội',
       createdAt: timestamp,
+      ratingAverageBasisPoints: 425,
+      ratingCount: 4,
     });
     (repository.countFollowers as jest.Mock).mockResolvedValue(7);
   });
 
-  it('composes weighted profile aggregates and explicit response placeholders', async () => {
+  it('uses persisted review aggregates and explicit response placeholders', async () => {
     (catalog.getShopSummary as jest.Mock).mockResolvedValue({
-      products: [
-        { ratingAverageBasisPoints: 500, ratingCount: 1, soldCount: 4 },
-        { ratingAverageBasisPoints: 400, ratingCount: 3, soldCount: 6 },
-      ],
+      products: [{ soldCount: 4 }, { soldCount: 6 }],
       categories: [{ slug: 'phones', name: 'Điện thoại', parentSlug: null, productCount: 2 }],
     });
     await expect(service.profile('demo-shop')).resolves.toMatchObject({
@@ -67,12 +66,19 @@ describe('ShopStorefrontService', () => {
     });
   });
 
-  it('fails closed when an aggregate would exceed the safe integer boundary', async () => {
+  it('fails closed when a persisted review aggregate is corrupted', async () => {
+    (repository.findPublicShopBySlug as jest.Mock).mockResolvedValue({
+      id: shopId,
+      ownerId: otherShopId,
+      slug: 'demo-shop',
+      name: 'Demo Shop',
+      location: 'Hà Nội',
+      createdAt: timestamp,
+      ratingAverageBasisPoints: 501,
+      ratingCount: Number.MAX_SAFE_INTEGER + 1,
+    });
     (catalog.getShopSummary as jest.Mock).mockResolvedValue({
-      products: [
-        { ratingAverageBasisPoints: 1, ratingCount: Number.MAX_SAFE_INTEGER, soldCount: 0 },
-        { ratingAverageBasisPoints: 1, ratingCount: 1, soldCount: 0 },
-      ],
+      products: [],
       categories: [],
     });
     await expect(service.profile('demo-shop')).rejects.toBeInstanceOf(ShopStorefrontAggregateError);

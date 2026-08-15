@@ -54,12 +54,12 @@ export default async function ProductDetailPage({
         <article className="product-detail-information">
           <Badge variant="brand">{product.category.name}</Badge>
           <h1>{product.name}</h1>
-          <div
-            className="product-detail-rating"
-            aria-label={`${(product.ratingAverageBasisPoints / 100).toFixed(1)} trên 5 sao`}
-          >
-            <strong>★ {(product.ratingAverageBasisPoints / 100).toFixed(1)}</strong>
-            <span>{formatNumber(product.ratingCount)} đánh giá</span>
+          <div className="product-detail-rating">
+            {product.ratingCount === 0 ? (
+              <span aria-label="Chưa có đánh giá">Chưa có đánh giá</span>
+            ) : (
+              <><strong aria-label={`${(product.ratingAverageBasisPoints / 100).toFixed(1)} trên 5 sao`}>★ {(product.ratingAverageBasisPoints / 100).toFixed(1)}</strong><span>{formatNumber(product.ratingCount)} đánh giá</span></>
+            )}
             <span>{formatNumber(product.soldCount)} đã bán</span>
           </div>
           <ProductDetailExperience product={product} />

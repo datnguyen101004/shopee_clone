@@ -22,6 +22,8 @@
     "ci:validate": "node scripts/validate-ci.mjs",
     "auth:google:preflight": "node --env-file=.env scripts/google-oauth-preflight.mjs",
     "auth:roles:bootstrap-admin": "pnpm --filter @shopee-clone/api auth:roles:bootstrap-admin",
+    "reviews:media:cleanup": "pnpm --filter @shopee-clone/api reviews:media:cleanup",
+    "reviews:aggregates:repair": "pnpm --filter @shopee-clone/api reviews:aggregates:repair",
     "db:generate": "pnpm --filter @shopee-clone/api db:generate",
     "db:format": "pnpm --filter @shopee-clone/api db:format",
     "db:validate": "pnpm --filter @shopee-clone/api db:validate",
@@ -58,6 +60,7 @@
     "test:e2e:vouchers:quick": "node scripts/quick-e2e.mjs vouchers",
     "test:e2e:checkout:quick": "node scripts/quick-e2e.mjs checkout",
     "test:e2e:orders:quick": "node scripts/quick-e2e.mjs orders",
+    "test:e2e:reviews:quick": "node scripts/quick-e2e.mjs reviews",
     "test:infra": "node --test scripts/infrastructure-smoke.test.mjs",
     "format": "prettier --write .",
     "format:check": "prettier --check ."

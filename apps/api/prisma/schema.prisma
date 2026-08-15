@@ -152,6 +152,20 @@ enum VoucherAllocationKind {
   @@map("voucher_allocation_kind")
 }
 
+enum ReviewVisibility {
+  VISIBLE @map("visible")
+  HIDDEN  @map("hidden")
+
+  @@map("review_visibility")
+}
+
+enum ReviewMediaState {
+  STAGED   @map("staged")
+  ATTACHED @map("attached")
+
+  @@map("review_media_state")
+}
+
 model User {
   id                  String                  @id @default(uuid()) @db.Uuid
   email               String                  @unique @db.VarChar(320)
@@ -180,6 +194,9 @@ model User {
   voucherRedemptions  VoucherRedemption[]
   purchases           Purchase[]
   orderTimelineEvents OrderTimelineEvent[]    @relation("OrderTimelineActorUser")
+  productReviews      ProductReview[]         @relation("ReviewBuyer")
+  stagedReviewMedia   ReviewMedia[]           @relation("ReviewMediaUploader")
+  reviewModeration    ReviewModerationEvent[] @relation("ReviewModerationActor")
 
   @@index([status])
   @@index([deletedAt])
@@ -310,21 +327,24 @@ model PasswordResetToken {
 }
 
 model Shop {
-  id               String            @id @default(uuid()) @db.Uuid
-  ownerId          String            @unique @map("owner_id") @db.Uuid
-  slug             String            @unique @db.VarChar(120)
-  name             String            @db.VarChar(160)
-  location         String            @default("Việt Nam") @db.VarChar(120)
-  status           ShopStatus        @default(ACTIVE)
-  createdAt        DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt        DateTime          @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
-  deletedAt        DateTime?         @map("deleted_at") @db.Timestamptz(3)
-  owner            User              @relation(fields: [ownerId], references: [id], onDelete: Restrict)
-  products         Product[]
-  followers        ShopFollower[]
-  vouchers         Voucher[]
-  orders           ShopOrder[]
-  purchaseVouchers PurchaseVoucher[]
+  id                       String            @id @default(uuid()) @db.Uuid
+  ownerId                  String            @unique @map("owner_id") @db.Uuid
+  slug                     String            @unique @db.VarChar(120)
+  name                     String            @db.VarChar(160)
+  location                 String            @default("Việt Nam") @db.VarChar(120)
+  status                   ShopStatus        @default(ACTIVE)
+  ratingAverageBasisPoints Int               @default(0) @map("rating_average_basis_points")
+  ratingCount              Int               @default(0) @map("rating_count")
+  createdAt                DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt                DateTime          @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt                DateTime?         @map("deleted_at") @db.Timestamptz(3)
+  owner                    User              @relation(fields: [ownerId], references: [id], onDelete: Restrict)
+  products                 Product[]
+  followers                ShopFollower[]
+  vouchers                 Voucher[]
+  orders                   ShopOrder[]
+  purchaseVouchers         PurchaseVoucher[]
+  reviews                  ProductReview[]
 
   @@index([status])
   @@index([deletedAt])
@@ -376,6 +396,7 @@ model Product {
   recentlyViewedBy         RecentlyViewedProduct[]
   voucherScopes            VoucherProductScope[]
   orderLines               OrderLine[]
+  reviews                  ProductReview[]
 
   @@unique([shopId, slug])
   @@index([shopId, status])
@@ -667,6 +688,72 @@ model ShopOrder {
   @@map("shop_orders")
 }
 
+model ProductReview {
+  id               String                  @id @default(uuid()) @db.Uuid
+  orderLineId      String                  @unique @map("order_line_id") @db.Uuid
+  buyerUserId      String                  @map("buyer_user_id") @db.Uuid
+  productId        String                  @map("product_id") @db.Uuid
+  shopId           String                  @map("shop_id") @db.Uuid
+  rating           Int
+  text             String?                 @db.VarChar(1000)
+  visibility       ReviewVisibility        @default(VISIBLE)
+  version          Int                     @default(0)
+  idempotencyKey   String                  @map("idempotency_key") @db.Uuid
+  requestDigest    String                  @map("request_digest") @db.Char(64)
+  createdAt        DateTime                @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt        DateTime                @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  orderLine        OrderLine               @relation(fields: [orderLineId], references: [id], onDelete: Restrict)
+  buyer            User                    @relation("ReviewBuyer", fields: [buyerUserId], references: [id], onDelete: Restrict)
+  product          Product                 @relation(fields: [productId], references: [id], onDelete: Restrict)
+  shop             Shop                    @relation(fields: [shopId], references: [id], onDelete: Restrict)
+  media            ReviewMedia[]
+  moderationEvents ReviewModerationEvent[]
+
+  @@unique([buyerUserId, idempotencyKey])
+  @@index([buyerUserId, updatedAt(sort: Desc), id])
+  @@index([productId, visibility, rating, updatedAt(sort: Desc), id])
+  @@index([shopId, visibility, updatedAt(sort: Desc), id])
+  @@map("product_reviews")
+}
+
+model ReviewMedia {
+  id         String           @id @default(uuid()) @db.Uuid
+  uploaderId String           @map("uploader_id") @db.Uuid
+  reviewId   String?          @map("review_id") @db.Uuid
+  storageKey String           @unique @map("storage_key") @db.VarChar(255)
+  mimeType   String           @map("mime_type") @db.VarChar(32)
+  byteSize   Int              @map("byte_size")
+  width      Int
+  height     Int
+  state      ReviewMediaState @default(STAGED)
+  sortOrder  Int              @default(0) @map("sort_order")
+  expiresAt  DateTime?        @map("expires_at") @db.Timestamptz(3)
+  createdAt  DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
+  uploader   User             @relation("ReviewMediaUploader", fields: [uploaderId], references: [id], onDelete: Restrict)
+  review     ProductReview?   @relation(fields: [reviewId], references: [id], onDelete: Restrict)
+
+  @@unique([reviewId, sortOrder])
+  @@index([uploaderId, state, expiresAt])
+  @@index([state, expiresAt])
+  @@map("review_media")
+}
+
+model ReviewModerationEvent {
+  id                 String           @id @default(uuid()) @db.Uuid
+  reviewId           String           @map("review_id") @db.Uuid
+  actorUserId        String?          @map("actor_user_id") @db.Uuid
+  previousVisibility ReviewVisibility @map("previous_visibility")
+  visibility         ReviewVisibility
+  reason             String           @db.VarChar(500)
+  createdAt          DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
+  review             ProductReview    @relation(fields: [reviewId], references: [id], onDelete: Restrict)
+  actor              User?            @relation("ReviewModerationActor", fields: [actorUserId], references: [id], onDelete: Restrict)
+
+  @@index([reviewId, createdAt, id])
+  @@index([actorUserId, createdAt, id])
+  @@map("review_moderation_events")
+}
+
 model OrderTimelineEvent {
   id             String             @id @default(uuid()) @db.Uuid
   orderId        String             @map("order_id") @db.Uuid
@@ -717,6 +804,7 @@ model OrderLine {
   product                         Product                     @relation(fields: [productId], references: [id], onDelete: Restrict)
   variant                         ProductVariant              @relation(fields: [variantId], references: [id], onDelete: Restrict)
   voucherAllocations              PurchaseVoucherAllocation[]
+  review                          ProductReview?
 
   @@unique([orderId, sourceCartLineId])
   @@index([productId, createdAt, id])

@@ -106,6 +106,8 @@ export class CatalogProductDetailService {
         name: product.shop.name,
         location: product.shop.location,
         activeProductCount,
+        ratingAverageBasisPoints: product.shop.ratingAverageBasisPoints,
+        ratingCount: product.shop.ratingCount,
       },
       shippingPreview: {
         origin: product.shop.location,

@@ -13,7 +13,7 @@ export class ShopStorefrontRepository {
   findPublicShopBySlug(slug: string) {
     return this.prisma.shop.findFirst({
       where: { slug, status: ShopStatus.ACTIVE, deletedAt: null },
-      select: { id: true, ownerId: true, slug: true, name: true, location: true, createdAt: true },
+      select: { id: true, ownerId: true, slug: true, name: true, location: true, createdAt: true, ratingAverageBasisPoints: true, ratingCount: true },
     });
   }
 

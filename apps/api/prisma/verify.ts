@@ -175,8 +175,12 @@ async function verifyDatabase(databaseUrl: string): Promise<void> {
     assert(datasetPlan.sources.some(({ shop }) => shop.id === product.shop.id));
     assert(datasetPlan.sources.some(({ category }) => category.id === product.category.id));
     assert.equal(product.status, ProductStatus.ACTIVE);
-    assert(product.ratingAverageBasisPoints >= 100 && product.ratingAverageBasisPoints <= 500);
-    assert(product.ratingCount >= 0);
+    // T21 rating projections are derived only from visible verified reviews;
+    // normal seed/dataset imports must leave the canonical zero-review state.
+    assert.equal(product.ratingAverageBasisPoints, 0);
+    assert.equal(product.ratingCount, 0);
+    assert.equal(product.shop.ratingAverageBasisPoints, 0);
+    assert.equal(product.shop.ratingCount, 0);
     assert(product.soldCount >= 0);
     assert.equal(product.images.length, 1);
     assert.equal(product.images[0]?.variantId, null);
@@ -375,6 +379,14 @@ async function verifyDatabase(databaseUrl: string): Promise<void> {
       orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
     });
     assert.equal(orderedProducts.length, 1_377);
+    assert.equal(
+      await prisma.product.count({ where: { OR: [{ ratingAverageBasisPoints: { not: 0 } }, { ratingCount: { not: 0 } }] } }),
+      0,
+    );
+    assert.equal(
+      await prisma.shop.count({ where: { OR: [{ ratingAverageBasisPoints: { not: 0 } }, { ratingCount: { not: 0 } }] } }),
+      0,
+    );
     assert.equal(
       new Set(orderedProducts.map((item) => item.createdAt.toISOString())).size,
       orderedProducts.length,

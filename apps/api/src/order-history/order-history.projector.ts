@@ -56,6 +56,9 @@ function projectSummary(order: BuyerOrderSummaryGraph | BuyerOrderDetailGraph): 
       productImageUrl: line.productImageUrl,
       variantName: line.variantName,
       variantSku: line.variantSku,
+      review: line.review
+        ? { state: 'REVIEWED' as const, reviewId: line.review.id }
+        : { state: status === 'DELIVERED' ? 'ELIGIBLE' as const : 'INELIGIBLE' as const, reviewId: null },
     })),
     shipping: jsonObject<MockShippingBreakdown>(order.shippingSnapshot),
     listSubtotalMinor: checkedMoneyFromBigInt(order.listSubtotalMinor),

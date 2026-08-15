@@ -2,6 +2,28 @@
   padding-block: 0.45rem 0.8rem;
 }
 
+/* T21 verified reviews */
+.product-reviews { display: grid; gap: 1rem; margin-top: 1.25rem; padding: 1.25rem; border: 1px solid #e5e7eb; background: #fff; }
+.product-reviews header { display: grid; gap: .8rem; }
+.product-reviews header > div:first-child { display: flex; align-items: baseline; flex-wrap: wrap; gap: .6rem; }
+.product-reviews h2 { margin: 0; font-size: 1.15rem; }
+.product-reviews header strong { color: #d73211; }
+.product-reviews [role='tablist'] { display: flex; flex-wrap: wrap; gap: .5rem; }
+.product-reviews button, .buyer-review-action button { border: 1px solid #d73211; border-radius: .3rem; padding: .45rem .7rem; color: #d73211; background: #fff; font: inherit; font-weight: 700; cursor: pointer; }
+.product-reviews [role='tab'][aria-selected='true'], .buyer-review-action form > button { color: #fff; background: #d73211; }
+.product-reviews article { display: grid; gap: .4rem; padding: 1rem 0; border-top: 1px solid #eef0f3; }
+.product-reviews article > span { color: #d97706; letter-spacing: .06em; }
+.product-reviews article small, .product-reviews article time { color: #64748b; }
+.product-reviews article p { margin: .2rem 0; white-space: pre-wrap; }
+.product-reviews__media { display: flex; flex-wrap: wrap; gap: .5rem; }
+.product-reviews__media img { width: 5rem; height: 5rem; object-fit: cover; border: 1px solid #e5e7eb; border-radius: .25rem; }
+.buyer-review-action { grid-column: 2 / -1; display: grid; justify-items: start; gap: .5rem; }
+.buyer-review-action form { display: grid; gap: .65rem; width: min(100%, 30rem); padding: .75rem; background: #fff7ed; }
+.buyer-review-action fieldset { display: flex; flex-wrap: wrap; gap: .4rem .75rem; border: 0; padding: 0; }
+.buyer-review-action label { display: grid; gap: .3rem; }
+.buyer-review-action textarea { min-height: 5rem; padding: .5rem; font: inherit; }
+.buyer-review-action p { margin: 0; color: #475569; font-size: .9rem; }
+
 /* T20 buyer order history, lifecycle timeline, and cancellation */
 .buyer-order-tabs {
   display: grid;

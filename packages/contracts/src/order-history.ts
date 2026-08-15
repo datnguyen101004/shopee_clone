@@ -7,6 +7,7 @@ import {
   type ShopOrderStatus,
 } from './checkout';
 import type { MockShippingBreakdown } from './pricing';
+import type { ReviewEligibility } from './reviews';
 
 export const ORDER_HISTORY_VERSION = 'order-history-v1' as const;
 export const ORDER_LIST_DEFAULT_LIMIT = 20;
@@ -90,7 +91,7 @@ export interface BuyerOrderSummary {
   updatedAt: string;
   shop: { id: string; slug: string; name: string };
   note: string;
-  lines: CheckoutPreviewLine[];
+  lines: BuyerOrderLine[];
   shipping: MockShippingBreakdown;
   listSubtotalMinor: number;
   productDiscountMinor: number;
@@ -103,6 +104,10 @@ export interface BuyerOrderSummary {
   shippingPayableMinor: number;
   payableTotalMinor: number;
   cancellation: BuyerOrderCancellationCapability;
+}
+
+export interface BuyerOrderLine extends CheckoutPreviewLine {
+  review?: ReviewEligibility;
 }
 
 export interface BuyerOrderListResponse {
@@ -239,7 +244,7 @@ export function parseCancelOrderRequest(value: unknown): CancelOrderRequest | nu
   };
 }
 
-function isLine(value: unknown): value is CheckoutPreviewLine {
+function isLine(value: unknown): value is BuyerOrderLine {
   if (
     !isRecord(value) ||
     !exact(value, [
@@ -262,10 +267,10 @@ function isLine(value: unknown): value is CheckoutPreviewLine {
       'productImageUrl',
       'variantName',
       'variantSku',
-    ])
+    ], ['review'])
   )
     return false;
-  const line = value as unknown as CheckoutPreviewLine;
+  const line = value as unknown as BuyerOrderLine;
   const money = [
     line.listUnitPriceMinor,
     line.sellingUnitPriceMinor,
@@ -296,7 +301,13 @@ function isLine(value: unknown): value is CheckoutPreviewLine {
     line.merchandiseVoucherDiscountMinor ===
       line.shopVoucherDiscountMinor + line.platformVoucherDiscountMinor &&
     line.payableMerchandiseMinor ===
-      line.merchandiseSubtotalMinor - line.merchandiseVoucherDiscountMinor
+      line.merchandiseSubtotalMinor - line.merchandiseVoucherDiscountMinor &&
+    (line.review === undefined ||
+      (isRecord(line.review) &&
+        exact(line.review, ['state', 'reviewId']) &&
+        ['ELIGIBLE', 'REVIEWED', 'INELIGIBLE'].includes(String(line.review.state)) &&
+        (line.review.reviewId === null || isUuid(line.review.reviewId)) &&
+        ((line.review.state === 'REVIEWED') === (line.review.reviewId !== null))))
   );
 }
 

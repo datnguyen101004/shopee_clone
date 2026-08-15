@@ -53,10 +53,14 @@ export function ProductCard({ product }: { product: CatalogProductCard }) {
             ) : null}
           </div>
           <div className="catalog-card__facts">
-            <span aria-label={`${(product.ratingAverageBasisPoints / 100).toFixed(1)} trên 5 sao`}>
-              ★ {(product.ratingAverageBasisPoints / 100).toFixed(1)} (
-              {formatNumber(product.ratingCount)})
-            </span>
+            {product.ratingCount === 0 ? (
+              <span aria-label="Chưa có đánh giá">Chưa có đánh giá</span>
+            ) : (
+              <span aria-label={`${(product.ratingAverageBasisPoints / 100).toFixed(1)} trên 5 sao`}>
+                ★ {(product.ratingAverageBasisPoints / 100).toFixed(1)} (
+                {formatNumber(product.ratingCount)})
+              </span>
+            )}
             <span>Đã bán {formatNumber(product.soldCount)}</span>
           </div>
           <span className="catalog-card__location">{product.shop.location}</span>

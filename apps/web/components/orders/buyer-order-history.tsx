@@ -152,9 +152,25 @@ function ReviewAction({ orderReference, line }: { orderReference: string; line: 
       setExisting({ id: result.review.id, etag: result.etag, mediaIds: result.review.media.map((media) => media.id) }); setRating(result.review.rating); setText(result.review.text ?? ''); setOpen(true); setMessage(result.review.visibility === 'HIDDEN' ? 'Đánh giá này hiện đang bị ẩn với người xem công khai.' : '');
     } catch { setMessage('Không thể tải đánh giá hiện tại. Vui lòng thử lại.'); }
   }
+  const close = () => { if (!pending) setOpen(false); };
   return <div className="buyer-review-action">
-    {line.review.state === 'REVIEWED' ? <button type="button" onClick={() => void openEdit()}>Sửa đánh giá</button> : <button type="button" onClick={() => setOpen((value) => !value)}>{open ? 'Đóng' : 'Đánh giá'}</button>}
-    {open ? <form onSubmit={(event) => { event.preventDefault(); void submit(); }}><fieldset><legend>Chọn số sao</legend>{[1, 2, 3, 4, 5].map((value) => <label key={value}><input disabled={pending} type="radio" name={`rating-${line.lineId}`} checked={rating === value} onChange={() => setRating(value)} />{value} sao</label>)}</fieldset><label>Nhận xét (không bắt buộc)<textarea disabled={pending} maxLength={1000} value={text} onChange={(event) => setText(event.target.value)} /></label><label>Ảnh đánh giá (JPEG, PNG hoặc WebP; tối đa 6 ảnh, 5 MiB/ảnh)<input disabled={pending} type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={(event) => setFiles(Array.from(event.target.files ?? []).slice(0, Math.max(0, 6 - (existing?.mediaIds.length ?? 0))))} /></label><button disabled={pending} type="submit">{pending ? 'Đang gửi…' : 'Gửi đánh giá'}</button></form> : null}
+    {line.review.state === 'REVIEWED' ? <button type="button" onClick={() => void openEdit()}>Sửa đánh giá</button> : <button type="button" onClick={() => setOpen(true)}>Đánh giá</button>}
+    {open ? <div className="review-dialog-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) close(); }}>
+      <section className="review-dialog" role="dialog" aria-modal="true" aria-labelledby={`review-title-${line.lineId}`}>
+        <header className="review-dialog__header"><h2 id={`review-title-${line.lineId}`}>Đánh giá sản phẩm</h2><button type="button" aria-label="Đóng đánh giá" disabled={pending} onClick={close}>×</button></header>
+        <div className="review-dialog__product">
+          {line.productImageUrl ? <img src={line.productImageUrl} alt="" /> : <span aria-hidden="true">SP</span>}
+          <div><strong>{line.productName}</strong><small>Phân loại: {line.variantName}</small></div>
+        </div>
+        <form onSubmit={(event) => { event.preventDefault(); void submit(); }}>
+          <fieldset className="review-dialog__rating"><legend>Chất lượng sản phẩm</legend><div>{[1, 2, 3, 4, 5].map((value) => <label className={value <= rating ? 'is-active' : undefined} key={value} title={`${value} sao`}><input disabled={pending} type="radio" name={`rating-${line.lineId}`} checked={rating === value} onChange={() => setRating(value)} /><span aria-hidden="true">★</span><span className="sr-only">{value} sao</span></label>)}</div><strong>{rating === 5 ? 'Tuyệt vời' : rating === 4 ? 'Hài lòng' : rating === 3 ? 'Bình thường' : rating === 2 ? 'Không hài lòng' : 'Tệ'}</strong></fieldset>
+          <div className="review-dialog__comment"><label htmlFor={`review-text-${line.lineId}`}>Đúng với mô tả:</label><textarea id={`review-text-${line.lineId}`} disabled={pending} maxLength={1000} placeholder="Hãy chia sẻ những điều bạn thích về sản phẩm này với những người mua khác nhé." value={text} onChange={(event) => setText(event.target.value)} /><small>{text.length}/1000</small></div>
+          <div className="review-dialog__media"><span>Thêm hình ảnh</span><label className="review-dialog__upload"><input aria-label="Ảnh đánh giá" disabled={pending || files.length >= 6} type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={(event) => setFiles((current) => [...current, ...Array.from(event.target.files ?? [])].slice(0, Math.max(0, 6 - (existing?.mediaIds.length ?? 0))))} /><span aria-hidden="true">＋</span><strong>Thêm hình ảnh</strong><small>{files.length}/6</small></label>{files.map((file, index) => <div className="review-dialog__file" key={`${file.name}-${index}`}><span>{file.name}</span><button type="button" aria-label={`Xóa ${file.name}`} onClick={() => setFiles((current) => current.filter((_, itemIndex) => itemIndex !== index))}>×</button></div>)}</div>
+          <p className="review-dialog__notice">Đánh giá của bạn sẽ được hiển thị công khai với nhãn “Đã mua hàng”.</p>
+          <footer><button type="button" disabled={pending} onClick={close}>Trở lại</button><button className="review-dialog__submit" disabled={pending} type="submit">{pending ? 'Đang gửi…' : 'Hoàn thành'}</button></footer>
+        </form>
+      </section>
+    </div> : null}
     {message ? <p role="status">{message}</p> : null}
   </div>;
 }

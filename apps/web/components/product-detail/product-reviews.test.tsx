@@ -23,7 +23,9 @@ afterEach(() => vi.unstubAllGlobals());
 
 describe('ProductReviews', () => {
   it('shows an explicit zero state, filters by exact rating, and appends pages', async () => {
-    const fetcher = vi.fn().mockResolvedValue(new Response(JSON.stringify(page(null, 'next')), { status: 200 }));
+    const fetcher = vi.fn().mockImplementation(() =>
+      Promise.resolve(new Response(JSON.stringify(page(null, 'next')), { status: 200 })),
+    );
     vi.stubGlobal('fetch', fetcher);
     const user = userEvent.setup();
     render(<ProductReviews product={product} />);

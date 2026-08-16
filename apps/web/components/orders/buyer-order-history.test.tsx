@@ -229,8 +229,11 @@ describe('buyer order-history screens', () => {
     const user = userEvent.setup();
     render(<BuyerOrderDetailScreen orderReference={order.orderReference} />);
     await user.click(await screen.findByRole('button', { name: 'Đánh giá' }));
-    await user.type(screen.getByLabelText('Nhận xét (không bắt buộc)'), 'Tốt');
-    await user.click(screen.getByRole('button', { name: 'Gửi đánh giá' }));
+    expect(screen.getByRole('dialog', { name: 'Đánh giá sản phẩm' })).toBeInTheDocument();
+    expect(screen.getByText('Tuyệt vời')).toBeInTheDocument();
+    await user.type(screen.getByLabelText('Đúng với mô tả:'), 'Tốt');
+    expect(screen.getByText('3/1000')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Hoàn thành' }));
     await waitFor(() => expect(createProductReview).toHaveBeenCalledTimes(1));
     expect(screen.getByText('Đánh giá đã được lưu. Tải lại chi tiết đơn để xem trạng thái mới.')).toBeInTheDocument();
   });

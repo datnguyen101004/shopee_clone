@@ -18,7 +18,7 @@
 - [x] 3.1 Implement a configurable local review-media adapter with opaque storage keys and no credential/path leakage.
 - [x] 3.2 Implement authenticated multipart staging with MIME signature, supported type, byte size, dimension, item-count, ownership, and 24-hour expiry validation.
 - [x] 3.3 Implement attached-only public media serving plus explicit cleanup limited to expired `STAGED` records/files.
-- [ ] 3.4 Add media unit/HTTP/PostgreSQL tests for invalid images, foreign/expired IDs, path traversal, atomic attachment, serving privacy, and cleanup scope.
+- [x] 3.4 Add media unit/HTTP/PostgreSQL tests for invalid images, foreign/expired IDs, path traversal, atomic attachment, serving privacy, and cleanup scope.
 
 ## 4. Review domain and API
 
@@ -28,7 +28,7 @@
 - [x] 4.4 Implement product/shop aggregate recomputation and repair helper from visible reviews inside the caller transaction.
 - [x] 4.5 Add NestJS private/public controllers, DTOs, module wiring, OpenAPI, Problem Details, AuthGuard, project-wide Origin guard, and cache headers.
 - [x] 4.6 Extend T20 order detail with review capability/existing review identity and extend catalog/product/shop projectors with authoritative summaries.
-- [ ] 4.7 Add unit and PostgreSQL HTTP tests for eligibility, privacy, duplicate/replay, different-input reuse, stale/racing edits, rollback, hidden reads, cursor/filter behavior, aggregate correctness, and corrupted persistence.
+- [x] 4.7 Add unit and PostgreSQL HTTP tests for eligibility, privacy, duplicate/replay, different-input reuse, stale/racing edits, rollback, hidden reads, cursor/filter behavior, aggregate correctness, and corrupted persistence.
 
 ## 5. Buyer and public UI
 
@@ -48,6 +48,6 @@
 ## 7. Verification
 
 - [x] 7.1 Run focused contract, schema/migration, media, service, HTTP/PostgreSQL, aggregate, and frontend component tests and fix regressions.
-- [ ] 7.2 Run database migrate/seed/verify plus workspace typecheck, lint, tests, and production builds for all affected packages/apps.
+- [x] 7.2 Run database migrate/seed/verify plus workspace typecheck, lint, tests, and production builds for all affected packages/apps.
 - [x] 7.3 Run `test:e2e:reviews:quick` followed by `test:e2e:homepage:quick`, recording environment-only skips explicitly.
-- [ ] 7.4 Validate `add-verified-product-reviews` with strict OpenSpec validation and prepare the implementation summary plus endpoint/screen verification guide.
+- [x] 7.4 Validate `add-verified-product-reviews` with strict OpenSpec validation and prepare the implementation summary plus endpoint/screen verification guide.

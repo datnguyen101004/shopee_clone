@@ -38,9 +38,9 @@ test('buyer stages media and reviews a delivered line across configured mobile, 
     await expect(page.getByText('Sản phẩm đã giao')).toBeVisible();
     await page.getByRole('button', { name: 'Đánh giá' }).click();
     await page.getByLabel('5 sao').check();
-    await page.getByLabel('Nhận xét (không bắt buộc)').fill('Tốt');
+    await page.getByLabel('Đúng với mô tả:').fill('Tốt');
     await page.getByLabel(/Ảnh đánh giá/).setInputFiles({ name: 'review.png', mimeType: 'image/png', buffer: Buffer.from([137, 80, 78, 71]) });
-    await page.getByRole('button', { name: 'Gửi đánh giá' }).click();
+    await page.getByRole('button', { name: 'Hoàn thành' }).click();
     await expect(page.getByText('Đánh giá đã được lưu.')).toBeVisible();
     expect(calls.creates()).toBe(1); expect(calls.stages()).toBe(1);
     const dimensions = await page.evaluate(() => ({ width: document.documentElement.clientWidth, scrollWidth: document.documentElement.scrollWidth }));

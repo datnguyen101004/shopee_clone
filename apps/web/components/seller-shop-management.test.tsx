@@ -7,6 +7,7 @@ const fetchWorkspace = vi.fn();
 const createShop = vi.fn();
 const updateRegistration = vi.fn();
 const updateShop = vi.fn();
+const authenticatedFetch = vi.fn();
 const defaultAddress = {
   recipientName: 'An Nguyen',
   phoneNumber: '0912345678',
@@ -18,7 +19,7 @@ const defaultAddress = {
 
 vi.mock('./auth-session-provider', () => ({
   useAuthSession: () => ({
-    authenticatedFetch: vi.fn(),
+    authenticatedFetch,
     state: { status: 'authenticated', user: { roles: ['buyer'] } },
   }),
 }));
@@ -94,14 +95,16 @@ describe('SellerShopManagement', () => {
       defaultAddress: { ...defaultAddress, addressLine: '99 Lê Lợi' },
     });
     render(<SellerShopManagement />);
-    expect(await screen.findByText(/Chờ duyệt/)).toBeInTheDocument();
+    expect((await screen.findAllByText(/Chờ duyệt/)).length).toBeGreaterThan(0);
     expect(screen.getByText(/không được bán/)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Mở bán' })).not.toBeInTheDocument();
+    expect(screen.getByTestId('seller-shop-profile-view')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Cập nhật hồ sơ' }));
     expect(screen.getAllByLabelText('Địa chỉ chi tiết').map((input) => input.getAttribute('value'))).toEqual([
       '12 Nguyễn Huệ',
       '12 Nguyễn Huệ',
     ]);
-    await userEvent.click(screen.getByRole('button', { name: 'Lưu hồ sơ' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Hủy' }));
     expect(window.localStorage.setItem).not.toHaveBeenCalled();
   });
 
@@ -133,6 +136,7 @@ describe('SellerShopManagement', () => {
     updateRegistration.mockResolvedValue({ ...rejected, onboardingStatus: 'pending_approval', onboardingReason: null });
     render(<SellerShopManagement />);
     expect(await screen.findByText(/Lý do từ chối/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Cập nhật hồ sơ' }));
     await userEvent.click(screen.getByRole('button', { name: 'Sửa và gửi lại đăng ký' }));
     expect(updateRegistration).toHaveBeenCalledTimes(1);
     expect(screen.queryByRole('button', { name: 'Mở bán' })).not.toBeInTheDocument();
@@ -163,6 +167,8 @@ describe('SellerShopManagement', () => {
     });
     render(<SellerShopManagement />);
     await screen.findByRole('heading', { name: 'Legacy Shop' });
+
+    await userEvent.click(screen.getByRole('button', { name: 'Cập nhật hồ sơ' }));
 
     expect(screen.getAllByLabelText('Người nhận')).toEqual(
       expect.arrayContaining([

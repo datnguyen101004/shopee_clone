@@ -1,6 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 
-import { ProductStatus, VariantStatus } from '../generated/prisma/enums';
+import { VariantStatus } from '../generated/prisma/enums';
+import { sellableProductWhere } from './sellable-product';
 import { PrismaService } from '../prisma/prisma.service';
 import { sellableShopWhere } from './sellable-shop';
 
@@ -19,8 +20,7 @@ export class CatalogRepository {
   findCandidates(categoryIds?: string[], shopId?: string) {
     return this.prisma.product.findMany({
       where: {
-        status: ProductStatus.ACTIVE,
-        deletedAt: null,
+        ...sellableProductWhere,
         ...(categoryIds ? { categoryId: { in: categoryIds } } : {}),
         ...(shopId ? { shopId } : {}),
         shop: sellableShopWhere,
@@ -48,8 +48,7 @@ export class CatalogRepository {
     return this.prisma.product.findFirst({
       where: {
         id: productId,
-        status: ProductStatus.ACTIVE,
-        deletedAt: null,
+        ...sellableProductWhere,
         shop: sellableShopWhere,
         category: { isActive: true, deletedAt: null },
       },
@@ -70,8 +69,7 @@ export class CatalogRepository {
     return this.prisma.product.count({
       where: {
         shopId,
-        status: ProductStatus.ACTIVE,
-        deletedAt: null,
+        ...sellableProductWhere,
         category: { isActive: true, deletedAt: null },
       },
     });
@@ -83,8 +81,7 @@ export class CatalogRepository {
       where: {
         id: { not: excludedProductId },
         categoryId,
-        status: ProductStatus.ACTIVE,
-        deletedAt: null,
+        ...sellableProductWhere,
         shop: sellableShopWhere,
         category: { isActive: true, deletedAt: null },
       },

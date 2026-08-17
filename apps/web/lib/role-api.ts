@@ -16,6 +16,7 @@ export class RoleApiError extends Error {
   constructor(
     public readonly kind: 'status' | 'contract',
     public readonly status: number,
+    public readonly problem?: { detail?: string; invalidParameters?: string[] },
   ) {
     super(`Role API ${kind} error`);
     this.name = 'RoleApiError';

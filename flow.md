@@ -734,3 +734,65 @@ ghi đè shop. Điều kiện bán là shop chưa xóa,
 `APPROVED` và `ACTIVE`, được kiểm tra lại ở cart, báo giá và checkout để trạng thái shop thay đổi sau
 khi buyer thêm hàng vào giỏ không thể tạo sale mới. Slug giữ unique toàn cục, còn owner và tên shop chỉ
 unique với shop chưa soft-delete.
+
+## 18. Seller Center: quản lý sản phẩm T23
+
+```mermaid
+flowchart LR
+    seller["Seller shop đã duyệt"] --> center["/seller\nSeller Center sidebar"]
+    center --> shop["Hồ sơ shop: xem chỉ đọc / cập nhật"]
+    center --> list["Sản phẩm\n/seller/products"]
+    list --> editor["Tạo mới hoặc chỉnh sửa editor"]
+    editor --> draft["POST/PATCH: lưu DRAFT"]
+    editor --> options["Thêm tối đa 2 nhóm\nMàu sắc: Đỏ/Xanh\nKích cỡ: M/L"]
+    options --> combinations["Tự sinh Đỏ-M, Đỏ-L, Xanh-M, Xanh-L"]
+    combinations --> stock["Seller nhập tồn kho từng dòng"]
+    stock --> validation{"Category, media, stock, dimensions hợp lệ?"}
+    validation -->|Không| errors["Problem Details theo field\nGiữ dữ liệu form"] --> editor
+    validation -->|Có| publish["PATCH lifecycle: PUBLISHED"]
+    publish --> public["Catalogue · Storefront · Product detail"]
+    public --> purchase["Cart · Quote · Checkout re-check"]
+    editor --> identifiers["Server tự sinh slug + SKU\nkhông cho seller nhập"]
+    editor --> hide["HIDDEN / ARCHIVED"]
+    moderation["Moderation SUSPENDED"] --> hidden["Không public, không mua"]
+    hide --> hidden
+```
+
+Shop ID không nằm trong payload seller. Mọi mutation lookup shop từ access session đã có role `seller`,
+và public/purchase flows chỉ nhận listing `ACTIVE`/published, moderation `ACTIVE`, category hợp lệ,
+shop active/approved, variant active và tồn kho dương. Product đã archive vẫn hiện cho owner nhưng không
+thể publish lại; moderation là boundary cho admin task tiếp theo nên seller không thể tự override.
+
+## 19. Seller profile và product media
+
+```mermaid
+flowchart TD
+    openShop["Mở /seller/shop"] --> exists{"Shop đã tồn tại?"}
+    exists -->|"Chưa"| onboarding["Form đăng ký shop"]
+    exists -->|"Rồi"| profile["Hồ sơ chỉ đọc"]
+    profile --> edit["Cập nhật hồ sơ"]
+    edit --> form["Form điền từ canonical data"]
+    form --> action{"Lưu hoặc hủy"}
+    action -->|"Hủy"| profile
+    action -->|"Lưu thành công"| profile
+    action -->|"Lỗi"| form
+
+    product["/seller/products/new"] --> pick["Chọn nhiều ảnh local"]
+    pick --> validate["Client kiểm tra JPG/PNG/WebP, 5 MB, tối đa 9"]
+    validate --> upload["POST /api/v1/seller/products/media\nfile từng ảnh, multipart, Origin guard"]
+    upload --> staged["Asset STAGED, preview riêng seller, hết hạn 24h"]
+    staged --> gallery["Gallery preview, xóa, sắp xếp, retry"]
+    gallery --> mapping["Ảnh cho từng giá trị nhóm đầu\nĐỏ dùng chung Đỏ-M và Đỏ-L"]
+    mapping --> save["POST/PATCH /api/v1/seller/products"]
+    save --> tx{"Ownership + expiry + payload hợp lệ?"}
+    tx -->|"Không"| retry["Rollback, giữ staged asset"]
+    tx -->|"Có"| attach["Transaction attach ProductImage + option image"]
+    attach --> public["GET /api/v1/product-media/:id\nCatalog/detail hiển thị URL public"]
+```
+
+Màn hình kiểm thử: `/seller/shop` (shop đã có dữ liệu phải thấy hồ sơ và nút `Cập nhật hồ sơ`),
+`/seller/products/new` hoặc `/seller/products/:productId` (chọn nhiều ảnh, kéo thứ tự, gán ảnh
+cho `Đỏ`/`Xanh`, kiểm tra các tổ hợp và tồn kho). Endpoint media gồm `POST
+/api/v1/seller/products/media`, `GET /api/v1/seller/products/media/:mediaId/preview` và
+`GET /api/v1/product-media/:mediaId`. Ảnh staged không được đọc qua public route trước khi lưu
+sản phẩm.

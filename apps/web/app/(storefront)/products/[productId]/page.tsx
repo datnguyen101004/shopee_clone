@@ -5,6 +5,7 @@ import { notFound } from 'next/navigation';
 
 import { ProductDetailExperience } from '../../../../components/product-detail/product-detail-experience';
 import { fetchProductDetail, ProductDetailApiError } from '../../../../lib/product-detail-api';
+import { marketplaceMediaUrl } from '../../../../lib/marketplace-media-url';
 
 export const dynamic = 'force-dynamic';
 
@@ -100,7 +101,7 @@ export default async function ProductDetailPage({
             {product.relatedProducts.map((related) => (
               <Link key={related.id} href={related.href} className="product-detail-related__card">
                 {related.imageUrl ? (
-                  <img src={related.imageUrl} alt={related.imageAlt} />
+                    <img src={marketplaceMediaUrl(related.imageUrl)} alt={related.imageAlt} />
                 ) : (
                   <span aria-hidden="true">S</span>
                 )}

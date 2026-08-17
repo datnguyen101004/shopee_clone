@@ -61,6 +61,12 @@ describe('product detail contract', () => {
     expect(
       isProductDetailResponse({
         ...response,
+        description: '',
+      }),
+    ).toBe(true);
+    expect(
+      isProductDetailResponse({
+        ...response,
         gallery: [],
         variants: [{ ...response.variants[0], preferredImageId: null }],
       }),

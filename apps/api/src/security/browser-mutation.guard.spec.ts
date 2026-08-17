@@ -95,4 +95,13 @@ describe('BrowserMutationGuard', () => {
     expect(guard.canActivate(upload(5 * 1024 * 1024 + 2048))).toBe(true);
     expect(() => guard.canActivate(upload(5 * 1024 * 1024 + 64 * 1024 + 1))).toThrow('mutation-body-too-large');
   });
+
+  it('allows multipart overhead only for the seller product media route', () => {
+    const request = (path: string, length: number) => context({
+      method: 'POST', originalUrl: path, headers: { origin: 'http://localhost:3000', 'content-length': String(length), 'content-type': 'multipart/form-data; boundary=product-upload' }, query: {},
+    } as Partial<Request>);
+    expect(guard.canActivate(request('/api/v1/seller/products/media', 5 * 1024 * 1024 + 2048))).toBe(true);
+    expect(() => guard.canActivate(request('/api/v1/seller/products', 2048))).toThrow('mutation-media-type-unsupported');
+    expect(() => guard.canActivate(request('/api/v1/seller/products/media', 5 * 1024 * 1024 + 64 * 1024 + 1))).toThrow('mutation-body-too-large');
+  });
 });

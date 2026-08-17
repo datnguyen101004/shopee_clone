@@ -15,6 +15,7 @@ import { ShopStorefrontModule } from './shop-storefront/shop-storefront.module';
 import { BrowserSecurityModule } from './security/browser-security.module';
 import { ReviewsModule } from './reviews/reviews.module';
 import { SellerOnboardingModule } from './seller-onboarding/seller-onboarding.module';
+import { SellerProductsModule } from './seller-products/seller-products.module';
 
 @Module({
   imports: [
@@ -32,6 +33,7 @@ import { SellerOnboardingModule } from './seller-onboarding/seller-onboarding.mo
     EngagementModule,
     ShopStorefrontModule,
     SellerOnboardingModule,
+    SellerProductsModule,
     ReviewsModule,
   ],
 })

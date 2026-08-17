@@ -11,7 +11,8 @@ import {
 } from '@shopee-clone/contracts';
 
 import type { Prisma } from '../generated/prisma/client';
-import { ProductStatus, VariantStatus } from '../generated/prisma/enums';
+import { VariantStatus } from '../generated/prisma/enums';
+import { isSellableProduct } from '../catalog/sellable-product';
 import { isSellableShop } from '../catalog/sellable-shop';
 import { PrismaService } from '../prisma/prisma.service';
 import {
@@ -81,8 +82,7 @@ function currentFacts(line: CartLineRow) {
   const contentAvailable =
     variant.status === VariantStatus.ACTIVE &&
     variant.deletedAt === null &&
-    product.status === ProductStatus.ACTIVE &&
-    product.deletedAt === null &&
+    isSellableProduct(product) &&
     product.category.isActive &&
     product.category.deletedAt === null &&
     isSellableShop(product.shop);

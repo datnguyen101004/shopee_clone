@@ -1,0 +1,419 @@
+import {
+  generateSellerProductCombinations,
+  isSellerProductLifecycleRequest,
+  isSellerProductUpsertRequest,
+  normalizeSellerProductText,
+  type SellerProductDetail,
+  type SellerProductLifecycle,
+  type SellerProductPage,
+  type SellerProductPageQuery,
+  type SellerProductUpsertRequest,
+} from '@shopee-clone/contracts';
+import { createHash, randomUUID } from 'node:crypto';
+import { Inject, Injectable } from '@nestjs/common';
+import { Prisma } from '../generated/prisma/client';
+import { ProductModerationStatus, ProductStatus, ShopOnboardingStatus, ShopStatus, VariantStatus } from '../generated/prisma/enums';
+import { PrismaService } from '../prisma/prisma.service';
+import { SellerProductConflictError, SellerProductInputError, SellerProductMediaError, SellerProductNotFoundError, SellerProductUnavailableError } from './seller-products.errors';
+import { SellerProductMediaStorage } from './seller-product-media.storage';
+
+const detailInclude = {
+  category: true,
+  images: { orderBy: [{ sortOrder: 'asc' as const }, { id: 'asc' as const }] },
+  attributes: { include: { definition: true } },
+  optionGroups: { include: { values: { include: { image: true }, orderBy: { sortOrder: 'asc' as const } } }, orderBy: { sortOrder: 'asc' as const } },
+  variants: {
+    include: { inventory: true, optionValues: { include: { optionValue: { include: { group: true, image: true } } } } },
+    orderBy: [{ createdAt: 'asc' as const }, { id: 'asc' as const }],
+  },
+} satisfies Prisma.ProductInclude;
+type ProductDetailRow = Prisma.ProductGetPayload<{ include: typeof detailInclude }>;
+type Transaction = Prisma.TransactionClient;
+
+function lifecycle(status: ProductStatus): SellerProductLifecycle {
+  if (status === ProductStatus.ACTIVE) return 'published';
+  if (status === ProductStatus.HIDDEN) return 'hidden';
+  if (status === ProductStatus.ARCHIVED) return 'archived';
+  return 'draft';
+}
+
+function moderation(status: ProductModerationStatus): 'active' | 'suspended' {
+  return status === ProductModerationStatus.SUSPENDED ? 'suspended' : 'active';
+}
+
+function safeMoney(value: bigint): number {
+  const numberValue = Number(value);
+  if (!Number.isSafeInteger(numberValue) || numberValue < 0) throw new SellerProductUnavailableError();
+  return numberValue;
+}
+
+function mapDetail(product: ProductDetailRow): SellerProductDetail {
+  return {
+    id: product.id,
+    slug: product.slug,
+    name: product.name,
+    description: product.description,
+    categoryId: product.categoryId,
+    attributes: product.attributes.map((attribute) => ({ definitionId: attribute.definitionId, value: attribute.value })),
+    media: product.images.map((image) => ({ id: image.id, url: image.url, altText: image.altText, sortOrder: image.sortOrder, variantId: image.variantId })),
+    packageLengthMm: product.packageLengthMm,
+    packageWidthMm: product.packageWidthMm,
+    packageHeightMm: product.packageHeightMm,
+    optionGroups: product.optionGroups.map((group) => ({ name: group.name, values: group.values.map((value) => value.value) })),
+    optionValueMedia: product.optionGroups.filter((group) => group.sortOrder === 0).flatMap((group) => group.values.map((value) => ({ groupIndex: 0, value: value.value, mediaRef: value.image ? { imageId: value.image.id } : null }))),
+    variants: product.variants.map((variant) => ({
+      id: variant.id,
+      combination: variant.optionValues
+        .sort((left, right) => left.optionValue.group.sortOrder - right.optionValue.group.sortOrder || left.optionValue.sortOrder - right.optionValue.sortOrder)
+        .map((entry) => entry.optionValue.value),
+      sku: variant.sku,
+      priceMinor: safeMoney(variant.priceMinor),
+      compareAtPriceMinor: variant.compareAtPriceMinor === null ? null : safeMoney(variant.compareAtPriceMinor),
+      stock: variant.inventory?.quantityOnHand ?? 0,
+      weightGrams: variant.weightGrams,
+      maxPurchaseQuantity: variant.maxPurchaseQuantity,
+      active: variant.status === VariantStatus.ACTIVE && variant.deletedAt === null,
+      imageUrl: variant.optionValues.find((entry) => entry.optionValue.group.sortOrder === 0)?.optionValue.image?.url ?? null,
+    })),
+    lifecycle: lifecycle(product.status),
+    moderationStatus: moderation(product.moderationStatus),
+    moderationReason: product.moderationStatus === ProductModerationStatus.SUSPENDED ? 'Sản phẩm đang bị tạm ngưng bởi kiểm duyệt.' : null,
+    createdAt: product.createdAt.toISOString(),
+    updatedAt: product.updatedAt.toISOString(),
+  };
+}
+
+function currentCombinationName(combination: string[]) { return combination.join(' · ') || 'Mặc định'; }
+function combinationKey(combination: string[]) { return combination.join('\u001f'); }
+const excludedSellerCategorySlugs = new Set(['mobile-accessories', 'kitchen-appliances']);
+
+function slugifyProductName(value: string): string {
+  const ascii = value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/gi, 'd');
+  return ascii.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 120) || 'san-pham';
+}
+
+type ResolvedMedia = {
+  url: string;
+  altText: string | null;
+  sortOrder: number;
+  aliases: string[];
+  assetId: string | null;
+};
+
+function mediaReferenceKey(reference: { assetId?: string; imageId?: string } | null | undefined): string | null {
+  if (reference?.assetId) return `asset:${reference.assetId}`;
+  if (reference?.imageId) return `image:${reference.imageId}`;
+  return null;
+}
+
+export function generatedProductSlug(name: string): string {
+  const hash = createHash('sha256').update(`${new Date().toISOString()}:${randomUUID()}`).digest('hex').slice(0, 10);
+  return `${slugifyProductName(name)}-${hash}`;
+}
+
+export function generatedVariantSku(productSlug: string, combination: string[]): string {
+  const suffix = createHash('sha256').update(`${productSlug}:${combination.join('\u001f')}`).digest('hex').slice(0, 12).toUpperCase();
+  return `SKU-${suffix}`;
+}
+
+function normalizedInput(raw: SellerProductUpsertRequest): SellerProductUpsertRequest {
+  const name = normalizeSellerProductText(raw.name, 240);
+  if (!name) throw new SellerProductInputError(['name']);
+  return {
+    ...raw,
+    name,
+    description: raw.description.trim(),
+    attributes: raw.attributes.map((attribute) => ({ ...attribute, value: attribute.value.trim() })),
+    media: raw.media.map((media) => ({ ...media, ...(media.url ? { url: media.url.trim() } : {}), altText: media.altText?.trim() || null })),
+    optionGroups: raw.optionGroups.map((group) => ({ name: group.name.trim(), values: group.values.map((value) => value.trim()) })),
+    optionValueMedia: raw.optionValueMedia?.map((entry) => ({ ...entry, value: entry.value.trim(), mediaRef: entry.mediaRef ? { ...entry.mediaRef } : null })),
+    variants: raw.variants.map((variant) => ({ ...variant, combination: variant.combination.map((value) => value.trim()) })),
+  };
+}
+
+@Injectable()
+export class SellerProductsService {
+  constructor(
+    @Inject(PrismaService) private readonly prisma: PrismaService,
+    @Inject(SellerProductMediaStorage) private readonly mediaStorage: SellerProductMediaStorage = new SellerProductMediaStorage(),
+  ) {}
+
+  async categories() {
+    const rows = await this.prisma.category.findMany({
+      where: { isActive: true, deletedAt: null },
+      include: { children: { where: { isActive: true, deletedAt: null }, select: { id: true } }, attributeDefinitions: { orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }] } },
+      orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }],
+    });
+    return rows.filter((category) => !excludedSellerCategorySlugs.has(category.slug)).map((category) => ({
+      id: category.id, name: category.name, slug: category.slug, parentId: category.parentId, isLeaf: category.children.length === 0,
+      attributes: category.attributeDefinitions.map((definition) => ({ id: definition.id, code: definition.code, label: definition.label, required: definition.isRequired, allowedValues: Array.isArray(definition.allowedValues) ? definition.allowedValues.filter((value): value is string => typeof value === 'string') : null })),
+    }));
+  }
+
+  async list(userId: string, query: SellerProductPageQuery): Promise<SellerProductPage> {
+    const shop = await this.requireShop(userId);
+    const rows = await this.prisma.product.findMany({
+      take: query.limit + 1,
+      ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
+      where: { shopId: shop.id, deletedAt: null, ...(query.lifecycle ? { status: this.statusFor(query.lifecycle) } : {}) },
+      include: { category: true, images: { take: 1, orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }] }, variants: { include: { inventory: true } } },
+      orderBy: [{ updatedAt: 'desc' }, { id: 'desc' }],
+    });
+    const page = rows.slice(0, query.limit);
+    return {
+      items: page.map((product) => ({ id: product.id, slug: product.slug, name: product.name, categoryName: product.category.name, lifecycle: lifecycle(product.status), moderationStatus: moderation(product.moderationStatus), primaryMediaUrl: product.images[0]?.url ?? null, variantCount: product.variants.length, stockQuantity: product.variants.reduce((total, variant) => total + Math.max(0, (variant.inventory?.quantityOnHand ?? 0) - (variant.inventory?.quantityReserved ?? 0)), 0), updatedAt: product.updatedAt.toISOString() })),
+      nextCursor: rows.length > query.limit ? page.at(-1)?.id ?? null : null,
+    };
+  }
+
+  async read(userId: string, productId: string): Promise<SellerProductDetail> { return mapDetail(await this.requireProduct(userId, productId)); }
+
+  async stageMedia(userId: string, input: { storageKey: string; mimeType: string; byteSize: number; width: number; height: number }) {
+    const shop = await this.requireShop(userId);
+    return this.prisma.sellerProductMediaAsset.create({ data: { uploaderId: userId, shopId: shop.id, storageKey: input.storageKey, mimeType: input.mimeType, byteSize: input.byteSize, width: input.width, height: input.height, expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000) } });
+  }
+
+  async stagedMedia(userId: string, mediaId: string) {
+    return this.prisma.sellerProductMediaAsset.findFirst({ where: { id: mediaId, uploaderId: userId, state: 'STAGED', expiresAt: { gt: new Date() } } });
+  }
+
+  async attachedMedia(mediaId: string) {
+    return this.prisma.sellerProductMediaAsset.findFirst({ where: { id: mediaId, state: 'ATTACHED' }, select: { storageKey: true, mimeType: true } });
+  }
+
+  async cleanupExpiredMedia(storage: { remove(key: string): Promise<void> }): Promise<number> {
+    const expired = await this.prisma.sellerProductMediaAsset.findMany({ where: { state: 'STAGED', expiresAt: { lt: new Date() } }, select: { id: true, storageKey: true } });
+    for (const item of expired) await storage.remove(item.storageKey);
+    if (expired.length) await this.prisma.sellerProductMediaAsset.deleteMany({ where: { id: { in: expired.map((item) => item.id) }, state: 'STAGED' } });
+    return expired.length;
+  }
+
+  async create(userId: string, rawInput: SellerProductUpsertRequest): Promise<SellerProductDetail> {
+    const input = this.acceptInput(rawInput);
+    return this.prisma.$transaction(async (transaction) => {
+      const shop = await this.requireShop(userId, transaction);
+      await this.validateCategoryInput(transaction, input);
+      const resolvedMedia = await this.resolveMedia(transaction, userId, shop.id, null, input);
+      try {
+        const product = await transaction.product.create({
+          data: { shopId: shop.id, categoryId: input.categoryId, slug: generatedProductSlug(input.name), name: input.name, description: input.description, status: ProductStatus.DRAFT, packageLengthMm: input.packageLengthMm, packageWidthMm: input.packageWidthMm, packageHeightMm: input.packageHeightMm, attributes: { create: input.attributes.map((attribute) => ({ definitionId: attribute.definitionId, value: attribute.value })) }, optionGroups: { create: input.optionGroups.map((group, index) => ({ name: group.name, sortOrder: index, values: { create: group.values.map((value, valueIndex) => ({ value, sortOrder: valueIndex })) } })) } },
+          include: detailInclude,
+        });
+        const mediaMap = await this.replaceProductMedia(transaction, product.id, resolvedMedia);
+        await this.applyOptionValueMedia(transaction, product.id, input, mediaMap);
+        await this.replaceVariants(transaction, product.id, product.slug, shop.id, input);
+        return mapDetail(await this.findDetail(transaction, product.id));
+      } catch (error) {
+        if (error instanceof SellerProductInputError || error instanceof SellerProductConflictError) throw error;
+        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') throw new SellerProductConflictError(['slugOrSku']);
+        throw error;
+      }
+    });
+  }
+
+  async update(userId: string, productId: string, rawInput: SellerProductUpsertRequest): Promise<SellerProductDetail> {
+    const input = this.acceptInput(rawInput);
+    return this.prisma.$transaction(async (transaction) => {
+      const current = await this.requireProduct(userId, productId, transaction);
+      if (current.status === ProductStatus.ARCHIVED) throw new SellerProductConflictError(['lifecycle']);
+      const protectedVariants = await transaction.productVariant.findMany({ where: { productId, OR: [{ orderLines: { some: {} } }, { cartLines: { some: {} } }] }, select: { id: true, sku: true, combinationKey: true } });
+      await this.validateCategoryInput(transaction, input);
+      const resolvedMedia = await this.resolveMedia(transaction, userId, current.shopId, productId, input);
+      try {
+        await transaction.product.update({ where: { id: productId }, data: { categoryId: input.categoryId, name: input.name, description: input.description, packageLengthMm: input.packageLengthMm, packageWidthMm: input.packageWidthMm, packageHeightMm: input.packageHeightMm, attributes: { deleteMany: {}, create: input.attributes.map((attribute) => ({ definitionId: attribute.definitionId, value: attribute.value })) }, optionGroups: { deleteMany: {}, create: input.optionGroups.map((group, index) => ({ name: group.name, sortOrder: index, values: { create: group.values.map((value, valueIndex) => ({ value, sortOrder: valueIndex })) } })) } } });
+        const mediaMap = await this.replaceProductMedia(transaction, productId, resolvedMedia);
+        await this.applyOptionValueMedia(transaction, productId, input, mediaMap);
+        await transaction.productVariant.deleteMany({ where: { productId, ...(protectedVariants.length ? { id: { notIn: protectedVariants.map((variant) => variant.id) } } : {}) } });
+        await this.replaceVariants(transaction, productId, current.slug, current.shopId, input, protectedVariants);
+        return mapDetail(await this.findDetail(transaction, productId));
+      } catch (error) {
+        if (error instanceof SellerProductInputError || error instanceof SellerProductConflictError) throw error;
+        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') throw new SellerProductConflictError(['slugOrSku']);
+        throw error;
+      }
+    });
+  }
+
+  async transition(userId: string, productId: string, input: unknown): Promise<SellerProductDetail> {
+    if (!isSellerProductLifecycleRequest(input)) throw new SellerProductInputError(['lifecycle']);
+    return this.prisma.$transaction(async (transaction) => {
+      const product = await this.requireProduct(userId, productId, transaction);
+      if (product.status === ProductStatus.ARCHIVED) throw new SellerProductConflictError(['lifecycle']);
+      if (input.lifecycle === 'published') this.assertPublishable(product);
+      await transaction.product.update({ where: { id: productId }, data: { status: this.statusFor(input.lifecycle) } });
+      return mapDetail(await this.findDetail(transaction, productId));
+    });
+  }
+
+  async deleteDraft(userId: string, productId: string): Promise<string[]> {
+    return this.prisma.$transaction(async (transaction) => {
+      const product = await this.requireProduct(userId, productId, transaction);
+      if (product.status !== ProductStatus.DRAFT) {
+        throw new SellerProductConflictError(['lifecycle']);
+      }
+
+      const assets = await transaction.sellerProductMediaAsset.findMany({
+        where: { productId },
+        select: { storageKey: true },
+      });
+      // Keep the rows staged until the storage cleanup finishes. If the process
+      // is interrupted after this transaction, the scheduled cleanup can still
+      // remove the files after their short retention window.
+      await transaction.sellerProductMediaAsset.updateMany({
+        where: { productId },
+        data: {
+          productId: null,
+          productImageId: null,
+          state: 'STAGED',
+          expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+        },
+      });
+      await transaction.product.update({
+        where: { id: productId },
+        data: { deletedAt: new Date() },
+      });
+      return assets.map((asset) => asset.storageKey);
+    });
+  }
+
+  private acceptInput(input: SellerProductUpsertRequest): SellerProductUpsertRequest {
+    if (!isSellerProductUpsertRequest(input)) throw new SellerProductInputError(['request']);
+    return normalizedInput(input);
+  }
+
+  private async requireShop(userId: string, client: PrismaService | Transaction = this.prisma) {
+    const shop = await client.shop.findFirst({ where: { ownerId: userId, status: ShopStatus.ACTIVE, onboardingStatus: ShopOnboardingStatus.APPROVED, deletedAt: null } });
+    if (!shop) throw new SellerProductNotFoundError();
+    return shop;
+  }
+
+  private async requireProduct(userId: string, productId: string, client: PrismaService | Transaction = this.prisma): Promise<ProductDetailRow> {
+    const shop = await this.requireShop(userId, client);
+    const product = await client.product.findFirst({ where: { id: productId, shopId: shop.id, deletedAt: null }, include: detailInclude });
+    if (!product) throw new SellerProductNotFoundError();
+    return product;
+  }
+
+  private async findDetail(client: Transaction, productId: string): Promise<ProductDetailRow> {
+    const product = await client.product.findUnique({ where: { id: productId }, include: detailInclude });
+    if (!product) throw new SellerProductNotFoundError();
+    return product;
+  }
+
+  private async validateCategoryInput(client: Transaction, input: SellerProductUpsertRequest): Promise<void> {
+    const category = await client.category.findFirst({ where: { id: input.categoryId, isActive: true, deletedAt: null, children: { none: { isActive: true, deletedAt: null } } }, include: { attributeDefinitions: true } });
+    if (!category || excludedSellerCategorySlugs.has(category.slug)) throw new SellerProductInputError(['categoryId']);
+    const definitions = new Map(category.attributeDefinitions.map((definition) => [definition.id, definition]));
+    const given = new Map(input.attributes.map((attribute) => [attribute.definitionId, attribute.value]));
+    if (given.size !== input.attributes.length) throw new SellerProductInputError(['attributes']);
+    for (const definition of definitions.values()) {
+      const value = given.get(definition.id);
+      if (definition.isRequired && value === undefined) throw new SellerProductInputError([`attributes.${definition.code}`]);
+      if (value !== undefined && Array.isArray(definition.allowedValues) && !definition.allowedValues.includes(value)) throw new SellerProductInputError([`attributes.${definition.code}`]);
+    }
+    for (const id of given.keys()) if (!definitions.has(id)) throw new SellerProductInputError(['attributes']);
+  }
+
+  private async resolveMedia(client: Transaction, userId: string, shopId: string, productId: string | null, input: SellerProductUpsertRequest): Promise<ResolvedMedia[]> {
+    const currentImages = productId
+      ? await client.productImage.findMany({ where: { productId }, include: { sellerProductMediaAsset: true } })
+      : [];
+    const currentById = new Map(currentImages.map((image) => [image.id, image]));
+    const resolved: ResolvedMedia[] = [];
+    for (const media of input.media) {
+      const altText = media.altText?.trim() || null;
+      if (media.url) {
+        resolved.push({ url: media.url, altText, sortOrder: media.sortOrder, aliases: [`url:${media.url}`], assetId: null });
+        continue;
+      }
+      if (media.imageId) {
+        const image = currentById.get(media.imageId);
+        if (!image) throw new SellerProductMediaError('seller-product-media-not-owned');
+        const assetId = image.sellerProductMediaAsset?.id ?? null;
+        const storedUrl = image.sellerProductMediaAsset
+          ? this.mediaStorage.publicUrl(image.sellerProductMediaAsset.storageKey)
+          : null;
+        resolved.push({ url: storedUrl ?? (assetId ? `/api/v1/product-media/${assetId}` : image.url), altText, sortOrder: media.sortOrder, aliases: [`image:${media.imageId}`, ...(assetId ? [`asset:${assetId}`] : [])], assetId });
+        continue;
+      }
+      if (!media.assetId) throw new SellerProductMediaError('seller-product-media-unavailable');
+      const asset = await client.sellerProductMediaAsset.findFirst({ where: { id: media.assetId, uploaderId: userId, shopId, state: 'STAGED', expiresAt: { gt: new Date() } } });
+      if (!asset) throw new SellerProductMediaError('seller-product-media-unavailable');
+      resolved.push({ url: this.mediaStorage.publicUrl(asset.storageKey) ?? `/api/v1/product-media/${asset.id}`, altText, sortOrder: media.sortOrder, aliases: [`asset:${asset.id}`], assetId: asset.id });
+    }
+    return resolved;
+  }
+
+  private async replaceProductMedia(client: Transaction, productId: string, resolved: ResolvedMedia[]): Promise<Map<string, string>> {
+    const previousAssets = await client.sellerProductMediaAsset.findMany({ where: { productId, state: 'ATTACHED' }, select: { id: true } });
+    await client.productImage.deleteMany({ where: { productId } });
+    if (previousAssets.length) await client.sellerProductMediaAsset.updateMany({ where: { id: { in: previousAssets.map((asset) => asset.id) } }, data: { productId: null, productImageId: null, state: 'STAGED', expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000) } });
+    const imageIds = new Map<string, string>();
+    for (const media of resolved) {
+      const image = await client.productImage.create({ data: { productId, url: media.url, altText: media.altText, sortOrder: media.sortOrder } });
+      for (const alias of media.aliases) imageIds.set(alias, image.id);
+      if (media.assetId) {
+        await client.sellerProductMediaAsset.update({ where: { id: media.assetId }, data: { productId, productImageId: image.id, state: 'ATTACHED', expiresAt: null } });
+      }
+    }
+    return imageIds;
+  }
+
+  private async applyOptionValueMedia(client: Transaction, productId: string, input: SellerProductUpsertRequest, imageIds: Map<string, string>): Promise<void> {
+    if (!input.optionValueMedia?.length) return;
+    const groups = await client.productOptionGroup.findMany({ where: { productId }, include: { values: true }, orderBy: { sortOrder: 'asc' } });
+    const seen = new Set<string>();
+    for (const mapping of input.optionValueMedia) {
+      if (mapping.groupIndex !== 0) throw new SellerProductMediaError('seller-product-classification-image-group');
+      const value = groups[mapping.groupIndex]?.values.find((item) => item.value === mapping.value);
+      if (!value) throw new SellerProductMediaError('seller-product-classification-image-value');
+      if (seen.has(mapping.value)) throw new SellerProductMediaError('seller-product-classification-image-duplicate');
+      seen.add(mapping.value);
+      if (!mapping.mediaRef) continue;
+      const key = mediaReferenceKey(mapping.mediaRef);
+      const imageId = key ? imageIds.get(key) : null;
+      if (!imageId) throw new SellerProductMediaError('seller-product-classification-image-unavailable');
+      await client.productOptionValue.update({ where: { id: value.id }, data: { imageId } });
+    }
+  }
+
+  private async replaceVariants(client: Transaction, productId: string, productSlug: string, shopId: string, input: SellerProductUpsertRequest, protectedVariants: Array<{ id: string; sku: string; combinationKey: string }> = []): Promise<void> {
+    const groups = await client.productOptionGroup.findMany({ where: { productId }, include: { values: { orderBy: { sortOrder: 'asc' } } }, orderBy: { sortOrder: 'asc' } });
+    const expected = generateSellerProductCombinations(input.optionGroups);
+    if (expected.length !== input.variants.length) throw new SellerProductInputError(['variants']);
+    const reusable = new Map(protectedVariants.map((variant) => [variant.combinationKey, variant]));
+    for (const variant of input.variants) {
+      const key = combinationKey(variant.combination);
+      const protectedVariant = reusable.get(key);
+      const sku = protectedVariant?.sku.startsWith('DRAFT-') ? generatedVariantSku(productSlug, variant.combination) : protectedVariant?.sku ?? generatedVariantSku(productSlug, variant.combination);
+      const ids = variant.combination.map((value, index) => groups[index]?.values.find((option) => option.value === value)?.id);
+      if (ids.some((id) => !id)) throw new SellerProductInputError(['variants.combination']);
+      const existing = protectedVariant;
+      if (existing) {
+        reusable.delete(key);
+        await client.productVariant.update({ where: { id: existing.id }, data: { shopId, combinationKey: combinationKey(variant.combination), name: currentCombinationName(variant.combination), priceMinor: BigInt(variant.priceMinor), compareAtPriceMinor: variant.compareAtPriceMinor === null ? null : BigInt(variant.compareAtPriceMinor), weightGrams: variant.weightGrams, maxPurchaseQuantity: variant.maxPurchaseQuantity, status: variant.active ? VariantStatus.ACTIVE : VariantStatus.INACTIVE, inventory: { upsert: { create: { quantityOnHand: variant.stock }, update: { quantityOnHand: variant.stock } } }, optionValues: { deleteMany: {}, create: ids.map((optionValueId) => ({ optionValueId: optionValueId! })) } } });
+      } else {
+        await client.productVariant.create({ data: { productId, shopId, combinationKey: combinationKey(variant.combination), sku, name: currentCombinationName(variant.combination), priceMinor: BigInt(variant.priceMinor), compareAtPriceMinor: variant.compareAtPriceMinor === null ? null : BigInt(variant.compareAtPriceMinor), weightGrams: variant.weightGrams, maxPurchaseQuantity: variant.maxPurchaseQuantity, status: variant.active ? VariantStatus.ACTIVE : VariantStatus.INACTIVE, inventory: { create: { quantityOnHand: variant.stock } }, optionValues: { create: ids.map((optionValueId) => ({ optionValueId: optionValueId! })) } } });
+      }
+    }
+    for (const variant of reusable.values()) await client.productVariant.update({ where: { id: variant.id }, data: { status: VariantStatus.INACTIVE } });
+  }
+
+  private assertPublishable(product: ProductDetailRow): void {
+    const fields: string[] = [];
+    if (product.moderationStatus !== ProductModerationStatus.ACTIVE) fields.push('moderationStatus');
+    if (product.images.length === 0) fields.push('media');
+    if (product.packageLengthMm === null || product.packageWidthMm === null || product.packageHeightMm === null) fields.push('packageDimensions');
+    if (!product.variants.some((variant) => variant.status === VariantStatus.ACTIVE && variant.deletedAt === null && variant.sku.length > 0 && !variant.sku.startsWith('DRAFT-'))) fields.push('variants');
+    const requiredMissing = product.category ? false : true;
+    if (requiredMissing) fields.push('category');
+    if (fields.length) throw new SellerProductInputError(fields);
+  }
+
+  private statusFor(value: SellerProductLifecycle): ProductStatus {
+    if (value === 'published') return ProductStatus.ACTIVE;
+    if (value === 'hidden') return ProductStatus.HIDDEN;
+    if (value === 'archived') return ProductStatus.ARCHIVED;
+    return ProductStatus.DRAFT;
+  }
+}

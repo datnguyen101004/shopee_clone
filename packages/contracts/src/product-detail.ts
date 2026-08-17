@@ -160,7 +160,7 @@ export function isProductDetailResponse(value: unknown): value is ProductDetailR
     !isRecord(value) ||
     !isUuid(value.id) ||
     !isString(value.name) ||
-    !isString(value.description) ||
+    typeof value.description !== 'string' ||
     !isCategory(value.category) ||
     !isSafeNonNegativeInteger(value.ratingAverageBasisPoints) ||
     value.ratingAverageBasisPoints > 500 ||

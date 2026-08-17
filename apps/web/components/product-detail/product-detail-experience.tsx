@@ -10,6 +10,7 @@ import { RecentlyViewedRecorder } from '../engagement/recently-viewed-recorder';
 import { useAuthSession } from '../auth-session-provider';
 import { useCart } from '../cart/cart-provider';
 import { ProductReviews } from './product-reviews';
+import { marketplaceMediaUrl } from '../../lib/marketplace-media-url';
 
 import {
   activeProductImage,
@@ -81,7 +82,7 @@ function ProductDetailInner({ product }: { product: ProductDetailResponse }) {
         <div className="product-detail-gallery__main" aria-live="polite">
           {image ? (
             <img
-              src={image.url}
+              src={marketplaceMediaUrl(image.url)}
               alt={image.altText}
               onError={(event) => {
                 event.currentTarget.onerror = null;
@@ -112,7 +113,7 @@ function ProductDetailInner({ product }: { product: ProductDetailResponse }) {
                 }
               >
                 <img
-                  src={thumbnail.url}
+                  src={marketplaceMediaUrl(thumbnail.url)}
                   alt=""
                   onError={(event) => {
                     event.currentTarget.onerror = null;

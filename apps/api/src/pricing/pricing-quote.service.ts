@@ -9,7 +9,8 @@ import {
 import { Inject, Injectable } from '@nestjs/common';
 
 import type { Prisma } from '../generated/prisma/client';
-import { ProductStatus, VariantStatus } from '../generated/prisma/enums';
+import { VariantStatus } from '../generated/prisma/enums';
+import { isSellableProduct } from '../catalog/sellable-product';
 import { isSellableShop } from '../catalog/sellable-shop';
 import { PrismaService } from '../prisma/prisma.service';
 import { SystemUtcClock } from '../vouchers/utc-clock';
@@ -56,6 +57,7 @@ const quoteCartSelect = {
               id: true,
               name: true,
               status: true,
+              moderationStatus: true,
               deletedAt: true,
               category: { select: { isActive: true, deletedAt: true } },
               images: {
@@ -70,6 +72,7 @@ const quoteCartSelect = {
                   name: true,
                   location: true,
                   status: true,
+                  onboardingStatus: true,
                   deletedAt: true,
                 },
               },
@@ -299,8 +302,7 @@ export class PricingQuoteService {
       const contentAvailable =
         variant.status === VariantStatus.ACTIVE &&
         variant.deletedAt === null &&
-        product.status === ProductStatus.ACTIVE &&
-        product.deletedAt === null &&
+        isSellableProduct(product) &&
         product.category.isActive &&
         product.category.deletedAt === null &&
         isSellableShop(shop);

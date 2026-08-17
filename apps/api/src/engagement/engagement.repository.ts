@@ -2,8 +2,9 @@ import { Inject, Injectable } from '@nestjs/common';
 import { RECENTLY_VIEWED_RETENTION_LIMIT } from '@shopee-clone/contracts';
 
 import type { Prisma } from '../generated/prisma/client';
-import { ProductStatus, VariantStatus } from '../generated/prisma/enums';
+import { VariantStatus } from '../generated/prisma/enums';
 import { sellableShopWhere } from '../catalog/sellable-shop';
+import { sellableProductWhere } from '../catalog/sellable-product';
 import { PrismaService } from '../prisma/prisma.service';
 
 const productInclude = {
@@ -18,8 +19,7 @@ const productInclude = {
 } satisfies Prisma.ProductInclude;
 
 const displayableProductWhere = {
-  status: ProductStatus.ACTIVE,
-  deletedAt: null,
+  ...sellableProductWhere,
   shop: sellableShopWhere,
   category: { isActive: true, deletedAt: null },
 } satisfies Prisma.ProductWhereInput;

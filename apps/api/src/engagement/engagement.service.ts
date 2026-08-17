@@ -9,6 +9,7 @@ import type {
 } from '@shopee-clone/contracts';
 
 import { mapCatalogProductCard } from '../catalog/catalog-presentation';
+import { isSellableProduct } from '../catalog/sellable-product';
 import { EngagementClock } from './engagement-clock';
 import {
   EngagementOwnerUnavailableError,
@@ -42,8 +43,7 @@ export class EngagementService {
       items: rows.map((row) => {
         const card = mapCatalogProductCard(row.product);
         const available =
-          row.product.status === 'ACTIVE' &&
-          row.product.deletedAt === null &&
+          isSellableProduct(row.product) &&
           row.product.shop.status === 'ACTIVE' &&
           row.product.shop.onboardingStatus === 'APPROVED' &&
           row.product.shop.deletedAt === null &&

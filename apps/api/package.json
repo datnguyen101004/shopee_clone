@@ -24,9 +24,11 @@
     "db:verify": "tsx prisma/verify.ts",
     "auth:roles:bootstrap-admin": "tsx scripts/bootstrap-admin.ts",
     "reviews:media:cleanup": "tsx scripts/cleanup-review-media.ts",
+    "seller-products:media:cleanup": "tsx scripts/cleanup-seller-product-media.ts",
     "reviews:aggregates:repair": "tsx scripts/repair-review-aggregates.ts"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1111.0",
     "@nestjs/common": "11.1.29",
     "@nestjs/core": "11.1.29",
     "@nestjs/jwt": "11.0.2",

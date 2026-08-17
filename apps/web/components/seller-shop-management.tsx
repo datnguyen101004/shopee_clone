@@ -40,10 +40,6 @@ const emptyForm: CreateSellerShopRequest = {
   returnAddress: emptyAddress,
 };
 
-function fromProfile(shop: SellerShopProfile): CreateSellerShopRequest {
-  return fromWorkspaceShop(shop, null);
-}
-
 function addressOrEmpty(address: ShopServiceAddress | null): ShopServiceAddress {
   return address ? { ...address } : { ...emptyAddress };
 }
@@ -107,8 +103,10 @@ function incompleteProfileMessage(input: CreateSellerShopRequest): string | null
 export function SellerShopManagement() {
   const { authenticatedFetch, state: authState } = useAuthSession();
   const [shop, setShop] = useState<SellerShopProfile | null>(null);
+  const [workspaceDefaultAddress, setWorkspaceDefaultAddress] = useState<ShopServiceAddress | null>(null);
   const [form, setForm] = useState(emptyForm);
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
+  const [mode, setMode] = useState<'onboarding' | 'view' | 'editing'>('onboarding');
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
@@ -119,11 +117,13 @@ export function SellerShopManagement() {
       .then((workspace) => {
         if (!active) return;
         setShop(workspace.shop);
+        setWorkspaceDefaultAddress(workspace.defaultAddress);
         setForm(
           workspace.shop
             ? fromWorkspaceShop(workspace.shop, workspace.defaultAddress)
             : newShopForm(workspace.defaultAddress),
         );
+        setMode(workspace.shop ? 'view' : 'onboarding');
         setStatus('ready');
       })
       .catch(() => {
@@ -161,7 +161,8 @@ export function SellerShopManagement() {
           : await updateSellerRegistration(authenticatedFetch, payload)
         : await createSellerShop(authenticatedFetch, payload);
       setShop(next);
-      setForm(fromProfile(next));
+      setForm(fromWorkspaceShop(next, workspaceDefaultAddress));
+      setMode('view');
       setMessage(
         shop
           ? shop.onboardingStatus === 'rejected'
@@ -214,10 +215,10 @@ export function SellerShopManagement() {
   return (
     <section
       className="operational-panel seller-shop-panel"
-      aria-labelledby="seller-shop-form-title"
+      aria-labelledby="seller-shop-title"
     >
       <span className="operational-eyebrow">Hồ sơ gian hàng</span>
-      <h1 id="seller-shop-form-title">{shop ? shop.name : 'Đăng ký gian hàng'}</h1>
+      <h1 id="seller-shop-title">{shop ? shop.name : 'Đăng ký gian hàng'}</h1>
       {shop ? (
         <p>
           Trạng thái duyệt: {onboardingLabel(shop.onboardingStatus)}. Vận hành:{' '}
@@ -232,6 +233,67 @@ export function SellerShopManagement() {
       {shop?.onboardingReason && shop.onboardingStatus === 'rejected' ? (
         <p role="status">Lý do từ chối: {shop.onboardingReason}</p>
       ) : null}
+      {shop && mode === 'view' ? (
+        <div className="seller-shop-profile-view" data-testid="seller-shop-profile-view">
+          <div className="seller-shop-profile-actions">
+            <button
+              className="seller-shop-submit"
+              type="button"
+              onClick={() => {
+                setForm(fromWorkspaceShop(shop, workspaceDefaultAddress));
+                setMessage(null);
+                setMode('editing');
+              }}
+            >
+              Cập nhật hồ sơ
+            </button>
+            {shop.onboardingStatus === 'approved' ? (
+              <button
+                className="seller-shop-status-action"
+                type="button"
+                disabled={pending}
+                onClick={() => {
+                  setMessage(null);
+                  setPending(true);
+                  void updateSellerShop(authenticatedFetch, {
+                    status: shop.status === 'active' ? 'inactive' : 'active',
+                  })
+                    .then((next) => {
+                      setShop(next);
+                      setForm(fromWorkspaceShop(next, workspaceDefaultAddress));
+                      setMessage(next.status === 'active' ? 'Shop đã mở bán.' : 'Shop đã tạm ngừng bán.');
+                    })
+                    .catch(() => setMessage('Không thể cập nhật trạng thái bán. Hãy thử lại.'))
+                    .finally(() => setPending(false));
+                }}
+              >
+                {shop.status === 'active' ? 'Tạm ngừng bán' : 'Mở bán'}
+              </button>
+            ) : null}
+          </div>
+          <dl className="seller-shop-profile-grid">
+            <div><dt>Tên shop</dt><dd>{shop.name}</dd></div>
+            <div><dt>Slug</dt><dd>{shop.slug}</dd></div>
+            <div><dt>Trạng thái duyệt</dt><dd>{onboardingLabel(shop.onboardingStatus)}</dd></div>
+            <div><dt>Trạng thái bán</dt><dd>{statusLabel(shop.status)}</dd></div>
+            <div><dt>Điện thoại</dt><dd>{shop.contactPhone || 'Chưa cập nhật'}</dd></div>
+            <div><dt>Email</dt><dd>{shop.contactEmail || 'Chưa cập nhật'}</dd></div>
+            <div><dt>Khu vực</dt><dd>{shop.location || 'Chưa cập nhật'}</dd></div>
+            <div className="seller-shop-profile-wide"><dt>Mô tả</dt><dd>{shop.description || 'Chưa có mô tả'}</dd></div>
+            <div className="seller-shop-profile-wide">
+              <dt>Địa chỉ lấy hàng</dt>
+              <dd>{formatShopAddress(shop.pickupAddress)}</dd>
+            </div>
+            <div className="seller-shop-profile-wide">
+              <dt>Địa chỉ trả hàng</dt>
+              <dd>{formatShopAddress(shop.returnAddress)}</dd>
+            </div>
+            <div><dt>Logo</dt><dd>{shop.logoUrl ? <img className="seller-shop-profile-media" src={shop.logoUrl} alt={`Logo ${shop.name}`} /> : 'Chưa cập nhật'}</dd></div>
+            <div><dt>Banner</dt><dd>{shop.bannerUrl ? <img className="seller-shop-profile-banner" src={shop.bannerUrl} alt={`Banner ${shop.name}`} /> : 'Chưa cập nhật'}</dd></div>
+          </dl>
+          {message ? <p role="status">{message}</p> : null}
+        </div>
+      ) : (
       <form className="seller-shop-form" onSubmit={(event) => void submit(event)}>
         <label>
           Đường dẫn
@@ -415,7 +477,7 @@ export function SellerShopManagement() {
             />
           </label>
         </fieldset>
-        {shop?.onboardingStatus === 'approved' ? (
+        {shop?.onboardingStatus === 'approved' && mode === 'editing' ? (
           <fieldset className="seller-shop-form-wide">
             <legend>Trạng thái bán</legend>
             <button
@@ -427,7 +489,7 @@ export function SellerShopManagement() {
                   status: shop.status === 'active' ? 'inactive' : 'active',
                 }).then((next) => {
                   setShop(next);
-                  setForm(fromProfile(next));
+                  setForm(fromWorkspaceShop(next, workspaceDefaultAddress));
                 });
               }}
             >
@@ -437,11 +499,42 @@ export function SellerShopManagement() {
         ) : (
           <p>Chỉ shop đã duyệt mới có thể tự kích hoạt bán.</p>
         )}
+        <div className="seller-shop-form-actions">
+        {shop && mode === 'editing' ? (
+          <button
+            className="seller-shop-status-action"
+            type="button"
+            disabled={pending}
+            onClick={() => {
+              setForm(fromWorkspaceShop(shop, workspaceDefaultAddress));
+              setMessage(null);
+              setMode('view');
+            }}
+          >
+            Hủy
+          </button>
+        ) : null}
         <button className="seller-shop-submit" type="submit" disabled={pending}>
           {shop?.onboardingStatus === 'rejected' ? 'Sửa và gửi lại đăng ký' : shop ? 'Lưu hồ sơ' : 'Gửi đăng ký'}
         </button>
+        </div>
         {message ? <p role="status">{message}</p> : null}
       </form>
+      )}
     </section>
   );
+}
+
+function formatShopAddress(address: ShopServiceAddress | null): string {
+  if (!address) return 'Chưa cập nhật';
+  return [
+    address.recipientName,
+    address.phoneNumber,
+    address.addressLine,
+    address.ward,
+    address.district,
+    address.province,
+  ]
+    .filter(Boolean)
+    .join(' · ') || 'Chưa cập nhật';
 }

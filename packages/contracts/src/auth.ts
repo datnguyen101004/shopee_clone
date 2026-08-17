@@ -47,11 +47,13 @@ export interface RoleAssignmentResult {
   roles: MarketplaceRole[];
 }
 
+export type SellerShopStatus = 'active' | 'inactive' | 'suspended';
+
 export interface SellerShop {
   id: string;
   slug: string;
   name: string;
-  status: 'active' | 'inactive';
+  status: SellerShopStatus;
 }
 
 export interface RoleAuditEvent {
@@ -238,7 +240,7 @@ export function isSellerShop(value: unknown): value is SellerShop {
     value.name === value.name.trim() &&
     value.name.length >= 1 &&
     value.name.length <= 160 &&
-    ['active', 'inactive'].includes(String(value.status))
+    ['active', 'inactive', 'suspended'].includes(String(value.status))
   );
 }
 

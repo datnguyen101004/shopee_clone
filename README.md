@@ -100,6 +100,8 @@ See [Account authentication](docs/authentication.md) for T11 email/password sess
 
 See [Marketplace role authorization](docs/role-authorization.md) for the T12 permission matrix, persisted seller ownership, first-admin bootstrap, admin role workflow, append-only audit, and focused verification commands.
 
+See [Seller onboarding and shop profile](docs/seller-onboarding.md) for T22 shop applications, profile validation, approval placeholder, sellability, and focused verification commands.
+
 See [Buyer profile and shipping addresses](docs/account-management.md) for the T13 account endpoints, Vietnamese normalization, default-address locking/invariant, privacy boundary, checkout snapshot responsibility, and focused verification commands.
 
 See [Buyer order lifecycle](docs/order-history.md) for T20 order-list/detail endpoints, lifecycle transitions, timeline auditing, retry-safe cancellation, account screens, and focused verification commands.

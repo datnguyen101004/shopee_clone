@@ -5,6 +5,7 @@ import { Container } from '@shopee-clone/ui';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
+import { approveSellerShop } from '../lib/seller-shop-api';
 import { fetchRoleAuditPage, fetchSellerShop, RoleApiError } from '../lib/role-api';
 import { useAuthSession } from './auth-session-provider';
 import { OperationalRoleGate } from './operational-role-gate';
@@ -77,11 +78,71 @@ function SellerContent() {
         </div>
         <div>
           <dt>Trạng thái</dt>
-          <dd>{state.data.status === 'active' ? 'Đang hoạt động' : 'Tạm ngừng'}</dd>
+          <dd>
+            {state.data.status === 'active'
+              ? 'Đang hoạt động'
+              : state.data.status === 'suspended'
+                ? 'Đang bị tạm khóa'
+                : 'Tạm ngừng'}
+          </dd>
         </div>
       </dl>
-      <p>T12 chỉ cung cấp điểm vào an toàn; quản lý sản phẩm sẽ được bổ sung ở task sau.</p>
+      <p>
+        {state.data.status === 'active'
+          ? 'Shop đang hoạt động trên marketplace.'
+          : 'Shop hiện không được bán trên catalog và checkout.'}
+      </p>
+      <Link href="/seller/shop">Quản lý hồ sơ shop</Link>
     </section>
+  );
+}
+
+function AdminApprovalPlaceholder() {
+  const { authenticatedFetch } = useAuthSession();
+  const [shopId, setShopId] = useState('');
+  const [decision, setDecision] = useState<'approve' | 'reject'>('approve');
+  const [reason, setReason] = useState('');
+  const [pending, setPending] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+
+  return (
+    <form
+      className="seller-shop-form"
+      onSubmit={(event) => {
+        event.preventDefault();
+        if (pending) return;
+        setPending(true);
+        setMessage(null);
+        void approveSellerShop(authenticatedFetch, shopId, { decision, reason })
+          .then((shop) => {
+            setMessage(`Đã ${decision === 'approve' ? 'duyệt' : 'từ chối'} ${shop.name}.`);
+          })
+          .catch(() => {
+            setMessage('Không thể cập nhật duyệt shop.');
+          })
+          .finally(() => setPending(false));
+      }}
+    >
+      <h2>Duyệt đăng ký mở shop</h2>
+      <p>Khi duyệt, chủ shop sẽ được cấp quyền người bán và shop được mở bán.</p>
+      <label>
+        Mã shop
+        <input name="shopId" value={shopId} onChange={(event) => setShopId(event.target.value)} required />
+      </label>
+      <label>
+        Quyết định
+        <select name="decision" value={decision} onChange={(event) => setDecision(event.target.value as 'approve' | 'reject')}>
+          <option value="approve">Duyệt</option>
+          <option value="reject">Từ chối</option>
+        </select>
+      </label>
+      <label>
+        Lý do
+        <input name="reason" value={reason} onChange={(event) => setReason(event.target.value)} required minLength={8} />
+      </label>
+      <button type="submit" disabled={pending}>{pending ? 'Đang gửi…' : 'Gửi quyết định'}</button>
+      {message ? <p role="status">{message}</p> : null}
+    </form>
   );
 }
 
@@ -112,6 +173,7 @@ function AdminContent() {
         Backend đã hỗ trợ cấp, thu hồi và audit vai trò. Giao diện quản trị đầy đủ sẽ được xây dựng
         trong task quản trị sau.
       </p>
+      <AdminApprovalPlaceholder />
       <strong>{state.data.items.length} sự kiện audit gần nhất</strong>
       <ul className="operational-audit-list" aria-label="Sự kiện phân quyền gần nhất">
         {state.data.items.slice(0, 5).map((event) => (

@@ -1,6 +1,8 @@
 import { Inject, Injectable } from '@nestjs/common';
 
-import { ProductStatus, ShopStatus, VariantStatus } from '../generated/prisma/enums';
+import { ProductStatus, VariantStatus } from '../generated/prisma/enums';
+import type { ShopOnboardingStatus, ShopStatus } from '../generated/prisma/enums';
+import { isSellableShop } from '../catalog/sellable-shop';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
@@ -46,13 +48,12 @@ export class HomepageRepository {
   static isDisplayableProduct(product: {
     status: ProductStatus;
     deletedAt: Date | null;
-    shop: { status: ShopStatus; deletedAt: Date | null };
+    shop: { status: ShopStatus; onboardingStatus?: ShopOnboardingStatus; deletedAt: Date | null };
   }): boolean {
     return (
       product.status === ProductStatus.ACTIVE &&
       product.deletedAt === null &&
-      product.shop.status === ShopStatus.ACTIVE &&
-      product.shop.deletedAt === null
+      isSellableShop(product.shop)
     );
   }
 }

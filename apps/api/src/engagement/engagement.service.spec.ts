@@ -20,7 +20,13 @@ const product = (id: string, status: 'ACTIVE' | 'ARCHIVED' = 'ACTIVE') => ({
   soldCount: 3,
   status,
   deletedAt: null,
-  shop: { name: 'Shop', location: 'Hà Nội', status: 'ACTIVE', deletedAt: null },
+  shop: {
+    name: 'Shop',
+    location: 'Hà Nội',
+    status: 'ACTIVE',
+    onboardingStatus: 'APPROVED',
+    deletedAt: null,
+  },
   category: { slug: 'category', name: 'Category', isActive: true, deletedAt: null },
   images: [{ url: '/product.webp', altText: 'Product' }],
   variants: [

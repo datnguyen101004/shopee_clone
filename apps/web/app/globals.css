@@ -3225,6 +3225,118 @@
   font-size: 0.8rem;
 }
 
+.seller-shop-panel {
+  max-width: 920px;
+}
+
+.seller-shop-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.9rem;
+  margin-top: 1.25rem;
+}
+
+.seller-shop-form-wide,
+.seller-shop-form fieldset,
+.seller-shop-form button[type='submit'],
+.seller-shop-form p,
+.seller-shop-form h2 {
+  grid-column: 1 / -1;
+}
+
+.seller-shop-form label,
+.seller-shop-form fieldset {
+  display: grid;
+  gap: 0.35rem;
+  font-weight: 700;
+}
+
+.seller-shop-form fieldset {
+  border: 1px solid var(--sc-color-border);
+  border-radius: var(--sc-radius-md);
+  padding: 0.9rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.seller-shop-form input,
+.seller-shop-form textarea,
+.seller-shop-form select {
+  min-height: 2.5rem;
+  border: 1px solid var(--sc-color-border);
+  border-radius: var(--sc-radius-md);
+  padding: 0.5rem 0.7rem;
+  font: inherit;
+}
+
+.seller-shop-status-action,
+.seller-shop-submit {
+  min-height: 2.75rem;
+  border-radius: var(--sc-radius-md);
+  padding: 0.7rem 1.1rem;
+  font: inherit;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  transition: background-color 160ms ease, border-color 160ms ease, box-shadow 160ms ease,
+    transform 160ms ease;
+}
+
+.seller-shop-status-action {
+  width: fit-content;
+  min-width: 11.5rem;
+  border: 1px solid var(--sc-color-brand-500);
+  background: var(--sc-color-brand-50);
+  color: var(--sc-color-brand-700);
+}
+
+.seller-shop-status-action:hover:not(:disabled) {
+  border-color: var(--sc-color-brand-600);
+  background: color-mix(in srgb, var(--sc-color-brand-50) 45%, white);
+  box-shadow: 0 4px 12px rgb(210 52 26 / 14%);
+}
+
+.seller-shop-submit {
+  justify-self: end;
+  min-width: 10.75rem;
+  border: 1px solid var(--sc-color-brand-600);
+  background: var(--sc-color-brand-600);
+  color: white;
+  box-shadow: 0 4px 12px rgb(210 52 26 / 24%);
+}
+
+.seller-shop-submit:hover:not(:disabled) {
+  background: var(--sc-color-brand-700);
+  box-shadow: 0 6px 16px rgb(210 52 26 / 30%);
+  transform: translateY(-1px);
+}
+
+.seller-shop-status-action:focus-visible,
+.seller-shop-submit:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--sc-color-brand-500) 42%, white);
+  outline-offset: 2px;
+}
+
+.seller-shop-status-action:disabled,
+.seller-shop-submit:disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
+}
+
+@media (max-width: 720px) {
+  .seller-shop-form,
+  .seller-shop-form fieldset {
+    grid-template-columns: 1fr;
+  }
+
+  .seller-shop-status-action,
+  .seller-shop-submit {
+    width: 100%;
+  }
+
+  .seller-shop-submit {
+    justify-self: stretch;
+  }
+}
+
 .buyer-account-page {
   min-height: 68vh;
   padding-block: clamp(1.25rem, 4vw, 3rem) clamp(3rem, 7vw, 5rem);

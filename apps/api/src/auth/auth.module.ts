@@ -64,6 +64,7 @@ import { SellerController } from './seller.controller';
     RolesGuard,
     AuthService,
     MarketplaceOwnershipService,
+    RoleAuthorizationService,
   ],
 })
 export class AuthModule {}

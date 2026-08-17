@@ -5,6 +5,7 @@ import {
   ProductStatus,
   RoleAuditAction,
   RoleAuditSource,
+  ShopOnboardingStatus,
   ShopStatus,
   UserStatus,
   VariantStatus,
@@ -114,13 +115,18 @@ async function importSource(
 
   await transaction.shop.upsert({
     where: { id: source.shop.id },
-    create: { ...source.shop, status: ShopStatus.ACTIVE },
+    create: {
+      ...source.shop,
+      status: ShopStatus.ACTIVE,
+      onboardingStatus: ShopOnboardingStatus.APPROVED,
+    },
     update: {
       ownerId: source.shop.ownerId,
       slug: source.shop.slug,
       name: source.shop.name,
       location: source.shop.location,
       status: ShopStatus.ACTIVE,
+      onboardingStatus: ShopOnboardingStatus.APPROVED,
       deletedAt: null,
     },
   });

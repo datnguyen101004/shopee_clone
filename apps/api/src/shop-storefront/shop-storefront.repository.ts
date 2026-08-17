@@ -1,7 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 
 import type { Prisma } from '../generated/prisma/client';
-import { ShopStatus } from '../generated/prisma/enums';
+import { sellableShopWhere } from '../catalog/sellable-shop';
 import { PrismaService } from '../prisma/prisma.service';
 
 export type ShopStorefrontTransaction = Prisma.TransactionClient;
@@ -12,7 +12,7 @@ export class ShopStorefrontRepository {
 
   findPublicShopBySlug(slug: string) {
     return this.prisma.shop.findFirst({
-      where: { slug, status: ShopStatus.ACTIVE, deletedAt: null },
+      where: { slug, ...sellableShopWhere },
       select: { id: true, ownerId: true, slug: true, name: true, location: true, createdAt: true, ratingAverageBasisPoints: true, ratingCount: true },
     });
   }
@@ -26,7 +26,7 @@ export class ShopStorefrontRepository {
       where: {
         userId,
         shopId: { in: shopIds },
-        shop: { status: ShopStatus.ACTIVE, deletedAt: null },
+        shop: sellableShopWhere,
       },
       select: { shopId: true },
     });

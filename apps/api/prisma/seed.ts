@@ -4,6 +4,7 @@ import {
   ProductStatus,
   RoleAuditAction,
   RoleAuditSource,
+  ShopOnboardingStatus,
   ShopStatus,
   UserStatus,
   VoucherBenefitType,
@@ -82,13 +83,18 @@ async function seedMarketplace() {
     for (const shop of seedShops) {
       await transaction.shop.upsert({
         where: { id: shop.id },
-        create: { ...shop, status: ShopStatus.ACTIVE },
+        create: {
+          ...shop,
+          status: ShopStatus.ACTIVE,
+          onboardingStatus: ShopOnboardingStatus.APPROVED,
+        },
         update: {
           ownerId: shop.ownerId,
           slug: shop.slug,
           name: shop.name,
           location: shop.location,
           status: ShopStatus.ACTIVE,
+          onboardingStatus: ShopOnboardingStatus.APPROVED,
           deletedAt: null,
         },
       });

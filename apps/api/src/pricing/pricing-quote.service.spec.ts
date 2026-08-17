@@ -1,6 +1,11 @@
 import { isPricingQuoteResponse } from '@shopee-clone/contracts';
 
-import { ProductStatus, ShopStatus, VariantStatus } from '../generated/prisma/enums';
+import {
+  ProductStatus,
+  ShopOnboardingStatus,
+  ShopStatus,
+  VariantStatus,
+} from '../generated/prisma/enums';
 import type { PrismaService } from '../prisma/prisma.service';
 import type { SystemUtcClock } from '../vouchers/utc-clock';
 import { VoucherPricingCalculator } from '../vouchers/voucher-pricing.calculator';
@@ -49,6 +54,7 @@ function fixtureCart() {
               name: 'Fixture Shop',
               location: 'Hà Nội',
               status: ShopStatus.ACTIVE,
+              onboardingStatus: ShopOnboardingStatus.APPROVED as ShopOnboardingStatus,
               deletedAt: null,
             },
           },
@@ -139,6 +145,18 @@ describe('pricing quote orchestration', () => {
         },
       ]),
     ).rejects.toBeInstanceOf(PricingValidationError);
+  });
+
+  it('revalidates a once-sellable cart line after its shop approval is withdrawn', async () => {
+    const cart = fixtureCart();
+    cart.lines[0]!.variant.product.shop.onboardingStatus = ShopOnboardingStatus.REJECTED;
+
+    const quote = await serviceWith({ cart }).quote(userId, 2, addressId, []);
+
+    expect(quote.shops).toEqual([]);
+    expect(quote.exclusions).toEqual([
+      expect.objectContaining({ lineId: cart.lines[0]!.id, code: 'unavailable' }),
+    ]);
   });
 
   it('supports a valid zero cart only at version zero', async () => {

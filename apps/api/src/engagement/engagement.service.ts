@@ -45,6 +45,7 @@ export class EngagementService {
           row.product.status === 'ACTIVE' &&
           row.product.deletedAt === null &&
           row.product.shop.status === 'ACTIVE' &&
+          row.product.shop.onboardingStatus === 'APPROVED' &&
           row.product.shop.deletedAt === null &&
           row.product.category.isActive &&
           row.product.category.deletedAt === null &&

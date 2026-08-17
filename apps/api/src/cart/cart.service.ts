@@ -11,7 +11,8 @@ import {
 } from '@shopee-clone/contracts';
 
 import type { Prisma } from '../generated/prisma/client';
-import { ProductStatus, ShopStatus, VariantStatus } from '../generated/prisma/enums';
+import { ProductStatus, VariantStatus } from '../generated/prisma/enums';
+import { isSellableShop } from '../catalog/sellable-shop';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   CartCapacityError,
@@ -84,8 +85,7 @@ function currentFacts(line: CartLineRow) {
     product.deletedAt === null &&
     product.category.isActive &&
     product.category.deletedAt === null &&
-    product.shop.status === ShopStatus.ACTIVE &&
-    product.shop.deletedAt === null;
+    isSellableShop(product.shop);
   const maxPurchaseQuantity = Math.min(
     CART_MAX_QUANTITY,
     availableQuantity,
@@ -511,10 +511,7 @@ export class CartService {
             id: shop.id,
             slug: shop.slug,
             name: shop.name,
-            href:
-              shop.status === ShopStatus.ACTIVE && shop.deletedAt === null
-                ? `/shops/${shop.slug}`
-                : null,
+            href: isSellableShop(shop) ? `/shops/${shop.slug}` : null,
           },
           lines: [],
           selectedEligibleLineCount: 0,

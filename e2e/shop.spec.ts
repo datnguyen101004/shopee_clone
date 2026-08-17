@@ -225,7 +225,11 @@ test.describe('public shop storefront and following', () => {
       await fulfillJson(route, followedPage(product.shop, { page: requestedPage, totalItems: 21 }));
     });
     await page.goto('/');
-    await page.getByRole('link', { name: 'Shop đang theo dõi' }).first().click();
+    if ((page.viewportSize()?.width ?? 0) < 640) {
+      await page.goto('/account/followed-shops');
+    } else {
+      await page.getByRole('link', { name: 'Shop đang theo dõi' }).first().click();
+    }
     await expect(page).toHaveURL(/\/account\/followed-shops/);
     await expect(page.getByRole('heading', { name: 'Shop đang theo dõi', level: 1 })).toBeVisible();
     await expect(

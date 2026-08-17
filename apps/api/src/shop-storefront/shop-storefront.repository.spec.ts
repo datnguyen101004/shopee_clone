@@ -12,7 +12,7 @@ describe('ShopStorefrontRepository', () => {
       where: {
         userId,
         shopId: { in: [shopId] },
-        shop: { status: 'ACTIVE', deletedAt: null },
+        shop: { status: 'ACTIVE', onboardingStatus: 'APPROVED', deletedAt: null },
       },
       select: { shopId: true },
     });

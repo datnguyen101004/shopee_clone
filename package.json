@@ -61,6 +61,7 @@
     "test:e2e:checkout:quick": "node scripts/quick-e2e.mjs checkout",
     "test:e2e:orders:quick": "node scripts/quick-e2e.mjs orders",
     "test:e2e:reviews:quick": "node scripts/quick-e2e.mjs reviews",
+    "test:e2e:seller:quick": "node scripts/quick-e2e.mjs seller",
     "test:infra": "node --test scripts/infrastructure-smoke.test.mjs",
     "format": "prettier --write .",
     "format:check": "prettier --check ."

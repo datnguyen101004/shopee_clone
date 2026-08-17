@@ -1,7 +1,8 @@
 import { Inject, Injectable } from '@nestjs/common';
 
-import { ProductStatus, ShopStatus, VariantStatus } from '../generated/prisma/enums';
+import { ProductStatus, VariantStatus } from '../generated/prisma/enums';
 import { PrismaService } from '../prisma/prisma.service';
+import { sellableShopWhere } from './sellable-shop';
 
 @Injectable()
 export class CatalogRepository {
@@ -22,7 +23,7 @@ export class CatalogRepository {
         deletedAt: null,
         ...(categoryIds ? { categoryId: { in: categoryIds } } : {}),
         ...(shopId ? { shopId } : {}),
-        shop: { status: ShopStatus.ACTIVE, deletedAt: null },
+        shop: sellableShopWhere,
         category: { isActive: true, deletedAt: null },
       },
       include: {
@@ -49,7 +50,7 @@ export class CatalogRepository {
         id: productId,
         status: ProductStatus.ACTIVE,
         deletedAt: null,
-        shop: { status: ShopStatus.ACTIVE, deletedAt: null },
+        shop: sellableShopWhere,
         category: { isActive: true, deletedAt: null },
       },
       include: {
@@ -84,7 +85,7 @@ export class CatalogRepository {
         categoryId,
         status: ProductStatus.ACTIVE,
         deletedAt: null,
-        shop: { status: ShopStatus.ACTIVE, deletedAt: null },
+        shop: sellableShopWhere,
         category: { isActive: true, deletedAt: null },
       },
       include: {

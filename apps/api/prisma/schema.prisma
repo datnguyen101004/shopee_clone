@@ -17,10 +17,19 @@ enum UserStatus {
 }
 
 enum ShopStatus {
-  ACTIVE   @map("active")
-  INACTIVE @map("inactive")
+  ACTIVE    @map("active")
+  INACTIVE  @map("inactive")
+  SUSPENDED @map("suspended")
 
   @@map("shop_status")
+}
+
+enum ShopOnboardingStatus {
+  PENDING_APPROVAL @map("pending_approval")
+  APPROVED         @map("approved")
+  REJECTED         @map("rejected")
+
+  @@map("shop_onboarding_status")
 }
 
 enum ProductStatus {
@@ -176,7 +185,7 @@ model User {
   createdAt           DateTime                @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt           DateTime                @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
   deletedAt           DateTime?               @map("deleted_at") @db.Timestamptz(3)
-  shop                Shop?
+  shops               Shop[]
   authSessions        AuthSession[]
   passwordResetTokens PasswordResetToken[]
   externalIdentities  ExternalIdentity[]
@@ -327,18 +336,37 @@ model PasswordResetToken {
 }
 
 model Shop {
-  id                       String            @id @default(uuid()) @db.Uuid
-  ownerId                  String            @unique @map("owner_id") @db.Uuid
-  slug                     String            @unique @db.VarChar(120)
-  name                     String            @db.VarChar(160)
-  location                 String            @default("Việt Nam") @db.VarChar(120)
-  status                   ShopStatus        @default(ACTIVE)
+  id                       String               @id @default(uuid()) @db.Uuid
+  ownerId                  String               @map("owner_id") @db.Uuid
+  slug                     String               @unique @db.VarChar(120)
+  name                     String               @db.VarChar(160)
+  description              String               @default("") @db.VarChar(2000)
+  logoUrl                  String?              @map("logo_url") @db.VarChar(500)
+  bannerUrl                String?              @map("banner_url") @db.VarChar(500)
+  location                 String               @default("Việt Nam") @db.VarChar(120)
+  contactPhone             String?              @map("contact_phone") @db.VarChar(10)
+  contactEmail             String?              @map("contact_email") @db.VarChar(320)
+  pickupRecipientName      String?              @map("pickup_recipient_name") @db.VarChar(120)
+  pickupPhoneNumber        String?              @map("pickup_phone_number") @db.VarChar(10)
+  pickupProvince           String?              @map("pickup_province") @db.VarChar(100)
+  pickupDistrict           String?              @map("pickup_district") @db.VarChar(100)
+  pickupWard               String?              @map("pickup_ward") @db.VarChar(100)
+  pickupAddressLine        String?              @map("pickup_address_line") @db.VarChar(255)
+  returnRecipientName      String?              @map("return_recipient_name") @db.VarChar(120)
+  returnPhoneNumber        String?              @map("return_phone_number") @db.VarChar(10)
+  returnProvince           String?              @map("return_province") @db.VarChar(100)
+  returnDistrict           String?              @map("return_district") @db.VarChar(100)
+  returnWard               String?              @map("return_ward") @db.VarChar(100)
+  returnAddressLine        String?              @map("return_address_line") @db.VarChar(255)
+  status                   ShopStatus           @default(INACTIVE)
+  onboardingStatus         ShopOnboardingStatus @default(PENDING_APPROVAL) @map("onboarding_status")
+  onboardingReason         String?              @map("onboarding_reason") @db.VarChar(240)
   ratingAverageBasisPoints Int               @default(0) @map("rating_average_basis_points")
   ratingCount              Int               @default(0) @map("rating_count")
   createdAt                DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt                DateTime          @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
   deletedAt                DateTime?         @map("deleted_at") @db.Timestamptz(3)
-  owner                    User              @relation(fields: [ownerId], references: [id], onDelete: Restrict)
+  owner                    User                 @relation(fields: [ownerId], references: [id], onDelete: Restrict)
   products                 Product[]
   followers                ShopFollower[]
   vouchers                 Voucher[]
@@ -346,7 +374,9 @@ model Shop {
   purchaseVouchers         PurchaseVoucher[]
   reviews                  ProductReview[]
 
+  @@index([ownerId])
   @@index([status])
+  @@index([onboardingStatus])
   @@index([deletedAt])
   @@map("shops")
 }

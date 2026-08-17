@@ -11,7 +11,7 @@ Tài liệu này mô tả trạng thái hiện tại của Shopee Clone sau TS01
 | Khám phá sản phẩm  | `/search`                                                                   | Tìm kiếm, lọc, sắp xếp, phân trang và URL có thể chia sẻ                                     |
 | Chi tiết sản phẩm  | `/products/{productId}`                                                     | Gallery, biến thể, giá, tồn kho, số lượng, shop, sản phẩm liên quan và purchase intent       |
 | Tài khoản          | `/login`, `/register`, `/forgot-password`, `/reset-password`                | Email/password, Google OIDC, refresh session, logout và khôi phục mật khẩu                   |
-| Phân quyền         | `/seller`, `/admin` và API tương ứng                                        | Buyer mặc định, seller theo quyền và ownership, admin quản lý role và audit                  |
+| Phân quyền         | `/seller`, `/seller/shop`, `/admin` và API tương ứng                        | Buyer mặc định, seller onboarding/hồ sơ shop, admin duyệt placeholder và audit               |
 | Hồ sơ giao hàng    | `/account/profile`, `/account/addresses`                                    | Hồ sơ, số điện thoại, CRUD địa chỉ và địa chỉ mặc định                                       |
 | Tương tác buyer    | `/account/favorites`, `/account/recently-viewed`, `/account/followed-shops` | Yêu thích, lịch sử xem gần đây và danh sách shop đang theo dõi riêng theo tài khoản          |
 | Gian hàng          | `/shops/{shopSlug}`                                                         | Hồ sơ shop, catalog riêng, tìm kiếm/lọc/sắp xếp/phân trang và theo dõi shop                  |
@@ -700,3 +700,37 @@ Mỗi transition tăng `ShopOrder.version` đúng một lần và ghi một `Ord
 transaction. Buyer chỉ có command hủy ở `PENDING_CONFIRMATION`; các cạnh seller/return được lưu trong
 state machine để task sau tái sử dụng nhưng T20 chưa mở endpoint tương ứng. List/detail chỉ dùng snapshot
 T19 và filter ownership trong PostgreSQL, nên reference missing và foreign cùng trả `404` không liệt kê.
+
+## 17. Seller onboarding và hồ sơ shop T22
+
+```mermaid
+flowchart TD
+    buyer["Buyer account"] --> workspace["GET /seller/shop/workspace"]
+    workspace --> accountAddress["Đọc địa chỉ account mặc định\n(defaultAddress hoặc null)"]
+    accountAddress --> hasShop{"Có shop chưa xóa?"}
+    hasShop -->|Không| apply["POST /seller/shop\nprofile + pickup/return address"]
+    apply --> lock["Lock user + partial unique owner"]
+    lock --> pending["PENDING_APPROVAL + INACTIVE"]
+    hasShop -->|Có| completeAddress{"Pickup/return shop\nđầy đủ?"}
+    completeAddress -->|Có| manage["Ưu tiên địa chỉ shop\nBuyer: PATCH registration\nSeller: PATCH profile"]
+    completeAddress -->|Không| prefill["Prefill pickup + return\ntừ defaultAddress nếu có"] --> manage
+    pending --> admin["Admin POST approval"]
+    admin --> decision{"Quyết định"}
+    decision -->|Approve| approved["Grant SELLER + APPROVED + ACTIVE\n(one transaction)"]
+    decision -->|Reject| rejected["REJECTED + INACTIVE\nremains BUYER"]
+    rejected --> manage
+    approved --> toggle["Seller chỉ đổi ACTIVE/INACTIVE"]
+    approved --> sellable["Catalog · storefront · cart · quote · checkout"]
+    toggle --> sellable
+    suspended["SUSPENDED"] --> unavailable["Ẩn/chặn sale, không lộ lý do buyer"]
+    pending --> unavailable
+    rejected --> unavailable
+    toggle --> unavailable
+```
+
+Owner identity luôn lấy từ session; browser không truyền `ownerId`. `defaultAddress` chỉ là dữ liệu
+khởi tạo form: shop đã có địa chỉ đầy đủ luôn được ưu tiên, còn thay đổi địa chỉ account sau này không tự
+ghi đè shop. Điều kiện bán là shop chưa xóa,
+`APPROVED` và `ACTIVE`, được kiểm tra lại ở cart, báo giá và checkout để trạng thái shop thay đổi sau
+khi buyer thêm hàng vào giỏ không thể tạo sale mới. Slug giữ unique toàn cục, còn owner và tên shop chỉ
+unique với shop chưa soft-delete.

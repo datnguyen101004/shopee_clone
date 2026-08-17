@@ -135,6 +135,39 @@ export class RoleAuthorizationService {
     }
   }
 
+  async grantSellerForShopApproval(
+    transaction: Prisma.TransactionClient,
+    actorUserId: string,
+    targetUserId: string,
+    reason: string,
+  ): Promise<void> {
+    await this.assertCurrentAdmin(transaction, actorUserId);
+    await this.assertEligibleTarget(transaction, targetUserId);
+    const existing = await transaction.userRoleAssignment.findUnique({
+      where: { userId_role: { userId: targetUserId, role: MarketplaceRole.SELLER } },
+      select: { userId: true },
+    });
+    if (existing) return;
+    await transaction.userRoleAssignment.create({
+      data: {
+        userId: targetUserId,
+        role: MarketplaceRole.SELLER,
+        source: RoleAuditSource.ADMIN,
+        grantedByUserId: actorUserId,
+      },
+    });
+    await transaction.roleAuditEvent.create({
+      data: {
+        targetUserId,
+        role: MarketplaceRole.SELLER,
+        action: RoleAuditAction.GRANT,
+        source: RoleAuditSource.ADMIN,
+        actorUserId,
+        reason,
+      },
+    });
+  }
+
   revokeRole(
     actorUserId: string,
     targetUserId: string,

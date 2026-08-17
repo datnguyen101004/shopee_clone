@@ -14,6 +14,7 @@ import { PricingModule } from './pricing/pricing.module';
 import { ShopStorefrontModule } from './shop-storefront/shop-storefront.module';
 import { BrowserSecurityModule } from './security/browser-security.module';
 import { ReviewsModule } from './reviews/reviews.module';
+import { SellerOnboardingModule } from './seller-onboarding/seller-onboarding.module';
 
 @Module({
   imports: [
@@ -30,6 +31,7 @@ import { ReviewsModule } from './reviews/reviews.module';
     AccountModule,
     EngagementModule,
     ShopStorefrontModule,
+    SellerOnboardingModule,
     ReviewsModule,
   ],
 })

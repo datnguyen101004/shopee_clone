@@ -190,6 +190,8 @@ export function LegacyAdministrativeDivisionFields({
   districtError,
   wardError,
   disabled = false,
+  idPrefix = 'address',
+  onChange,
 }: {
   initialProvince?: string;
   initialDistrict?: string;
@@ -198,6 +200,8 @@ export function LegacyAdministrativeDivisionFields({
   districtError?: string;
   wardError?: string;
   disabled?: boolean;
+  idPrefix?: string;
+  onChange?: (value: { province: string; district: string; ward: string }) => void;
 }) {
   const [province, setProvince] = useState(initialProvince);
   const [district, setDistrict] = useState(initialDistrict);
@@ -240,7 +244,7 @@ export function LegacyAdministrativeDivisionFields({
   return (
     <>
       <DivisionPopup
-        id="address-province"
+        id={`${idPrefix}-province`}
         label="Tỉnh/Thành phố"
         name="province"
         value={province}
@@ -255,12 +259,15 @@ export function LegacyAdministrativeDivisionFields({
             setDistrict('');
             setWard('');
             setWardLoadState(EMPTY_WARD_LOAD_STATE);
+            onChange?.({ province: selectedProvince.name, district: '', ward: '' });
+          } else {
+            onChange?.({ province: selectedProvince.name, district, ward });
           }
           setProvince(selectedProvince.name);
         }}
       />
       <DivisionPopup
-        id="address-district"
+        id={`${idPrefix}-district`}
         label="Quận/Huyện"
         name="district"
         value={district}
@@ -277,18 +284,22 @@ export function LegacyAdministrativeDivisionFields({
           const selectedDistrict = choice as LegacyDistrict;
           if (resolvedDistrict?.code !== selectedDistrict.code) {
             const hasNoWardLevel = isLegacyNoWardDistrict(selectedDistrict.code);
-            setWard(hasNoWardLevel ? LEGACY_NO_WARD_SENTINEL : '');
+            const nextWard = hasNoWardLevel ? LEGACY_NO_WARD_SENTINEL : '';
+            setWard(nextWard);
             setWardLoadState({
               districtCode: selectedDistrict.code,
               status: hasNoWardLevel ? 'ready' : 'loading',
               choices: [],
             });
+            onChange?.({ province, district: selectedDistrict.name, ward: nextWard });
+          } else {
+            onChange?.({ province, district: selectedDistrict.name, ward });
           }
           setDistrict(selectedDistrict.name);
         }}
       />
       <DivisionPopup
-        id="address-ward"
+        id={`${idPrefix}-ward`}
         label="Phường/Xã"
         name="ward"
         value={effectiveWard}
@@ -319,7 +330,11 @@ export function LegacyAdministrativeDivisionFields({
           });
           setWardLoadAttempt((attempt) => attempt + 1);
         }}
-        onSelect={(choice) => setWard((choice as LegacyWard).name)}
+        onSelect={(choice) => {
+          const nextWard = (choice as LegacyWard).name;
+          setWard(nextWard);
+          onChange?.({ province, district, ward: nextWard });
+        }}
       />
       {resolvedDistrict && district !== resolvedDistrict.name ? (
         <span className="sc-visually-hidden" aria-live="polite">

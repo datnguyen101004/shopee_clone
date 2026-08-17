@@ -25,7 +25,12 @@ export class MarketplaceOwnershipService {
       id: shop.id,
       slug: shop.slug,
       name: shop.name,
-      status: shop.status === ShopStatus.ACTIVE ? 'active' : 'inactive',
+      status:
+        shop.status === ShopStatus.ACTIVE
+          ? 'active'
+          : shop.status === ShopStatus.SUSPENDED
+            ? 'suspended'
+            : 'inactive',
     };
   }
 

@@ -9,7 +9,8 @@ import {
 import { Inject, Injectable } from '@nestjs/common';
 
 import type { Prisma } from '../generated/prisma/client';
-import { ProductStatus, ShopStatus, VariantStatus } from '../generated/prisma/enums';
+import { ProductStatus, VariantStatus } from '../generated/prisma/enums';
+import { isSellableShop } from '../catalog/sellable-shop';
 import { PrismaService } from '../prisma/prisma.service';
 import { SystemUtcClock } from '../vouchers/utc-clock';
 import {
@@ -302,8 +303,7 @@ export class PricingQuoteService {
         product.deletedAt === null &&
         product.category.isActive &&
         product.category.deletedAt === null &&
-        shop.status === ShopStatus.ACTIVE &&
-        shop.deletedAt === null;
+        isSellableShop(shop);
       const maxPurchaseQuantity = Math.min(
         CART_MAX_QUANTITY,
         availableQuantity,

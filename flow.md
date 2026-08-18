@@ -796,3 +796,184 @@ cho `Đỏ`/`Xanh`, kiểm tra các tổ hợp và tồn kho). Endpoint media g�
 /api/v1/seller/products/media`, `GET /api/v1/seller/products/media/:mediaId/preview` và
 `GET /api/v1/product-media/:mediaId`. Ảnh staged không được đọc qua public route trước khi lưu
 sản phẩm.
+
+## 20. Kế hoạch T24: tồn kho và checkout reservation
+
+> Trạng thái: Đã apply backend, migration, pg-boss TTL và Seller Center; concurrency/API/UI regression suites đã có kiểm thử tự động.
+
+```mermaid
+flowchart TD
+    seller["Seller mở /seller/inventory"] --> balances["GET /api/v1/seller/inventory\nOn-hand · Reserved · Sold · Available"]
+    balances --> adjust["Nhập delta + lý do + ghi chú"]
+    adjust --> request["POST /seller/inventory/:variantId/adjustments\nIf-Match + Idempotency-Key"]
+    request --> lock["Lock inventory row + kiểm tra version"]
+    lock --> valid{"onHand + delta >= reserved\nvà không âm?"}
+    valid -->|Không| conflict["409 Problem Details\nReload balance, giữ form"]
+    valid -->|Có| commit["Cập nhật on-hand + version\nGhi audit event bất biến"]
+    commit --> balances
+```
+
+```mermaid
+sequenceDiagram
+    actor Buyer
+    participant Checkout as Checkout API
+    participant Inventory as Inventory service
+    participant DB as PostgreSQL
+    participant Queue as One-shot expiry queue
+
+    Buyer->>Checkout: POST /checkout/cod
+    Checkout->>DB: Rebuild cart + pricing + fingerprint
+    Checkout->>Inventory: Reserve authoritative quantities
+    Inventory->>DB: Lock variants theo UUID tăng dần
+    alt Đủ available stock cho tất cả dòng
+        Inventory->>DB: reserved += quantity + ACTIVE reservation
+        Inventory->>Queue: Chạy một lần tại expiresAt
+        Checkout->>DB: Transaction order + voucher + cart cleanup
+        Checkout->>Inventory: Consume trong cùng transaction
+        Inventory->>DB: reserved -= qty; onHand -= qty; sold += qty
+        Checkout-->>Buyer: Purchase thành công
+    else Một dòng thiếu stock
+        Inventory-->>Checkout: Atomic rollback
+        Checkout-->>Buyer: 409 insufficient stock
+    end
+```
+
+```mermaid
+stateDiagram-v2
+    [*] --> ACTIVE: checkout giữ hàng
+    ACTIVE --> CONSUMED: purchase commit
+    ACTIVE --> RELEASED: checkout thất bại
+    ACTIVE --> EXPIRED: one-shot job tới expiresAt
+    CONSUMED --> [*]
+    RELEASED --> [*]
+    EXPIRED --> [*]
+```
+
+`available = onHand - reserved` là công thức duy nhất cho catalog, product detail, cart, quote,
+checkout và Seller Center. Reservation chỉ bắt đầu khi buyer xác nhận COD, không giữ hàng lúc xem
+sản phẩm, thêm giỏ hoặc preview. Job hết hạn là one-shot pg-boss lưu bền vững trong PostgreSQL tại
+`expiresAt = databaseNow + 15 phút`, không phải CronJob; nếu worker bị gián đoạn thì job chạy muộn và
+chỉ làm stock bị giữ lâu hơn, không gây oversell. Reservation và job phải commit cùng transaction;
+enqueue không được âm thầm bỏ qua.
+
+Kiểm thử API seller: `GET /api/v1/seller/inventory?lowStock=true`, `GET
+/api/v1/seller/inventory/:variantId/adjustments`, và `POST
+/api/v1/seller/inventory/:variantId/adjustments` với `If-Match: "inventory-<version>"`,
+`Idempotency-Key: <UUID>` và body `{ "delta": 10, "reason": "RESTOCK", "note": null }`.
+Màn hình tương ứng là `/seller/inventory`; nút `Điều chỉnh` mở form delta/lý do, còn `Lịch sử`
+hiển thị before/delta/after. Migration local chạy bằng `pnpm --filter @shopee-clone/api
+db:migrate:deploy`; worker expiry dùng pg-boss với `DATABASE_URL`, không lưu credential riêng.
+Nếu migration dừng giữa chừng, chỉ sau khi kiểm tra DB và backup mới dùng `prisma migrate resolve
+--rolled-back 20260817160000_inventory_reservations`, sửa nguyên nhân rồi chạy lại
+`db:migrate:deploy`; không sửa trực tiếp `_prisma_migrations` trên môi trường production.
+
+## 21. Kế hoạch: pg-boss TTL 15 phút cho inventory reservation
+
+> Trạng thái: Đã apply; giữ nguyên TTL 15 phút và dùng database time/transactional pg-boss.
+
+```mermaid
+flowchart LR
+    reserve["Tạo ACTIVE reservation\nexpiresAt = DB time + 15 phút"] --> tx["Cùng PostgreSQL transaction:\nreserved stock + pg-boss job"]
+    tx --> committed{"Reservation và job\nđều commit?"}
+    committed -->|Không| rollback["Rollback toàn bộ\nkhông giữ stock"]
+    committed -->|Có| delay["pg-boss lưu job\nchạy tại expiresAt"]
+    delay --> expired["Expiry worker"]
+    expired --> verify{"DB vẫn ACTIVE, đúng generation\nvà databaseNow >= expiresAt?"}
+    verify -->|Có| release["reserved -= quantity\nreservation EXPIRED\nhold EXPIRED"]
+    release --> pending["Order vẫn PENDING\nchặn payment/fulfillment\ncho tới khi reserve lại"]
+    verify -->|Không| noop["No-op\nCONSUMED/RELEASED/stale/early"]
+    paymentFail["Payment FAILED trước 15 phút"] --> immediate["Shared release command\nreservation RELEASED"]
+    immediate --> pending
+```
+
+```mermaid
+stateDiagram-v2
+    [*] --> ACTIVE: giữ tồn kho thành công
+    ACTIVE --> CONSUMED: payment hoặc COD commit
+    ACTIVE --> RELEASED: payment thất bại
+    ACTIVE --> EXPIRED: pg-boss chạy tại/sau expiresAt 15 phút
+    RELEASED --> ACTIVE: reserve lại bằng generation mới
+    EXPIRED --> ACTIVE: reserve lại bằng generation mới
+    CONSUMED --> [*]
+```
+
+pg-boss dùng chính PostgreSQL và `DATABASE_URL`, nên không cần RabbitMQ, Redis, outbox hay credential
+dịch vụ mới. Job được ghi bằng transaction Prisma hiện tại; nếu không ghi được job thì reservation cũng
+phải rollback. Worker luôn dùng database time, lock lại reservation/inventory và kiểm tra generation,
+vì vậy job trùng, job cũ hoặc đến sau khi thanh toán thành công không thay đổi tồn kho lần hai.
+
+Record reservation được giữ để audit; “xóa reservation” trong nghiệp vụ nghĩa là nhả stock hold và đổi
+sang `EXPIRED`/`RELEASED`, không hard-delete. Payment failure gọi release ngay, còn pg-boss chỉ là
+recovery cho reservation còn `ACTIVE` tới hạn. Không dùng CronJob hoặc `setTimeout` 15 phút trong API.
+
+## 22. Soft delete và cleanup sản phẩm sau 7 ngày
+
+```mermaid
+flowchart LR
+    seller["Seller mở /seller/products"] --> confirm["Custom alertdialog\nảnh + cảnh báo 7 ngày"]
+    confirm -->|Hủy/Escape| restore["Đóng dialog, trả focus"]
+    confirm -->|Xác nhận| delete["DELETE /api/v1/seller/products/:productId"]
+    delete --> tx["Transaction: ownership + DB clock\ndeletedAt + dọn cart/favorite/placement"]
+    tx --> hidden["Ẩn ngay khỏi seller/catalog/cart/quote/checkout"]
+    hidden --> wait["Giữ record và media private\ntrong 7 ngày"]
+    cron["04:00 Asia/Ho_Chi_Minh\n@nestjs/schedule"] --> lock["PostgreSQL advisory lock"]
+    lock --> batch["Batch 100\nclock_timestamp()"]
+    batch --> boundary{"deletedAt < DB time - 7 days?"}
+    boundary -->|Không| next["Đợi run sau"]
+    boundary -->|Có| history{"Order/review/reservation/\ndataset/sold history?"}
+    history -->|Có| tombstone["purgeBlockedAt + HISTORICAL_TOMBSTONE\nGiữ tombstone private"]
+    history -->|Không| purge["Xóa authoring graph\ncart/variant/inventory/audit/options"]
+    purge --> stage["Stage media trong transaction"]
+    stage --> commit["Commit DB"]
+    commit --> storage["Xóa S3/local sau commit"]
+    storage -->|Lỗi| retry["Giữ STAGED để retry cleanup"]
+    storage -->|Thành công| mediaRows["Xóa media metadata"]
+```
+
+Các endpoint kiểm tra: `DELETE /api/v1/seller/products/:productId` (204, `no-store`) và
+`GET /api/v1/health/product-retention` (status aggregate, không có dữ liệu nhạy cảm). Màn hình kiểm thử
+là `/seller/products` với sản phẩm draft/published, dialog xác nhận, sau đó xác nhận sản phẩm biến mất;
+trang `/products/{id}` của sản phẩm đã xóa hiển thị `Sản phẩm đã bị xóa` qua `410 PRODUCT_DELETED`.
+
+## 23. Inventory chỉ hiển thị sản phẩm đang bán
+
+```mermaid
+flowchart TD
+    seller["Seller mở /seller/inventory"] --> request["GET /api/v1/seller/inventory"]
+    request --> predicate["Predicate chung:\nshop APPROVED + ACTIVE\nproduct ACTIVE + moderation ACTIVE + category active\nvariant ACTIVE + chưa xóa"]
+    predicate --> low["Lọc low-stock bằng available = onHand - reserved"]
+    low --> cursor["Cursor + LIMIT (eligible rows trước pagination)"]
+    cursor --> image["Chọn ảnh đầu theo sortOrder, id\nproductImageUrl hoặc null"]
+    image --> ui["Thumbnail cố định + fallback\n/seller/inventory"]
+    ui --> mutation["POST /seller/inventory/:variantId/adjustments"]
+    mutation --> recheck["Recheck predicate + version/idempotency\ntrong transaction"]
+    recheck -->|Không hợp lệ| refresh["Problem Details no-store\nrefresh published-only list"]
+    recheck -->|Hợp lệ| audit["Update balance + audit immutable"]
+```
+
+Inventory không hiển thị draft, hidden, archived, suspended, soft-deleted hoặc variant inactive.
+API và UI đều không nhận storage credential; ảnh S3/local chỉ là URL đã được server kiểm tra.
+
+## 24. Review/order history với sản phẩm đã xóa
+
+```mermaid
+sequenceDiagram
+    actor Buyer
+    participant Orders as Order history API
+    participant DB as PostgreSQL
+    participant Product as Product detail API
+    participant Web as `/products/{id}`
+    Buyer->>Orders: GET /api/v1/account/orders
+    Orders->>DB: OrderLine snapshot + product.deletedAt
+    DB-->>Orders: productName/image snapshot, productAvailable=false
+    Orders-->>Buyer: Link `/products/{id}` vẫn giữ nguyên
+    Buyer->>Product: GET /api/v1/catalog/products/{id}
+    Product->>DB: tìm public row, sau đó deleted tombstone
+    DB-->>Product: deletedAt IS NOT NULL
+    Product-->>Web: 410 Problem Details code PRODUCT_DELETED
+    Web-->>Buyer: `Sản phẩm đã bị xóa` + quay lại an toàn
+```
+
+Review/order snapshot không bị xóa; chỉ product authoring graph đủ điều kiện mới bị purge. Product
+không tồn tại trả 404 generic, còn tombstone trả 410 tối thiểu, không lộ seller, mô tả, media hay
+`purgeBlockReason`.

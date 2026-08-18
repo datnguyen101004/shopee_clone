@@ -44,6 +44,8 @@ export type CheckoutBlockerCode = (typeof CHECKOUT_BLOCKER_CODES)[number];
 export type PurchasePaymentMethod = (typeof PURCHASE_PAYMENT_METHODS)[number];
 export type PurchasePaymentStatus = (typeof PURCHASE_PAYMENT_STATUSES)[number];
 export type ShopOrderStatus = (typeof SHOP_ORDER_STATUSES)[number];
+export const INVENTORY_HOLD_STATUSES = ['ACTIVE', 'CONSUMED', 'RELEASED', 'EXPIRED'] as const;
+export type InventoryHoldStatus = (typeof INVENTORY_HOLD_STATUSES)[number];
 
 export interface CheckoutShopNote {
   shopId: string;
@@ -123,6 +125,11 @@ export interface PurchaseShopOrder extends Omit<CheckoutPreviewShop, 'note'> {
   status: ShopOrderStatus;
   paymentStatus: PurchasePaymentStatus;
   note: string;
+  inventoryHold?: {
+    status: InventoryHoldStatus;
+    expiresAt: string | null;
+    terminalReason: string | null;
+  };
 }
 
 export interface PurchaseResult {
@@ -152,8 +159,10 @@ export interface CheckoutProblemDetails {
   title: string;
   status: number;
   detail: string;
+  code?: string;
   invalidParameters?: string[];
   currentCartVersion?: number;
+  availableQuantity?: number;
   preview?: CheckoutPreviewResponse;
 }
 
@@ -162,6 +171,7 @@ const problemType = /^https:\/\/shopee-clone\.local\/problems\/[a-z0-9]+(?:-[a-z
 const problemStatuses = new Set([400, 401, 403, 404, 409, 413, 415, 503]);
 const blockerCodes = new Set<string>(CHECKOUT_BLOCKER_CODES);
 const shopOrderStatuses = new Set<string>(SHOP_ORDER_STATUSES);
+const inventoryHoldStatuses = new Set<string>(INVENTORY_HOLD_STATUSES);
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -588,11 +598,18 @@ function isOrder(value: unknown): value is PurchaseShopOrder {
       'voucherDiscountMinor',
       'shippingPayableMinor',
       'payableTotalMinor',
-    ]) ||
+    ], ['inventoryHold']) ||
     !isUuid(value.orderReference) ||
     typeof value.status !== 'string' ||
     !shopOrderStatuses.has(value.status) ||
-    value.paymentStatus !== 'UNPAID'
+    value.paymentStatus !== 'UNPAID' ||
+    (value.inventoryHold !== undefined &&
+      (!isRecord(value.inventoryHold) ||
+        !hasExactKeys(value.inventoryHold, ['status', 'expiresAt', 'terminalReason']) ||
+        typeof value.inventoryHold.status !== 'string' ||
+        !inventoryHoldStatuses.has(value.inventoryHold.status) ||
+        !(value.inventoryHold.expiresAt === null || isCanonicalDateTime(value.inventoryHold.expiresAt)) ||
+        !(value.inventoryHold.terminalReason === null || isNonEmptyString(value.inventoryHold.terminalReason, 120))))
   ) {
     return false;
   }
@@ -600,6 +617,7 @@ function isOrder(value: unknown): value is PurchaseShopOrder {
   delete common.orderReference;
   delete common.status;
   delete common.paymentStatus;
+  delete common.inventoryHold;
   return isShopCommon(common);
 }
 
@@ -651,7 +669,10 @@ export function isPurchaseResult(value: unknown): value is PurchaseResult {
     !isAddress(value.address) ||
     !Array.isArray(value.orders) ||
     value.orders.length === 0 ||
-    !value.orders.every(isOrder)
+    !value.orders.every((order) => {
+      const valid = isOrder(order);
+      return valid;
+    })
   ) {
     return false;
   }
@@ -687,7 +708,7 @@ export function isCheckoutProblemDetails(value: unknown): value is CheckoutProbl
     !hasExactKeys(
       value,
       ['type', 'title', 'status', 'detail'],
-      ['invalidParameters', 'currentCartVersion', 'preview'],
+      ['code', 'invalidParameters', 'currentCartVersion', 'availableQuantity', 'preview'],
     ) ||
     !isNonEmptyString(value.type) ||
     !problemType.test(value.type) ||
@@ -695,7 +716,9 @@ export function isCheckoutProblemDetails(value: unknown): value is CheckoutProbl
     typeof value.status !== 'number' ||
     !problemStatuses.has(value.status) ||
     !isNonEmptyString(value.detail, 500) ||
+    !(value.code === undefined || (typeof value.code === 'string' && /^[A-Z][A-Z0-9_]{1,63}$/.test(value.code))) ||
     !(value.currentCartVersion === undefined || isNonNegativeInteger(value.currentCartVersion)) ||
+    !(value.availableQuantity === undefined || isNonNegativeInteger(value.availableQuantity)) ||
     !(value.preview === undefined || isCheckoutPreviewResponse(value.preview))
   ) {
     return false;

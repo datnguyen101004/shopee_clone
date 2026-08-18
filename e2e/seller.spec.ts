@@ -63,16 +63,18 @@ test('approved seller can create, publish, then hide a product listing', async (
   };
   let creates = 0;
   let lifecycle: 'draft' | 'published' | 'hidden' = 'draft';
+  let deleted = false;
   await page.route('**/api/v1/**', async (route) => {
     const request = route.request(); const path = new URL(request.url()).pathname;
     if (request.method() === 'POST' && path === '/api/v1/auth/refresh') return json(route, { accessToken: 'header.payload.signature', expiresAt: '2099-08-17T00:00:00.000Z', user: { id: '30000000-0000-4000-8000-000000000002', email: 'seller@example.test', displayName: 'Seller Test', status: 'active', roles: ['buyer', 'seller'] } });
     if (request.method() === 'GET' && path === '/api/v1/cart') return route.fulfill({ status: 404 });
-    if (request.method() === 'GET' && path === '/api/v1/seller/products') return json(route, { items: [{ id: product.id, slug: product.slug, name: product.name, categoryName: 'Thiết bị điện tử', lifecycle, moderationStatus: 'active', primaryMediaUrl: product.media[0]?.url ?? null, variantCount: 1, stockQuantity: 5, updatedAt: product.updatedAt }], nextCursor: null });
+    if (request.method() === 'GET' && path === '/api/v1/seller/products') return json(route, { items: deleted ? [] : [{ id: product.id, slug: product.slug, name: product.name, categoryName: 'Thiết bị điện tử', lifecycle, moderationStatus: 'active', primaryMediaUrl: product.media[0]?.url ?? null, variantCount: 1, stockQuantity: 5, updatedAt: product.updatedAt }], nextCursor: null });
     if (request.method() === 'GET' && path === '/api/v1/seller/products/categories') return json(route, [{ id: product.categoryId, name: 'Thiết bị điện tử', slug: 'thiet-bi-dien-tu', parentId: null, isLeaf: true, attributes: [] }]);
     if (request.method() === 'GET' && path === `/api/v1/seller/products/${product.id}`) return json(route, { ...product, lifecycle });
     if (request.method() === 'POST' && path === '/api/v1/seller/products/media') return json(route, { id: '30000000-0000-4000-8000-000000000205', mimeType: 'image/png', byteSize: 24, width: 1, height: 1, previewUrl: '/api/v1/seller/products/media/30000000-0000-4000-8000-000000000205/preview', expiresAt: '2026-08-18T00:00:00.000Z' }, 201);
     if (request.method() === 'POST' && path === '/api/v1/seller/products') { creates += 1; lifecycle = 'draft'; return json(route, { ...product, lifecycle }, 201); }
     if (request.method() === 'PATCH' && path.endsWith('/lifecycle')) { lifecycle = (request.postDataJSON() as { lifecycle: 'published' | 'hidden' }).lifecycle; return json(route, { ...product, lifecycle }); }
+    if (request.method() === 'DELETE' && path === `/api/v1/seller/products/${product.id}`) { deleted = true; return route.fulfill({ status: 204 }); }
     return route.fulfill({ status: 404 });
   });
   await page.goto('/seller/products');
@@ -107,6 +109,13 @@ test('approved seller can create, publish, then hide a product listing', async (
   await expect(page.getByRole('button', { name: 'Ẩn sản phẩm' })).toBeVisible();
   await page.getByRole('button', { name: 'Ẩn sản phẩm' }).click();
   await expect(page.getByRole('button', { name: 'Đăng bán' })).toBeVisible();
+  await page.getByRole('link', { name: 'Quay lại danh sách' }).click();
+  await expect(page).toHaveURL(/\/seller\/products$/);
+  await page.getByRole('button', { name: `Xóa sản phẩm ${product.name}` }).click();
+  await expect(page.getByRole('alertdialog')).toBeVisible();
+  await page.getByRole('alertdialog').getByRole('button', { name: 'Xóa sản phẩm' }).click();
+  await expect(page.getByText('Đã xóa sản phẩm.')).toBeVisible();
+  await expect(page.getByText(product.name)).not.toBeVisible();
 });
 
 test('existing shop opens read-only and can cancel or save profile editing', async ({ page }) => {
@@ -158,4 +167,54 @@ test('seller gets a stock row for every generated classification combination', a
   await expect(page.getByLabel('Tồn kho Đỏ L')).toBeVisible();
   await expect(page.getByLabel('Tồn kho Xanh M')).toBeVisible();
   await expect(page.getByLabel('Tồn kho Xanh L')).toBeVisible();
+});
+
+test('seller inventory supports adjustment, availability refresh, history, and invalid reduction feedback', async ({ page }) => {
+  const variantId = '30000000-0000-4000-8000-000000000402';
+  const inventory = {
+    variantId,
+    productId: '30000000-0000-4000-8000-000000000401',
+    productName: 'Tồn kho kiểm thử',
+    productImageUrl: null,
+    variantName: 'Đỏ · M',
+    sku: 'INVENTORY-TEST',
+    lifecycle: 'active',
+    quantityOnHand: 5,
+    quantityReserved: 0,
+    quantitySold: 0,
+    availableQuantity: 5,
+    lowStock: false,
+    version: 0,
+    updatedAt: '2026-08-18T00:00:00.000Z',
+  };
+  let current = { ...inventory };
+  await page.route('**/api/v1/**', async (route) => {
+    const request = route.request();
+    const path = new URL(request.url()).pathname;
+    if (request.method() === 'POST' && path === '/api/v1/auth/refresh') return json(route, { accessToken: 'header.payload.signature', expiresAt: '2099-08-18T00:00:00.000Z', user: { id: '30000000-0000-4000-8000-000000000002', email: 'seller@example.test', displayName: 'Seller Test', status: 'active', roles: ['buyer', 'seller'] } });
+    if (request.method() === 'GET' && path === '/api/v1/cart') return route.fulfill({ status: 404 });
+    if (request.method() === 'GET' && path === '/api/v1/seller/inventory') return json(route, { items: [current], nextCursor: null });
+    if (request.method() === 'GET' && path === `/api/v1/seller/inventory/${variantId}/adjustments`) return json(route, { items: [{ id: '30000000-0000-4000-8000-000000000403', variantId, actorUserId: '30000000-0000-4000-8000-000000000002', reason: 'RESTOCK', note: 'Bổ sung hàng', delta: 2, quantityOnHandBefore: 5, quantityOnHandAfter: 7, quantityReserved: 0, quantitySold: 0, availableQuantity: 7, inventoryVersion: 1, idempotencyKey: null, occurredAt: '2026-08-18T00:01:00.000Z' }], nextCursor: null });
+    if (request.method() === 'POST' && path === `/api/v1/seller/inventory/${variantId}/adjustments`) {
+      const body = request.postDataJSON() as { delta: number };
+      if (body.delta < 0) return json(route, { type: 'https://shopee-clone.local/problems/inventory-insufficient', title: 'Insufficient inventory', status: 409, detail: 'Available quantity is insufficient.', code: 'INVENTORY_INSUFFICIENT', availableQuantity: 5 }, 409);
+      current = { ...current, quantityOnHand: current.quantityOnHand + body.delta, availableQuantity: current.availableQuantity + body.delta, version: current.version + 1 };
+      return json(route, { id: '30000000-0000-4000-8000-000000000404', variantId, actorUserId: '30000000-0000-4000-8000-000000000002', reason: 'RESTOCK', note: null, delta: body.delta, quantityOnHandBefore: 5, quantityOnHandAfter: current.quantityOnHand, quantityReserved: 0, quantitySold: 0, availableQuantity: current.availableQuantity, inventoryVersion: current.version, idempotencyKey: null, occurredAt: '2026-08-18T00:02:00.000Z' }, 201);
+    }
+    return route.fulfill({ status: 404 });
+  });
+  await page.goto('/seller/inventory');
+  await expect(page.getByText('Tồn kho kiểm thử')).toBeVisible();
+  await page.getByRole('button', { name: 'Điều chỉnh' }).click();
+  await page.getByLabel('Thay đổi số lượng').fill('2');
+  await page.getByRole('button', { name: 'Lưu điều chỉnh' }).click();
+  await expect(page.getByRole('cell', { name: '7', exact: true }).first()).toBeVisible();
+  await page.getByRole('button', { name: 'Lịch sử' }).click();
+  await expect(page.getByRole('heading', { name: 'Lịch sử điều chỉnh' })).toBeVisible();
+  await page.getByRole('button', { name: 'Đóng' }).click();
+  await page.getByRole('button', { name: 'Điều chỉnh' }).click();
+  await page.getByLabel('Thay đổi số lượng').fill('-10');
+  await page.getByRole('button', { name: 'Lưu điều chỉnh' }).click();
+  await expect(page.getByText('Available quantity is insufficient.')).toBeVisible();
+  await expect(page.getByRole('dialog')).toBeVisible();
 });

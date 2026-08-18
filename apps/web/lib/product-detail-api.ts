@@ -2,12 +2,13 @@ import 'server-only';
 
 import {
   isCanonicalProductId,
+  isProductDeletedProblemDetails,
   parseProductDetailResponse,
   type ProductDetailResponse,
 } from '@shopee-clone/contracts';
 
 export type ProductDetailApiErrorKind =
-  'invalid-id' | 'not-found' | 'timeout' | 'transport' | 'status' | 'contract';
+  'invalid-id' | 'not-found' | 'deleted' | 'timeout' | 'transport' | 'status' | 'contract';
 
 export class ProductDetailApiError extends Error {
   constructor(public readonly kind: ProductDetailApiErrorKind) {
@@ -43,9 +44,11 @@ export async function fetchProductDetail(
         error instanceof DOMException && error.name === 'AbortError' ? 'timeout' : 'transport',
       );
     }
+    const body = await response.json().catch(() => null);
     if (response.status === 404) throw new ProductDetailApiError('not-found');
+    if (response.status === 410 && isProductDeletedProblemDetails(body)) throw new ProductDetailApiError('deleted');
     if (!response.ok) throw new ProductDetailApiError('status');
-    const parsed = parseProductDetailResponse(await response.json());
+    const parsed = parseProductDetailResponse(body);
     if (!parsed) throw new ProductDetailApiError('contract');
     return parsed;
   } finally {

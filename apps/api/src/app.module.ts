@@ -16,6 +16,9 @@ import { BrowserSecurityModule } from './security/browser-security.module';
 import { ReviewsModule } from './reviews/reviews.module';
 import { SellerOnboardingModule } from './seller-onboarding/seller-onboarding.module';
 import { SellerProductsModule } from './seller-products/seller-products.module';
+import { InventoryModule } from './inventory/inventory.module';
+import { ProductRetentionModule } from './product-retention/product-retention.module';
+import { ScheduleModule } from '@nestjs/schedule';
 
 @Module({
   imports: [
@@ -34,6 +37,9 @@ import { SellerProductsModule } from './seller-products/seller-products.module';
     ShopStorefrontModule,
     SellerOnboardingModule,
     SellerProductsModule,
+    InventoryModule,
+    ScheduleModule.forRoot(),
+    ProductRetentionModule,
     ReviewsModule,
   ],
 })

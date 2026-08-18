@@ -8,7 +8,6 @@ import { RequireRoles, RolesGuard } from '../auth/role-authorization.guard';
 import { SellerProductLifecycleDto, SellerProductUpsertDto } from './seller-products.dto';
 import { SellerProductsExceptionFilter } from './seller-products-exception.filter';
 import { SellerProductsService } from './seller-products.service';
-import { SellerProductMediaStorage } from './seller-product-media.storage';
 import { SellerProductInputError } from './seller-products.errors';
 
 @ApiTags('seller products')
@@ -20,7 +19,6 @@ import { SellerProductInputError } from './seller-products.errors';
 export class SellerProductsController {
   constructor(
     @Inject(SellerProductsService) private readonly products: SellerProductsService,
-    @Inject(SellerProductMediaStorage) private readonly mediaStorage: SellerProductMediaStorage,
   ) {}
 
   @Get('categories') @Header('Cache-Control', 'no-store') @ApiOperation({ summary: 'List active categories available to seller listings' })
@@ -44,8 +42,7 @@ export class SellerProductsController {
 
   @Delete(':productId') @HttpCode(HttpStatus.NO_CONTENT) @Header('Cache-Control', 'no-store') @ApiOperation({ summary: 'Delete a seller-owned draft product' })
   async remove(@Req() request: AuthenticatedRequest, @Param('productId') productId: string): Promise<void> {
-    const storageKeys = await this.products.deleteDraft(request.authUser!.id, productId);
-    await Promise.allSettled(storageKeys.map((storageKey) => this.mediaStorage.remove(storageKey)));
+    await this.products.deleteDraft(request.authUser!.id, productId);
   }
 
   @Patch(':productId/lifecycle') @Header('Cache-Control', 'no-store') @ApiOperation({ summary: 'Publish, hide, or archive a seller product' })

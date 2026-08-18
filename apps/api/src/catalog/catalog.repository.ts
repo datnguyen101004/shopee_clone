@@ -65,6 +65,13 @@ export class CatalogRepository {
     });
   }
 
+  findDeletedProduct(productId: string) {
+    return this.prisma.product.findFirst({
+      where: { id: productId, deletedAt: { not: null } },
+      select: { id: true },
+    });
+  }
+
   countPublicProductsForShop(shopId: string) {
     return this.prisma.product.count({
       where: {

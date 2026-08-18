@@ -12,8 +12,9 @@ import {
 import { createHash, randomUUID } from 'node:crypto';
 import { Inject, Injectable } from '@nestjs/common';
 import { Prisma } from '../generated/prisma/client';
-import { ProductModerationStatus, ProductStatus, ShopOnboardingStatus, ShopStatus, VariantStatus } from '../generated/prisma/enums';
+import { InventoryAdjustmentReason, ProductModerationStatus, ProductStatus, ShopOnboardingStatus, ShopStatus, VariantStatus } from '../generated/prisma/enums';
 import { PrismaService } from '../prisma/prisma.service';
+import { InventoryService } from '../inventory/inventory.service';
 import { SellerProductConflictError, SellerProductInputError, SellerProductMediaError, SellerProductNotFoundError, SellerProductUnavailableError } from './seller-products.errors';
 import { SellerProductMediaStorage } from './seller-product-media.storage';
 
@@ -74,6 +75,7 @@ function mapDetail(product: ProductDetailRow): SellerProductDetail {
       maxPurchaseQuantity: variant.maxPurchaseQuantity,
       active: variant.status === VariantStatus.ACTIVE && variant.deletedAt === null,
       imageUrl: variant.optionValues.find((entry) => entry.optionValue.group.sortOrder === 0)?.optionValue.image?.url ?? null,
+      inventoryVersion: variant.inventory?.version ?? 0,
     })),
     lifecycle: lifecycle(product.status),
     moderationStatus: moderation(product.moderationStatus),
@@ -135,6 +137,7 @@ function normalizedInput(raw: SellerProductUpsertRequest): SellerProductUpsertRe
 export class SellerProductsService {
   constructor(
     @Inject(PrismaService) private readonly prisma: PrismaService,
+    @Inject(InventoryService) private readonly inventory: InventoryService = null as never,
     @Inject(SellerProductMediaStorage) private readonly mediaStorage: SellerProductMediaStorage = new SellerProductMediaStorage(),
   ) {}
 
@@ -178,7 +181,7 @@ export class SellerProductsService {
   }
 
   async attachedMedia(mediaId: string) {
-    return this.prisma.sellerProductMediaAsset.findFirst({ where: { id: mediaId, state: 'ATTACHED' }, select: { storageKey: true, mimeType: true } });
+    return this.prisma.sellerProductMediaAsset.findFirst({ where: { id: mediaId, state: 'ATTACHED', product: { deletedAt: null } }, select: { storageKey: true, mimeType: true } });
   }
 
   async cleanupExpiredMedia(storage: { remove(key: string): Promise<void> }): Promise<number> {
@@ -201,7 +204,7 @@ export class SellerProductsService {
         });
         const mediaMap = await this.replaceProductMedia(transaction, product.id, resolvedMedia);
         await this.applyOptionValueMedia(transaction, product.id, input, mediaMap);
-        await this.replaceVariants(transaction, product.id, product.slug, shop.id, input);
+        await this.replaceVariants(transaction, product.id, product.slug, shop.id, input, [], userId);
         return mapDetail(await this.findDetail(transaction, product.id));
       } catch (error) {
         if (error instanceof SellerProductInputError || error instanceof SellerProductConflictError) throw error;
@@ -224,7 +227,7 @@ export class SellerProductsService {
         const mediaMap = await this.replaceProductMedia(transaction, productId, resolvedMedia);
         await this.applyOptionValueMedia(transaction, productId, input, mediaMap);
         await transaction.productVariant.deleteMany({ where: { productId, ...(protectedVariants.length ? { id: { notIn: protectedVariants.map((variant) => variant.id) } } : {}) } });
-        await this.replaceVariants(transaction, productId, current.slug, current.shopId, input, protectedVariants);
+        await this.replaceVariants(transaction, productId, current.slug, current.shopId, input, protectedVariants, userId);
         return mapDetail(await this.findDetail(transaction, productId));
       } catch (error) {
         if (error instanceof SellerProductInputError || error instanceof SellerProductConflictError) throw error;
@@ -245,34 +248,27 @@ export class SellerProductsService {
     });
   }
 
-  async deleteDraft(userId: string, productId: string): Promise<string[]> {
+  async deleteDraft(userId: string, productId: string): Promise<void> {
     return this.prisma.$transaction(async (transaction) => {
-      const product = await this.requireProduct(userId, productId, transaction);
-      if (product.status !== ProductStatus.DRAFT) {
-        throw new SellerProductConflictError(['lifecycle']);
-      }
+      const shop = await this.requireShop(userId, transaction);
+      const product = await transaction.product.findFirst({ where: { id: productId, shopId: shop.id }, select: { id: true, deletedAt: true } });
+      if (!product || product.deletedAt !== null) throw new SellerProductNotFoundError();
 
-      const assets = await transaction.sellerProductMediaAsset.findMany({
-        where: { productId },
-        select: { storageKey: true },
-      });
-      // Keep the rows staged until the storage cleanup finishes. If the process
-      // is interrupted after this transaction, the scheduled cleanup can still
-      // remove the files after their short retention window.
-      await transaction.sellerProductMediaAsset.updateMany({
-        where: { productId },
-        data: {
-          productId: null,
-          productImageId: null,
-          state: 'STAGED',
-          expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
-        },
-      });
+      const cartLines = await transaction.cartLine.findMany({ where: { variant: { productId } }, select: { cartId: true } });
+      const cartIds = [...new Set(cartLines.map((line) => line.cartId))];
+      await transaction.cartLine.deleteMany({ where: { variant: { productId } } });
+      await transaction.productFavorite.deleteMany({ where: { productId } });
+      await transaction.recentlyViewedProduct.deleteMany({ where: { productId } });
+      await transaction.homepageModuleProduct.deleteMany({ where: { productId } });
+      await transaction.voucherProductScope.deleteMany({ where: { productId } });
+      if (cartIds.length > 0) await transaction.cart.updateMany({ where: { id: { in: cartIds } }, data: { version: { increment: 1 } } });
+      const nowRows = await transaction.$queryRaw<Array<{ now: Date }>>(Prisma.sql`SELECT clock_timestamp() AS "now"`);
+      const databaseNow = nowRows[0]?.now;
+      if (!(databaseNow instanceof Date) || Number.isNaN(databaseNow.getTime())) throw new SellerProductUnavailableError();
       await transaction.product.update({
         where: { id: productId },
-        data: { deletedAt: new Date() },
+        data: { deletedAt: databaseNow, purgeBlockedAt: null, purgeBlockReason: null },
       });
-      return assets.map((asset) => asset.storageKey);
     });
   }
 
@@ -377,7 +373,7 @@ export class SellerProductsService {
     }
   }
 
-  private async replaceVariants(client: Transaction, productId: string, productSlug: string, shopId: string, input: SellerProductUpsertRequest, protectedVariants: Array<{ id: string; sku: string; combinationKey: string }> = []): Promise<void> {
+  private async replaceVariants(client: Transaction, productId: string, productSlug: string, shopId: string, input: SellerProductUpsertRequest, protectedVariants: Array<{ id: string; sku: string; combinationKey: string }> = [], actorUserId?: string): Promise<void> {
     const groups = await client.productOptionGroup.findMany({ where: { productId }, include: { values: { orderBy: { sortOrder: 'asc' } } }, orderBy: { sortOrder: 'asc' } });
     const expected = generateSellerProductCombinations(input.optionGroups);
     if (expected.length !== input.variants.length) throw new SellerProductInputError(['variants']);
@@ -391,9 +387,32 @@ export class SellerProductsService {
       const existing = protectedVariant;
       if (existing) {
         reusable.delete(key);
-        await client.productVariant.update({ where: { id: existing.id }, data: { shopId, combinationKey: combinationKey(variant.combination), name: currentCombinationName(variant.combination), priceMinor: BigInt(variant.priceMinor), compareAtPriceMinor: variant.compareAtPriceMinor === null ? null : BigInt(variant.compareAtPriceMinor), weightGrams: variant.weightGrams, maxPurchaseQuantity: variant.maxPurchaseQuantity, status: variant.active ? VariantStatus.ACTIVE : VariantStatus.INACTIVE, inventory: { upsert: { create: { quantityOnHand: variant.stock }, update: { quantityOnHand: variant.stock } } }, optionValues: { deleteMany: {}, create: ids.map((optionValueId) => ({ optionValueId: optionValueId! })) } } });
+        await client.productVariant.update({ where: { id: existing.id }, data: { shopId, combinationKey: combinationKey(variant.combination), name: currentCombinationName(variant.combination), priceMinor: BigInt(variant.priceMinor), compareAtPriceMinor: variant.compareAtPriceMinor === null ? null : BigInt(variant.compareAtPriceMinor), weightGrams: variant.weightGrams, maxPurchaseQuantity: variant.maxPurchaseQuantity, status: variant.active ? VariantStatus.ACTIVE : VariantStatus.INACTIVE, optionValues: { deleteMany: {}, create: ids.map((optionValueId) => ({ optionValueId: optionValueId! })) } } });
+        const currentInventory = await client.inventory.findUnique({ where: { variantId: existing.id } });
+        const before = currentInventory?.quantityOnHand ?? 0;
+        const reserved = currentInventory?.quantityReserved ?? 0;
+        if (variant.stock < reserved) throw new SellerProductInputError(['variants.stock']);
+        if (before !== variant.stock) {
+          if (currentInventory && actorUserId && this.inventory) {
+            await this.inventory.adjustInTransaction(
+              client,
+              actorUserId,
+              existing.id,
+              currentInventory.version,
+              randomUUID(),
+              createHash('sha256').update(`${existing.id}:${variant.stock}`).digest('hex'),
+              { delta: variant.stock - before, reason: InventoryAdjustmentReason.PRODUCT_EDIT, note: 'seller-product-edit' },
+            );
+          } else {
+            const nextInventory = currentInventory
+              ? await client.inventory.update({ where: { variantId: existing.id }, data: { quantityOnHand: variant.stock, version: { increment: 1 } } })
+              : await client.inventory.create({ data: { variantId: existing.id, quantityOnHand: variant.stock } });
+            await client.inventoryAdjustment.create({ data: { variantId: existing.id, shopId, actorUserId: actorUserId ?? null, reason: InventoryAdjustmentReason.PRODUCT_EDIT, delta: variant.stock - before, quantityOnHandBefore: before, quantityOnHandAfter: nextInventory.quantityOnHand, quantityReserved: nextInventory.quantityReserved, quantitySold: nextInventory.quantitySold, inventoryVersion: nextInventory.version } });
+          }
+        }
       } else {
-        await client.productVariant.create({ data: { productId, shopId, combinationKey: combinationKey(variant.combination), sku, name: currentCombinationName(variant.combination), priceMinor: BigInt(variant.priceMinor), compareAtPriceMinor: variant.compareAtPriceMinor === null ? null : BigInt(variant.compareAtPriceMinor), weightGrams: variant.weightGrams, maxPurchaseQuantity: variant.maxPurchaseQuantity, status: variant.active ? VariantStatus.ACTIVE : VariantStatus.INACTIVE, inventory: { create: { quantityOnHand: variant.stock } }, optionValues: { create: ids.map((optionValueId) => ({ optionValueId: optionValueId! })) } } });
+        const created = await client.productVariant.create({ data: { productId, shopId, combinationKey: combinationKey(variant.combination), sku, name: currentCombinationName(variant.combination), priceMinor: BigInt(variant.priceMinor), compareAtPriceMinor: variant.compareAtPriceMinor === null ? null : BigInt(variant.compareAtPriceMinor), weightGrams: variant.weightGrams, maxPurchaseQuantity: variant.maxPurchaseQuantity, status: variant.active ? VariantStatus.ACTIVE : VariantStatus.INACTIVE, inventory: { create: { quantityOnHand: variant.stock } }, optionValues: { create: ids.map((optionValueId) => ({ optionValueId: optionValueId! })) } } });
+        if (variant.stock !== 0) await client.inventoryAdjustment.create({ data: { variantId: created.id, shopId, actorUserId: actorUserId ?? null, reason: InventoryAdjustmentReason.INITIAL_STOCK, delta: variant.stock, quantityOnHandBefore: 0, quantityOnHandAfter: variant.stock, quantityReserved: 0, quantitySold: 0, inventoryVersion: 0 } });
       }
     }
     for (const variant of reusable.values()) await client.productVariant.update({ where: { id: variant.id }, data: { status: VariantStatus.INACTIVE } });

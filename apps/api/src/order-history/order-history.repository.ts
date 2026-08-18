@@ -6,13 +6,25 @@ import { PrismaService } from '../prisma/prisma.service';
 import type { OrderCursorPosition } from './order-canonical';
 
 export const buyerOrderSummaryInclude = {
-  purchase: { select: { id: true } },
-  lines: { orderBy: [{ sourceCartLineId: 'asc' as const }, { id: 'asc' as const }], include: { review: { select: { id: true } } } },
+  purchase: {
+    select: {
+      id: true,
+      inventoryReservation: { select: { status: true, expiresAt: true, terminalReason: true } },
+    },
+  },
+  lines: { orderBy: [{ sourceCartLineId: 'asc' as const }, { id: 'asc' as const }], include: { review: { select: { id: true } }, product: { select: { deletedAt: true } } } },
 } satisfies Prisma.ShopOrderInclude;
 
 export const buyerOrderDetailInclude = {
-  purchase: { select: { id: true, addressSnapshot: true, currency: true } },
-  lines: { orderBy: [{ sourceCartLineId: 'asc' as const }, { id: 'asc' as const }], include: { review: { select: { id: true } } } },
+  purchase: {
+    select: {
+      id: true,
+      addressSnapshot: true,
+      currency: true,
+      inventoryReservation: { select: { status: true, expiresAt: true, terminalReason: true } },
+    },
+  },
+  lines: { orderBy: [{ sourceCartLineId: 'asc' as const }, { id: 'asc' as const }], include: { review: { select: { id: true } }, product: { select: { deletedAt: true } } } },
   timelineEvents: { orderBy: [{ orderVersion: 'asc' as const }, { id: 'asc' as const }] },
   voucherAllocations: {
     orderBy: [

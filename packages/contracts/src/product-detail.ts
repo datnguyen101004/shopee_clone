@@ -63,6 +63,14 @@ export interface ProductDetailResponse {
   relatedProducts: CatalogProductCard[];
 }
 
+export interface ProductDeletedProblemDetails {
+  type: 'https://shopee-clone.local/problems/product-deleted';
+  title: 'Product deleted';
+  status: 410;
+  detail: string;
+  code: 'PRODUCT_DELETED';
+}
+
 const canonicalUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -153,6 +161,16 @@ function isRelatedCard(value: unknown): value is CatalogProductCard {
         isPositiveInteger(value.discountPercent) &&
         value.discountPercent <= 100))
   );
+}
+
+export function isProductDeletedProblemDetails(value: unknown): value is ProductDeletedProblemDetails {
+  return isRecord(value) &&
+    Object.keys(value).sort().join(',') === 'code,detail,status,title,type' &&
+    value.type === 'https://shopee-clone.local/problems/product-deleted' &&
+    value.title === 'Product deleted' &&
+    value.status === 410 &&
+    typeof value.detail === 'string' &&
+    value.code === 'PRODUCT_DELETED';
 }
 
 export function isProductDetailResponse(value: unknown): value is ProductDetailResponse {

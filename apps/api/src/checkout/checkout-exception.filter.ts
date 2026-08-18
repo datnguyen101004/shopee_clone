@@ -19,6 +19,7 @@ import {
 import {
   CheckoutCartConflictError,
   CheckoutIdempotencyConflictError,
+  CheckoutInventoryConflictError,
   CheckoutNotReadyError,
   CheckoutPreviewChangedError,
   CheckoutPurchaseNotFoundError,
@@ -137,6 +138,10 @@ export class CheckoutExceptionFilter implements ExceptionFilter {
         'Idempotency key conflict',
         'This idempotency key was already used for a different checkout request.',
       );
+      return;
+    }
+    if (exception instanceof CheckoutInventoryConflictError) {
+      this.problem(response, 409, 'checkout-inventory-conflict', 'Inventory changed', 'Some selected items no longer have enough available stock. Refresh the checkout preview and try again.', { code: 'INVENTORY_INSUFFICIENT', availableQuantity: exception.availableQuantity });
       return;
     }
     if (exception instanceof CheckoutUnavailableError) {

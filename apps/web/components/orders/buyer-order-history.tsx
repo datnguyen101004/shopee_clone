@@ -82,15 +82,13 @@ function OrderCard({ order }: { order: BuyerOrderSummary }) {
       <div className="buyer-order-card__lines">
         {order.lines.map((line) => (
           <article key={line.lineId}>
-            {line.productImageUrl ? (
-              <img src={line.productImageUrl} alt="" />
-            ) : (
-              <span aria-hidden="true">SP</span>
-            )}
+            <Link className="buyer-order-product-link" href={`/products/${line.productId}`} aria-label={`${line.productName}${line.productAvailable ? '' : ' (sản phẩm đã bị xóa)'}`}>
+              {line.productImageUrl ? <img src={line.productImageUrl} alt="" /> : <span aria-hidden="true">SP</span>}
+            </Link>
             <div>
-              <strong>{line.productName}</strong>
+              <strong><Link href={`/products/${line.productId}`}>{line.productName}</Link></strong>
               <small>
-                {line.variantName} · x{line.quantity}
+                {line.variantName} · x{line.quantity}{line.productAvailable ? '' : ' · Sản phẩm đã bị xóa'}
               </small>
             </div>
             <b>{money(line.payableMerchandiseMinor)}</b>
@@ -462,15 +460,13 @@ export function BuyerOrderDetailScreen({ orderReference }: { orderReference: str
               <h2>{detail.order.shop.name}</h2>
               {detail.order.lines.map((line) => (
                 <article className="buyer-order-detail__line" key={line.lineId}>
-                  {line.productImageUrl ? (
-                    <img src={line.productImageUrl} alt="" />
-                  ) : (
-                    <span aria-hidden="true">SP</span>
-                  )}
+                  <Link className="buyer-order-product-link" href={`/products/${line.productId}`} aria-label={`${line.productName}${line.productAvailable ? '' : ' (sản phẩm đã bị xóa)'}`}>
+                    {line.productImageUrl ? <img src={line.productImageUrl} alt="" /> : <span aria-hidden="true">SP</span>}
+                  </Link>
                   <div>
-                    <strong>{line.productName}</strong>
+                    <strong><Link href={`/products/${line.productId}`}>{line.productName}</Link></strong>
                     <small>
-                      {line.variantName} · x{line.quantity}
+                      {line.variantName} · x{line.quantity}{line.productAvailable ? '' : ' · Sản phẩm đã bị xóa'}
                     </small>
                   </div>
                   <b>{money(line.payableMerchandiseMinor)}</b>

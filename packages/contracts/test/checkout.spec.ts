@@ -138,6 +138,7 @@ const purchase: PurchaseResult = {
       orderReference,
       status: 'PENDING_CONFIRMATION',
       paymentStatus: 'UNPAID',
+      inventoryHold: { status: 'CONSUMED', expiresAt: '2026-08-14T05:16:00.000Z', terminalReason: 'checkout-completed' },
     },
   ],
   vouchers: [],
@@ -275,6 +276,7 @@ describe('checkout contracts', () => {
         status: 409,
         detail: 'Vui lòng xác nhận lại tổng tiền mới.',
         currentCartVersion: 8,
+        availableQuantity: 0,
         preview,
       }),
     ).toBe(true);

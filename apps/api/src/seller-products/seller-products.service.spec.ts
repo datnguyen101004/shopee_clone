@@ -1,6 +1,9 @@
 import { SellerProductsService, generatedProductSlug, generatedVariantSku } from './seller-products.service';
 import { SellerProductInputError, SellerProductMediaError } from './seller-products.errors';
 
+const userId = '00000000-0000-4000-8000-000000000001';
+const shopId = '00000000-0000-4000-8000-000000000002';
+
 describe('SellerProductsService authoring rules', () => {
   it('generates name-based slugs and deterministic variant SKUs without seller input', () => {
     const slug = generatedProductSlug('Áo thun nam');
@@ -41,5 +44,24 @@ describe('SellerProductsService authoring rules', () => {
     await (service as never as { applyOptionValueMedia: (client: unknown, productId: string, input: unknown, imageIds: Map<string, string>) => Promise<void> }).applyOptionValueMedia(prisma, 'product', { optionValueMedia: [{ groupIndex: 0, value: 'Red', mediaRef: { assetId: 'asset-red' } }] }, new Map([['asset:asset-red', 'image-red']]));
     expect(prisma.productOptionValue.update).toHaveBeenCalledWith({ where: { id: 'value-red' }, data: { imageId: 'image-red' } });
     await expect((service as never as { applyOptionValueMedia: (client: unknown, productId: string, input: unknown, imageIds: Map<string, string>) => Promise<void> }).applyOptionValueMedia(prisma, 'product', { optionValueMedia: [{ groupIndex: 1, value: 'M', mediaRef: null }] }, new Map())).rejects.toBeInstanceOf(SellerProductMediaError);
+  });
+
+  it('audits initial stock and routes an edited stock target through the versioned inventory command', async () => {
+    const initialAudit = jest.fn().mockResolvedValue(undefined);
+    const client = {
+      productOptionGroup: { findMany: jest.fn().mockResolvedValue([{ values: [{ id: 'value-red', value: 'Red' }] }]) },
+      productVariant: { create: jest.fn().mockResolvedValue({ id: 'variant-new' }), update: jest.fn() },
+      inventoryAdjustment: { create: initialAudit },
+      inventory: { findUnique: jest.fn().mockResolvedValue(null), create: jest.fn().mockResolvedValue({ quantityOnHand: 5, quantityReserved: 0, quantitySold: 0, version: 0 }) },
+    };
+    const inventory = { adjustInTransaction: jest.fn() };
+    const service = new SellerProductsService({} as never, inventory as never);
+    const input = { name: 'Product', description: '', categoryId: 'category', attributes: [], media: [], packageLengthMm: 1, packageWidthMm: 1, packageHeightMm: 1, optionGroups: [{ name: 'Màu', values: ['Red'] }], optionValueMedia: [], variants: [{ combination: ['Red'], priceMinor: 100, compareAtPriceMinor: null, stock: 5, weightGrams: 100, maxPurchaseQuantity: null, active: true }] };
+    await (service as never as { replaceVariants: (client: unknown, productId: string, slug: string, shopId: string, input: unknown, protectedVariants?: unknown[], actorUserId?: string) => Promise<void> }).replaceVariants(client, 'product', 'product-slug', shopId, input, [], userId);
+    expect(initialAudit).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ reason: 'INITIAL_STOCK', delta: 5 }) }));
+
+    client.inventory.findUnique.mockResolvedValue({ variantId: 'variant-existing', quantityOnHand: 5, quantityReserved: 1, quantitySold: 0, version: 3 });
+    await (service as never as { replaceVariants: (client: unknown, productId: string, slug: string, shopId: string, input: unknown, protectedVariants?: unknown[], actorUserId?: string) => Promise<void> }).replaceVariants(client, 'product', 'product-slug', shopId, { ...input, variants: [{ ...input.variants[0], stock: 7 }] }, [{ id: 'variant-existing', sku: 'SKU', combinationKey: 'Red' }], userId);
+    expect(inventory.adjustInTransaction).toHaveBeenCalledWith(expect.anything(), userId, 'variant-existing', 3, expect.any(String), expect.any(String), expect.objectContaining({ delta: 2, reason: 'PRODUCT_EDIT' }));
   });
 });

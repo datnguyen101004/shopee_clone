@@ -97,6 +97,7 @@ export interface SellerProductVariant extends SellerProductVariantInput {
   id: string;
   sku: string;
   imageUrl?: string | null;
+  inventoryVersion?: number;
 }
 
 export interface SellerProductDetail extends SellerProductUpsertRequest {
@@ -257,6 +258,7 @@ export function isSellerProductDetail(value: unknown): value is SellerProductDet
       delete input.id;
       delete input.sku;
       delete input.imageUrl;
+      delete input.inventoryVersion;
       return input;
     })
     : value.variants;

@@ -28,8 +28,9 @@ export const purchaseInclude = {
           orderLine: { select: { sourceCartLineId: true } },
         },
       },
-    },
+      },
   },
+  inventoryReservation: true,
 } satisfies Prisma.PurchaseInclude;
 
 export type PurchaseGraph = Prisma.PurchaseGetPayload<{ include: typeof purchaseInclude }>;
@@ -51,6 +52,13 @@ export class PurchaseProjector {
         orderReference: order.id,
         status: order.status,
         paymentStatus: order.paymentStatus,
+        inventoryHold: purchase.inventoryReservation
+          ? {
+              status: purchase.inventoryReservation.status,
+              expiresAt: purchase.inventoryReservation.expiresAt.toISOString(),
+              terminalReason: purchase.inventoryReservation.terminalReason,
+            }
+          : undefined,
         shop,
         note: order.note,
         lines: order.lines.map((line) => ({

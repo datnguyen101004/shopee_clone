@@ -19,3 +19,9 @@ export class OrderTransitionConflictError extends Error {
     super('Order transition is not allowed');
   }
 }
+
+export class OrderInventoryHoldConflictError extends Error {
+  constructor(public readonly holdStatus: 'ACTIVE' | 'CONSUMED' | 'RELEASED' | 'EXPIRED') {
+    super('Order inventory hold is unavailable');
+  }
+}

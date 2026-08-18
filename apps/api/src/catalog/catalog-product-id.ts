@@ -12,6 +12,12 @@ export class CatalogProductNotFoundError extends Error {
   }
 }
 
+export class CatalogProductDeletedError extends Error {
+  constructor() {
+    super('The requested product was deleted.');
+  }
+}
+
 export function parseCatalogProductId(value: unknown): string {
   if (typeof value !== 'string' || !isCanonicalProductId(value)) {
     throw new CatalogProductIdValidationError();

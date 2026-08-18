@@ -168,8 +168,8 @@ export function SellerProductDetailView({ productId }: { productId: string }) {
           <h2>Biến thể và tồn kho</h2>
           <div className="seller-product-detail__table-wrap">
             <table className="seller-product-detail__table">
-              <thead><tr><th>Biến thể</th><th>SKU</th><th>Giá bán</th><th>Tồn kho</th><th>Khối lượng</th></tr></thead>
-              <tbody>{product.variants.map((variant) => <tr key={variant.id}><td>{variant.combination.join(' · ') || 'Mặc định'}</td><td>{variant.sku}</td><td>₫{formatNumber(variant.priceMinor)}</td><td>{formatNumber(variant.stock)}</td><td>{formatNumber(variant.weightGrams)} g</td></tr>)}</tbody>
+              <thead><tr><th>Biến thể</th><th>SKU</th><th>Giá bán</th><th>Tồn kho</th><th>Phiên bản</th><th>Khối lượng</th></tr></thead>
+              <tbody>{product.variants.map((variant) => <tr key={variant.id}><td>{variant.combination.join(' · ') || 'Mặc định'}</td><td>{variant.sku}</td><td>₫{formatNumber(variant.priceMinor)}</td><td>{formatNumber(variant.stock)}</td><td>v{variant.inventoryVersion ?? 0}</td><td>{formatNumber(variant.weightGrams)} g</td></tr>)}</tbody>
             </table>
           </div>
         </section>

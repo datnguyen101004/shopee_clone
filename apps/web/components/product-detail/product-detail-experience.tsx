@@ -2,7 +2,7 @@
 
 import type { ProductDetailResponse } from '@shopee-clone/contracts';
 import Link from 'next/link';
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 
 import { FavoriteButton } from '../engagement/favorite-button';
 import { FavoriteStateProvider } from '../engagement/favorite-state-provider';
@@ -39,21 +39,13 @@ function ProductDetailInner({ product }: { product: ProductDetailResponse }) {
     cartMessage ||
     error ||
     (selectedVariant ? `Đã chọn ${selectedVariant.name}.` : 'Chưa có biến thể để chọn.');
-  const handoffs = useMemo(
-    () =>
-      selectedVariant && purchaseReady
-        ? {
-            add: productLoginHandoff(
-              product,
-              selectedVariant.id,
-              selection.quantity,
-              'add-to-cart',
-            ),
-            buy: productLoginHandoff(product, selectedVariant.id, selection.quantity, 'buy-now'),
-          }
-        : null,
-    [product, purchaseReady, selectedVariant, selection.quantity],
-  );
+  const handoffs =
+    selectedVariant && purchaseReady
+      ? {
+          add: productLoginHandoff(product, selectedVariant.id, selection.quantity, 'add-to-cart'),
+          buy: productLoginHandoff(product, selectedVariant.id, selection.quantity, 'buy-now'),
+        }
+      : null;
 
   async function handleAddToCart() {
     if (

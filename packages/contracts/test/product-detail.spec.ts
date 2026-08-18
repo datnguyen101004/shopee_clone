@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { isProductDetailResponse, parseProductDetailResponse } from '../src';
+import { isProductDeletedProblemDetails, isProductDetailResponse, parseProductDetailResponse } from '../src';
 
 const productId = '00000000-0000-4000-8000-000000000301';
 const variantId = '00000000-0000-4000-8000-000000000401';
@@ -56,6 +56,24 @@ const response = {
 };
 
 describe('product detail contract', () => {
+  it('accepts only the minimal deleted-product 410 problem details', () => {
+    expect(isProductDeletedProblemDetails({
+      type: 'https://shopee-clone.local/problems/product-deleted',
+      title: 'Product deleted',
+      status: 410,
+      detail: 'The requested product has been deleted.',
+      code: 'PRODUCT_DELETED',
+    })).toBe(true);
+    expect(isProductDeletedProblemDetails({
+      type: 'https://shopee-clone.local/problems/product-deleted',
+      title: 'Product deleted',
+      status: 410,
+      detail: 'The requested product has been deleted.',
+      code: 'PRODUCT_DELETED',
+      deletedAt: 'secret',
+    })).toBe(false);
+  });
+
   it('accepts populated, no-media, unavailable, and empty-related responses', () => {
     expect(parseProductDetailResponse(response)).toEqual(response);
     expect(

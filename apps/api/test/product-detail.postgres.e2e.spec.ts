@@ -83,7 +83,7 @@ databaseTest('Product detail endpoint with isolated PostgreSQL', () => {
         where: { id: productId },
         data: { status: ProductStatus.ACTIVE, deletedAt: new Date() },
       });
-      await request(app.getHttpServer()).get(`/api/v1/catalog/products/${productId}`).expect(404);
+      await request(app.getHttpServer()).get(`/api/v1/catalog/products/${productId}`).expect(410);
       await prisma.product.update({ where: { id: productId }, data: { deletedAt: null } });
       await prisma.shop.update({ where: { id: shopId }, data: { status: ShopStatus.INACTIVE } });
       await request(app.getHttpServer()).get(`/api/v1/catalog/products/${productId}`).expect(404);

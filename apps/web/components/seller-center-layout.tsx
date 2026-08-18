@@ -9,6 +9,7 @@ const navigation = [
   { href: '/seller', label: 'Tổng quan', icon: '⌂' },
   { href: '/seller/shop', label: 'Hồ sơ shop', icon: '◉' },
   { href: '/seller/products', label: 'Sản phẩm', icon: '▦' },
+  { href: '/seller/inventory', label: 'Tồn kho', icon: '◫' },
 ];
 
 export function SellerCenterLayout({ children }: { children: ReactNode }) {

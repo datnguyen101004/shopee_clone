@@ -11,7 +11,7 @@ import {
   promotionFor,
   safeMinor,
 } from './catalog-presentation';
-import { CatalogProductNotFoundError } from './catalog-product-id';
+import { CatalogProductDeletedError, CatalogProductNotFoundError } from './catalog-product-id';
 import { CatalogRepository } from './catalog.repository';
 
 type ProductDetailCandidate = NonNullable<
@@ -73,7 +73,10 @@ export class CatalogProductDetailService {
 
   async getProduct(productId: string): Promise<ProductDetailResponse> {
     const product = await this.repository.findPublicProduct(productId);
-    if (!product) throw new CatalogProductNotFoundError();
+    if (!product) {
+      if (await this.repository.findDeletedProduct(productId)) throw new CatalogProductDeletedError();
+      throw new CatalogProductNotFoundError();
+    }
 
     const [activeProductCount, relatedCandidates] = await Promise.all([
       this.repository.countPublicProductsForShop(product.shopId),

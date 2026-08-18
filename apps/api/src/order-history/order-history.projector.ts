@@ -54,6 +54,7 @@ function projectSummary(order: BuyerOrderSummaryGraph | BuyerOrderDetailGraph): 
       payableMerchandiseMinor: checkedMoneyFromBigInt(line.payableMerchandiseMinor),
       productName: line.productName,
       productImageUrl: line.productImageUrl,
+      productAvailable: line.product.deletedAt === null,
       variantName: line.variantName,
       variantSku: line.variantSku,
       review: line.review
@@ -75,6 +76,15 @@ function projectSummary(order: BuyerOrderSummaryGraph | BuyerOrderDetailGraph): 
       allowed: status === 'PENDING_CONFIRMATION',
       reasonCodes: status === 'PENDING_CONFIRMATION' ? [...ORDER_CANCELLATION_REASON_CODES] : [],
     },
+    ...(order.purchase.inventoryReservation
+      ? {
+          inventoryHold: {
+            status: order.purchase.inventoryReservation.status,
+            expiresAt: order.purchase.inventoryReservation.expiresAt.toISOString(),
+            terminalReason: order.purchase.inventoryReservation.terminalReason,
+          },
+        }
+      : {}),
   };
 }
 

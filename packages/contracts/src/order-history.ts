@@ -5,6 +5,7 @@ import {
   type CheckoutPreviewLine,
   type PurchasePaymentStatus,
   type ShopOrderStatus,
+  type InventoryHoldStatus,
 } from './checkout';
 import type { MockShippingBreakdown } from './pricing';
 import type { ReviewEligibility } from './reviews';
@@ -49,6 +50,12 @@ export interface CancelOrderRequest {
 export interface BuyerOrderCancellationCapability {
   allowed: boolean;
   reasonCodes: OrderCancellationReasonCode[];
+}
+
+export interface BuyerOrderInventoryHold {
+  status: InventoryHoldStatus;
+  expiresAt: string | null;
+  terminalReason: string | null;
 }
 
 export interface BuyerOrderVoucherAllocation {
@@ -104,9 +111,11 @@ export interface BuyerOrderSummary {
   shippingPayableMinor: number;
   payableTotalMinor: number;
   cancellation: BuyerOrderCancellationCapability;
+  inventoryHold?: BuyerOrderInventoryHold;
 }
 
 export interface BuyerOrderLine extends CheckoutPreviewLine {
+  productAvailable: boolean;
   review?: ReviewEligibility;
 }
 
@@ -265,6 +274,7 @@ function isLine(value: unknown): value is BuyerOrderLine {
       'payableMerchandiseMinor',
       'productName',
       'productImageUrl',
+      'productAvailable',
       'variantName',
       'variantSku',
     ], ['review'])
@@ -292,6 +302,7 @@ function isLine(value: unknown): value is BuyerOrderLine {
     money.every(isMoney) &&
     isText(line.productName, 240) &&
     (line.productImageUrl === null || isText(line.productImageUrl, 2048)) &&
+    typeof line.productAvailable === 'boolean' &&
     isText(line.variantName, 160) &&
     isText(line.variantSku, 80) &&
     line.shipmentWeightGrams === line.unitWeightGrams * line.quantity &&
@@ -370,6 +381,16 @@ function isCancellation(value: unknown): value is BuyerOrderCancellationCapabili
     : value.reasonCodes.length === 0;
 }
 
+function isInventoryHold(value: unknown): value is BuyerOrderInventoryHold {
+  return (
+    isRecord(value) &&
+    exact(value, ['status', 'expiresAt', 'terminalReason']) &&
+    ['ACTIVE', 'CONSUMED', 'RELEASED', 'EXPIRED'].includes(String(value.status)) &&
+    (value.expiresAt === null || isInstant(value.expiresAt)) &&
+    (value.terminalReason === null || isText(value.terminalReason, 120))
+  );
+}
+
 function sum(values: number[]): number | null {
   const total = values.reduce((result, value) => result + value, 0);
   return Number.isSafeInteger(total) ? total : null;
@@ -401,7 +422,7 @@ export function isBuyerOrderSummary(value: unknown): value is BuyerOrderSummary 
       'shippingPayableMinor',
       'payableTotalMinor',
       'cancellation',
-    ])
+    ], ['inventoryHold'])
   )
     return false;
   const order = value as unknown as BuyerOrderSummary;
@@ -427,7 +448,8 @@ export function isBuyerOrderSummary(value: unknown): value is BuyerOrderSummary 
     !order.lines.every(isLine) ||
     !isShipping(order.shipping) ||
     order.shipping.shopId !== order.shop.id ||
-    !isCancellation(order.cancellation)
+    !isCancellation(order.cancellation) ||
+    (order.inventoryHold !== undefined && !isInventoryHold(order.inventoryHold))
   )
     return false;
   const money = [

@@ -13,6 +13,7 @@ import {
 } from '../security/browser-mutation.error';
 import {
   OrderHistoryUnavailableError,
+  OrderInventoryHoldConflictError,
   OrderHistoryValidationError,
   OrderIdempotencyConflictError,
   OrderNotFoundError,
@@ -87,6 +88,17 @@ export class OrderHistoryExceptionFilter implements ExceptionFilter {
         'Cancellation unavailable',
         'This order can no longer be cancelled by the buyer.',
         { currentVersion: exception.currentVersion },
+      );
+      return;
+    }
+    if (exception instanceof OrderInventoryHoldConflictError) {
+      this.problem(
+        response,
+        409,
+        'order-inventory-hold-unavailable',
+        'Inventory hold unavailable',
+        'This order must reacquire inventory before payment or fulfillment can continue.',
+        { inventoryHoldStatus: exception.holdStatus },
       );
       return;
     }

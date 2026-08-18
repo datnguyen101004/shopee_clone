@@ -2,7 +2,7 @@ import { Catch, type ArgumentsHost, type ExceptionFilter } from '@nestjs/common'
 import type { Response } from 'express';
 
 import { CatalogQueryValidationError } from './catalog-query';
-import { CatalogProductIdValidationError, CatalogProductNotFoundError } from './catalog-product-id';
+import { CatalogProductDeletedError, CatalogProductIdValidationError, CatalogProductNotFoundError } from './catalog-product-id';
 
 @Catch()
 export class CatalogExceptionFilter implements ExceptionFilter {
@@ -33,6 +33,17 @@ export class CatalogExceptionFilter implements ExceptionFilter {
         title: 'Product not found',
         status: 404,
         detail: 'The requested product is not available.',
+      });
+      return;
+    }
+    if (exception instanceof CatalogProductDeletedError) {
+      response.setHeader('Cache-Control', 'no-store');
+      response.status(410).type('application/problem+json').json({
+        type: 'https://shopee-clone.local/problems/product-deleted',
+        title: 'Product deleted',
+        status: 410,
+        detail: 'The requested product has been deleted and is no longer available for purchase.',
+        code: 'PRODUCT_DELETED',
       });
       return;
     }

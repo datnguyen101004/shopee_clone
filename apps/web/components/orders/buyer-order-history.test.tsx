@@ -50,8 +50,9 @@ const order: BuyerOrderSummary = {
       platformVoucherDiscountMinor: 0,
       merchandiseVoucherDiscountMinor: 0,
       payableMerchandiseMinor: 100_000,
-      productName: 'Ghế công thái học',
-      productImageUrl: null,
+    productName: 'Ghế công thái học',
+    productImageUrl: null,
+    productAvailable: true,
       variantName: 'Đen',
       variantSku: 'CHAIR-BLACK',
     },
@@ -166,6 +167,23 @@ describe('buyer order-history screens', () => {
       'href',
       `/account/orders/${order.orderReference}`,
     );
+  });
+
+  it('keeps a deleted historical product link and explains that the product is unavailable', async () => {
+    vi.mocked(getBuyerOrders).mockResolvedValue({
+      orderHistoryVersion: 'order-history-v1',
+      items: [{
+        ...order,
+        lines: [{ ...order.lines[0]!, productAvailable: false }],
+      }],
+      page: { limit: 20, nextCursor: null },
+    });
+
+    render(<BuyerOrderListScreen filter="PENDING_CONFIRMATION" />);
+
+    const productLink = await screen.findByRole('link', { name: 'Ghế công thái học (sản phẩm đã bị xóa)' });
+    expect(productLink).toHaveAttribute('href', `/products/${order.lines[0]!.productId}`);
+    expect(screen.getByText(/Sản phẩm đã bị xóa/)).toBeInTheDocument();
   });
 
   it('shows timeline and prevents a second cancellation submit', async () => {

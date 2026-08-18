@@ -47,6 +47,7 @@ function detail(): BuyerOrderDetailResponse {
           payableMerchandiseMinor: 185_000,
           productName: 'Sản phẩm',
           productImageUrl: null,
+          productAvailable: true,
           variantName: 'Mặc định',
           variantSku: 'SKU-1',
         },
@@ -166,6 +167,21 @@ describe('buyer order-history contracts', () => {
       isBuyerOrderDetailResponse({
         ...valid,
         timeline: [{ ...valid.timeline[0]!, actorType: 'BUYER' }],
+      }),
+    ).toBe(false);
+    expect(
+      isBuyerOrderDetailResponse({
+        ...valid,
+        order: {
+          ...valid.order,
+          inventoryHold: { status: 'EXPIRED', expiresAt: '2026-08-14T00:15:00.000Z', terminalReason: 'expired' },
+        },
+      }),
+    ).toBe(true);
+    expect(
+      isBuyerOrderDetailResponse({
+        ...valid,
+        order: { ...valid.order, inventoryHold: { status: 'ACTIVE', expiresAt: 'not-an-instant', terminalReason: null } },
       }),
     ).toBe(false);
   });

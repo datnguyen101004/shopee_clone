@@ -1,5 +1,7 @@
 export { isHealthResponse } from './health';
 export type { HealthResponse } from './health';
+export { isProductRetentionCleanupStatus } from './product-retention';
+export type { ProductRetentionCleanupStatus } from './product-retention';
 export { isHomepageResponse, isKnownHomepageModule, parseHomepageResponse } from './homepage';
 export type {
   HomepageBanner,
@@ -243,10 +245,12 @@ export type {
 } from './account';
 export {
   isCanonicalProductId,
+  isProductDeletedProblemDetails,
   isProductDetailResponse,
   parseProductDetailResponse,
 } from './product-detail';
 export type {
+  ProductDeletedProblemDetails,
   ProductAvailability,
   ProductDetailCategory,
   ProductDetailResponse,
@@ -352,6 +356,7 @@ export {
   CHECKOUT_IDEMPOTENCY_KEY_PATTERN,
   CHECKOUT_NOTE_MAX_LENGTH,
   CHECKOUT_VERSION,
+  INVENTORY_HOLD_STATUSES,
   PURCHASE_PAYMENT_METHODS,
   PURCHASE_PAYMENT_STATUSES,
   SHOP_ORDER_STATUSES,
@@ -382,6 +387,7 @@ export type {
   CheckoutPreviewShop,
   CheckoutProblemDetails,
   CheckoutShopNote,
+  InventoryHoldStatus,
   PurchasePaymentMethod,
   PurchasePaymentStatus,
   PurchaseResult,
@@ -413,6 +419,7 @@ export {
 export type {
   BuyerOrderCancellationCapability,
   BuyerOrderDetailResponse,
+  BuyerOrderInventoryHold,
   BuyerOrderLine,
   BuyerOrderListFilter,
   BuyerOrderListQuery,
@@ -454,6 +461,36 @@ export {
   parseReviewVersionEtag,
   parseUpdateProductReviewRequest,
 } from './reviews';
+export {
+  INVENTORY_ADJUSTMENT_NOTE_MAX_LENGTH,
+  INVENTORY_DEFAULT_PAGE_SIZE,
+  INVENTORY_IDEMPOTENCY_KEY_PATTERN,
+  INVENTORY_MAX_PAGE_SIZE,
+  INVENTORY_VERSION,
+  formatInventoryVersionEtag,
+  canonicalInventoryAdjustmentRequest,
+  canonicalInventoryUtcTimestamp,
+  inventoryAdjustmentReasonValues,
+  isInventoryAdjustmentPage,
+  isInventoryAdjustment,
+  isInventoryPage,
+  isInventoryProblemDetails,
+  parseInventoryAdjustmentPage,
+  parseInventoryAdjustmentRequest,
+  parseInventoryIdempotencyKey,
+  parseInventoryPage,
+  parseInventoryPageQuery,
+  parseInventoryVersionEtag,
+} from './inventory';
+export type {
+  InventoryAdjustment,
+  InventoryAdjustmentPage,
+  InventoryAdjustmentReason,
+  InventoryAdjustmentRequest,
+  InventoryBalance,
+  InventoryPage,
+  InventoryProblemDetails,
+} from './inventory';
 export {
   SELLER_PRODUCT_DEFAULT_PAGE_SIZE,
   SELLER_PRODUCT_DESCRIPTION_MAX_LENGTH,

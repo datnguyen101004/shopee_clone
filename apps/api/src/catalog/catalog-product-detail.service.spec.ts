@@ -1,5 +1,5 @@
 import type { CatalogRepository } from './catalog.repository';
-import { CatalogProductNotFoundError } from './catalog-product-id';
+import { CatalogProductDeletedError, CatalogProductNotFoundError } from './catalog-product-id';
 import { CatalogProductDetailService } from './catalog-product-detail.service';
 
 const productId = '00000000-0000-4000-8000-000000000301';
@@ -65,6 +65,7 @@ function candidate(overrides: Record<string, unknown> = {}): DetailCandidate {
 describe('CatalogProductDetailService', () => {
   const repository = {
     findPublicProduct: jest.fn(),
+    findDeletedProduct: jest.fn(),
     countPublicProductsForShop: jest.fn(),
     findRelatedCandidates: jest.fn(),
   };
@@ -73,6 +74,7 @@ describe('CatalogProductDetailService', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     repository.findPublicProduct.mockResolvedValue(candidate());
+    repository.findDeletedProduct.mockResolvedValue(null);
     repository.countPublicProductsForShop.mockResolvedValue(4);
     repository.findRelatedCandidates.mockResolvedValue([]);
   });
@@ -124,5 +126,8 @@ describe('CatalogProductDetailService', () => {
     });
     repository.findPublicProduct.mockResolvedValueOnce(null);
     await expect(service.getProduct(productId)).rejects.toBeInstanceOf(CatalogProductNotFoundError);
+    repository.findPublicProduct.mockResolvedValueOnce(null);
+    repository.findDeletedProduct.mockResolvedValueOnce({ id: productId });
+    await expect(service.getProduct(productId)).rejects.toBeInstanceOf(CatalogProductDeletedError);
   });
 });

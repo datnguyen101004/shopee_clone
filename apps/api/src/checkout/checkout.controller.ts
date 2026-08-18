@@ -140,4 +140,21 @@ export class CheckoutController {
     response.setHeader('Cache-Control', 'private, no-store');
     return this.checkout.getPurchase(request.authUser.id, purchaseReference);
   }
+
+  @Post('purchases/:purchaseReference/payment-failed')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Release an active inventory hold after authoritative payment failure' })
+  @ApiParam({ name: 'purchaseReference', format: 'uuid' })
+  async paymentFailed(
+    @Req() request: AuthenticatedRequest,
+    @Param('purchaseReference') purchaseReference: string,
+    @Res({ passthrough: true }) response: Response,
+  ): Promise<{ released: boolean }> {
+    if (!request.authUser) throw new AuthenticationFailedError();
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(purchaseReference)) {
+      throw new CheckoutValidationError(['purchaseReference']);
+    }
+    response.setHeader('Cache-Control', 'private, no-store');
+    return this.checkout.markPaymentFailed(request.authUser.id, purchaseReference);
+  }
 }

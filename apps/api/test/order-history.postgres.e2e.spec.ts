@@ -313,6 +313,19 @@ databaseTest('buyer order history HTTP with PostgreSQL', () => {
     expect(isBuyerOrderDetailResponse(detail.body)).toBe(true);
     expect(detail.body.timeline).toHaveLength(3);
     expect(detail.body.order.purchaseReference).toBe(purchaseId);
+    await prisma.product.update({ where: { id: products[1]!.id }, data: { deletedAt: new Date() } });
+    try {
+      const deletedDetail = await request(app.getHttpServer())
+        .get(`/api/v1/account/orders/${secondOrderId}`)
+        .set('Authorization', buyerBearer)
+        .expect(200);
+      expect(deletedDetail.body.order.lines[0]).toMatchObject({
+        productId: products[1]!.id,
+        productAvailable: false,
+      });
+    } finally {
+      await prisma.product.update({ where: { id: products[1]!.id }, data: { deletedAt: null } });
+    }
     await request(app.getHttpServer())
       .get(`/api/v1/account/orders/${secondOrderId}`)
       .set('Authorization', foreignBearer)

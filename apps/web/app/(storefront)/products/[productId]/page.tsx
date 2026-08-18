@@ -31,6 +31,16 @@ export default async function ProductDetailPage({
     ) {
       notFound();
     }
+    if (error instanceof ProductDetailApiError && error.kind === 'deleted') {
+      return (
+        <Container className="product-detail-page product-detail-state">
+          <Badge variant="danger">SẢN PHẨM ĐÃ XÓA</Badge>
+          <h1>Sản phẩm đã bị xóa</h1>
+          <p>Sản phẩm này không còn được bán. Bạn vẫn có thể xem lại lịch sử đánh giá từ đơn hàng của mình.</p>
+          <Link href="/search">Quay lại khám phá sản phẩm</Link>
+        </Container>
+      );
+    }
     return (
       <Container className="product-detail-page product-detail-state">
         <Badge variant="danger">TẠM THỜI GIÁN ĐOẠN</Badge>

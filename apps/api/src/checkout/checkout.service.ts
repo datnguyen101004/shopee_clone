@@ -31,6 +31,7 @@ import { CheckoutAssembler } from './checkout-assembler';
 import {
   CheckoutCartConflictError,
   CheckoutIdempotencyConflictError,
+  CheckoutInventoryConflictError,
   CheckoutNotReadyError,
   CheckoutPreviewChangedError,
   CheckoutPurchaseNotFoundError,
@@ -38,6 +39,8 @@ import {
 } from './checkout.errors';
 import { OrderWriter } from './order-writer';
 import { purchaseInclude, PurchaseProjector } from './purchase-projector';
+import { InventoryService } from '../inventory/inventory.service';
+import { InventoryIdempotencyConflictError, InventoryInsufficientError } from '../inventory/inventory.errors';
 
 const MAX_SERIALIZABLE_ATTEMPTS = 3;
 
@@ -63,6 +66,7 @@ export class CheckoutService {
     @Inject(VoucherConsumptionService)
     private readonly voucherConsumption: VoucherConsumptionService,
     @Inject(SystemUtcClock) private readonly clock: SystemUtcClock,
+    @Inject(InventoryService) private readonly inventory: InventoryService,
   ) {}
 
   preview(
@@ -129,6 +133,16 @@ export class CheckoutService {
             }
 
             const purchaseId = randomUUID();
+            const reservation = await this.inventory.reserveForCheckout(
+              transaction,
+              userId,
+              expectedVersion,
+              idempotencyKey,
+              requestDigest,
+              assembled.preview.shops.flatMap((shop) =>
+                shop.lines.map((line) => ({ variantId: line.variantId, quantity: line.quantity })),
+              ),
+            );
             const writtenPurchaseVouchers = await this.writer.write(transaction, {
               purchaseId,
               buyerId: userId,
@@ -137,6 +151,7 @@ export class CheckoutService {
               preview: assembled.preview,
               applied: assembled.applied,
             });
+            await this.inventory.consumeInTransaction(transaction, reservation.id, userId, purchaseId);
             const consumption = await this.voucherConsumption.consumeInTransaction(transaction, {
               purchaseReference: purchaseId,
               userId,
@@ -182,9 +197,12 @@ export class CheckoutService {
         if (error instanceof VoucherConsumptionConflictError) {
           throw new CheckoutUnavailableError();
         }
+        if (error instanceof InventoryInsufficientError) throw new CheckoutInventoryConflictError(error.availableQuantity);
+        if (error instanceof InventoryIdempotencyConflictError) throw new CheckoutIdempotencyConflictError();
         if (
           error instanceof CheckoutCartConflictError ||
           error instanceof CheckoutIdempotencyConflictError ||
+          error instanceof CheckoutInventoryConflictError ||
           error instanceof CheckoutNotReadyError ||
           error instanceof CheckoutPreviewChangedError ||
           error instanceof CheckoutUnavailableError ||
@@ -207,5 +225,17 @@ export class CheckoutService {
     });
     if (!purchase) throw new CheckoutPurchaseNotFoundError();
     return this.projector.project(purchase);
+  }
+
+  async markPaymentFailed(userId: string, purchaseReference: string): Promise<{ released: boolean }> {
+    const purchase = await this.prisma.purchase.findFirst({
+      where: { id: purchaseReference, buyerId: userId },
+      select: { inventoryReservation: { select: { id: true, status: true } } },
+    });
+    if (!purchase) throw new CheckoutPurchaseNotFoundError();
+    const reservation = purchase.inventoryReservation;
+    if (!reservation || reservation.status !== 'ACTIVE') return { released: false };
+    await this.inventory.release(reservation.id, 'payment-failed');
+    return { released: true };
   }
 }

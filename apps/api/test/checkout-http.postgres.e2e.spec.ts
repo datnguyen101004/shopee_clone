@@ -75,6 +75,11 @@ databaseTest('authenticated COD checkout HTTP with PostgreSQL', () => {
         where: { order: { purchaseId: { in: purchaseIds } } },
       });
       await prisma.shopOrder.deleteMany({ where: { purchaseId: { in: purchaseIds } } });
+      const reservations = await prisma.inventoryReservation.findMany({ where: { purchaseId: { in: purchaseIds } }, select: { id: true } });
+      if (reservations.length > 0) {
+        await prisma.inventoryReservationLine.deleteMany({ where: { reservationId: { in: reservations.map(({ id }) => id) } } });
+        await prisma.inventoryReservation.deleteMany({ where: { id: { in: reservations.map(({ id }) => id) } } });
+      }
       await prisma.purchase.deleteMany({ where: { id: { in: purchaseIds } } });
     }
   }
@@ -147,6 +152,7 @@ databaseTest('authenticated COD checkout HTTP with PostgreSQL', () => {
       where: { id: { in: [addressId, foreignAddressId] } },
     });
     await prisma.cart.deleteMany({ where: { id: cartId } });
+    await prisma.voucherUserUsage.deleteMany({ where: { userId: { in: [buyerId, foreignBuyerId] } } });
     await prisma.user.deleteMany({ where: { id: { in: [buyerId, foreignBuyerId] } } });
     await prisma.user.createMany({
       data: [

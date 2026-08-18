@@ -3,8 +3,9 @@ import { randomUUID } from 'node:crypto';
 import type { OrderTimelineActor, ShopOrderStatus } from '@shopee-clone/contracts';
 import { Injectable } from '@nestjs/common';
 
-import type { Prisma } from '../generated/prisma/client';
-import { OrderStaleConflictError, OrderTransitionConflictError } from './order-history.errors';
+import { Prisma } from '../generated/prisma/client';
+import type { Prisma as PrismaTypes } from '../generated/prisma/client';
+import { OrderInventoryHoldConflictError, OrderStaleConflictError, OrderTransitionConflictError } from './order-history.errors';
 import { canTransitionOrder } from './order-lifecycle';
 
 export interface TransitionOrderInput {
@@ -23,11 +24,26 @@ export interface TransitionOrderInput {
 @Injectable()
 export class OrderLifecycleService {
   async transition(
-    transaction: Prisma.TransactionClient,
+    transaction: PrismaTypes.TransactionClient,
     input: TransitionOrderInput,
   ): Promise<void> {
     if (!canTransitionOrder(input.currentStatus, input.targetStatus)) {
       throw new OrderTransitionConflictError(input.expectedVersion);
+    }
+    if (input.targetStatus !== 'CANCELLED') {
+      const hold = await transaction.inventoryReservation.findFirst({
+        where: { purchase: { orders: { some: { id: input.orderId } } } },
+        select: { status: true, expiresAt: true },
+      });
+      if (hold && (hold.status === 'RELEASED' || hold.status === 'EXPIRED')) {
+        throw new OrderInventoryHoldConflictError(hold.status);
+      }
+      if (hold?.status === 'ACTIVE') {
+        const nowRows = await transaction.$queryRaw<Array<{ now: Date }>>(Prisma.sql`SELECT clock_timestamp() AS "now"`);
+        if (nowRows[0]?.now instanceof Date && hold.expiresAt <= nowRows[0].now) {
+          throw new OrderInventoryHoldConflictError('EXPIRED');
+        }
+      }
     }
     const advanced = await transaction.shopOrder.updateMany({
       where: {

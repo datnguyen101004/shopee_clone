@@ -25,5 +25,6 @@ export class CheckoutPreviewChangedError extends Error {
 }
 
 export class CheckoutIdempotencyConflictError extends Error {}
+export class CheckoutInventoryConflictError extends Error { constructor(public readonly availableQuantity: number) { super('Inventory is insufficient'); } }
 export class CheckoutPurchaseNotFoundError extends Error {}
 export class CheckoutUnavailableError extends Error {}

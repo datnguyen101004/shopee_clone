@@ -113,39 +113,59 @@ describe('Seller product management', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('Sản phẩm đã được đăng bán.');
   });
 
-  it('asks for confirmation before deleting a draft and removes it from the list', async () => {
+  it('uses a custom alertdialog before deleting a draft and removes it from the list', async () => {
     const productId = '00000000-0000-4000-8000-000000000101';
     fetchProducts.mockResolvedValue({
       items: [{ id: productId, slug: 'draft-product', name: 'Bản nháp cần xóa', categoryName: 'Thiết bị điện tử', lifecycle: 'draft', moderationStatus: 'active', primaryMediaUrl: null, variantCount: 1, stockQuantity: 1, updatedAt: '2026-08-17T00:00:00.000Z' }],
       nextCursor: null,
     });
     deleteDraft.mockResolvedValue(undefined);
-    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
     render(<SellerProductList />);
     await screen.findByText('Bản nháp cần xóa');
     fireEvent.click(screen.getByRole('button', { name: 'Xóa sản phẩm nháp Bản nháp cần xóa' }));
+    expect(screen.getByRole('alertdialog')).toHaveTextContent('Dữ liệu lịch sử được giữ lại');
+    fireEvent.click(screen.getByRole('button', { name: 'Xóa sản phẩm' }));
     await waitFor(() => expect(deleteDraft).toHaveBeenCalledWith(expect.anything(), productId));
-    expect(confirm).toHaveBeenCalledWith(expect.stringContaining('Bản nháp cần xóa'));
     await waitFor(() => expect(screen.queryByText('Bản nháp cần xóa')).not.toBeInTheDocument());
-    expect(screen.getByRole('alert')).toHaveTextContent('Đã xóa sản phẩm nháp.');
-    confirm.mockRestore();
+    expect(screen.getByRole('alert')).toHaveTextContent('Đã xóa sản phẩm.');
   });
-  it('asks for confirmation before archiving a published product from the list', async () => {
+  it('soft-deletes a published product from the same custom alertdialog', async () => {
     const productId = '00000000-0000-4000-8000-000000000101';
     fetchProducts.mockResolvedValue({
       items: [{ id: productId, slug: 'published-product', name: 'Sản phẩm đang bán', categoryName: 'Thiết bị điện tử', lifecycle: 'published', moderationStatus: 'active', primaryMediaUrl: null, variantCount: 1, stockQuantity: 1, updatedAt: '2026-08-17T00:00:00.000Z' }],
       nextCursor: null,
     });
-    transitionProduct.mockResolvedValue({});
-    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    deleteDraft.mockResolvedValue(undefined);
     render(<SellerProductList />);
     await screen.findByText('Sản phẩm đang bán');
     fireEvent.click(screen.getByRole('button', { name: 'Xóa sản phẩm đang bán Sản phẩm đang bán' }));
-    await waitFor(() => expect(transitionProduct).toHaveBeenCalledWith(expect.anything(), productId, 'archived'));
-    expect(confirm).toHaveBeenCalledWith(expect.stringContaining('Sản phẩm đang bán'));
-    expect(await screen.findByText('Đã lưu trữ', { selector: 'b' })).toBeInTheDocument();
-    expect(screen.getByRole('alert')).toHaveTextContent('Đã chuyển sản phẩm vào Đã lưu trữ.');
-    confirm.mockRestore();
+    fireEvent.click(screen.getByRole('button', { name: 'Xóa sản phẩm' }));
+    await waitFor(() => expect(deleteDraft).toHaveBeenCalledWith(expect.anything(), productId));
+    await waitFor(() => expect(screen.queryByText('Sản phẩm đang bán')).not.toBeInTheDocument());
+    expect(screen.getByRole('alert')).toHaveTextContent('Đã xóa sản phẩm.');
+  });
+  it('cancels with Escape, restores focus, and prevents duplicate destructive requests', async () => {
+    const productId = '00000000-0000-4000-8000-000000000101';
+    fetchProducts.mockResolvedValue({
+      items: [{ id: productId, slug: 'draft-product', name: 'Bản nháp bàn phím', categoryName: 'Thiết bị điện tử', lifecycle: 'draft', moderationStatus: 'active', primaryMediaUrl: null, variantCount: 1, stockQuantity: 1, updatedAt: '2026-08-17T00:00:00.000Z' }],
+      nextCursor: null,
+    });
+    let resolveDelete!: () => void;
+    deleteDraft.mockImplementation(() => new Promise<void>((resolve) => { resolveDelete = resolve; }));
+    render(<SellerProductList />);
+    await screen.findByText('Bản nháp bàn phím');
+    const trigger = screen.getByRole('button', { name: 'Xóa sản phẩm nháp Bản nháp bàn phím' });
+    fireEvent.click(trigger);
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Xóa sản phẩm' })).toHaveFocus());
+    fireEvent.keyDown(screen.getByRole('alertdialog'), { key: 'Escape' });
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+    await waitFor(() => expect(trigger).toHaveFocus());
+    fireEvent.click(trigger);
+    fireEvent.click(screen.getByRole('button', { name: 'Xóa sản phẩm' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Đang xử lý…' }));
+    expect(deleteDraft).toHaveBeenCalledTimes(1);
+    resolveDelete();
+    await waitFor(() => expect(screen.queryByText('Bản nháp bàn phím')).not.toBeInTheDocument());
   });
   it('loads an existing draft into the editor instead of showing an empty form', async () => {
     const productId = '00000000-0000-4000-8000-000000000101';

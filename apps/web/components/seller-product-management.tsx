@@ -15,7 +15,7 @@ import {
 } from '@shopee-clone/contracts';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import { RoleApiError } from '../lib/role-api';
 import {
   createSellerProduct,
@@ -174,6 +174,110 @@ function errorMessage(error: unknown) {
   return 'Không thể lưu sản phẩm. Hãy thử lại.';
 }
 
+type SellerProductListItem = Awaited<ReturnType<typeof fetchSellerProducts>>['items'][number];
+type SellerProductDialogItem = Pick<SellerProductListItem, 'id' | 'name' | 'primaryMediaUrl'>;
+
+function SellerProductDeleteDialog({
+  item,
+  pending,
+  error,
+  eyebrow = 'Xác nhận xóa',
+  title,
+  description,
+  confirmLabel = 'Xóa sản phẩm',
+  restoreFocusElement,
+  onCancel,
+  onConfirm,
+}: {
+  item: SellerProductDialogItem | null;
+  pending: boolean;
+  error: string;
+  eyebrow?: string;
+  title?: string;
+  description?: string;
+  confirmLabel?: string;
+  restoreFocusElement?: HTMLElement | null;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const cancelRef = useRef<HTMLButtonElement>(null);
+  const confirmRef = useRef<HTMLButtonElement>(null);
+  const previousFocus = useRef<HTMLElement | null>(null);
+  const [imageFailedKey, setImageFailedKey] = useState<string | null>(null);
+  useEffect(() => {
+    if (!item) return;
+    previousFocus.current = restoreFocusElement ?? (document.activeElement instanceof HTMLElement ? document.activeElement : null);
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    const timer = window.setTimeout(() => confirmRef.current?.focus(), 0);
+    return () => {
+      window.clearTimeout(timer);
+      document.body.style.overflow = previousOverflow;
+      previousFocus.current?.focus();
+    };
+  }, [item, restoreFocusElement]);
+  if (!item) return null;
+  const imageKey = `${item.id}:${item.primaryMediaUrl ?? ''}`;
+  const imageFailed = imageFailedKey === imageKey;
+  function handleKeyDown(event: KeyboardEvent<HTMLDivElement>) {
+    if (event.key === 'Escape' && !pending) {
+      event.preventDefault();
+      onCancel();
+      return;
+    }
+    if (event.key !== 'Tab') return;
+    const focusable = [cancelRef.current, confirmRef.current].filter(Boolean) as HTMLElement[];
+    if (focusable.length === 0) return;
+    const first = focusable[0]!;
+    const last = focusable[focusable.length - 1]!;
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  }
+  return (
+    <div className="seller-product-dialog-backdrop" role="presentation">
+      <div
+        ref={dialogRef}
+        className="seller-product-delete-dialog"
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby={`seller-product-delete-title-${item.id}`}
+        aria-describedby={`seller-product-delete-description-${item.id}`}
+        tabIndex={-1}
+        onKeyDown={handleKeyDown}
+      >
+        <div className="seller-product-delete-dialog__media">
+          {item.primaryMediaUrl && !imageFailed ? (
+            <img src={sellerProductMediaUrl(item.primaryMediaUrl)} alt="" onError={() => setImageFailedKey(imageKey)} />
+          ) : (
+            <span aria-hidden="true">Ảnh</span>
+          )}
+        </div>
+        <div className="seller-product-delete-dialog__content">
+          <span className="operational-eyebrow">{eyebrow}</span>
+          <h2 id={`seller-product-delete-title-${item.id}`}>{title ?? `Xóa “${item.name}”?`}</h2>
+          <p id={`seller-product-delete-description-${item.id}`}>
+            {description ?? 'Sản phẩm sẽ biến mất ngay khỏi Seller Center, giỏ hàng và trang mua sắm. Dữ liệu lịch sử được giữ lại; bản ghi không có lịch sử sẽ được dọn sau 7 ngày.'}
+          </p>
+          {error ? <p className="seller-product-delete-dialog__error" role="alert">{error}</p> : null}
+          {pending ? <p className="seller-product-delete-dialog__progress" role="status" aria-live="polite">Đang xử lý…</p> : null}
+          <div className="seller-product-delete-dialog__actions">
+            <button ref={cancelRef} type="button" disabled={pending} onClick={onCancel}>Hủy</button>
+            <button ref={confirmRef} type="button" className="seller-product-delete-dialog__danger" disabled={pending} onClick={onConfirm}>
+              {pending ? 'Đang xử lý…' : confirmLabel}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function SellerProductList() {
   const { authenticatedFetch, state } = useAuthSession();
   const [items, setItems] = useState<Awaited<ReturnType<typeof fetchSellerProducts>>['items']>([]);
@@ -182,6 +286,9 @@ export function SellerProductList() {
   const [message, setMessage] = useState('');
   const [publishingId, setPublishingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [deleteDialogItem, setDeleteDialogItem] = useState<SellerProductListItem | null>(null);
+  const [deleteDialogError, setDeleteDialogError] = useState('');
+  const [deleteDialogTrigger, setDeleteDialogTrigger] = useState<HTMLElement | null>(null);
   const load = useCallback(
     (cursor?: string) => {
       void fetchSellerProducts(authenticatedFetch, { cursor, lifecycle })
@@ -211,36 +318,23 @@ export function SellerProductList() {
       setPublishingId(null);
     }
   }
-  async function deleteDraft(item: (typeof items)[number]) {
-    if (!window.confirm(`Bạn có chắc muốn xóa bản nháp “${item.name}”? Ảnh và dữ liệu của bản nháp sẽ được xóa.`)) return;
+  function requestDelete(item: SellerProductListItem, trigger?: HTMLElement) {
+    setDeleteDialogError('');
+    setDeleteDialogTrigger(trigger ?? null);
+    setDeleteDialogItem(item);
+  }
+  async function confirmDelete() {
+    if (!deleteDialogItem) return;
+    const item = deleteDialogItem;
     setMessage('');
     setDeletingId(item.id);
     try {
       await deleteSellerProductDraft(authenticatedFetch, item.id);
       setItems((current) => current.filter((product) => product.id !== item.id));
-      setMessage('Đã xóa sản phẩm nháp.');
+      setDeleteDialogItem(null);
+      setMessage('Đã xóa sản phẩm.');
     } catch (error) {
-      setMessage(errorMessage(error));
-    } finally {
-      setDeletingId(null);
-    }
-  }
-  async function archivePublishedProduct(item: (typeof items)[number]) {
-    if (!window.confirm(`Bạn có chắc muốn xóa sản phẩm đang bán “${item.name}”? Sản phẩm sẽ được chuyển vào Đã lưu trữ và không còn hiển thị để mua.`)) return;
-    setMessage('');
-    setDeletingId(item.id);
-    try {
-      await transitionSellerProduct(authenticatedFetch, item.id, 'archived');
-      setItems((current) =>
-        lifecycle === 'published'
-          ? current.filter((product) => product.id !== item.id)
-          : current.map((product) =>
-              product.id === item.id ? { ...product, lifecycle: 'archived' as const } : product,
-            ),
-      );
-      setMessage('Đã chuyển sản phẩm vào Đã lưu trữ.');
-    } catch (error) {
-      setMessage(errorMessage(error));
+      setDeleteDialogError(errorMessage(error));
     } finally {
       setDeletingId(null);
     }
@@ -340,7 +434,7 @@ export function SellerProductList() {
                       title="Xóa sản phẩm nháp"
                       aria-label={`Xóa sản phẩm nháp ${item.name}`}
                       disabled={publishingId !== null || deletingId !== null}
-                      onClick={() => void deleteDraft(item)}
+                      onClick={(event) => requestDelete(item, event.currentTarget)}
                     >
                       <svg aria-hidden="true" viewBox="0 0 24 24" focusable="false">
                         <path d="M9 3h6l1 2h4v2H4V5h4l1-2Zm-2 6h2v9H7V9Zm4 0h2v9h-2V9Zm4 0h2v9h-2V9ZM6 21V8h12v13H6Z" />
@@ -356,7 +450,22 @@ export function SellerProductList() {
                     title="Xóa sản phẩm đang bán"
                     aria-label={`Xóa sản phẩm đang bán ${item.name}`}
                     disabled={publishingId !== null || deletingId !== null}
-                    onClick={() => void archivePublishedProduct(item)}
+                    onClick={(event) => requestDelete(item, event.currentTarget)}
+                  >
+                    <svg aria-hidden="true" viewBox="0 0 24 24" focusable="false">
+                      <path d="M9 3h6l1 2h4v2H4V5h4l1-2Zm-2 6h2v9H7V9Zm4 0h2v9h-2V9Zm4 0h2v9h-2V9ZM6 21V8h12v13H6Z" />
+                    </svg>
+                    <span className="seller-product-visually-hidden">{deletingId === item.id ? 'Đang xóa' : 'Xóa'}</span>
+                  </button>
+                ) : null}
+                {item.lifecycle !== 'draft' && item.lifecycle !== 'published' ? (
+                  <button
+                    className="seller-product-row-delete"
+                    type="button"
+                    title="Xóa sản phẩm"
+                    aria-label={`Xóa sản phẩm ${item.name}`}
+                    disabled={publishingId !== null || deletingId !== null}
+                    onClick={(event) => requestDelete(item, event.currentTarget)}
                   >
                     <svg aria-hidden="true" viewBox="0 0 24 24" focusable="false">
                       <path d="M9 3h6l1 2h4v2H4V5h4l1-2Zm-2 6h2v9H7V9Zm4 0h2v9h-2V9Zm4 0h2v9h-2V9ZM6 21V8h12v13H6Z" />
@@ -375,6 +484,7 @@ export function SellerProductList() {
           Tải thêm
         </button>
       ) : null}
+      <SellerProductDeleteDialog item={deleteDialogItem} pending={deletingId !== null} error={deleteDialogError} restoreFocusElement={deleteDialogTrigger} onCancel={() => { if (!deletingId) setDeleteDialogItem(null); }} onConfirm={() => void confirmDelete()} />
     </section>
   );
 }
@@ -389,6 +499,9 @@ export function SellerProductEditor({ productId }: { productId?: string }) {
   const [product, setProduct] = useState<SellerProductDetail | null>(null);
   const [message, setMessage] = useState('');
   const [pending, setPending] = useState(false);
+  const [archivePending, setArchivePending] = useState(false);
+  const [archiveDialogError, setArchiveDialogError] = useState('');
+  const [archiveDialogOpen, setArchiveDialogOpen] = useState(false);
   const [loadingProduct, setLoadingProduct] = useState(Boolean(productId));
   const canManage = state.status === 'authenticated' && state.user.roles.includes('seller');
   const loadedKeyRef = useRef<string | null>(null);
@@ -434,6 +547,21 @@ export function SellerProductEditor({ productId }: { productId?: string }) {
     () => categories.find((item) => item.id === form.categoryId) ?? null,
     [categories, form.categoryId],
   );
+  async function confirmArchive() {
+    if (!product || archivePending) return;
+    setArchivePending(true);
+    setArchiveDialogError('');
+    try {
+      const archived = await transitionSellerProduct(authenticatedFetch, product.id, 'archived');
+      setProduct(archived);
+      setArchiveDialogOpen(false);
+      setMessage('Đã lưu trữ sản phẩm.');
+    } catch (error) {
+      setArchiveDialogError(errorMessage(error));
+    } finally {
+      setArchivePending(false);
+    }
+  }
   function chooseCategory(categoryId: string) {
     const next = categories.find((item) => item.id === categoryId);
     setForm((current) => ({
@@ -1200,18 +1328,24 @@ export function SellerProductEditor({ productId }: { productId?: string }) {
           <button
             type="button"
             disabled={pending}
-            onClick={() => {
-              if (window.confirm('Lưu trữ sản phẩm này?'))
-                void transitionSellerProduct(authenticatedFetch, product.id, 'archived')
-                  .then(setProduct)
-                  .catch((error) => setMessage(errorMessage(error)));
-            }}
+            onClick={() => { setArchiveDialogError(''); setArchiveDialogOpen(true); }}
           >
             Lưu trữ
           </button>
         ) : null}
       </div>
       {message ? <p role="status">{message}</p> : null}
+      <SellerProductDeleteDialog
+        item={archiveDialogOpen && product ? { id: product.id, name: product.name, primaryMediaUrl: product.media[0]?.url ?? null } : null}
+        pending={archivePending}
+        error={archiveDialogError}
+        eyebrow="Xác nhận lưu trữ"
+        title={`Lưu trữ “${product?.name ?? ''}”?`}
+        description="Sản phẩm sẽ ngừng bán và không còn xuất hiện trong các luồng mua sắm. Bạn có thể quản lý lại trạng thái trong Seller Center."
+        confirmLabel="Lưu trữ sản phẩm"
+        onCancel={() => { if (!archivePending) setArchiveDialogOpen(false); }}
+        onConfirm={() => void confirmArchive()}
+      />
     </section>
   );
 }

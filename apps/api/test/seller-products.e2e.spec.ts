@@ -20,7 +20,7 @@ describe('Seller product endpoints', () => {
   const service = { categories: jest.fn(), list: jest.fn(), read: jest.fn(), create: jest.fn(), update: jest.fn(), transition: jest.fn(), deleteDraft: jest.fn(), stageMedia: jest.fn(), stagedMedia: jest.fn(), attachedMedia: jest.fn() };
   const mediaStorage = { write: jest.fn(), read: jest.fn(), remove: jest.fn() };
   beforeAll(async () => { const module = await Test.createTestingModule({ imports: [AppModule] }).overrideProvider(PrismaService).useValue({ onModuleInit: jest.fn(), onModuleDestroy: jest.fn() }).overrideProvider(SellerProductsService).useValue(service).overrideProvider(SellerProductMediaStorage).useValue(mediaStorage).overrideGuard(AuthGuard).useClass(TestAuthGuard).compile(); app = module.createNestApplication(); configureApplication(app, loadAuthConfig({ NODE_ENV: 'test', AUTH_ALLOWED_ORIGINS: 'http://localhost:3000' })); await app.init(); });
-  beforeEach(() => { jest.clearAllMocks(); service.categories.mockResolvedValue([]); service.list.mockResolvedValue({ items: [], nextCursor: null }); service.read.mockResolvedValue(product); service.create.mockResolvedValue(product); service.update.mockResolvedValue(product); service.transition.mockResolvedValue({ ...product, lifecycle: 'published' }); service.deleteDraft.mockResolvedValue(['opaque.png']); service.stageMedia.mockResolvedValue({ id: '00000000-0000-4000-8000-000000000105', mimeType: 'image/png', byteSize: 24, width: 1, height: 1, expiresAt: new Date('2026-08-18T00:00:00.000Z') }); mediaStorage.write.mockResolvedValue('opaque.png'); mediaStorage.read.mockResolvedValue(Buffer.from('image')); mediaStorage.remove.mockResolvedValue(undefined); });
+  beforeEach(() => { jest.clearAllMocks(); service.categories.mockResolvedValue([]); service.list.mockResolvedValue({ items: [], nextCursor: null }); service.read.mockResolvedValue(product); service.create.mockResolvedValue(product); service.update.mockResolvedValue(product); service.transition.mockResolvedValue({ ...product, lifecycle: 'published' }); service.deleteDraft.mockResolvedValue(undefined); service.stageMedia.mockResolvedValue({ id: '00000000-0000-4000-8000-000000000105', mimeType: 'image/png', byteSize: 24, width: 1, height: 1, expiresAt: new Date('2026-08-18T00:00:00.000Z') }); mediaStorage.write.mockResolvedValue('opaque.png'); mediaStorage.read.mockResolvedValue(Buffer.from('image')); mediaStorage.remove.mockResolvedValue(undefined); });
   afterAll(async () => app.close());
   it('enforces seller authentication and exposes no-store seller product operations', async () => {
     await request(app.getHttpServer()).get('/api/v1/seller/products').expect(401);
@@ -33,10 +33,10 @@ describe('Seller product endpoints', () => {
     expect(service.transition).toHaveBeenCalledWith(seller.id, product.id, { lifecycle: 'published' });
   });
 
-  it('deletes only through the authenticated seller draft endpoint and cleans media storage keys', async () => {
+  it('soft-deletes through the authenticated seller endpoint without deleting retained media', async () => {
     await request(app.getHttpServer()).delete(`/api/v1/seller/products/${product.id}`).set('Authorization', 'Bearer seller').set('Origin', 'http://localhost:3000').expect(204);
     expect(service.deleteDraft).toHaveBeenCalledWith(seller.id, product.id);
-    expect(mediaStorage.remove).toHaveBeenCalledWith('opaque.png');
+    expect(mediaStorage.remove).not.toHaveBeenCalled();
   });
 
   it('stages a seller product image through the guarded multipart route', async () => {

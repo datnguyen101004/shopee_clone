@@ -197,6 +197,7 @@ enum InventoryAdjustmentReason {
   DAMAGE        @map("damage")
   RETURN        @map("return")
   CORRECTION    @map("correction")
+  ORDER_CANCELLATION @map("order_cancellation")
 
   @@map("inventory_adjustment_reason")
 }
@@ -208,6 +209,30 @@ enum InventoryReservationStatus {
   EXPIRED  @map("expired")
 
   @@map("inventory_reservation_status")
+}
+
+enum SellerOrderFulfillmentState {
+  PENDING_CONFIRMATION @map("pending_confirmation")
+  CONFIRMED            @map("confirmed")
+  PREPARING            @map("preparing")
+  READY_FOR_PICKUP     @map("ready_for_pickup")
+  HANDED_OFF           @map("handed_off")
+  REJECTED             @map("rejected")
+  CANCELLED            @map("cancelled")
+
+  @@map("seller_order_fulfillment_state")
+}
+
+enum SellerOrderShipmentProvider {
+  MOCK @map("mock")
+
+  @@map("seller_order_shipment_provider")
+}
+
+enum SellerOrderShipmentStatus {
+  HANDED_OFF @map("handed_off")
+
+  @@map("seller_order_shipment_status")
 }
 
 model User {
@@ -238,6 +263,8 @@ model User {
   voucherRedemptions       VoucherRedemption[]
   purchases                Purchase[]
   orderTimelineEvents      OrderTimelineEvent[]      @relation("OrderTimelineActorUser")
+  sellerFulfillmentEvents  SellerOrderFulfillmentEvent[] @relation("SellerOrderFulfillmentActorUser")
+  sellerCompensations      SellerOrderInventoryCompensation[] @relation("SellerOrderCompensationActor")
   productReviews           ProductReview[]           @relation("ReviewBuyer")
   stagedReviewMedia        ReviewMedia[]             @relation("ReviewMediaUploader")
   stagedSellerProductMedia SellerProductMediaAsset[] @relation("SellerProductMediaUploader")
@@ -835,6 +862,10 @@ model ShopOrder {
   lines                           OrderLine[]
   voucherAllocations              PurchaseVoucherAllocation[]
   timelineEvents                  OrderTimelineEvent[]
+  fulfillment                     SellerOrderFulfillment?
+  shipment                        SellerOrderShipment?
+  inventoryCompensation           SellerOrderInventoryCompensation?
+  inventoryCompensationAdjustments InventoryAdjustment[] @relation("OrderInventoryCompensationAdjustments")
 
   @@unique([purchaseId, shopId])
   @@index([shopId, createdAt(sort: Desc), id])
@@ -931,6 +962,96 @@ model OrderTimelineEvent {
   @@index([orderId, occurredAt, id])
   @@index([actorUserId, occurredAt, id])
   @@map("order_timeline_events")
+}
+
+model SellerOrderFulfillment {
+  orderId                   String                         @id @map("order_id") @db.Uuid
+  state                     SellerOrderFulfillmentState    @default(PENDING_CONFIRMATION)
+  version                   Int                            @default(0)
+  confirmationDeadlineAt   DateTime                       @map("confirmation_deadline_at") @db.Timestamptz(3)
+  handoffDeadlineAt        DateTime?                      @map("handoff_deadline_at") @db.Timestamptz(3)
+  confirmedAt              DateTime?                      @map("confirmed_at") @db.Timestamptz(3)
+  preparingAt              DateTime?                      @map("preparing_at") @db.Timestamptz(3)
+  readyForPickupAt         DateTime?                      @map("ready_for_pickup_at") @db.Timestamptz(3)
+  handedOffAt              DateTime?                      @map("handed_off_at") @db.Timestamptz(3)
+  rejectedAt               DateTime?                      @map("rejected_at") @db.Timestamptz(3)
+  cancelledAt              DateTime?                      @map("cancelled_at") @db.Timestamptz(3)
+  createdAt                DateTime                       @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt                DateTime                       @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  order                    ShopOrder                      @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  events                   SellerOrderFulfillmentEvent[]
+
+  @@index([state, updatedAt(sort: Desc), orderId(sort: Desc)])
+  @@index([confirmationDeadlineAt, state])
+  @@index([handoffDeadlineAt, state])
+  @@map("seller_order_fulfillments")
+}
+
+model SellerOrderFulfillmentEvent {
+  id             String                      @id @default(uuid()) @db.Uuid
+  orderId        String                      @map("order_id") @db.Uuid
+  previousState  SellerOrderFulfillmentState? @map("previous_state")
+  state          SellerOrderFulfillmentState
+  fulfillmentVersion Int                     @map("fulfillment_version")
+  actorType      OrderTimelineActor          @map("actor_type")
+  actorUserId    String?                     @map("actor_user_id") @db.Uuid
+  action         String                      @db.VarChar(40)
+  reasonCode     String                      @map("reason_code") @db.VarChar(80)
+  reasonNote     String?                     @map("reason_note") @db.VarChar(500)
+  late           Boolean                     @default(false)
+  idempotencyKey String?                     @map("idempotency_key") @db.Uuid
+  requestDigest  String?                     @map("request_digest") @db.Char(64)
+  occurredAt     DateTime                    @default(now()) @map("occurred_at") @db.Timestamptz(3)
+  fulfillment    SellerOrderFulfillment      @relation(fields: [orderId], references: [orderId], onDelete: Restrict)
+  actorUser      User?                       @relation("SellerOrderFulfillmentActorUser", fields: [actorUserId], references: [id], onDelete: Restrict)
+
+  @@unique([orderId, fulfillmentVersion])
+  @@unique([orderId, idempotencyKey])
+  @@index([orderId, occurredAt, id])
+  @@index([actorUserId, occurredAt, id])
+  @@map("seller_order_fulfillment_events")
+}
+
+model SellerOrderShipment {
+  id                String                         @id @default(uuid()) @db.Uuid
+  orderId           String                         @unique @map("order_id") @db.Uuid
+  provider          SellerOrderShipmentProvider
+  trackingCode      String                         @unique @map("tracking_code") @db.VarChar(80)
+  status            SellerOrderShipmentStatus      @default(HANDED_OFF)
+  service           String                         @db.VarChar(40)
+  shippingSnapshot  Json                           @map("shipping_snapshot") @db.JsonB
+  handedOffAt       DateTime                       @map("handed_off_at") @db.Timestamptz(3)
+  createdAt         DateTime                       @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt         DateTime                       @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  order             ShopOrder                      @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  events            SellerOrderShipmentEvent[]
+
+  @@index([status, handedOffAt(sort: Desc), id])
+  @@map("seller_order_shipments")
+}
+
+model SellerOrderShipmentEvent {
+  id          String                @id @default(uuid()) @db.Uuid
+  shipmentId  String                @map("shipment_id") @db.Uuid
+  status      SellerOrderShipmentStatus
+  occurredAt  DateTime              @default(now()) @map("occurred_at") @db.Timestamptz(3)
+  shipment    SellerOrderShipment   @relation(fields: [shipmentId], references: [id], onDelete: Restrict)
+
+  @@index([shipmentId, occurredAt, id])
+  @@map("seller_order_shipment_events")
+}
+
+model SellerOrderInventoryCompensation {
+  id          String    @id @default(uuid()) @db.Uuid
+  orderId     String    @unique @map("order_id") @db.Uuid
+  actorUserId String?   @map("actor_user_id") @db.Uuid
+  reason      String    @db.VarChar(80)
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  order       ShopOrder @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  actorUser   User?     @relation("SellerOrderCompensationActor", fields: [actorUserId], references: [id], onDelete: Restrict)
+
+  @@index([actorUserId, createdAt, id])
+  @@map("seller_order_inventory_compensations")
 }
 
 model OrderLine {
@@ -1110,15 +1231,18 @@ model InventoryAdjustment {
   inventoryVersion     Int                       @map("inventory_version")
   idempotencyKey       String?                   @map("idempotency_key") @db.Uuid
   requestDigest        String?                   @map("request_digest") @db.Char(64)
+  sourceOrderId        String?                   @map("source_order_id") @db.Uuid
   occurredAt           DateTime                  @default(now()) @map("occurred_at") @db.Timestamptz(3)
   inventory            Inventory                 @relation("InventoryAdjustmentInventory", fields: [variantId], references: [variantId], onDelete: Restrict, map: "inventory_adjustments_inventory_variant_id_fkey")
   variant              ProductVariant            @relation("InventoryAdjustmentVariant", fields: [variantId], references: [id], onDelete: Restrict, map: "inventory_adjustments_variant_id_fkey")
   shop                 Shop                      @relation(fields: [shopId], references: [id], onDelete: Restrict)
   actor                User?                     @relation("InventoryAdjustmentActor", fields: [actorUserId], references: [id], onDelete: Restrict)
+  sourceOrder          ShopOrder?                @relation("OrderInventoryCompensationAdjustments", fields: [sourceOrderId], references: [id], onDelete: Restrict)
 
   @@index([variantId, occurredAt(sort: Desc), id])
   @@index([shopId, occurredAt(sort: Desc), id])
   @@index([idempotencyKey])
+  @@index([sourceOrderId, variantId, occurredAt(sort: Desc)])
   @@map("inventory_adjustments")
 }
 

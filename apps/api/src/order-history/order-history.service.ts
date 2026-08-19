@@ -25,6 +25,7 @@ import {
 import { OrderHistoryProjector } from './order-history.projector';
 import { OrderHistoryRepository } from './order-history.repository';
 import { OrderLifecycleService } from './order-lifecycle.service';
+import { SellerOrderCompensationService } from '../seller-orders/seller-order-compensation.service';
 
 @Injectable()
 export class OrderHistoryService {
@@ -33,6 +34,7 @@ export class OrderHistoryService {
     @Inject(OrderHistoryRepository) private readonly repository: OrderHistoryRepository,
     @Inject(OrderHistoryProjector) private readonly projector: OrderHistoryProjector,
     @Inject(OrderLifecycleService) private readonly lifecycle: OrderLifecycleService,
+    @Inject(SellerOrderCompensationService) private readonly compensation: SellerOrderCompensationService,
   ) {}
 
   async list(userId: string, query: BuyerOrderListQuery): Promise<BuyerOrderListResponse> {
@@ -107,6 +109,17 @@ export class OrderHistoryService {
             expectedVersion,
             actorType: 'BUYER',
             actorUserId: userId,
+            reasonCode: input.reasonCode,
+            reasonNote: input.reasonNote ?? null,
+            idempotencyKey,
+            requestDigest: digest,
+          });
+          await this.compensation.cancelAndCompensate(transaction, {
+            orderId: orderReference,
+            actorUserId: userId,
+            actorType: 'BUYER',
+            state: 'CANCELLED',
+            action: 'BUYER_CANCELLED',
             reasonCode: input.reasonCode,
             reasonNote: input.reasonNote ?? null,
             idempotencyKey,

@@ -7,9 +7,10 @@ import { OrderHistoryProjector } from './order-history.projector';
 import { OrderHistoryRepository } from './order-history.repository';
 import { OrderHistoryService } from './order-history.service';
 import { OrderLifecycleService } from './order-lifecycle.service';
+import { SellerOrderCompensationModule } from '../seller-orders/seller-order-compensation.module';
 
 @Module({
-  imports: [AuthModule],
+  imports: [AuthModule, SellerOrderCompensationModule],
   controllers: [OrderHistoryController],
   providers: [
     OrderHistoryExceptionFilter,

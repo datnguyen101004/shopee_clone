@@ -3,7 +3,8 @@ import { randomUUID } from 'node:crypto';
 import type { CheckoutPreviewResponse } from '@shopee-clone/contracts';
 import { Injectable } from '@nestjs/common';
 
-import type { Prisma } from '../generated/prisma/client';
+import { Prisma } from '../generated/prisma/client';
+import type { Prisma as PrismaTypes } from '../generated/prisma/client';
 import type { AppliedVoucherSnapshot } from '../vouchers/voucher-pricing.calculator';
 import { CheckoutUnavailableError } from './checkout.errors';
 
@@ -21,7 +22,7 @@ export interface WrittenPurchaseVouchers {
 }
 
 const money = (value: number) => BigInt(value);
-const json = (value: object) => value as Prisma.InputJsonValue;
+const json = (value: object) => value as PrismaTypes.InputJsonValue;
 
 @Injectable()
 export class OrderWriter {
@@ -30,6 +31,8 @@ export class OrderWriter {
     input: WritePurchaseInput,
   ): Promise<WrittenPurchaseVouchers> {
     const { summary } = input.preview;
+    const clock = await transaction.$queryRaw<Array<{ now: Date }>>(Prisma.sql`SELECT clock_timestamp() AS "now"`);
+    const createdAt = clock[0]?.now instanceof Date ? clock[0].now : new Date();
     await transaction.purchase.create({
       data: {
         id: input.purchaseId,
@@ -78,6 +81,8 @@ export class OrderWriter {
           voucherDiscountMinor: money(shop.voucherDiscountMinor),
           shippingPayableMinor: money(shop.shippingPayableMinor),
           payableTotalMinor: money(shop.payableTotalMinor),
+          createdAt,
+          updatedAt: createdAt,
         },
       });
       await transaction.orderTimelineEvent.create({
@@ -91,6 +96,32 @@ export class OrderWriter {
           actorUserId: null,
           reasonCode: 'ORDER_CREATED',
           reasonNote: null,
+          },
+      });
+      await transaction.sellerOrderFulfillment.create({
+        data: {
+          orderId,
+          state: 'PENDING_CONFIRMATION',
+          version: 0,
+          confirmationDeadlineAt: new Date(createdAt.getTime() + 24 * 60 * 60 * 1000),
+          createdAt,
+          updatedAt: createdAt,
+        },
+      });
+      await transaction.sellerOrderFulfillmentEvent.create({
+        data: {
+          id: randomUUID(),
+          orderId,
+          previousState: null,
+          state: 'PENDING_CONFIRMATION',
+          fulfillmentVersion: 0,
+          actorType: 'SYSTEM',
+          actorUserId: null,
+          action: 'ORDER_CREATED',
+          reasonCode: 'ORDER_CREATED',
+          reasonNote: null,
+          late: false,
+          occurredAt: createdAt,
         },
       });
       for (const line of [...shop.lines].sort((left, right) =>

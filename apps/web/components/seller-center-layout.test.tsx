@@ -9,6 +9,6 @@ describe('SellerCenterLayout', () => {
     render(<SellerCenterLayout><p>Editor</p></SellerCenterLayout>);
     expect(screen.getByRole('link', { name: /Sản phẩm/ })).toHaveAttribute('aria-current', 'page');
     expect(screen.getByRole('link', { name: /Hồ sơ shop/ })).toHaveAttribute('href', '/seller/shop');
-    expect(screen.queryByRole('link', { name: /Đơn hàng/ })).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Đơn hàng/ })).toHaveAttribute('href', '/seller/orders');
   });
 });

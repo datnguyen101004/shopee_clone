@@ -150,6 +150,8 @@ pnpm db:reset             # DESTRUCTIVE: reset DATABASE_URL in development
 - Prices use integer minor units stored as PostgreSQL `bigint`; inventory quantities are non-negative integers enforced by database checks.
 - `apps/api/src/generated/prisma` is generated and ignored. Run `pnpm db:generate` after pulling schema changes; API build and typecheck also regenerate it.
 
+Seller fulfillment details, endpoint contracts, state mapping, and focused test commands are documented in [docs/seller-order-fulfillment.md](docs/seller-order-fulfillment.md).
+
 The deterministic seed creates two users and shops, four hierarchical categories, four products, six variants with inventory, and four images using fixed UUIDs and business keys. Rerunning it converges on the same demo records without deleting unrelated development data.
 
 Docker Compose provisions both database targets locally, while CI uses the same guarded verification against an ephemeral Compose project.

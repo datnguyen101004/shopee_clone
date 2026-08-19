@@ -18,6 +18,7 @@ import { SellerOnboardingModule } from './seller-onboarding/seller-onboarding.mo
 import { SellerProductsModule } from './seller-products/seller-products.module';
 import { InventoryModule } from './inventory/inventory.module';
 import { ProductRetentionModule } from './product-retention/product-retention.module';
+import { SellerOrdersModule } from './seller-orders/seller-orders.module';
 import { ScheduleModule } from '@nestjs/schedule';
 
 @Module({
@@ -41,6 +42,7 @@ import { ScheduleModule } from '@nestjs/schedule';
     ScheduleModule.forRoot(),
     ProductRetentionModule,
     ReviewsModule,
+    SellerOrdersModule,
   ],
 })
 export class AppModule {}

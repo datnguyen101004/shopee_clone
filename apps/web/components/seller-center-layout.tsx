@@ -10,6 +10,7 @@ const navigation = [
   { href: '/seller/shop', label: 'Hồ sơ shop', icon: '◉' },
   { href: '/seller/products', label: 'Sản phẩm', icon: '▦' },
   { href: '/seller/inventory', label: 'Tồn kho', icon: '◫' },
+  { href: '/seller/orders', label: 'Đơn hàng', icon: '▤' },
 ];
 
 export function SellerCenterLayout({ children }: { children: ReactNode }) {

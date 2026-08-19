@@ -49,6 +49,28 @@ flowchart LR
 
 `@shopee-clone/contracts` giữ kiểu dữ liệu và parser dùng chung giữa frontend và backend. Dữ liệu riêng tư và mọi phản hồi phụ thuộc phiên đều dùng `Cache-Control: no-store`.
 
+## 2.1. Seller order fulfillment
+
+```mermaid
+flowchart LR
+    seller["Seller /seller/orders"] --> queue["GET seller/orders\nowner-scoped queue"]
+    queue --> detail["GET :orderReference\nsnapshot + ETag"]
+    detail --> action{"Server-declared action"}
+    action -->|CONFIRM| confirmed["AWAITING_PICKUP\nCONFIRMED"]
+    confirmed --> preparing["START_PREPARING\nPREPARING"]
+    preparing --> ready["MARK_READY_FOR_PICKUP\nREADY_FOR_PICKUP"]
+    ready --> handoff["HAND_OFF\nlock + mock shipment"]
+    handoff --> shipping["SHIPPING\nHANDED_OFF + tracking"]
+    action -->|REJECT| reject["CANCELLED\ncompensate consumed inventory"]
+    buyerCancel["Buyer cancellation"] --> reject2["CANCELLED\nshared compensation"]
+    reject --> audit["Fulfillment + order audit"]
+    shipping --> audit
+    reject2 --> audit
+    audit --> refresh["Authoritative detail response"]
+```
+
+Mỗi mutation khóa `ShopOrder` rồi fulfillment aggregate, kiểm tra replay theo `Idempotency-Key` trước state/ETag, lấy `clock_timestamp()` của PostgreSQL, ghi audit bất biến và chỉ commit khi lifecycle, fulfillment, inventory, shipment cùng thành công.
+
 ## 3. Hành trình khám phá sản phẩm công khai
 
 ```mermaid

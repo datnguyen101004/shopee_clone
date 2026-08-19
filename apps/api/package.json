@@ -22,6 +22,7 @@
     "db:import:dataset": "tsx prisma/import-dataset.ts",
     "db:reset": "prisma migrate reset",
     "db:verify": "tsx prisma/verify.ts",
+    "seller-orders:migration:verify": "tsx prisma/verify-seller-order-migration.ts",
     "auth:roles:bootstrap-admin": "tsx scripts/bootstrap-admin.ts",
     "reviews:media:cleanup": "tsx scripts/cleanup-review-media.ts",
     "seller-products:media:cleanup": "tsx scripts/cleanup-seller-product-media.ts",

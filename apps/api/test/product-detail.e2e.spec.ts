@@ -84,14 +84,22 @@ describe('Product detail endpoint', () => {
     });
     expect(detail.getProduct).toHaveBeenCalledWith(productId);
   });
+  it('returns product detail when looked up by slug', async () => {
+    const result = await request(app.getHttpServer())
+      .get('/api/v1/catalog/products/ao-thun-nam')
+      .expect(200);
+    expect(result.headers['cache-control']).toBe('no-store');
+    expect(detail.getProduct).toHaveBeenCalledWith('ao-thun-nam');
+  });
   it('rejects malformed IDs without loading data', async () => {
     const result = await request(app.getHttpServer())
-      .get('/api/v1/catalog/products/not-a-uuid')
+      .get('/api/v1/catalog/products/INVALID_ID!@#')
       .expect(400);
     expect(result.headers['content-type']).toContain('application/problem+json');
     expect(result.body).toMatchObject({ status: 400, title: 'Invalid product identifier' });
     expect(detail.getProduct).not.toHaveBeenCalled();
   });
+
   it('sanitizes not-found and source failures', async () => {
     detail.getProduct.mockImplementationOnce(() => {
       throw new CatalogProductNotFoundError();

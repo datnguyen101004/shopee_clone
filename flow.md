@@ -1053,3 +1053,100 @@ sequenceDiagram
 Review/order snapshot không bị xóa; chỉ product authoring graph đủ điều kiện mới bị purge. Product
 không tồn tại trả 404 generic, còn tombstone trả 410 tối thiểu, không lộ seller, mô tả, media hay
 `purgeBlockReason`.
+
+## 25. Trung tâm Quản trị (Admin Console - Issue #28 / T27)
+
+Trung tâm Quản trị (`/admin`) cho phép Administrator giám sát toàn sàn, quản lý người dùng, duyệt/khóa shop, hiệu chỉnh cây danh mục 3 cấp, cấu hình module trang chủ & banner, và tra cứu nhật ký kiểm toán bất biến.
+
+### 25.1. Luồng phân quyền và khóa tài khoản / Shop (Immediate Session Revocation)
+
+```mermaid
+sequenceDiagram
+    actor Admin
+    participant UI as Admin Console (/admin/users)
+    participant API as Admin Controller / Guard
+    participant Svc as AdminService
+    participant DB as PostgreSQL (Transaction)
+    participant Buyer as Buyer Bị Khóa
+
+    Admin->>UI: Chọn khóa tài khoản + nhập lý do (8-240 ký tự)
+    UI->>API: POST /api/v1/admin/users/:userId/actions<br/>Origin: trusted, Auth: Bearer Admin
+    API->>API: Check AuthGuard + RolesGuard ('admin') + Origin
+    API->>Svc: executeUserAction(actorAdminId, targetUserId, 'SUSPEND', reason)
+    Svc->>Svc: Check tự khóa (SelfActionForbidden) & Last-Admin
+    Svc->>DB: BEGIN Transaction
+    Svc->>DB: UPDATE users SET status='SUSPENDED' WHERE id=targetUserId
+    Svc->>DB: UPDATE auth_sessions SET revoked_at=NOW() WHERE user_id=targetUserId AND revoked_at IS NULL
+    Svc->>DB: INSERT INTO privileged_audit_events (target=USER, action=SUSPEND, actor, reason, diff)
+    Svc->>DB: COMMIT Transaction
+    DB-->>API: Success
+    API-->>UI: 201 Created (AdminUserSummary)
+    
+    Note over Buyer,API: Khi Buyer gửi request tiếp theo:
+    Buyer->>API: GET /api/v1/account/profile (Bearer token cũ)
+    API->>DB: findAuthenticatedSession(userId, sessionId)
+    DB-->>API: revokedAt != null OR user.status == 'SUSPENDED'
+    API-->>Buyer: 401 AuthenticationFailedError (Problem Details)
+```
+
+### 25.2. Quản lý cây danh mục và ngăn ngừa vòng lặp / cô lập dữ liệu
+
+```mermaid
+flowchart TD
+    admin["Admin /admin/categories"] --> action{"Thao tác Danh mục"}
+    
+    action -->|Tạo mới| create["Kiểm tra slug kebab-case\nKiểm tra độ sâu <= 3 cấp\nCommit + Audit CREATE"]
+    
+    action -->|Cập nhật parentId| cycleCheck{"Kiểm tra vòng lặp\n(Cycle Detection)"}
+    cycleCheck -->|parentId là chính nó hoặc con cháu| cycleErr["409 CategoryCycleConflictError\n(Problem Details)"]
+    cycleCheck -->|Hợp lệ| updateCat["Cập nhật parentId\nCommit + Audit UPDATE"]
+    
+    action -->|Xóa danh mục| deleteCheck{"Kiểm tra ràng buộc toàn vẹn"}
+    deleteCheck -->|Còn sản phẩm liên kết (products > 0)| delErr1["409 CategoryIntegrityConflictError\n'Category contains active products'"]
+    deleteCheck -->|Còn danh mục con (children > 0)| delErr2["409 CategoryIntegrityConflictError\n'Category has subcategories'"]
+    deleteCheck -->|Không còn ràng buộc| deleteCommit["DELETE FROM categories\nCommit + Audit DELETE"]
+```
+
+### 25.3. Kiểm soát và Kiểm duyệt Sản phẩm (Product Inspection & Moderation)
+
+```mermaid
+sequenceDiagram
+    actor Admin
+    participant UI as Admin Console (/admin/products)
+    participant API as AdminProductsController
+    participant Svc as AdminService
+    participant DB as PostgreSQL
+
+    Admin->>UI: Nhập slug (hoặc UUID sản phẩm) -> Click "Tra cứu"
+    UI->>API: GET /api/v1/admin/products/lookup?slug=...<br/>Auth: Bearer Admin
+    API->>Svc: lookupProduct(slug)
+    Svc->>DB: findProductBySlugOrId (include shop, category, images, variants, inventory)
+    DB-->>Svc: Product Detail Record
+    Svc-->>API: AdminProductLookupResponse
+    API-->>UI: 200 OK (Render full product profile, shop, variants & stock)
+
+    opt Admin quyết định Khóa/Mở khóa sản phẩm
+        Admin->>UI: Click "Khóa sản phẩm" / "Mở khóa" + Nhập lý do (>= 8 ký tự)
+        UI->>API: POST /api/v1/admin/products/:productId/actions<br/>Body: { action: 'SUSPEND' | 'RESTORE', reason }
+        API->>Svc: applyProductAction(productId, input, actorAdminId)
+        Svc->>DB: BEGIN Transaction
+        Svc->>DB: UPDATE products SET moderation_status = 'SUSPENDED'/'ACTIVE' WHERE id = productId
+        Svc->>DB: INSERT INTO privileged_audit_events (target=PRODUCT, action, actor, reason, diff)
+        Svc->>DB: COMMIT Transaction
+        DB-->>API: Success
+        API-->>UI: 200 OK (AdminProductActionResult)
+        UI->>UI: Cập nhật huy hiệu kiểm duyệt realtime
+    end
+```
+
+Các endpoint chính:
+- `GET /api/v1/admin/dashboard` - Thống kê realtime toàn hệ thống.
+- `GET /api/v1/admin/users`, `POST /api/v1/admin/users/:userId/actions` - Tra cứu, khóa/mở khóa user.
+- `GET /api/v1/admin/shops`, `POST /api/v1/admin/shops/:shopId/actions` - Tra cứu, khóa/mở khóa shop.
+- `GET /api/v1/admin/products/lookup`, `POST /api/v1/admin/products/:productId/actions` - Tra cứu, kiểm duyệt, khóa/mở khóa sản phẩm vi phạm.
+- `GET /api/v1/admin/categories`, `POST`, `PATCH :id`, `DELETE :id`, `POST reorder` - Quản lý phân cấp ngành hàng.
+- `GET /api/v1/admin/homepage/banners`, `POST`, `PATCH :id`, `DELETE :id`, `POST reorder` - Banner chiến dịch.
+- `GET /api/v1/admin/homepage/modules`, `PATCH :id` - Cấu hình hiển thị modules trang chủ.
+- `GET /api/v1/admin/audit` - Nhật ký kiểm toán thao tác đặc quyền (Append-only).
+
+

@@ -108,8 +108,10 @@ export class CatalogProductDetailService {
 
     return {
       id: product.id,
+      slug: product.slug,
       name: product.name,
       description: product.description,
+
       category: { slug: product.category.slug, name: product.category.name },
       ratingAverageBasisPoints: product.ratingAverageBasisPoints,
       ratingCount: product.ratingCount,

@@ -87,17 +87,19 @@ function optionalNonNegativeInteger(
 ): number | null {
   const raw = rawString(name, value, issues);
   if (raw === undefined || raw === '') return null;
-  if (!/^(?:0|[1-9]\d*)$/.test(raw)) {
+  const sanitized = raw.replace(/[.,]/g, '');
+  if (!/^(?:0|[1-9]\d*)$/.test(sanitized)) {
     issues.push({ name, reason: 'must be a non-negative integer' });
     return null;
   }
-  const parsed = Number(raw);
+  const parsed = Number(sanitized);
   if (!Number.isSafeInteger(parsed)) {
     issues.push({ name, reason: 'is too large' });
     return null;
   }
   return parsed;
 }
+
 
 function optionalEnum<T extends string>(
   name: 'availability' | 'promotion' | 'sort',

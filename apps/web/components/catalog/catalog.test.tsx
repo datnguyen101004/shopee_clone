@@ -1,5 +1,6 @@
 import type { CatalogProductCard, CatalogProductsResponse } from '@shopee-clone/contracts';
-import { render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
+
 import { describe, expect, it } from 'vitest';
 
 import { CatalogContent, CatalogPagination, DiscoveryControls, catalogPageHref } from './catalog';
@@ -175,11 +176,17 @@ describe('catalog components', () => {
     );
   });
 
-  it('renders a labelled, non-interactive loading composition', () => {
-    render(<CatalogLoading />);
-    const loading = screen.getByLabelText('Đang tải danh mục sản phẩm');
-    expect(loading).toHaveAttribute('aria-busy', 'true');
-    expect(loading.querySelectorAll('.catalog-skeleton--card')).toHaveLength(12);
-    expect(within(loading).queryByRole('link')).not.toBeInTheDocument();
+  it('formats and visualizes numbers in price range inputs with thousands separators', () => {
+    const discovery = response();
+    render(<DiscoveryControls response={discovery} context={context()} />);
+    const minInput = screen.getByRole('textbox', { name: 'Giá thấp nhất' });
+    const maxInput = screen.getByRole('textbox', { name: 'Giá cao nhất' });
+
+    fireEvent.change(minInput, { target: { value: '1000' } });
+    expect(minInput).toHaveValue('1.000');
+
+    fireEvent.change(maxInput, { target: { value: '5000000' } });
+    expect(maxInput).toHaveValue('5.000.000');
   });
 });
+

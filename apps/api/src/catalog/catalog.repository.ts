@@ -44,10 +44,11 @@ export class CatalogRepository {
     return this.findCandidates(undefined, shopId);
   }
 
-  findPublicProduct(productId: string) {
+  findPublicProduct(identifier: string) {
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(identifier);
     return this.prisma.product.findFirst({
       where: {
-        id: productId,
+        ...(isUuid ? { id: identifier } : { slug: identifier }),
         ...sellableProductWhere,
         shop: sellableShopWhere,
         category: { isActive: true, deletedAt: null },
@@ -65,10 +66,14 @@ export class CatalogRepository {
     });
   }
 
-  findDeletedProduct(productId: string) {
+  findDeletedProduct(identifier: string) {
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(identifier);
     return this.prisma.product.findFirst({
-      where: { id: productId, deletedAt: { not: null } },
-      select: { id: true },
+      where: {
+        ...(isUuid ? { id: identifier } : { slug: identifier }),
+        deletedAt: { not: null },
+      },
+      select: { id: true, slug: true },
     });
   }
 

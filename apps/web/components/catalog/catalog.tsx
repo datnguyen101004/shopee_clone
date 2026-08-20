@@ -1,3 +1,5 @@
+'use client';
+
 import type {
   CatalogProductCard,
   CatalogProductsResponse,
@@ -5,6 +7,7 @@ import type {
 } from '@shopee-clone/contracts';
 import { Badge, Card } from '@shopee-clone/ui';
 import Link from 'next/link';
+import { useState } from 'react';
 
 import { MarketplaceProductImage } from '../marketplace-product-image';
 import { FavoriteButton } from '../engagement/favorite-button';
@@ -21,6 +24,56 @@ export type CatalogRouteContext = CatalogQueryContext & { pageSize: number };
 function formatNumber(value: number): string {
   return new Intl.NumberFormat('vi-VN').format(value);
 }
+
+function formatPriceDisplay(value: number | string | null | undefined): string {
+  if (value === null || value === undefined || value === '') return '';
+  const digits = String(value).replace(/\D/g, '');
+  if (!digits) return '';
+  return new Intl.NumberFormat('vi-VN').format(Number(digits));
+}
+
+function FormattedPriceInput({
+  name,
+  ariaLabel,
+  initialValue,
+  placeholder,
+}: {
+  name: 'minPrice' | 'maxPrice';
+  ariaLabel: string;
+  initialValue: number | null;
+  placeholder: string;
+}) {
+  const [displayValue, setDisplayValue] = useState(() => formatPriceDisplay(initialValue));
+  const [rawValue, setRawValue] = useState(() => (initialValue !== null ? String(initialValue) : ''));
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const rawDigits = e.target.value.replace(/\D/g, '');
+    if (!rawDigits) {
+      setDisplayValue('');
+      setRawValue('');
+      return;
+    }
+    const num = Number(rawDigits);
+    if (!Number.isSafeInteger(num)) return;
+    setDisplayValue(new Intl.NumberFormat('vi-VN').format(num));
+    setRawValue(rawDigits);
+  };
+
+  return (
+    <>
+      <input type="hidden" name={name} value={rawValue} />
+      <input
+        aria-label={ariaLabel}
+        type="text"
+        inputMode="numeric"
+        value={displayValue}
+        onChange={handleChange}
+        placeholder={placeholder}
+      />
+    </>
+  );
+}
+
 
 export function ProductCard({ product }: { product: CatalogProductCard }) {
   return (
@@ -244,26 +297,21 @@ export function DiscoveryControls({
         </div>
         <fieldset className="catalog-price">
           <legend>Khoảng giá (₫)</legend>
-          <input
-            aria-label="Giá thấp nhất"
+          <FormattedPriceInput
+            ariaLabel="Giá thấp nhất"
             name="minPrice"
-            type="number"
-            min="0"
-            step="1"
-            defaultValue={query.minPrice ?? ''}
-            placeholder={facets.priceRange.min === null ? 'Từ' : String(facets.priceRange.min)}
+            initialValue={query.minPrice}
+            placeholder={facets.priceRange.min === null ? 'Từ' : formatPriceDisplay(facets.priceRange.min)}
           />
           <span>–</span>
-          <input
-            aria-label="Giá cao nhất"
+          <FormattedPriceInput
+            ariaLabel="Giá cao nhất"
             name="maxPrice"
-            type="number"
-            min="0"
-            step="1"
-            defaultValue={query.maxPrice ?? ''}
-            placeholder={facets.priceRange.max === null ? 'Đến' : String(facets.priceRange.max)}
+            initialValue={query.maxPrice}
+            placeholder={facets.priceRange.max === null ? 'Đến' : formatPriceDisplay(facets.priceRange.max)}
           />
         </fieldset>
+
         <div className="catalog-field">
           <label htmlFor="catalog-rating">Đánh giá</label>
           <select id="catalog-rating" name="rating" defaultValue={query.rating ?? ''}>

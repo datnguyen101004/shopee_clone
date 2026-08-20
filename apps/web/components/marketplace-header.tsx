@@ -30,6 +30,14 @@ export function MarketplaceHeader({
   const [searchError, setSearchError] = useState('');
   const userMenuId = 'marketplace-user-menu';
 
+  useEffect(() => {
+    if (!searchError) return;
+    const timer = setTimeout(() => {
+      setSearchError('');
+    }, 3000);
+    return () => clearTimeout(timer);
+  }, [searchError]);
+
   function handleSearchSubmit(event: FormEvent<HTMLFormElement>) {
     const form = event.currentTarget;
     const input = form.elements.namedItem('q');
@@ -44,6 +52,7 @@ export function MarketplaceHeader({
     input.value = query;
     setSearchError('');
   }
+
 
   return (
     <Container className="market-header">

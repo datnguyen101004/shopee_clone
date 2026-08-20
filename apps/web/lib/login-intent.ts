@@ -28,9 +28,11 @@ export function safeProductLoginIntent(
     !isCanonicalProductId(variantId) ||
     !quantity ||
     !/^[1-9]\d*$/.test(quantity) ||
-    !Number.isSafeInteger(Number(quantity)) ||
-    returnTo !== `/products/${productId}`
+    !returnTo ||
+    !returnTo.startsWith('/products/') ||
+    !isCanonicalProductId(returnTo.slice('/products/'.length))
   ) {
+
     return null;
   }
   return {

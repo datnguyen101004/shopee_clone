@@ -105,6 +105,32 @@ enum RoleAuditSource {
   @@map("role_audit_source")
 }
 
+enum PrivilegedTargetType {
+  USER            @map("user")
+  SHOP            @map("shop")
+  CATEGORY        @map("category")
+  BANNER          @map("banner")
+  HOMEPAGE_MODULE @map("homepage_module")
+  PRODUCT         @map("product")
+
+  @@map("privileged_target_type")
+}
+
+
+enum PrivilegedAction {
+  SUSPEND @map("suspend")
+  RESTORE @map("restore")
+  CREATE  @map("create")
+  UPDATE  @map("update")
+  DELETE  @map("delete")
+  REORDER @map("reorder")
+  APPROVE @map("approve")
+  REJECT  @map("reject")
+
+  @@map("privileged_action")
+}
+
+
 enum VoucherIssuer {
   PLATFORM @map("platform")
   SHOP     @map("shop")
@@ -278,6 +304,7 @@ model User {
   reviewModeration         ReviewModerationEvent[]   @relation("ReviewModerationActor")
   inventoryAdjustments     InventoryAdjustment[]     @relation("InventoryAdjustmentActor")
   inventoryReservations    InventoryReservation[]    @relation("InventoryReservationBuyer")
+  privilegedAuditActions   PrivilegedAuditEvent[]    @relation("PrivilegedAuditActor")
 
   @@index([status])
   @@index([deletedAt])
@@ -338,6 +365,26 @@ model RoleAuditEvent {
   @@index([role, action, createdAt])
   @@map("role_audit_events")
 }
+
+model PrivilegedAuditEvent {
+  id            String               @id @default(uuid()) @db.Uuid
+  actorUserId   String               @map("actor_user_id") @db.Uuid
+  targetType    PrivilegedTargetType @map("target_type")
+  targetId      String               @map("target_id") @db.Uuid
+  action        PrivilegedAction
+  reason        String               @db.VarChar(240)
+  beforeSummary Json?                @map("before_summary")
+  afterSummary  Json?                @map("after_summary")
+  createdAt     DateTime             @default(now()) @map("created_at") @db.Timestamptz(3)
+  actorUser     User                 @relation("PrivilegedAuditActor", fields: [actorUserId], references: [id], onDelete: Restrict)
+
+  @@index([createdAt, id])
+  @@index([targetType, targetId, createdAt])
+  @@index([actorUserId, createdAt])
+  @@index([action, createdAt])
+  @@map("privileged_audit_events")
+}
+
 
 model ExternalIdentity {
   id              String                   @id @default(uuid()) @db.Uuid

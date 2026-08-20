@@ -10,8 +10,10 @@ export interface CatalogueOffer {
 
 export interface CatalogueCandidate {
   id: string;
+  slug?: string;
   name: string;
   categoryId: string;
+
   description: string;
   createdAt: Date;
   ratingAverageBasisPoints: number;
@@ -99,8 +101,9 @@ export function mapCatalogProductCard(product: CatalogueCandidate): CatalogProdu
   return {
     id: product.id,
     name: product.name,
-    href: `/products/${product.id}`,
+    href: `/products/${product.slug || product.id}`,
     imageUrl: image?.url ?? null,
+
     imageAlt: image?.altText ?? product.name,
     priceMinor: representative.priceMinor,
     ...(promotion ?? {}),

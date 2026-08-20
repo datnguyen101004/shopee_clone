@@ -124,8 +124,9 @@ export class HomepageService {
           id: product.id,
           name: product.name,
           shopName: product.shop.name,
-          href: `/products/${encodeURIComponent(product.id)}`,
+          href: `/products/${encodeURIComponent(product.slug || product.id)}`,
           imageUrl: image?.url ?? null,
+
           imageAlt: image?.altText ?? product.name,
           priceMinor,
           ...(compareAt !== null && compareAt > priceMinor

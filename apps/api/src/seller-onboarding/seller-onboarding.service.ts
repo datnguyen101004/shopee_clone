@@ -25,7 +25,13 @@ import { Inject, Injectable } from '@nestjs/common';
 import { AuthorizationDeniedError } from '../auth/auth.errors';
 import { RoleAuthorizationService } from '../auth/role-authorization.service';
 import { Prisma } from '../generated/prisma/client';
-import { ShopOnboardingStatus, ShopStatus } from '../generated/prisma/enums';
+import {
+  PrivilegedAction,
+  PrivilegedTargetType,
+  ShopOnboardingStatus,
+  ShopStatus,
+} from '../generated/prisma/enums';
+import { recordPrivilegedAudit } from '../admin/privileged-audit.helper';
 import {
   SellerOnboardingInputError,
   SellerOnboardingUnavailableError,
@@ -440,7 +446,23 @@ export class SellerOnboardingService {
           input.reason,
         );
       }
+      await recordPrivilegedAudit(transaction, {
+        actorUserId,
+        targetType: PrivilegedTargetType.SHOP,
+        targetId: shop.id,
+        action: input.decision === 'approve' ? PrivilegedAction.APPROVE : PrivilegedAction.REJECT,
+        reason: input.reason,
+        beforeSummary: {
+          status: shop.status,
+          onboardingStatus: shop.onboardingStatus,
+        },
+        afterSummary: {
+          status: next.status,
+          onboardingStatus: next.onboardingStatus,
+        },
+      });
       return profile(await this.repository.updateShop(transaction, shop.id, next));
     });
   }
 }
+

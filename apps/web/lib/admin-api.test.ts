@@ -1,0 +1,155 @@
+import { describe, expect, it, vi } from 'vitest';
+import {
+  applyAdminProductAction,
+  executeAdminShopAction,
+  executeAdminUserAction,
+  fetchAdminDashboard,
+  fetchAdminUsers,
+  lookupAdminProduct,
+} from './admin-api';
+
+
+
+describe('Admin API boundary', () => {
+  it('calls dashboard with no-store and handles valid response', async () => {
+    const dashboardData = {
+      adminVersion: 'admin-v1',
+      generatedAt: '2026-08-20T12:00:00.000Z',
+      counts: {
+        usersCount: 10,
+        activeUsersCount: 9,
+        suspendedUsersCount: 1,
+        shopsCount: 5,
+        pendingShopApprovalsCount: 1,
+        categoriesCount: 8,
+        activeCategoriesCount: 8,
+        homepageBannersCount: 2,
+        enabledHomepageModulesCount: 4,
+        recentAuditEventsCount: 3,
+      },
+    };
+
+    const authenticatedFetch = vi.fn().mockResolvedValue(Response.json(dashboardData));
+    const result = await fetchAdminDashboard(authenticatedFetch);
+
+    expect(result).toEqual(dashboardData);
+    const [url, init] = authenticatedFetch.mock.calls[0]!;
+    expect(String(url)).toBe('http://localhost:3001/api/v1/admin/dashboard');
+    expect(init).toMatchObject({ cache: 'no-store' });
+  });
+
+  it('submits user suspension action with valid body', async () => {
+    const userSummary = {
+      id: '00000000-0000-4000-8000-000000000002',
+      email: 'target@example.com',
+      displayName: 'Target User',
+      phoneNumber: null,
+      status: 'SUSPENDED',
+      roles: ['buyer'],
+      createdAt: '2026-08-20T12:00:00.000Z',
+      updatedAt: '2026-08-20T12:00:00.000Z',
+    };
+
+    const authenticatedFetch = vi.fn().mockResolvedValue(Response.json(userSummary));
+    const result = await executeAdminUserAction(
+      authenticatedFetch,
+      '00000000-0000-4000-8000-000000000002',
+      { action: 'SUSPEND', reason: 'Violation of marketplace policy' },
+    );
+
+    expect(result.status).toBe('SUSPENDED');
+    const [url, init] = authenticatedFetch.mock.calls[0]!;
+    expect(String(url)).toBe(
+      'http://localhost:3001/api/v1/admin/users/00000000-0000-4000-8000-000000000002/actions',
+    );
+    expect(init.method).toBe('POST');
+    expect(JSON.parse(String(init.body))).toEqual({
+      action: 'SUSPEND',
+      reason: 'Violation of marketplace policy',
+    });
+  });
+
+  it('submits shop restore action with valid payload', async () => {
+    const shopSummary = {
+      id: '00000000-0000-4000-8000-000000000101',
+      ownerUserId: '00000000-0000-4000-8000-000000000002',
+      slug: 'my-shop',
+      name: 'My Shop',
+      status: 'ACTIVE',
+      onboardingStatus: 'APPROVED',
+      onboardingReason: 'Approved after manual review',
+      createdAt: '2026-08-20T12:00:00.000Z',
+      updatedAt: '2026-08-20T12:00:00.000Z',
+    };
+
+    const authenticatedFetch = vi.fn().mockResolvedValue(Response.json(shopSummary));
+    const result = await executeAdminShopAction(
+      authenticatedFetch,
+      '00000000-0000-4000-8000-000000000101',
+      { action: 'RESTORE', reason: 'Suspension resolved after proof of identity' },
+    );
+
+    expect(result.status).toBe('ACTIVE');
+  });
+
+  it('passes search filters and status to users query', async () => {
+    const authenticatedFetch = vi.fn().mockResolvedValue(Response.json({ items: [], nextCursor: null }));
+    await fetchAdminUsers(authenticatedFetch, {
+      status: 'ACTIVE',
+      role: 'seller',
+      q: 'john',
+    });
+
+    const [url] = authenticatedFetch.mock.calls[0]!;
+    expect(String(url)).toContain('status=ACTIVE');
+    expect(String(url)).toContain('role=seller');
+    expect(String(url)).toContain('q=john');
+  });
+
+  it('looks up product by slug and executes product suspension action', async () => {
+    const productLookupResponse = {
+      adminVersion: 'admin-v1',
+      product: {
+        id: '00000000-0000-4000-8000-000000000301',
+        shopId: '00000000-0000-4000-8000-000000000101',
+        shopName: 'Sample Shop',
+        shopSlug: 'sample-shop',
+        shopStatus: 'ACTIVE',
+        categoryId: '00000000-0000-4000-8000-000000000201',
+        categoryName: 'Thời trang',
+        categorySlug: 'thoi-trang',
+        slug: 'ao-thun-nam',
+        name: 'Áo thun nam cotton',
+        description: 'Mô tả sản phẩm',
+        status: 'ACTIVE',
+        moderationStatus: 'ACTIVE',
+        ratingAverageBasisPoints: 480,
+        ratingCount: 120,
+        soldCount: 540,
+        images: [],
+        variants: [],
+        createdAt: '2026-08-20T12:00:00.000Z',
+        updatedAt: '2026-08-20T12:00:00.000Z',
+      },
+    };
+
+    const actionResult = {
+      adminVersion: 'admin-v1',
+      productId: '00000000-0000-4000-8000-000000000301',
+      moderationStatus: 'SUSPENDED',
+      updatedAt: '2026-08-20T12:05:00.000Z',
+    };
+
+    const fetchLookup = vi.fn().mockResolvedValue(Response.json(productLookupResponse));
+    const lookupRes = await lookupAdminProduct(fetchLookup, { slug: 'ao-thun-nam' });
+    expect(lookupRes.product?.name).toBe('Áo thun nam cotton');
+
+    const fetchAction = vi.fn().mockResolvedValue(Response.json(actionResult));
+    const actionRes = await applyAdminProductAction(fetchAction, '00000000-0000-4000-8000-000000000301', {
+      action: 'SUSPEND',
+      reason: 'Prohibited counterfeit goods reported',
+    });
+    expect(actionRes.moderationStatus).toBe('SUSPENDED');
+  });
+});
+

@@ -82,8 +82,9 @@ export function productLoginHandoff(
 ): string {
   const params = new URLSearchParams({
     intent,
-    returnTo: `/products/${product.id}`,
+    returnTo: `/products/${product.slug || product.id}`,
     productId: product.id,
+
     variantId,
     quantity,
   });

@@ -22,6 +22,7 @@ import { SellerOrdersModule } from './seller-orders/seller-orders.module';
 import { ScheduleModule } from '@nestjs/schedule';
 import { SellerAnalyticsModule } from './seller-analytics/seller-analytics.module';
 import { SellerPromotionsModule } from './seller-promotions/seller-promotions.module';
+import { AdminModule } from './admin/admin.module';
 
 @Module({
   imports: [
@@ -47,6 +48,7 @@ import { SellerPromotionsModule } from './seller-promotions/seller-promotions.mo
     SellerOrdersModule,
     SellerAnalyticsModule,
     SellerPromotionsModule,
+    AdminModule,
   ],
 })
 export class AppModule {}

@@ -143,8 +143,10 @@ function isCatalogProductCard(value: unknown): value is CatalogProductCard {
     ) ||
     !isCanonicalEngagementProductId(value.id) ||
     !isString(value.name) ||
-    value.href !== `/products/${value.id}` ||
+    !isString(value.href) ||
+    !value.href.startsWith('/products/') ||
     !(value.imageUrl === null || isString(value.imageUrl)) ||
+
     !isString(value.imageAlt) ||
     !isNonNegativeInteger(value.priceMinor) ||
     !isNonNegativeInteger(value.ratingAverageBasisPoints) ||

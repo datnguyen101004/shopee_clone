@@ -51,7 +51,8 @@ describe('fetchProductDetail', () => {
     expect(init).toMatchObject({ cache: 'no-store' });
   });
   it.each([
-    ['invalid-id', 'not-uuid', vi.fn()],
+    ['invalid-id', 'INVALID_ID!@#', vi.fn()],
+
     ['not-found', productId, vi.fn().mockResolvedValue(new Response('{}', { status: 404 }))],
     ['deleted', productId, vi.fn().mockResolvedValue(new Response(JSON.stringify({ type: 'https://shopee-clone.local/problems/product-deleted', title: 'Product deleted', status: 410, detail: 'Deleted', code: 'PRODUCT_DELETED' }), { status: 410 }))],
     ['status', productId, vi.fn().mockResolvedValue(new Response('{}', { status: 503 }))],

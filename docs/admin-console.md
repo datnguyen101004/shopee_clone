@@ -1,0 +1,27 @@
+# Admin Console Architecture & Security (T27)
+
+T27 adds the operational Admin Console, enabling platform administrators to oversee marketplace operations, manage users, approve and moderate seller shops, maintain category taxonomy, configure homepage modules & campaign banners, and review append-only privileged audit events.
+
+## Permission Matrix & Security Guardrails
+
+| Route Group | Path | Auth / Role | Safeguards |
+| :--- | :--- | :--- | :--- |
+| **Dashboard** | `GET /api/v1/admin/dashboard` | `AuthGuard` + `RolesGuard('admin')` | Realtime count aggregate, `Cache-Control: private, no-store` |
+| **User Moderation** | `GET /api/v1/admin/users`, `POST .../actions` | `AuthGuard` + `RolesGuard('admin')` + Trusted Origin | Self-suspend prevention, Last-Admin conflict protection, immediate DB session revocation (`revokedAt = now()`) |
+| **Shop Moderation** | `GET /api/v1/admin/shops`, `POST .../actions` | `AuthGuard` + `RolesGuard('admin')` + Trusted Origin | Restore rejected shop prevention, reason bounded 8-240 chars |
+| **Category Hierarchy** | `GET /api/v1/admin/categories`, `POST`, `PATCH`, `DELETE` | `AuthGuard` + `RolesGuard('admin')` + Trusted Origin | Max 3 depth levels, parent cycle conflict detection, product/child integrity locks |
+| **Homepage & Banners**| `GET /api/v1/admin/homepage/banners`, `POST`, `PATCH`, `DELETE` | `AuthGuard` + `RolesGuard('admin')` + Trusted Origin | Open-redirect defense (relative path `/...`), media URL allowlist |
+| **Privileged Audit** | `GET /api/v1/admin/audit` | `AuthGuard` + `RolesGuard('admin')` | Append-only in PostgreSQL, transactional writes, no update/delete routes |
+
+## Multi-Device Session Invalidation on Suspend
+
+When an administrator suspends a user via `POST /api/v1/admin/users/:userId/actions`:
+1. User status is set to `SUSPENDED`.
+2. All active sessions for `userId` in `auth_sessions` are updated with `revoked_at = NOW()`.
+3. An append-only record is committed in `privileged_audit_events`.
+4. Any subsequent API request using tokens from those sessions receives immediate `401 AuthenticationFailedError` upon session verification in `AuthGuard`.
+
+## Category Taxonomy Integrity
+
+- **Cycle Detection**: Attempting to set a category's `parentId` to itself or any of its descendants traverses upward and throws `409 CategoryCycleConflictError`.
+- **Referential Integrity**: Categories with `productsCount > 0` or `childrenCount > 0` cannot be deleted and reject with `409 CategoryIntegrityConflictError`.

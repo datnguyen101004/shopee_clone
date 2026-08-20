@@ -67,3 +67,43 @@ export async function fetchRoleAuditPage(
   if (!isRoleAuditPage(body)) throw new RoleApiError('contract', status);
   return body;
 }
+
+export async function grantRole(
+  fetcher: AuthenticatedFetcher,
+  userId: string,
+  role: 'seller' | 'admin',
+  reason: string,
+): Promise<void> {
+
+  const url = endpoint(`/api/v1/admin/users/${userId}/roles`);
+  const response = await fetcher(url, {
+    method: 'POST',
+    cache: 'no-store',
+    headers: {
+      Accept: 'application/json, application/problem+json',
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ role, reason }),
+  });
+  if (!response.ok) throw new RoleApiError('status', response.status);
+}
+
+export async function revokeRole(
+  fetcher: AuthenticatedFetcher,
+  userId: string,
+  role: 'seller' | 'admin',
+  reason: string,
+): Promise<void> {
+  const url = endpoint(`/api/v1/admin/users/${userId}/roles/${role}/revoke`);
+  const response = await fetcher(url, {
+    method: 'POST',
+    cache: 'no-store',
+    headers: {
+      Accept: 'application/json, application/problem+json',
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ reason }),
+  });
+  if (!response.ok) throw new RoleApiError('status', response.status);
+}
+

@@ -138,8 +138,9 @@ function isProduct(value: unknown): value is CartProductSummary {
     hasExactKeys(value, ['id', 'name', 'href', 'imageUrl', 'imageAlt']) &&
     isUuid(value.id) &&
     isString(value.name) &&
-    (value.href === null || value.href === `/products/${value.id}`) &&
+    (value.href === null || (isString(value.href) && value.href.startsWith('/products/'))) &&
     (value.imageUrl === null || isString(value.imageUrl)) &&
+
     isString(value.imageAlt)
   );
 }

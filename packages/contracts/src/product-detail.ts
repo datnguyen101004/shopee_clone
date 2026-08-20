@@ -50,6 +50,7 @@ export interface ProductShippingPreview {
 
 export interface ProductDetailResponse {
   id: string;
+  slug?: string;
   name: string;
   description: string;
   category: ProductDetailCategory;
@@ -64,6 +65,7 @@ export interface ProductDetailResponse {
   shippingPreview: ProductShippingPreview;
   relatedProducts: CatalogProductCard[];
 }
+
 
 export interface ProductDeletedProblemDetails {
   type: 'https://shopee-clone.local/problems/product-deleted';
@@ -141,8 +143,7 @@ function isVariant(value: unknown, galleryIds: Set<string>): value is ProductDet
 
 function isRelatedCard(value: unknown): value is CatalogProductCard {
   if (!isRecord(value) || !isUuid(value.id) || !isString(value.href)) return false;
-  const href = `/products/${value.id}`;
-  if (value.href !== href) return false;
+  if (!value.href.startsWith('/products/')) return false;
   return (
     isString(value.name) &&
     (value.imageUrl === null || isString(value.imageUrl)) &&
@@ -180,6 +181,7 @@ export function isProductDetailResponse(value: unknown): value is ProductDetailR
   if (
     !isRecord(value) ||
     !isUuid(value.id) ||
+    !(value.slug === undefined || isString(value.slug)) ||
     !isString(value.name) ||
     typeof value.description !== 'string' ||
     !isCategory(value.category) ||
@@ -214,6 +216,8 @@ export function isProductDetailResponse(value: unknown): value is ProductDetailR
   const gallery = value.gallery as unknown[];
   const relatedProducts = value.relatedProducts as unknown[];
   const variantIds = new Set<string>();
+  const galleryIds = new Set<string>();
+
   if (
     !variants.every(
       (variant) =>
@@ -224,7 +228,7 @@ export function isProductDetailResponse(value: unknown): value is ProductDetailR
     )
   )
     return false;
-  const galleryIds = new Set<string>();
+
   if (
     !gallery.every(
       (media) =>
@@ -235,6 +239,7 @@ export function isProductDetailResponse(value: unknown): value is ProductDetailR
     )
   )
     return false;
+
   if (!gallery.every((media) => isGalleryMedia(media, variantIds))) return false;
   if (!variants.every((variant) => isVariant(variant, galleryIds))) return false;
   const typedGallery = gallery as ProductGalleryMedia[];
@@ -272,6 +277,11 @@ export function parseProductDetailResponse(value: unknown): ProductDetailRespons
   return isProductDetailResponse(value) ? value : null;
 }
 
-export function isCanonicalProductId(value: string): boolean {
-  return canonicalUuid.test(value);
+export function isCanonicalProductSlug(value: string): boolean {
+  return /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(value) && value.length >= 1 && value.length <= 200;
 }
+
+export function isCanonicalProductId(value: string): boolean {
+  return canonicalUuid.test(value) || isCanonicalProductSlug(value);
+}
+

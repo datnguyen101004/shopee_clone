@@ -1,5 +1,6 @@
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+
 
 import { StorefrontShell } from './storefront-shell';
 import { MarketplaceHeader } from './marketplace-header';
@@ -57,6 +58,26 @@ describe('StorefrontShell', () => {
     expect(input).toHaveValue('tai nghe bluetooth');
     expect(screen.queryByText('Vui lòng nhập từ khoá cần tìm.')).not.toBeInTheDocument();
   });
+
+  it('automatically clears search error after 3 seconds', () => {
+    vi.useFakeTimers();
+    try {
+      renderShell();
+      const search = screen.getByRole('search');
+
+      fireEvent.submit(search);
+      expect(screen.getByText('Vui lòng nhập từ khoá cần tìm.')).toBeInTheDocument();
+
+      act(() => {
+        vi.advanceTimersByTime(3000);
+      });
+      expect(screen.queryByText('Vui lòng nhập từ khoá cần tìm.')).not.toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+
 
   it('opens mobile categories and restores trigger focus after Escape', async () => {
     const user = userEvent.setup();

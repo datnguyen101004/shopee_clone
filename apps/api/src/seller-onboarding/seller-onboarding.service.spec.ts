@@ -77,6 +77,8 @@ describe('SellerOnboardingService', () => {
     updateShop,
     transaction: (work: (tx: unknown) => Promise<unknown>) => work({}),
   } as unknown as SellerOnboardingRepository;
+
+
   const roles = {
     grantSellerForShopApproval: jest.fn().mockResolvedValue(undefined),
   } as unknown as RoleAuthorizationService;

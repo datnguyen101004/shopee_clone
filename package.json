@@ -24,6 +24,7 @@
     "auth:roles:bootstrap-admin": "pnpm --filter @shopee-clone/api auth:roles:bootstrap-admin",
     "reviews:media:cleanup": "pnpm --filter @shopee-clone/api reviews:media:cleanup",
     "reviews:aggregates:repair": "pnpm --filter @shopee-clone/api reviews:aggregates:repair",
+    "seller-analytics:benchmark": "pnpm --filter @shopee-clone/api seller-analytics:benchmark",
     "db:generate": "pnpm --filter @shopee-clone/api db:generate",
     "db:format": "pnpm --filter @shopee-clone/api db:format",
     "db:validate": "pnpm --filter @shopee-clone/api db:validate",
@@ -64,6 +65,7 @@
     "test:e2e:reviews:quick": "node scripts/quick-e2e.mjs reviews",
     "test:e2e:seller:quick": "node scripts/quick-e2e.mjs seller",
     "test:e2e:seller-orders:quick": "node scripts/quick-e2e.mjs seller-orders",
+    "test:e2e:seller-analytics-promotions:quick": "node scripts/quick-e2e.mjs seller-analytics-promotions",
     "test:infra": "node --test scripts/infrastructure-smoke.test.mjs",
     "format": "prettier --write .",
     "format:check": "prettier --check ."

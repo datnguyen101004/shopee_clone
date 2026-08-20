@@ -194,6 +194,32 @@ export function useCartPricing(
     retryGeneration,
   ]);
 
+  useEffect(() => {
+    if (status !== 'ready' || !quote) return;
+    const rejectedShopIds = new Set(
+      quote.vouchers
+        .filter((item) => item.slot === 'SHOP' && item.status === 'REJECTED' && item.shopId)
+        .map((item) => item.shopId as string),
+    );
+    const shippingRejected = quote.vouchers.some(
+      (item) => item.slot === 'FREE_SHIPPING' && item.status === 'REJECTED',
+    );
+    if (rejectedShopIds.size === 0 && !shippingRejected) return;
+    // Clearing a rejected shop/shipping code is synchronized with the latest quote result.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setVoucherChoices((current) => {
+      const shopCodes = (current.shopCodes ?? []).filter((item) => !rejectedShopIds.has(item.shopId));
+      const shopUnchanged = shopCodes.length === (current.shopCodes ?? []).length;
+      const shippingUnchanged = !shippingRejected || !current.freeShippingCode;
+      if (shopUnchanged && shippingUnchanged) return current;
+      const next = { ...current };
+      if (shopCodes.length) next.shopCodes = shopCodes;
+      else delete next.shopCodes;
+      if (shippingRejected) delete next.freeShippingCode;
+      return next;
+    });
+  }, [quote, status]);
+
   return {
     status,
     addresses,

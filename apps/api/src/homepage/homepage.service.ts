@@ -11,6 +11,8 @@ import type {
 import { HomepageModuleType } from '../generated/prisma/enums';
 import { HOMEPAGE_CLOCK, type HomepageClock } from './homepage.clock';
 import { HomepageRepository } from './homepage.repository';
+import { ScheduledDiscountService } from '../pricing/scheduled-discount.service';
+import { publicScheduledPrice } from '../catalog/catalog-presentation';
 
 const moduleTypeMap = {
   [HomepageModuleType.CAMPAIGN_BANNER]: 'campaign-banner',
@@ -35,6 +37,7 @@ export class HomepageService {
   constructor(
     private readonly repository: HomepageRepository,
     @Inject(HOMEPAGE_CLOCK) private readonly clock: HomepageClock,
+    @Inject(ScheduledDiscountService) private readonly scheduledDiscounts?: ScheduledDiscountService,
   ) {}
 
   async getHomepage(): Promise<HomepageResponse> {
@@ -94,6 +97,9 @@ export class HomepageService {
       }
 
       const products: HomepageProductSummary[] = [];
+      const discounts = this.scheduledDiscounts
+        ? await this.scheduledDiscounts.resolveVariants(undefined, record.products.flatMap((entry) => entry.product.variants.map((variant) => ({ id: variant.id, productId: entry.product.id, priceMinor: variant.priceMinor, compareAtPriceMinor: variant.compareAtPriceMinor }))), now)
+        : new Map();
       for (const entry of record.products) {
         const product = entry.product;
         if (!HomepageRepository.isDisplayableProduct(product)) continue;
@@ -103,10 +109,15 @@ export class HomepageService {
             candidate.inventory.quantityOnHand - candidate.inventory.quantityReserved > 0,
         );
         if (!variant) continue;
-        const priceMinor = safeMinor(variant.priceMinor);
+        const discount = discounts.get(variant.id);
+        const effectivePriceMinor = discount?.effectivePriceMinor ?? variant.priceMinor;
+        const effectiveCompareAt = discount && discount.effectivePriceMinor !== discount.basePriceMinor
+          ? (variant.compareAtPriceMinor === null || variant.compareAtPriceMinor < discount.basePriceMinor ? discount.basePriceMinor : variant.compareAtPriceMinor)
+          : variant.compareAtPriceMinor;
+        const priceMinor = safeMinor(effectivePriceMinor);
         if (priceMinor === null) continue;
-        const compareAt = variant.compareAtPriceMinor
-          ? safeMinor(variant.compareAtPriceMinor)
+        const compareAt = effectiveCompareAt
+          ? safeMinor(effectiveCompareAt)
           : null;
         const image = product.images[0];
         products.push({
@@ -120,6 +131,7 @@ export class HomepageService {
           ...(compareAt !== null && compareAt > priceMinor
             ? { compareAtPriceMinor: compareAt }
             : {}),
+          ...(discount ? (() => { const scheduledPrice = publicScheduledPrice(discount); return scheduledPrice ? { scheduledPrice } : {}; })() : {}),
           ...(entry.label ? { label: entry.label } : {}),
           ...(entry.soldCount !== null ? { soldCount: entry.soldCount } : {}),
         });

@@ -129,6 +129,37 @@ function buildQuote(request: PricingQuoteRequest): PricingQuoteResponse {
       ? [selectionResult(freeShippingCode, 'FREE_SHIPPING', shippingDiscount)]
       : []),
   ];
+  const availableShopVouchers = [
+    {
+      shopId: ids.shop,
+      code: 'SHOP-15',
+      name: 'Giảm 15% sản phẩm La Vie',
+      benefitType: 'PERCENTAGE' as const,
+      minimumSpendMinor: 0,
+      estimatedDiscountMinor: 30_000,
+      remainingCount: 9,
+    },
+  ];
+  const availablePlatformVouchers = [
+    {
+      code: 'PLATFORM-10',
+      name: 'Shopee giảm 10%',
+      benefitType: 'PERCENTAGE' as const,
+      minimumSpendMinor: 0,
+      estimatedDiscountMinor: 17_000,
+      remainingCount: 5,
+    },
+  ];
+  const availableShippingVouchers = [
+    {
+      code: 'FREESHIP-30K',
+      name: 'Miễn phí vận chuyển',
+      benefitType: 'FREE_SHIPPING' as const,
+      minimumSpendMinor: 0,
+      estimatedDiscountMinor: Math.min(30_000, shippingRule.fee),
+      remainingCount: 4,
+    },
+  ];
   return {
     pricingVersion: 'pricing-v2',
     voucherVersion: 'voucher-v1',
@@ -188,6 +219,9 @@ function buildQuote(request: PricingQuoteRequest): PricingQuoteResponse {
       },
     ],
     vouchers,
+    availableShopVouchers,
+    availablePlatformVouchers,
+    availableShippingVouchers,
     exclusions: [],
     summary: {
       selectedLineCount: 1,
@@ -291,8 +325,8 @@ test('applies, stacks, rejects, removes and requotes vouchers from server totals
   await page.goto('/cart');
   await expect(page.getByText('222.000₫', { exact: true })).toBeVisible();
 
-  const shopInput = page.getByRole('textbox', { name: /Mã giảm giá của Bách Hóa Xanh/ });
-  await applyCode(shopInput, ' shop-15 ');
+  await page.getByRole('button', { name: /Mã giảm giá của Bách Hóa Xanh/ }).click();
+  await page.getByRole('option', { name: /SHOP-15/ }).click();
   await expect(page.getByText(/Đã áp dụng Giảm 15% sản phẩm La Vie/)).toBeVisible();
 
   const platformInput = page.getByRole('textbox', { name: /Mã Shopee/ });

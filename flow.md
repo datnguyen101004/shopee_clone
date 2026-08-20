@@ -71,6 +71,60 @@ flowchart LR
 
 Mỗi mutation khóa `ShopOrder` rồi fulfillment aggregate, kiểm tra replay theo `Idempotency-Key` trước state/ETag, lấy `clock_timestamp()` của PostgreSQL, ghi audit bất biến và chỉ commit khi lifecycle, fulfillment, inventory, shipment cùng thành công.
 
+## 2.2. Seller analytics dashboard (T26, phần đã apply)
+
+```mermaid
+flowchart LR
+    sellerDashboard["/seller"] --> filters["Chọn from/to + DAY/WEEK/MONTH"]
+    filters --> auth["AuthGuard + seller role"]
+    auth --> owner["Resolve active approved shop của user"]
+    owner --> range["Inclusive local dates → half-open UTC range"]
+    range --> orders["SQL aggregate eligible orders\nAWAITING_PICKUP / SHIPPING / DELIVERED"]
+    range --> inventory["SQL current published inventory\navailable = on-hand - reserved"]
+    orders --> snapshot["Order-line snapshot\nrevenue, units, best sellers"]
+    inventory --> response["Bounded response\nKPI, buckets, top 10, low stock"]
+    snapshot --> response
+    response --> ui["KPI cards + chart + panels\nconversion = NOT_AVAILABLE"]
+```
+
+Đã triển khai `GET /api/v1/seller/dashboard` và `GET /api/v1/seller/analytics/products`. Dashboard chỉ tính đơn đã xác nhận/đang giao/đã giao, không nhận `shopId` từ client, trả múi giờ của shop (mặc định `Asia/Ho_Chi_Minh`), giới hạn khoảng ngày tối đa 366 ngày, và dùng `Cache-Control: private, no-store`. UI dashboard ở `/seller`, quản lý voucher/campaign ở `/seller/promotions`.
+
+## 2.3. Seller promotion lifecycle và giá động
+
+```mermaid
+flowchart LR
+    seller["Seller Center /seller/promotions"] --> tabs{"Voucher shop / Giảm giá sản phẩm"}
+    tabs --> voucher["POST vouchers\nOrigin + Idempotency-Key"]
+    tabs --> campaign["POST discounts\nproduct scope + 1–90% rate"]
+    voucher --> versioned["ETag version\nIf-Match khi sửa"]
+    campaign --> lock["Khóa product IDs ổn định\nkiểm tra overlap"]
+    versioned --> actions{"PAUSE / RESUME / ARCHIVE"}
+    lock --> actions
+    actions --> db[(PostgreSQL\nstate + command replay)]
+    db --> resolver["Central scheduled-price resolver\nserver time, no cron"]
+    resolver --> catalog["Catalog / homepage / product detail"]
+    resolver --> quote["Cart quote"]
+    quote --> checkout["Checkout re-evaluate\norder snapshot immutable"]
+```
+
+Mutation bị giới hạn theo shop sở hữu, lỗi ownership không tiết lộ resource tồn tại. `SellerPromotionCommand` lưu request digest và response để replay idempotent; version mismatch trả `412`. Resolver dùng cùng một rule cho public pricing và quote, theo thứ tự scheduled discount → shop voucher → platform voucher → shipping benefit.
+
+## 2.4. Kiểm thử Seller Center
+
+```mermaid
+sequenceDiagram
+    participant Browser as Browser
+    participant Web as Next.js
+    participant API as NestJS
+    participant DB as PostgreSQL
+    Browser->>Web: Mở /seller hoặc /seller/promotions
+    Web->>API: GET dashboard/promotions (no-store)
+    API->>DB: owner-scoped query + DB time
+    DB-->>API: bounded contract + ETag
+    API-->>Web: response/problem details
+    Web-->>Browser: KPI, trạng thái, form hoặc retry
+```
+
 ## 3. Hành trình khám phá sản phẩm công khai
 
 ```mermaid

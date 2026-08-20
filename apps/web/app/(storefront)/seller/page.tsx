@@ -1,5 +1,6 @@
-import { SellerEntryPage } from '../../../components/role-entry-pages';
+import { Container } from '@shopee-clone/ui';
+import { SellerDashboard } from '../../../components/seller-dashboard';
 
 export default function SellerPage() {
-  return <SellerEntryPage />;
+  return <Container className="operational-page"><SellerDashboard /></Container>;
 }

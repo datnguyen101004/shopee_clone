@@ -10,9 +10,11 @@ import {
   mapCatalogProductCard,
   promotionFor,
   safeMinor,
+  publicScheduledPrice,
 } from './catalog-presentation';
 import { CatalogProductDeletedError, CatalogProductNotFoundError } from './catalog-product-id';
 import { CatalogRepository } from './catalog.repository';
+import { ScheduledDiscountService } from '../pricing/scheduled-discount.service';
 
 type ProductDetailCandidate = NonNullable<
   Awaited<ReturnType<CatalogRepository['findPublicProduct']>>
@@ -47,18 +49,20 @@ function mapVariants(
   const genericPrimary =
     gallery.find((image) => image.variantId === null)?.id ?? gallery[0]?.id ?? null;
   return product.variants.flatMap((variant) => {
-    const priceMinor = safeMinor(variant.priceMinor);
-    const stock = availableQuantity(variant.inventory);
+    const enriched = variant as typeof variant & { scheduledPrice?: ProductDetailVariant['scheduledPrice'] };
+    const priceMinor = safeMinor(enriched.priceMinor);
+    const stock = availableQuantity(enriched.inventory);
     if (priceMinor === null || stock === null) return [];
     const preferredImageId =
-      gallery.find((image) => image.variantId === variant.id)?.id ?? genericPrimary;
+      gallery.find((image) => image.variantId === enriched.id)?.id ?? genericPrimary;
     return [
       {
-        id: variant.id,
-        name: variant.name,
-        sku: variant.sku,
+        id: enriched.id,
+        name: enriched.name,
+        sku: enriched.sku,
         priceMinor,
-        ...(promotionFor(priceMinor, variant.compareAtPriceMinor) ?? {}),
+        ...(promotionFor(priceMinor, enriched.compareAtPriceMinor) ?? {}),
+        ...(enriched.scheduledPrice ? { scheduledPrice: enriched.scheduledPrice } : {}),
         availableQuantity: stock,
         availability: stock > 0 ? 'in-stock' : 'unavailable',
         preferredImageId,
@@ -69,7 +73,7 @@ function mapVariants(
 
 @Injectable()
 export class CatalogProductDetailService {
-  constructor(@Inject(CatalogRepository) private readonly repository: CatalogRepository) {}
+  constructor(@Inject(CatalogRepository) private readonly repository: CatalogRepository, @Inject(ScheduledDiscountService) private readonly scheduledDiscounts?: ScheduledDiscountService) {}
 
   async getProduct(productId: string): Promise<ProductDetailResponse> {
     const product = await this.repository.findPublicProduct(productId);
@@ -82,6 +86,17 @@ export class CatalogProductDetailService {
       this.repository.countPublicProductsForShop(product.shopId),
       this.repository.findRelatedCandidates(product.categoryId, product.id),
     ]);
+    if (this.scheduledDiscounts) {
+      const discounts = await this.scheduledDiscounts.resolveVariants(undefined, product.variants.map((variant) => ({ id: variant.id, productId: product.id, priceMinor: variant.priceMinor, compareAtPriceMinor: variant.compareAtPriceMinor })), new Date());
+      for (const variant of product.variants) {
+        const discount = discounts.get(variant.id);
+        if (discount && discount.effectivePriceMinor !== discount.basePriceMinor) {
+          variant.compareAtPriceMinor = variant.compareAtPriceMinor === null || variant.compareAtPriceMinor < discount.basePriceMinor ? discount.basePriceMinor : variant.compareAtPriceMinor;
+          variant.priceMinor = discount.effectivePriceMinor;
+          (variant as typeof variant & { scheduledPrice?: unknown }).scheduledPrice = publicScheduledPrice(discount);
+        }
+      }
+    }
     const gallery = mapGallery(product);
     const variants = mapVariants(product, gallery);
     const purchasableVariants = variants.filter((variant) => variant.availability === 'in-stock');

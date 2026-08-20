@@ -238,6 +238,42 @@ describe('pricing and voucher contracts', () => {
 
   it('accepts a fully reconciled promotion-aware multi-shop quote', () => {
     expect(isPricingQuoteResponse(quote)).toBe(true);
+    expect(
+      isPricingQuoteResponse({
+        ...quote,
+        availableShopVouchers: [
+          {
+            shopId: shopA,
+            code: 'SHOP-20K',
+            name: 'Giảm 20k',
+            benefitType: 'FIXED_AMOUNT',
+            minimumSpendMinor: 100_000,
+            estimatedDiscountMinor: 20_000,
+            remainingCount: 8,
+          },
+        ],
+        availablePlatformVouchers: [
+          {
+            code: 'PLATFORM-10',
+            name: 'Shopee giảm 10%',
+            benefitType: 'PERCENTAGE',
+            minimumSpendMinor: 100_000,
+            estimatedDiscountMinor: 18_000,
+            remainingCount: 3,
+          },
+        ],
+        availableShippingVouchers: [
+          {
+            code: 'FREESHIP-20K',
+            name: 'Miễn phí vận chuyển',
+            benefitType: 'FREE_SHIPPING',
+            minimumSpendMinor: 100_000,
+            estimatedDiscountMinor: 20_000,
+            remainingCount: 4,
+          },
+        ],
+      }),
+    ).toBe(true);
   });
 
   it('accepts a stable zero quote without vouchers', () => {

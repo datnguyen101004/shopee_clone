@@ -7,4 +7,15 @@ export * from './skeleton';
 export * from './states';
 export * from './toast';
 export * from './tokens';
-export { Heart, Search, ShoppingCart, Star, Store, Truck, UserRound } from 'lucide-react';
+export {
+  CalendarDays,
+  ChevronDown,
+  ChevronUp,
+  Heart,
+  Search,
+  ShoppingCart,
+  Star,
+  Store,
+  Truck,
+  UserRound,
+} from 'lucide-react';

@@ -18,6 +18,7 @@ import { CartPricingPanel } from './cart-pricing-panel';
 import { useCart } from './cart-provider';
 import { useCartPricing } from './use-cart-pricing';
 import type { CartPricingState } from './use-cart-pricing';
+import { ShopVoucherPicker } from './shop-voucher-picker';
 import { VoucherCodeControl } from './voucher-code-control';
 
 function formatCurrency(value: number): string {
@@ -198,13 +199,16 @@ function ShopGroup({
         />
       ))}
       <div className="cart-shop__voucher">
-        <VoucherCodeControl
+        <ShopVoucherPicker
           label={`Mã giảm giá của ${group.shop.name}`}
           appliedCode={
             pricing.vouchers.shopCodes?.find(({ shopId }) => shopId === group.shop.id)?.code
           }
           result={pricing.quote?.vouchers.find(
             ({ slot, shopId }) => slot === 'SHOP' && shopId === group.shop.id,
+          )}
+          options={(pricing.quote?.availableShopVouchers ?? []).filter(
+            (item) => item.shopId === group.shop.id,
           )}
           pending={pricing.status === 'loading' || pricing.status === 'stale'}
           onApply={(code) => pricing.setShopVoucher(group.shop.id, code)}
@@ -234,20 +238,40 @@ function CartVoucherPanel({ pricing }: { pricing: CartPricingState }) {
         <h2 id="cart-vouchers-title">Mã giảm giá</h2>
       </header>
       <div className="cart-vouchers__controls">
-        <VoucherCodeControl
-          label="Mã Shopee"
-          appliedCode={pricing.vouchers.platformCode}
-          result={pricing.quote?.vouchers.find(({ slot }) => slot === 'PLATFORM')}
-          pending={pending}
-          onApply={pricing.setPlatformVoucher}
-        />
-        <VoucherCodeControl
-          label="Mã miễn phí vận chuyển"
-          appliedCode={pricing.vouchers.freeShippingCode}
-          result={pricing.quote?.vouchers.find(({ slot }) => slot === 'FREE_SHIPPING')}
-          pending={pending}
-          onApply={pricing.setFreeShippingVoucher}
-        />
+        <div className="cart-vouchers__platform">
+          <VoucherCodeControl
+            label="Mã Shopee"
+            appliedCode={pricing.vouchers.platformCode}
+            result={pricing.quote?.vouchers.find(({ slot }) => slot === 'PLATFORM')}
+            pending={pending}
+            onApply={pricing.setPlatformVoucher}
+          />
+          <ShopVoucherPicker
+            label="Voucher Shopee"
+            appliedCode={pricing.vouchers.platformCode}
+            result={pricing.quote?.vouchers.find(({ slot }) => slot === 'PLATFORM')}
+            options={pricing.quote?.availablePlatformVouchers ?? []}
+            pending={pending}
+            onApply={pricing.setPlatformVoucher}
+          />
+        </div>
+        <div className="cart-vouchers__shipping">
+          <VoucherCodeControl
+            label="Mã miễn phí vận chuyển"
+            appliedCode={pricing.vouchers.freeShippingCode}
+            result={pricing.quote?.vouchers.find(({ slot }) => slot === 'FREE_SHIPPING')}
+            pending={pending}
+            onApply={pricing.setFreeShippingVoucher}
+          />
+          <ShopVoucherPicker
+            label="Voucher vận chuyển"
+            appliedCode={pricing.vouchers.freeShippingCode}
+            result={pricing.quote?.vouchers.find(({ slot }) => slot === 'FREE_SHIPPING')}
+            options={pricing.quote?.availableShippingVouchers ?? []}
+            pending={pending}
+            onApply={pricing.setFreeShippingVoucher}
+          />
+        </div>
       </div>
     </section>
   );

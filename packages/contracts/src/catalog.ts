@@ -1,3 +1,5 @@
+import { isPublicScheduledPriceBreakdown, type PublicScheduledPriceBreakdown } from './pricing';
+
 export const CATALOG_DEFAULT_PAGE = 1;
 export const CATALOG_DEFAULT_PAGE_SIZE = 12;
 export const CATALOG_MAX_PAGE_SIZE = 48;
@@ -68,6 +70,7 @@ export interface CatalogProductCard {
   priceMinor: number;
   compareAtPriceMinor?: number;
   discountPercent?: number;
+  scheduledPrice?: PublicScheduledPriceBreakdown;
   ratingAverageBasisPoints: number;
   ratingCount: number;
   soldCount: number;
@@ -142,6 +145,7 @@ export const isCatalogProductCard = (value: unknown): value is CatalogProductCar
     value.ratingAverageBasisPoints > 500 ||
     !isSafeNonNegativeInteger(value.ratingCount) ||
     !isSafeNonNegativeInteger(value.soldCount) ||
+    !(value.scheduledPrice === undefined || isPublicScheduledPriceBreakdown(value.scheduledPrice)) ||
     !isShop(value.shop) ||
     !isCategory(value.category)
   ) {

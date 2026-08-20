@@ -1,7 +1,7 @@
 import type { ProductDetailResponse } from '@shopee-clone/contracts';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ProductDetailExperience } from './product-detail-experience';
 import {
@@ -10,6 +10,48 @@ import {
   quantityError,
   selectProductVariant,
 } from './product-detail-interactions';
+
+const { push, addItem, authSession, cartSession } = vi.hoisted(() => {
+  const addItemFn = vi.fn();
+  return {
+    push: vi.fn(),
+    addItem: addItemFn,
+    authSession: {
+      state: {
+        state: { status: 'guest' as 'guest' | 'authenticated' | 'loading' },
+        authenticatedFetch: vi.fn(),
+      },
+    },
+    cartSession: {
+      state: {
+        state: { status: 'unauthenticated' as 'unauthenticated' | 'ready' | 'loading', cart: null },
+        pending: false,
+        message: '',
+        refresh: vi.fn(),
+        addItem: addItemFn,
+        updateQuantity: vi.fn(),
+        removeItem: vi.fn(),
+        selectLine: vi.fn(),
+        selectShop: vi.fn(),
+        selectAll: vi.fn(),
+      },
+    },
+  };
+});
+
+vi.mock('next/navigation', () => ({ useRouter: () => ({ push }) }));
+vi.mock('../auth-session-provider', () => ({
+  useAuthSession: () => authSession.state,
+}));
+vi.mock('../cart/cart-provider', () => ({
+  useCart: () => cartSession.state,
+}));
+vi.mock('../engagement/favorite-state-provider', () => ({
+  FavoriteStateProvider: ({ children }: { children: unknown }) => children,
+}));
+vi.mock('../engagement/favorite-button', () => ({ FavoriteButton: () => null }));
+vi.mock('../engagement/recently-viewed-recorder', () => ({ RecentlyViewedRecorder: () => null }));
+vi.mock('./product-reviews', () => ({ ProductReviews: () => null }));
 
 const product: ProductDetailResponse = {
   id: '00000000-0000-4000-8000-000000000301',
@@ -77,6 +119,14 @@ const product: ProductDetailResponse = {
 };
 
 describe('product detail interactions', () => {
+  beforeEach(() => {
+    push.mockReset();
+    addItem.mockReset();
+    authSession.state.state = { status: 'guest' };
+    cartSession.state.state = { status: 'unauthenticated', cart: null };
+    cartSession.state.pending = false;
+  });
+
   it('initializes deterministically, switches media, resets invalid quantity, and serializes only trusted handoffs', () => {
     const initial = initialProductDetailSelection(product);
     expect(initial).toEqual({
@@ -109,5 +159,18 @@ describe('product detail interactions', () => {
     ).toBe(true);
     await user.click(screen.getByRole('button', { name: 'Xem Phone' }));
     expect(screen.getByRole('img', { name: 'Phone' })).toBeVisible();
+  });
+
+  it('adds the selected variant then navigates to cart when buying now while authenticated', async () => {
+    const user = userEvent.setup();
+    authSession.state.state = { status: 'authenticated' };
+    cartSession.state.state = { status: 'ready', cart: null };
+    addItem.mockResolvedValue({ adjustments: [] });
+    render(<ProductDetailExperience product={product} />);
+    await user.click(screen.getByRole('button', { name: 'Mua ngay' }));
+    await waitFor(() =>
+      expect(addItem).toHaveBeenCalledWith(product.variants[0]!.id, 1),
+    );
+    expect(push).toHaveBeenCalledWith('/cart');
   });
 });

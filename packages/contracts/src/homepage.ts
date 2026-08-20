@@ -1,3 +1,5 @@
+import { isPublicScheduledPriceBreakdown, type PublicScheduledPriceBreakdown } from './pricing';
+
 export const homepageModuleTypes = [
   'campaign-banner',
   'category-shortcuts',
@@ -45,6 +47,7 @@ export interface HomepageProductSummary {
   imageAlt: string;
   priceMinor: number;
   compareAtPriceMinor?: number;
+  scheduledPrice?: PublicScheduledPriceBreakdown;
   label?: string;
   soldCount?: number;
 }
@@ -118,6 +121,7 @@ const isProduct = (value: unknown): value is HomepageProductSummary =>
   isSafeInteger(value.priceMinor) &&
   value.priceMinor >= 0 &&
   (value.compareAtPriceMinor === undefined || isSafeInteger(value.compareAtPriceMinor)) &&
+  (value.scheduledPrice === undefined || isPublicScheduledPriceBreakdown(value.scheduledPrice)) &&
   isOptionalString(value.label) &&
   (value.soldCount === undefined || isSafeInteger(value.soldCount));
 

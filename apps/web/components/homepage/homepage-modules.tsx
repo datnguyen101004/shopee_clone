@@ -114,6 +114,7 @@ function ProductCard({ product }: { product: HomepageProductSummary }) {
               <del>₫{formatMoney(product.compareAtPriceMinor)}</del>
             ) : null}
           </div>
+          {product.scheduledPrice ? <small aria-label={`Giảm giá sản phẩm ${Math.floor(product.scheduledPrice.discountBasisPoints / 100)} phần trăm`}>Đang giảm {Math.floor(product.scheduledPrice.discountBasisPoints / 100)}%</small> : null}
           {product.soldCount !== undefined ? (
             <span className="product-card__sold">Đã bán {formatMoney(product.soldCount)}</span>
           ) : null}

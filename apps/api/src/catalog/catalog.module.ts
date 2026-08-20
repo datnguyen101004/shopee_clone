@@ -5,8 +5,10 @@ import { CatalogPublicFacade } from './catalog-public.facade';
 import { CatalogRepository } from './catalog.repository';
 import { CatalogService } from './catalog.service';
 import { CatalogProductDetailService } from './catalog-product-detail.service';
+import { PricingModule } from '../pricing/pricing.module';
 
 @Module({
+  imports: [PricingModule],
   controllers: [CatalogController],
   providers: [
     CatalogRepository,

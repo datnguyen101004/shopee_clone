@@ -113,6 +113,28 @@ describe('Seller product management', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('Sản phẩm đã được đăng bán.');
   });
 
+  it('hides a published product from the seller product list', async () => {
+    const productId = '00000000-0000-4000-8000-000000000101';
+    fetchProducts.mockResolvedValue({
+      items: [{
+        id: productId, slug: 'sample-product', name: 'Sample Product', categoryName: 'Thiết bị điện tử',
+        lifecycle: 'published', moderationStatus: 'active', primaryMediaUrl: null, variantCount: 1, stockQuantity: 3, updatedAt: '2026-08-17T00:00:00.000Z',
+      }],
+      nextCursor: null,
+    });
+    transitionProduct.mockResolvedValue({});
+    render(<SellerProductList />);
+    await screen.findByText('Sample Product');
+    fireEvent.click(screen.getByRole('button', { name: 'Ẩn sản phẩm Sample Product' }));
+    expect(screen.getByRole('alertdialog')).toHaveTextContent('biến mất khỏi trang mua sắm');
+    fireEvent.click(screen.getByRole('button', { name: 'Ẩn sản phẩm' }));
+    await waitFor(() =>
+      expect(transitionProduct).toHaveBeenCalledWith(expect.anything(), productId, 'hidden'),
+    );
+    expect(await screen.findByText('Đã ẩn', { selector: 'b' })).toBeInTheDocument();
+    expect(screen.getByRole('alert')).toHaveTextContent('Đã ẩn sản phẩm.');
+  });
+
   it('uses a custom alertdialog before deleting a draft and removes it from the list', async () => {
     const productId = '00000000-0000-4000-8000-000000000101';
     fetchProducts.mockResolvedValue({
@@ -219,6 +241,80 @@ describe('Seller product management', () => {
     expect(screen.getByLabelText('Danh mục')).toHaveValue(categoryId);
     expect(screen.getByLabelText('Giá bán mặc định')).toHaveValue('500.000');
     expect(screen.getByLabelText('Tồn kho mặc định')).toHaveValue('7');
+    expect(screen.getByRole('button', { name: 'Hủy' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Cập nhật' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Lưu nháp' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Đăng bán' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Ẩn sản phẩm' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Lưu trữ' })).not.toBeInTheDocument();
+  });
+
+  it('updates an existing product without staging media when images are unchanged', async () => {
+    const productId = '00000000-0000-4000-8000-000000000101';
+    const categoryId = '00000000-0000-4000-8000-000000000102';
+    const imageId = '00000000-0000-4000-8000-000000000109';
+    const saved = {
+      id: productId,
+      slug: 'sample-product-abc123',
+      name: 'Sản phẩm đã lưu',
+      description: 'Mô tả đã lưu',
+      categoryId,
+      attributes: [],
+      media: [{ id: imageId, url: `/api/v1/product-media/${imageId}`, altText: null, sortOrder: 0, variantId: null }],
+      packageLengthMm: 100,
+      packageWidthMm: 100,
+      packageHeightMm: 100,
+      optionGroups: [],
+      optionValueMedia: [],
+      variants: [{ id: '00000000-0000-4000-8000-000000000103', combination: [], sku: 'SAMPLE-SKU', priceMinor: 500000, compareAtPriceMinor: null, stock: 7, weightGrams: 500, maxPurchaseQuantity: null, active: true }],
+      lifecycle: 'published',
+      moderationStatus: 'active',
+      moderationReason: null,
+      createdAt: '2026-08-17T00:00:00.000Z',
+      updatedAt: '2026-08-17T00:00:00.000Z',
+    };
+    fetchCategories.mockResolvedValue([{ id: categoryId, name: 'Thiết bị điện tử', slug: 'thiet-bi-dien-tu', parentId: null, isLeaf: true, attributes: [] }]);
+    fetchProduct.mockResolvedValue(saved);
+    updateProduct.mockResolvedValue({ ...saved, name: 'Sản phẩm đã lưu' });
+    render(<SellerProductEditor productId={productId} />);
+    await screen.findByText('Chỉnh sửa sản phẩm');
+    fireEvent.click(screen.getByRole('button', { name: 'Cập nhật' }));
+    await waitFor(() => expect(updateProduct).toHaveBeenCalledTimes(1));
+    expect(stageMedia).not.toHaveBeenCalled();
+    expect(updateProduct).toHaveBeenCalledWith(
+      authenticatedFetch,
+      productId,
+      expect.objectContaining({ media: [expect.objectContaining({ imageId, sortOrder: 0 })] }),
+    );
+    expect(await screen.findByRole('status')).toHaveTextContent('Đã cập nhật sản phẩm.');
+  });
+
+  it('stages only newly selected images when updating a product', async () => {
+    const productId = '00000000-0000-4000-8000-000000000101';
+    const categoryId = '00000000-0000-4000-8000-000000000102';
+    const imageId = '00000000-0000-4000-8000-000000000109';
+    const assetId = '00000000-0000-4000-8000-000000000110';
+    const saved = {
+      id: productId, slug: 'sample-product-abc123', name: 'Sản phẩm đã lưu', description: 'Mô tả đã lưu', categoryId, attributes: [],
+      media: [{ id: imageId, url: `/api/v1/product-media/${imageId}`, altText: null, sortOrder: 0, variantId: null }],
+      packageLengthMm: 100, packageWidthMm: 100, packageHeightMm: 100, optionGroups: [], optionValueMedia: [],
+      variants: [{ id: '00000000-0000-4000-8000-000000000103', combination: [], sku: 'SAMPLE-SKU', priceMinor: 500000, compareAtPriceMinor: null, stock: 7, weightGrams: 500, maxPurchaseQuantity: null, active: true }],
+      lifecycle: 'published', moderationStatus: 'active', moderationReason: null, createdAt: '2026-08-17T00:00:00.000Z', updatedAt: '2026-08-17T00:00:00.000Z',
+    };
+    fetchCategories.mockResolvedValue([{ id: categoryId, name: 'Thiết bị điện tử', slug: 'thiet-bi-dien-tu', parentId: null, isLeaf: true, attributes: [] }]);
+    fetchProduct.mockResolvedValue(saved);
+    stageMedia.mockResolvedValue({ id: assetId, mimeType: 'image/png', byteSize: 12, width: 1, height: 1, previewUrl: '/preview/new', expiresAt: '2026-08-18T00:00:00.000Z' });
+    updateProduct.mockResolvedValue(saved);
+    render(<SellerProductEditor productId={productId} />);
+    await screen.findByText('Chỉnh sửa sản phẩm');
+    fireEvent.change(screen.getByLabelText('Chọn ảnh từ máy'), { target: { files: [new File(['png'], 'extra.png', { type: 'image/png' })] } });
+    await waitFor(() => expect(screen.getAllByAltText(/Ảnh sản phẩm/)).toHaveLength(2));
+    fireEvent.click(screen.getByRole('button', { name: 'Cập nhật' }));
+    await waitFor(() => expect(updateProduct).toHaveBeenCalledTimes(1));
+    expect(stageMedia).toHaveBeenCalledTimes(1);
+    expect(updateProduct.mock.calls[0]?.[2]).toMatchObject({
+      media: [expect.objectContaining({ imageId }), expect.objectContaining({ assetId, sortOrder: 1 })],
+    });
   });
 
   it('adds classification values and generates Color x Size variants before submission', async () => {

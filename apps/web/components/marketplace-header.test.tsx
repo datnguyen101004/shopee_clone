@@ -100,20 +100,21 @@ describe('StorefrontShell', () => {
         onLogout={onLogout}
       />,
     );
-    expect(screen.getByLabelText('Tài khoản Buyer Example')).toBeInTheDocument();
-    expect(screen.getByLabelText('Tài khoản Buyer Example')).toHaveAttribute(
+    const accountTrigger = screen.getByLabelText('Tài khoản Buyer Example');
+    expect(accountTrigger).toBeInTheDocument();
+    expect(accountTrigger.tagName).toBe('BUTTON');
+    expect(screen.queryByRole('link', { name: 'Địa chỉ' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Yêu thích' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Shop đang theo dõi' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Đơn mua' })).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Giỏ hàng, 0 sản phẩm' })).not.toHaveTextContent('Giỏ hàng');
+    await user.hover(accountTrigger);
+    expect(screen.getByRole('menuitem', { name: 'Tài khoản của tôi' })).toHaveAttribute(
       'href',
       '/account/profile',
     );
-    expect(screen.getByRole('link', { name: 'Địa chỉ' })).toHaveAttribute(
-      'href',
-      '/account/addresses',
-    );
-    expect(screen.getByRole('link', { name: 'Shop đang theo dõi' })).toHaveAttribute(
-      'href',
-      '/account/followed-shops',
-    );
-    await user.click(screen.getByRole('button', { name: 'Đăng xuất' }));
+    expect(screen.getByRole('menuitem', { name: 'Tài khoản của tôi' })).toBeVisible();
+    await user.click(screen.getByRole('menuitem', { name: 'Đăng xuất' }));
     expect(onLogout).toHaveBeenCalledTimes(1);
   });
 

@@ -186,7 +186,9 @@ export class VoucherConsumptionService {
           id: item.voucherId,
           usedCount: { lt: voucherById.get(item.voucherId)!.usageLimit },
         },
-        data: { usedCount: { increment: 1 } },
+        // Bump the seller-facing version with every redemption so a concurrent
+        // seller edit cannot overwrite the economic rule that was just used.
+        data: { usedCount: { increment: 1 }, version: { increment: 1 } },
       });
       const buyerUpdated = await transaction.voucherUserUsage.updateMany({
         where: {

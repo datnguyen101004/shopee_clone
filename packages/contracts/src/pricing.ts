@@ -20,6 +20,28 @@ export const MOCK_SHIPPING_VERSION = 'mock-v1' as const;
 export const PRICING_CURRENCY = 'VND' as const;
 export const SHIPPING_SERVICES = ['ECONOMY', 'STANDARD', 'EXPRESS'] as const;
 
+/** Server-authoritative scheduled product price details exposed to storefronts. */
+export interface PublicScheduledPriceBreakdown {
+  basePriceMinor: number;
+  effectivePriceMinor: number;
+  compareAtPriceMinor: number | null;
+  discountBasisPoints: number;
+  campaignId: string;
+  evaluatedAt: string;
+}
+
+export function isPublicScheduledPriceBreakdown(value: unknown): value is PublicScheduledPriceBreakdown {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return false;
+  const item = value as Record<string, unknown>;
+  return Number.isSafeInteger(item.basePriceMinor) && (item.basePriceMinor as number) > 0
+    && Number.isSafeInteger(item.effectivePriceMinor) && (item.effectivePriceMinor as number) > 0
+    && (item.compareAtPriceMinor === null || (Number.isSafeInteger(item.compareAtPriceMinor) && (item.compareAtPriceMinor as number) >= (item.effectivePriceMinor as number)))
+    && Number.isInteger(item.discountBasisPoints) && (item.discountBasisPoints as number) >= 1 && (item.discountBasisPoints as number) <= 9000
+    && typeof item.campaignId === 'string' && item.campaignId.length > 0
+    && typeof item.evaluatedAt === 'string' && Number.isFinite(Date.parse(item.evaluatedAt))
+    && (item.effectivePriceMinor as number) < (item.basePriceMinor as number);
+}
+
 export type ShippingServiceCode = (typeof SHIPPING_SERVICES)[number];
 export type ShippingZone = 'SAME_PROVINCE' | 'SAME_REGION' | 'CROSS_REGION' | 'UNKNOWN';
 export type PricingExclusionCode = 'unavailable' | 'insufficient-stock';
@@ -114,6 +136,34 @@ export interface PricingQuoteSummary {
   payableTotalMinor: number;
 }
 
+export interface AvailableShopVoucher {
+  shopId: string;
+  code: string;
+  name: string;
+  benefitType: Extract<VoucherBenefitType, 'FIXED_AMOUNT' | 'PERCENTAGE'>;
+  minimumSpendMinor: number;
+  estimatedDiscountMinor: number;
+  remainingCount: number;
+}
+
+export interface AvailablePlatformVoucher {
+  code: string;
+  name: string;
+  benefitType: Extract<VoucherBenefitType, 'FIXED_AMOUNT' | 'PERCENTAGE'>;
+  minimumSpendMinor: number;
+  estimatedDiscountMinor: number;
+  remainingCount: number;
+}
+
+export interface AvailableShippingVoucher {
+  code: string;
+  name: string;
+  benefitType: Extract<VoucherBenefitType, 'FREE_SHIPPING'>;
+  minimumSpendMinor: number;
+  estimatedDiscountMinor: number;
+  remainingCount: number;
+}
+
 export interface PricingQuoteResponse {
   pricingVersion: typeof PRICING_VERSION;
   voucherVersion: typeof VOUCHER_VERSION;
@@ -124,6 +174,9 @@ export interface PricingQuoteResponse {
   address: PricingQuoteAddress;
   shops: PricingQuoteShop[];
   vouchers: VoucherSelectionResult[];
+  availableShopVouchers?: AvailableShopVoucher[];
+  availablePlatformVouchers?: AvailablePlatformVoucher[];
+  availableShippingVouchers?: AvailableShippingVoucher[];
   exclusions: PricingQuoteExclusion[];
   summary: PricingQuoteSummary;
 }
@@ -497,6 +550,83 @@ function isShop(value: unknown): value is PricingQuoteShop {
   );
 }
 
+function isAvailableShopVoucher(value: unknown): value is AvailableShopVoucher {
+  return (
+    isRecord(value) &&
+    hasExactKeys(value, [
+      'shopId',
+      'code',
+      'name',
+      'benefitType',
+      'minimumSpendMinor',
+      'estimatedDiscountMinor',
+      'remainingCount',
+    ]) &&
+    isUuid(value.shopId) &&
+    normalizeVoucherCode(value.code) === value.code &&
+    isText(value.name) &&
+    (value.benefitType === 'FIXED_AMOUNT' || value.benefitType === 'PERCENTAGE') &&
+    isMoney(value.minimumSpendMinor) &&
+    isPositiveInteger(value.estimatedDiscountMinor) &&
+    isPositiveInteger(value.remainingCount)
+  );
+}
+
+function isAvailableShopVoucherList(value: unknown): value is AvailableShopVoucher[] {
+  if (!Array.isArray(value) || value.length > 100 || !value.every(isAvailableShopVoucher)) return false;
+  return new Set(value.map((item) => `${item.shopId}:${item.code}`)).size === value.length;
+}
+
+function isAvailablePlatformVoucher(value: unknown): value is AvailablePlatformVoucher {
+  return (
+    isRecord(value) &&
+    hasExactKeys(value, [
+      'code',
+      'name',
+      'benefitType',
+      'minimumSpendMinor',
+      'estimatedDiscountMinor',
+      'remainingCount',
+    ]) &&
+    normalizeVoucherCode(value.code) === value.code &&
+    isText(value.name) &&
+    (value.benefitType === 'FIXED_AMOUNT' || value.benefitType === 'PERCENTAGE') &&
+    isMoney(value.minimumSpendMinor) &&
+    isPositiveInteger(value.estimatedDiscountMinor) &&
+    isPositiveInteger(value.remainingCount)
+  );
+}
+
+function isAvailablePlatformVoucherList(value: unknown): value is AvailablePlatformVoucher[] {
+  if (!Array.isArray(value) || value.length > 100 || !value.every(isAvailablePlatformVoucher)) return false;
+  return new Set(value.map((item) => item.code)).size === value.length;
+}
+
+function isAvailableShippingVoucher(value: unknown): value is AvailableShippingVoucher {
+  return (
+    isRecord(value) &&
+    hasExactKeys(value, [
+      'code',
+      'name',
+      'benefitType',
+      'minimumSpendMinor',
+      'estimatedDiscountMinor',
+      'remainingCount',
+    ]) &&
+    normalizeVoucherCode(value.code) === value.code &&
+    isText(value.name) &&
+    value.benefitType === 'FREE_SHIPPING' &&
+    isMoney(value.minimumSpendMinor) &&
+    isPositiveInteger(value.estimatedDiscountMinor) &&
+    isPositiveInteger(value.remainingCount)
+  );
+}
+
+function isAvailableShippingVoucherList(value: unknown): value is AvailableShippingVoucher[] {
+  if (!Array.isArray(value) || value.length > 100 || !value.every(isAvailableShippingVoucher)) return false;
+  return new Set(value.map((item) => item.code)).size === value.length;
+}
+
 function isVoucherAllocation(value: unknown): value is VoucherDiscountAllocation {
   return (
     isRecord(value) &&
@@ -651,19 +781,23 @@ function isSummary(value: unknown): value is PricingQuoteSummary {
 export function isPricingQuoteResponse(value: unknown): value is PricingQuoteResponse {
   if (
     !isRecord(value) ||
-    !hasExactKeys(value, [
-      'pricingVersion',
-      'voucherVersion',
-      'shippingVersion',
-      'currency',
-      'evaluatedAt',
-      'cartVersion',
-      'address',
-      'shops',
-      'vouchers',
-      'exclusions',
-      'summary',
-    ]) ||
+    !hasExactKeys(
+      value,
+      [
+        'pricingVersion',
+        'voucherVersion',
+        'shippingVersion',
+        'currency',
+        'evaluatedAt',
+        'cartVersion',
+        'address',
+        'shops',
+        'vouchers',
+        'exclusions',
+        'summary',
+      ],
+      ['availableShopVouchers', 'availablePlatformVouchers', 'availableShippingVouchers'],
+    ) ||
     value.pricingVersion !== PRICING_VERSION ||
     value.voucherVersion !== VOUCHER_VERSION ||
     value.shippingVersion !== MOCK_SHIPPING_VERSION ||
@@ -675,6 +809,11 @@ export function isPricingQuoteResponse(value: unknown): value is PricingQuoteRes
     !value.shops.every(isShop) ||
     !Array.isArray(value.vouchers) ||
     !value.vouchers.every(isVoucherResult) ||
+    (value.availableShopVouchers !== undefined && !isAvailableShopVoucherList(value.availableShopVouchers)) ||
+    (value.availablePlatformVouchers !== undefined &&
+      !isAvailablePlatformVoucherList(value.availablePlatformVouchers)) ||
+    (value.availableShippingVouchers !== undefined &&
+      !isAvailableShippingVoucherList(value.availableShippingVouchers)) ||
     !Array.isArray(value.exclusions) ||
     !value.exclusions.every(isExclusion) ||
     !isSummary(value.summary)
@@ -684,6 +823,9 @@ export function isPricingQuoteResponse(value: unknown): value is PricingQuoteRes
   const shops = value.shops as PricingQuoteShop[];
   const lines = shops.flatMap((shop) => shop.lines);
   const vouchers = value.vouchers as VoucherSelectionResult[];
+  const availableShopVouchers = (value.availableShopVouchers ?? []) as AvailableShopVoucher[];
+  const shopIds = new Set(shops.map((shop) => shop.shop.id));
+  if (availableShopVouchers.some((item) => !shopIds.has(item.shopId))) return false;
   const exclusions = value.exclusions as PricingQuoteExclusion[];
   const slotKeys = vouchers.map(({ slot, shopId }) => `${slot}:${shopId ?? 'global'}`);
   if (

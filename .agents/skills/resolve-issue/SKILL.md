@@ -12,6 +12,7 @@ Quy trình 2 bước bắt buộc khi làm việc với OpenSpec trên Codex.
 1. Dùng OpenSpec để tạo proposal (slash command `/openspec-proposal` hoặc `/opsx:propose` / `openspec new change` + generate artifacts).
 2. Sau khi proposal và các artifact (proposal.md, design.md, tasks.md, specs) được tạo xong:
    - Liệt kê rõ ràng **danh sách công việc (tasks)** từ `tasks.md`.
+   - Liệt kê rõ ràng các công nghệ và kiến trúc được sử dụng (từ `design.md`).
    - Liệt kê rõ ràng **các API cần kiểm thử** (endpoints, request/response, edge cases, auth...).
 3. Dừng lại. Không implement code. Chờ user review và xác nhận trước khi sang Bước 2.
 

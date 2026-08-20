@@ -52,6 +52,7 @@ export function ProductCard({ product }: { product: CatalogProductCard }) {
               <del>₫{formatNumber(product.compareAtPriceMinor)}</del>
             ) : null}
           </div>
+          {product.scheduledPrice ? <small aria-label={`Giảm giá sản phẩm ${Math.floor(product.scheduledPrice.discountBasisPoints / 100)} phần trăm`}>Đang giảm {Math.floor(product.scheduledPrice.discountBasisPoints / 100)}%</small> : null}
           <div className="catalog-card__facts">
             {product.ratingCount === 0 ? (
               <span aria-label="Chưa có đánh giá">Chưa có đánh giá</span>

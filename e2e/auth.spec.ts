@@ -152,7 +152,8 @@ test.describe('secure account authentication', () => {
 
     await page.reload();
     await expect(page.getByLabel(`Tài khoản Buyer ${testInfo.project.name}`)).toBeVisible();
-    await page.getByRole('button', { name: 'Đăng xuất' }).click();
+    await page.getByLabel(`Tài khoản Buyer ${testInfo.project.name}`).hover();
+    await page.getByRole('menuitem', { name: 'Đăng xuất' }).click();
     await expect(page.getByRole('link', { name: 'Đăng nhập · Chưa đăng nhập' })).toBeVisible();
 
     const intent = new URLSearchParams({

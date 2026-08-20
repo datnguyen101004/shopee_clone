@@ -56,6 +56,30 @@ describe('feedback components', () => {
     await waitFor(() => expect(screen.queryByText('Đã thêm vào giỏ')).not.toBeInTheDocument());
   });
 
+  it('auto-dismisses toast after the configured duration', async () => {
+    function ShortToastDemo() {
+      const { toast } = useToast();
+      return (
+        <Button
+          onClick={() => toast({ title: 'Tự đóng', variant: 'danger', duration: 50 })}
+        >
+          Mở toast ngắn
+        </Button>
+      );
+    }
+    const user = userEvent.setup();
+    render(
+      <ToastProvider>
+        <ShortToastDemo />
+      </ToastProvider>,
+    );
+    await user.click(screen.getByRole('button', { name: 'Mở toast ngắn' }));
+    expect(screen.getByText('Tự đóng')).toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByText('Tự đóng')).not.toBeInTheDocument(), {
+      timeout: 2000,
+    });
+  });
+
   it('renders accessible empty and error states', async () => {
     const retry = vi.fn();
     const { container } = render(

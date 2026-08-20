@@ -1,4 +1,7 @@
 import {
+  type AvailablePlatformVoucher,
+  type AvailableShippingVoucher,
+  type AvailableShopVoucher,
   type PricingQuoteLine,
   type PricingQuoteRequest,
   type PricingQuoteResponse,
@@ -153,12 +156,176 @@ function rejected(
   };
 }
 
+function remainingUses(definition: VoucherDefinitionSnapshot): number {
+  return Math.max(
+    0,
+    Math.min(definition.usageLimit - definition.usedCount, definition.perBuyerLimit - definition.buyerUsedCount),
+  );
+}
+
 function percentageBenefit(baseMinor: number, basisPoints: number, maximumMinor: number): number {
   checkedInteger(baseMinor);
   checkedInteger(basisPoints);
   checkedInteger(maximumMinor);
   const calculated = checkedBigIntToMoney((BigInt(baseMinor) * BigInt(basisPoints)) / 10_000n);
   return Math.min(calculated, maximumMinor, baseMinor);
+}
+
+export function listAvailableShopVouchers(
+  quote: PricingQuoteResponse,
+  definitions: readonly VoucherDefinitionSnapshot[],
+  evaluatedAt: Date,
+): AvailableShopVoucher[] {
+  const offers: AvailableShopVoucher[] = [];
+  for (const shop of quote.shops) {
+    const shopOffers: AvailableShopVoucher[] = [];
+    for (const definition of definitions) {
+      if (definition.issuer !== 'SHOP' || definition.shopId !== shop.shop.id) continue;
+      if (definition.benefitType === 'FREE_SHIPPING') continue;
+      if (
+        (definition.benefitType === 'FIXED_AMOUNT' && definition.fixedAmountMinor === null) ||
+        (definition.benefitType === 'PERCENTAGE' &&
+          (definition.percentageBasisPoints === null || definition.maximumDiscountMinor === null))
+      ) {
+        continue;
+      }
+      const request = { code: definition.code, slot: 'SHOP' as const, shopId: shop.shop.id };
+      if (baseRejection(request, definition, evaluatedAt)) continue;
+      const remainingCount = remainingUses(definition);
+      if (remainingCount < 1) continue;
+      const productScope = new Set(definition.productIds);
+      const eligibleLines = shop.lines.filter(
+        (line) => productScope.size === 0 || productScope.has(line.productId),
+      );
+      if (eligibleLines.length === 0) continue;
+      const spend = checkedAdd(...eligibleLines.map((line) => line.merchandiseSubtotalMinor));
+      if (spend < definition.minimumSpendMinor) continue;
+      const estimatedDiscountMinor = benefitFor(definition, spend);
+      if (estimatedDiscountMinor <= 0) continue;
+      shopOffers.push({
+        shopId: shop.shop.id,
+        code: definition.code,
+        name: definition.name,
+        benefitType: definition.benefitType,
+        minimumSpendMinor: definition.minimumSpendMinor,
+        estimatedDiscountMinor,
+        remainingCount,
+      });
+    }
+    shopOffers.sort((left, right) => {
+      if (left.estimatedDiscountMinor !== right.estimatedDiscountMinor) {
+        return right.estimatedDiscountMinor - left.estimatedDiscountMinor;
+      }
+      return left.code.localeCompare(right.code);
+    });
+    offers.push(...shopOffers.slice(0, 20));
+  }
+  return offers.sort((left, right) => {
+    if (left.shopId !== right.shopId) return left.shopId.localeCompare(right.shopId);
+    if (left.estimatedDiscountMinor !== right.estimatedDiscountMinor) {
+      return right.estimatedDiscountMinor - left.estimatedDiscountMinor;
+    }
+    return left.code.localeCompare(right.code);
+  });
+}
+
+export function listAvailablePlatformVouchers(
+  quote: PricingQuoteResponse,
+  definitions: readonly VoucherDefinitionSnapshot[],
+  evaluatedAt: Date,
+): AvailablePlatformVoucher[] {
+  const lines = quote.shops.flatMap((shop) => shop.lines);
+  const offers: AvailablePlatformVoucher[] = [];
+  for (const definition of definitions) {
+    if (definition.issuer !== 'PLATFORM' || definition.benefitType === 'FREE_SHIPPING') continue;
+    if (
+      (definition.benefitType === 'FIXED_AMOUNT' && definition.fixedAmountMinor === null) ||
+      (definition.benefitType === 'PERCENTAGE' &&
+        (definition.percentageBasisPoints === null || definition.maximumDiscountMinor === null))
+    ) {
+      continue;
+    }
+    const request = { code: definition.code, slot: 'PLATFORM' as const, shopId: null };
+    if (baseRejection(request, definition, evaluatedAt)) continue;
+    const remainingCount = remainingUses(definition);
+    if (remainingCount < 1) continue;
+    const productScope = new Set(definition.productIds);
+    const eligibleLines = lines.filter(
+      (line) => productScope.size === 0 || productScope.has(line.productId),
+    );
+    if (eligibleLines.length === 0) continue;
+    const spend = checkedAdd(...eligibleLines.map((line) => line.merchandiseSubtotalMinor));
+    if (spend < definition.minimumSpendMinor) continue;
+    const estimatedDiscountMinor = benefitFor(definition, spend);
+    if (estimatedDiscountMinor <= 0) continue;
+    offers.push({
+      code: definition.code,
+      name: definition.name,
+      benefitType: definition.benefitType,
+      minimumSpendMinor: definition.minimumSpendMinor,
+      estimatedDiscountMinor,
+      remainingCount,
+    });
+  }
+  return offers
+    .sort((left, right) => {
+      if (left.estimatedDiscountMinor !== right.estimatedDiscountMinor) {
+        return right.estimatedDiscountMinor - left.estimatedDiscountMinor;
+      }
+      return left.code.localeCompare(right.code);
+    })
+    .slice(0, 20);
+}
+
+export function listAvailableShippingVouchers(
+  quote: PricingQuoteResponse,
+  definitions: readonly VoucherDefinitionSnapshot[],
+  evaluatedAt: Date,
+): AvailableShippingVoucher[] {
+  const offers: AvailableShippingVoucher[] = [];
+  for (const definition of definitions) {
+    if (definition.issuer !== 'PLATFORM' || definition.benefitType !== 'FREE_SHIPPING') continue;
+    if (definition.maximumDiscountMinor === null) continue;
+    const request = { code: definition.code, slot: 'FREE_SHIPPING' as const, shopId: null };
+    if (baseRejection(request, definition, evaluatedAt)) continue;
+    const remainingCount = remainingUses(definition);
+    if (remainingCount < 1) continue;
+    const productScope = new Set(definition.productIds);
+    const eligibleShops = quote.shops.filter((shop) =>
+      shop.lines.some((line) => productScope.size === 0 || productScope.has(line.productId)),
+    );
+    if (eligibleShops.length === 0) continue;
+    const spend = checkedAdd(
+      ...eligibleShops.flatMap((shop) =>
+        shop.lines
+          .filter((line) => productScope.size === 0 || productScope.has(line.productId))
+          .map((line) => line.merchandiseSubtotalMinor),
+      ),
+    );
+    if (spend < definition.minimumSpendMinor) continue;
+    const eligibleShipping = checkedAdd(
+      ...eligibleShops.map((shop) => shop.shipping.shippingFeeMinor),
+    );
+    if (eligibleShipping === 0) continue;
+    const estimatedDiscountMinor = benefitFor(definition, eligibleShipping);
+    if (estimatedDiscountMinor <= 0) continue;
+    offers.push({
+      code: definition.code,
+      name: definition.name,
+      benefitType: 'FREE_SHIPPING',
+      minimumSpendMinor: definition.minimumSpendMinor,
+      estimatedDiscountMinor,
+      remainingCount,
+    });
+  }
+  return offers
+    .sort((left, right) => {
+      if (left.estimatedDiscountMinor !== right.estimatedDiscountMinor) {
+        return right.estimatedDiscountMinor - left.estimatedDiscountMinor;
+      }
+      return left.code.localeCompare(right.code);
+    })
+    .slice(0, 20);
 }
 
 function benefitFor(definition: VoucherDefinitionSnapshot, baseMinor: number): number {

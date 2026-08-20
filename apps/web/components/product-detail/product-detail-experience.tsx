@@ -2,6 +2,7 @@
 
 import type { ProductDetailResponse } from '@shopee-clone/contracts';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
 import { FavoriteButton } from '../engagement/favorite-button';
@@ -29,6 +30,7 @@ function formatCurrency(value: number): string {
 function ProductDetailInner({ product }: { product: ProductDetailResponse }) {
   const auth = useAuthSession();
   const cart = useCart();
+  const router = useRouter();
   const [selection, setSelection] = useState(() => initialProductDetailSelection(product));
   const [cartMessage, setCartMessage] = useState('');
   const selectedVariant = getVariant(product, selection.variantId);
@@ -46,16 +48,15 @@ function ProductDetailInner({ product }: { product: ProductDetailResponse }) {
           buy: productLoginHandoff(product, selectedVariant.id, selection.quantity, 'buy-now'),
         }
       : null;
+  const canMutateCart =
+    auth.state.status === 'authenticated' &&
+    Boolean(selectedVariant) &&
+    purchaseReady &&
+    !cart.pending &&
+    cart.state.status === 'ready';
 
   async function handleAddToCart() {
-    if (
-      auth.state.status !== 'authenticated' ||
-      !selectedVariant ||
-      !purchaseReady ||
-      cart.pending ||
-      cart.state.status !== 'ready'
-    )
-      return;
+    if (!canMutateCart || !selectedVariant) return;
     setCartMessage('');
     try {
       const result = await cart.addItem(selectedVariant.id, Number(selection.quantity));
@@ -64,6 +65,17 @@ function ProductDetailInner({ product }: { product: ProductDetailResponse }) {
       );
     } catch {
       setCartMessage('Không thể thêm vào giỏ hàng. Vui lòng thử lại.');
+    }
+  }
+
+  async function handleBuyNow() {
+    if (!canMutateCart || !selectedVariant) return;
+    setCartMessage('');
+    try {
+      await cart.addItem(selectedVariant.id, Number(selection.quantity));
+      router.push('/cart');
+    } catch {
+      setCartMessage('Không thể mua ngay. Vui lòng thử lại.');
     }
   }
 
@@ -130,6 +142,11 @@ function ProductDetailInner({ product }: { product: ProductDetailResponse }) {
           ) : null}
           {selectedVariant?.discountPercent ? (
             <span>-{selectedVariant.discountPercent}%</span>
+          ) : null}
+          {selectedVariant?.scheduledPrice ? (
+            <small aria-label={`Giảm giá sản phẩm ${Math.floor(selectedVariant.scheduledPrice.discountBasisPoints / 100)} phần trăm`}>
+              Đang giảm {Math.floor(selectedVariant.scheduledPrice.discountBasisPoints / 100)}%
+            </small>
           ) : null}
         </div>
         <div className="product-detail-variants" role="group" aria-label="Biến thể sản phẩm">
@@ -242,15 +259,19 @@ function ProductDetailInner({ product }: { product: ProductDetailResponse }) {
                   : 'Thêm vào giỏ hàng'}
             </button>
           )}
-          {handoffs ? (
-            <Link href={auth.state.status === 'authenticated' ? '/cart' : handoffs.buy}>
-              {auth.state.status === 'authenticated'
-                ? 'Mua ngay · Xem giỏ hàng'
-                : 'Mua ngay · Đăng nhập'}
-            </Link>
+          {handoffs && auth.state.status === 'guest' ? (
+            <Link href={handoffs.buy}>Mua ngay · Đăng nhập</Link>
           ) : (
-            <button type="button" disabled>
-              Mua ngay
+            <button
+              type="button"
+              disabled={!handoffs || !canMutateCart}
+              onClick={() => void handleBuyNow()}
+            >
+              {auth.state.status === 'loading' || cart.state.status === 'loading'
+                ? 'Đang kiểm tra đăng nhập…'
+                : cart.pending
+                  ? 'Đang mua…'
+                  : 'Mua ngay'}
             </button>
           )}
         </div>

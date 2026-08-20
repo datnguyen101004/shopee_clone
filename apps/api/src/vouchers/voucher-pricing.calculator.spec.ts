@@ -8,6 +8,9 @@ import { MockShippingCalculator } from '../pricing/mock-shipping.calculator';
 import {
   VoucherPricingCalculator,
   allocateLargestRemainder,
+  listAvailablePlatformVouchers,
+  listAvailableShippingVouchers,
+  listAvailableShopVouchers,
   type VoucherDefinitionSnapshot,
 } from './voucher-pricing.calculator';
 
@@ -142,6 +145,56 @@ describe('voucher pricing calculator', () => {
     expect(result.applied.map(({ voucherId }) => voucherId)).toEqual(
       definitions.map(({ id }) => id),
     );
+  });
+
+  it('lists shop vouchers that currently meet the merchandise minimum', () => {
+    const quote = baseCalculator.calculate(snapshot);
+    const offers = listAvailableShopVouchers(
+      quote,
+      [
+        ...definitions,
+        definition({
+          id: '00000000-0000-4000-8000-000000000604',
+          code: 'SHOP-HIGH',
+          issuer: 'SHOP',
+          shopId: shopA,
+          fixedAmountMinor: 50_000,
+          minimumSpendMinor: 500_000,
+        }),
+      ],
+      evaluatedAt,
+    );
+    expect(listAvailableShippingVouchers(quote, definitions, evaluatedAt)).toEqual([
+      {
+        code: 'FREESHIP-20K',
+        name: 'FREESHIP-20K',
+        benefitType: 'FREE_SHIPPING',
+        minimumSpendMinor: 100_000,
+        estimatedDiscountMinor: 20_000,
+        remainingCount: 1,
+      },
+    ]);
+    expect(listAvailablePlatformVouchers(quote, definitions, evaluatedAt)).toEqual([
+      {
+        code: 'PLATFORM-10',
+        name: 'PLATFORM-10',
+        benefitType: 'PERCENTAGE',
+        minimumSpendMinor: 100_000,
+        estimatedDiscountMinor: 25_000,
+        remainingCount: 1,
+      },
+    ]);
+    expect(offers).toEqual([
+      {
+        shopId: shopA,
+        code: 'SHOP-20K',
+        name: 'SHOP-20K',
+        benefitType: 'FIXED_AMOUNT',
+        minimumSpendMinor: 100_000,
+        estimatedDiscountMinor: 20_000,
+        remainingCount: 1,
+      },
+    ]);
   });
 
   it.each([

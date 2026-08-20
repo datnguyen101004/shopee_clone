@@ -120,6 +120,13 @@ enum VoucherBenefitType {
   @@map("voucher_benefit_type")
 }
 
+enum SellerPromotionResource {
+  VOUCHER  @map("voucher")
+  DISCOUNT @map("discount")
+
+  @@map("seller_promotion_resource")
+}
+
 enum PurchasePaymentMethod {
   COD @map("cod")
 
@@ -409,6 +416,7 @@ model Shop {
   logoUrl                  String?                   @map("logo_url") @db.VarChar(500)
   bannerUrl                String?                   @map("banner_url") @db.VarChar(500)
   location                 String                    @default("Việt Nam") @db.VarChar(120)
+  timeZone                 String                    @default("Asia/Ho_Chi_Minh") @map("time_zone") @db.VarChar(64)
   contactPhone             String?                   @map("contact_phone") @db.VarChar(10)
   contactEmail             String?                   @map("contact_email") @db.VarChar(320)
   pickupRecipientName      String?                   @map("pickup_recipient_name") @db.VarChar(120)
@@ -435,6 +443,8 @@ model Shop {
   products                 Product[]
   followers                ShopFollower[]
   vouchers                 Voucher[]
+  discountCampaigns        ShopDiscountCampaign[]
+  sellerPromotionCommands  SellerPromotionCommand[]
   orders                   ShopOrder[]
   purchaseVouchers         PurchaseVoucher[]
   reviews                  ProductReview[]
@@ -499,6 +509,7 @@ model Product {
   favorites                ProductFavorite[]
   recentlyViewedBy         RecentlyViewedProduct[]
   voucherScopes            VoucherProductScope[]
+  discountCampaignProducts ShopDiscountProduct[]
   orderLines               OrderLine[]
   reviews                  ProductReview[]
   attributes               ProductAttributeValue[]
@@ -747,6 +758,8 @@ model Voucher {
   usageLimit            Int                   @map("usage_limit")
   perBuyerLimit         Int                   @map("per_buyer_limit")
   usedCount             Int                   @default(0) @map("used_count")
+  version               Int                   @default(0)
+  archivedAt            DateTime?             @map("archived_at") @db.Timestamptz(3)
   createdAt             DateTime              @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt             DateTime              @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
   shop                  Shop?                 @relation(fields: [shopId], references: [id], onDelete: Restrict)
@@ -757,7 +770,56 @@ model Voucher {
 
   @@index([shopId, isEnabled, startsAt, endsAt])
   @@index([isEnabled, startsAt, endsAt])
+  @@index([shopId, version, updatedAt(sort: Desc), id])
   @@map("vouchers")
+}
+
+model ShopDiscountCampaign {
+  id          String                 @id @default(uuid()) @db.Uuid
+  shopId      String                 @map("shop_id") @db.Uuid
+  name        String                 @db.VarChar(160)
+  startsAt    DateTime               @map("starts_at") @db.Timestamptz(3)
+  endsAt      DateTime               @map("ends_at") @db.Timestamptz(3)
+  isEnabled   Boolean                @default(true) @map("is_enabled")
+  version     Int                    @default(0)
+  archivedAt  DateTime?              @map("archived_at") @db.Timestamptz(3)
+  createdAt   DateTime               @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt   DateTime               @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  shop        Shop                   @relation(fields: [shopId], references: [id], onDelete: Restrict)
+  products    ShopDiscountProduct[]
+
+  @@index([shopId, createdAt(sort: Desc), id])
+  @@index([shopId, isEnabled, startsAt, endsAt])
+  @@index([archivedAt])
+  @@map("shop_discount_campaigns")
+}
+
+model ShopDiscountProduct {
+  campaignId            String               @map("campaign_id") @db.Uuid
+  productId             String               @map("product_id") @db.Uuid
+  discountBasisPoints   Int                  @map("discount_basis_points")
+  campaign              ShopDiscountCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  product               Product              @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  @@id([campaignId, productId])
+  @@index([productId, campaignId])
+  @@map("shop_discount_products")
+}
+
+model SellerPromotionCommand {
+  id              String                  @id @default(uuid()) @db.Uuid
+  shopId          String                  @map("shop_id") @db.Uuid
+  resource        SellerPromotionResource
+  resourceId      String                  @map("resource_id") @db.Uuid
+  idempotencyKey  String                  @map("idempotency_key") @db.Uuid
+  requestDigest   String                  @map("request_digest") @db.Char(64)
+  response        Json                    @db.JsonB
+  createdAt       DateTime                @default(now()) @map("created_at") @db.Timestamptz(3)
+  shop            Shop                    @relation(fields: [shopId], references: [id], onDelete: Restrict)
+
+  @@unique([shopId, idempotencyKey])
+  @@index([resource, resourceId, createdAt(sort: Desc)])
+  @@map("seller_promotion_commands")
 }
 
 model VoucherProductScope {

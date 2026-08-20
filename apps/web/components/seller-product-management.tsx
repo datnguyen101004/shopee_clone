@@ -185,6 +185,7 @@ function SellerProductDeleteDialog({
   title,
   description,
   confirmLabel = 'Xóa sản phẩm',
+  confirmTone = 'danger',
   restoreFocusElement,
   onCancel,
   onConfirm,
@@ -196,6 +197,7 @@ function SellerProductDeleteDialog({
   title?: string;
   description?: string;
   confirmLabel?: string;
+  confirmTone?: 'danger' | 'accent';
   restoreFocusElement?: HTMLElement | null;
   onCancel: () => void;
   onConfirm: () => void;
@@ -268,7 +270,17 @@ function SellerProductDeleteDialog({
           {pending ? <p className="seller-product-delete-dialog__progress" role="status" aria-live="polite">Đang xử lý…</p> : null}
           <div className="seller-product-delete-dialog__actions">
             <button ref={cancelRef} type="button" disabled={pending} onClick={onCancel}>Hủy</button>
-            <button ref={confirmRef} type="button" className="seller-product-delete-dialog__danger" disabled={pending} onClick={onConfirm}>
+            <button
+              ref={confirmRef}
+              type="button"
+              className={
+                confirmTone === 'accent'
+                  ? 'seller-product-delete-dialog__accent'
+                  : 'seller-product-delete-dialog__danger'
+              }
+              disabled={pending}
+              onClick={onConfirm}
+            >
               {pending ? 'Đang xử lý…' : confirmLabel}
             </button>
           </div>
@@ -289,6 +301,9 @@ export function SellerProductList() {
   const [deleteDialogItem, setDeleteDialogItem] = useState<SellerProductListItem | null>(null);
   const [deleteDialogError, setDeleteDialogError] = useState('');
   const [deleteDialogTrigger, setDeleteDialogTrigger] = useState<HTMLElement | null>(null);
+  const [hideDialogItem, setHideDialogItem] = useState<SellerProductListItem | null>(null);
+  const [hideDialogError, setHideDialogError] = useState('');
+  const [hideDialogTrigger, setHideDialogTrigger] = useState<HTMLElement | null>(null);
   const load = useCallback(
     (cursor?: string) => {
       void fetchSellerProducts(authenticatedFetch, { cursor, lifecycle })
@@ -301,17 +316,38 @@ export function SellerProductList() {
     [authenticatedFetch, lifecycle],
   );
   const canManage = state.status === 'authenticated' && state.user.roles.includes('seller');
-  async function publishProduct(productId: string) {
+  function requestHide(item: SellerProductListItem, trigger: HTMLElement) {
+    setMessage('');
+    setHideDialogError('');
+    setHideDialogTrigger(trigger);
+    setHideDialogItem(item);
+  }
+  async function confirmHide() {
+    if (!hideDialogItem || publishingId !== null) return;
+    setPublishingId(hideDialogItem.id);
+    setHideDialogError('');
+    try {
+      await transitionSellerProduct(authenticatedFetch, hideDialogItem.id, 'hidden');
+      setItems((current) =>
+        current.map((item) => (item.id === hideDialogItem.id ? { ...item, lifecycle: 'hidden' } : item)),
+      );
+      setHideDialogItem(null);
+      setMessage('Đã ẩn sản phẩm.');
+    } catch (error) {
+      setHideDialogError(errorMessage(error));
+    } finally {
+      setPublishingId(null);
+    }
+  }
+  async function changeLifecycle(productId: string, next: 'published' | 'hidden') {
     setMessage('');
     setPublishingId(productId);
     try {
-      await transitionSellerProduct(authenticatedFetch, productId, 'published');
+      await transitionSellerProduct(authenticatedFetch, productId, next);
       setItems((current) =>
-        current.map((item) =>
-          item.id === productId ? { ...item, lifecycle: 'published' as const } : item,
-        ),
+        current.map((item) => (item.id === productId ? { ...item, lifecycle: next } : item)),
       );
-      setMessage('Sản phẩm đã được đăng bán.');
+      setMessage(next === 'published' ? 'Sản phẩm đã được đăng bán.' : 'Đã ẩn sản phẩm.');
     } catch (error) {
       setMessage(errorMessage(error));
     } finally {
@@ -424,7 +460,7 @@ export function SellerProductList() {
                       className="seller-product-row-action seller-product-row-publish"
                       type="button"
                       disabled={publishingId !== null || deletingId !== null || item.moderationStatus === 'suspended'}
-                      onClick={() => void publishProduct(item.id)}
+                      onClick={() => void changeLifecycle(item.id, 'published')}
                     >
                       {publishingId === item.id ? 'Đang đăng...' : 'Đăng bán'}
                     </button>
@@ -443,20 +479,49 @@ export function SellerProductList() {
                     </button>
                   </div>
                 ) : null}
-                {item.lifecycle === 'published' ? (
+                {item.lifecycle === 'hidden' ? (
                   <button
-                    className="seller-product-row-delete"
+                    className="seller-product-row-action seller-product-row-publish"
                     type="button"
-                    title="Xóa sản phẩm đang bán"
-                    aria-label={`Xóa sản phẩm đang bán ${item.name}`}
-                    disabled={publishingId !== null || deletingId !== null}
-                    onClick={(event) => requestDelete(item, event.currentTarget)}
+                    disabled={publishingId !== null || deletingId !== null || item.moderationStatus === 'suspended'}
+                    onClick={() => void changeLifecycle(item.id, 'published')}
                   >
-                    <svg aria-hidden="true" viewBox="0 0 24 24" focusable="false">
-                      <path d="M9 3h6l1 2h4v2H4V5h4l1-2Zm-2 6h2v9H7V9Zm4 0h2v9h-2V9Zm4 0h2v9h-2V9ZM6 21V8h12v13H6Z" />
-                    </svg>
-                    <span className="seller-product-visually-hidden">{deletingId === item.id ? 'Đang xóa' : 'Xóa'}</span>
+                    {publishingId === item.id ? 'Đang đăng...' : 'Đăng bán'}
                   </button>
+                ) : null}
+                {item.lifecycle === 'published' ? (
+                  <div className="seller-product-row-draft-actions">
+                    <button
+                      className="seller-product-row-hide"
+                      type="button"
+                      title="Ẩn sản phẩm"
+                      aria-label={`Ẩn sản phẩm ${item.name}`}
+                      disabled={publishingId !== null || deletingId !== null}
+                      onClick={(event) => requestHide(item, event.currentTarget)}
+                    >
+                      <svg aria-hidden="true" viewBox="0 0 24 24" focusable="false">
+                        <path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z" />
+                        <circle cx="12" cy="12" r="3.1" />
+                        <path d="M4.2 19.8 19.8 4.2" />
+                      </svg>
+                      <span className="seller-product-visually-hidden">
+                        {publishingId === item.id ? 'Đang ẩn' : 'Ẩn sản phẩm'}
+                      </span>
+                    </button>
+                    <button
+                      className="seller-product-row-delete"
+                      type="button"
+                      title="Xóa sản phẩm đang bán"
+                      aria-label={`Xóa sản phẩm đang bán ${item.name}`}
+                      disabled={publishingId !== null || deletingId !== null}
+                      onClick={(event) => requestDelete(item, event.currentTarget)}
+                    >
+                      <svg aria-hidden="true" viewBox="0 0 24 24" focusable="false">
+                        <path d="M9 3h6l1 2h4v2H4V5h4l1-2Zm-2 6h2v9H7V9Zm4 0h2v9h-2V9Zm4 0h2v9h-2V9ZM6 21V8h12v13H6Z" />
+                      </svg>
+                      <span className="seller-product-visually-hidden">{deletingId === item.id ? 'Đang xóa' : 'Xóa'}</span>
+                    </button>
+                  </div>
                 ) : null}
                 {item.lifecycle !== 'draft' && item.lifecycle !== 'published' ? (
                   <button
@@ -485,6 +550,19 @@ export function SellerProductList() {
         </button>
       ) : null}
       <SellerProductDeleteDialog item={deleteDialogItem} pending={deletingId !== null} error={deleteDialogError} restoreFocusElement={deleteDialogTrigger} onCancel={() => { if (!deletingId) setDeleteDialogItem(null); }} onConfirm={() => void confirmDelete()} />
+      <SellerProductDeleteDialog
+        item={hideDialogItem}
+        pending={publishingId !== null}
+        error={hideDialogError}
+        restoreFocusElement={hideDialogTrigger}
+        eyebrow="Xác nhận ẩn"
+        title={hideDialogItem ? `Ẩn “${hideDialogItem.name}”?` : undefined}
+        description="Sản phẩm sẽ biến mất khỏi trang mua sắm cho đến khi bạn đăng bán lại. Thông tin vẫn được giữ trong Seller Center."
+        confirmLabel="Ẩn sản phẩm"
+        confirmTone="accent"
+        onCancel={() => { if (!publishingId) setHideDialogItem(null); }}
+        onConfirm={() => void confirmHide()}
+      />
     </section>
   );
 }
@@ -499,9 +577,6 @@ export function SellerProductEditor({ productId }: { productId?: string }) {
   const [product, setProduct] = useState<SellerProductDetail | null>(null);
   const [message, setMessage] = useState('');
   const [pending, setPending] = useState(false);
-  const [archivePending, setArchivePending] = useState(false);
-  const [archiveDialogError, setArchiveDialogError] = useState('');
-  const [archiveDialogOpen, setArchiveDialogOpen] = useState(false);
   const [loadingProduct, setLoadingProduct] = useState(Boolean(productId));
   const canManage = state.status === 'authenticated' && state.user.roles.includes('seller');
   const loadedKeyRef = useRef<string | null>(null);
@@ -547,21 +622,6 @@ export function SellerProductEditor({ productId }: { productId?: string }) {
     () => categories.find((item) => item.id === form.categoryId) ?? null,
     [categories, form.categoryId],
   );
-  async function confirmArchive() {
-    if (!product || archivePending) return;
-    setArchivePending(true);
-    setArchiveDialogError('');
-    try {
-      const archived = await transitionSellerProduct(authenticatedFetch, product.id, 'archived');
-      setProduct(archived);
-      setArchiveDialogOpen(false);
-      setMessage('Đã lưu trữ sản phẩm.');
-    } catch (error) {
-      setArchiveDialogError(errorMessage(error));
-    } finally {
-      setArchivePending(false);
-    }
-  }
   function chooseCategory(categoryId: string) {
     const next = categories.find((item) => item.id === categoryId);
     setForm((current) => ({
@@ -731,7 +791,11 @@ export function SellerProductEditor({ productId }: { productId?: string }) {
       ? 'Ảnh vượt quá 5 MB.'
       : 'Không thể tải ảnh lên khi lưu sản phẩm.';
   }
+  function hasPendingMediaUploads(items = mediaItems) {
+    return items.some((item) => Boolean(item.file) && !item.imageId);
+  }
   async function stagePendingMedia(): Promise<ProductMediaItem[]> {
+    if (!hasPendingMediaUploads()) return mediaItems;
     const nextItems = [...mediaItems];
     for (let index = 0; index < nextItems.length; index += 1) {
       const item = nextItems[index]!;
@@ -830,15 +894,25 @@ export function SellerProductEditor({ productId }: { productId?: string }) {
     let createdProduct: SellerProductDetail | null = null;
     let mediaStageFailed = false;
     try {
-      setMessage('Đang lưu ảnh sản phẩm trước khi tạo sản phẩm...');
+      const needsUpload = hasPendingMediaUploads();
       let stagedItems: ProductMediaItem[];
-      try {
-        stagedItems = await stagePendingMedia();
-      } catch (error) {
-        mediaStageFailed = true;
-        throw error;
+      if (needsUpload) {
+        setMessage(
+          creating
+            ? 'Đang lưu ảnh sản phẩm trước khi tạo sản phẩm...'
+            : 'Đang tải ảnh mới lên...',
+        );
+        try {
+          stagedItems = await stagePendingMedia();
+        } catch (error) {
+          mediaStageFailed = true;
+          throw error;
+        }
+        setMessage(creating ? 'Ảnh đã được lưu. Đang tạo sản phẩm...' : 'Ảnh đã được lưu. Đang cập nhật sản phẩm...');
+      } else {
+        stagedItems = mediaItems;
+        setMessage(creating ? 'Đang tạo sản phẩm...' : 'Đang cập nhật sản phẩm...');
       }
-      setMessage('Ảnh đã được lưu. Đang tạo sản phẩm...');
       const media = stagedItems
         .filter((item) => item.status === 'ready')
         .map((item, sortOrder) => ({
@@ -910,7 +984,7 @@ export function SellerProductEditor({ productId }: { productId?: string }) {
         router.push('/seller/products');
         return;
       }
-      setMessage(publish ? 'Sản phẩm đã được đăng bán.' : 'Đã lưu bản nháp sản phẩm.');
+      setMessage(publish ? 'Sản phẩm đã được đăng bán.' : 'Đã cập nhật sản phẩm.');
     } catch (error) {
       if (createdProduct) {
         mediaItems.forEach((item) => {
@@ -1059,7 +1133,9 @@ export function SellerProductEditor({ productId }: { productId?: string }) {
             />
           </label>
           <p className="seller-product-help">
-            Ảnh chỉ được tải lên và lưu vào thư mục dự án khi bạn nhấn Lưu nháp hoặc Đăng bán.
+            {product
+              ? 'Ảnh mới chỉ được tải lên khi bạn nhấn Cập nhật. Ảnh hiện có được giữ nguyên nếu bạn không thay đổi.'
+              : 'Ảnh chỉ được tải lên khi bạn nhấn Lưu nháp hoặc Đăng bán.'}
           </p>
           <div className="seller-product-media-grid">
             {mediaItems.map((item, index) => (
@@ -1292,60 +1368,41 @@ export function SellerProductEditor({ productId }: { productId?: string }) {
         </fieldset>
       </div>
       <div className="seller-product-actions">
-        <button
-          type="button"
-          disabled={pending || product?.lifecycle === 'archived'}
-          onClick={() => void save(false)}
-        >
-          Lưu nháp
-        </button>
-        <button
-          className="seller-product-primary"
-          type="button"
-          disabled={
-            pending ||
-            product?.lifecycle === 'archived' ||
-            product?.moderationStatus === 'suspended'
-          }
-          onClick={() => void save(true)}
-        >
-          Đăng bán
-        </button>
-        {product?.lifecycle === 'published' ? (
-          <button
-            type="button"
-            disabled={pending}
-            onClick={() =>
-              void transitionSellerProduct(authenticatedFetch, product.id, 'hidden')
-                .then(setProduct)
-                .catch((error) => setMessage(errorMessage(error)))
-            }
-          >
-            Ẩn sản phẩm
-          </button>
-        ) : null}
-        {product && product.lifecycle !== 'archived' ? (
-          <button
-            type="button"
-            disabled={pending}
-            onClick={() => { setArchiveDialogError(''); setArchiveDialogOpen(true); }}
-          >
-            Lưu trữ
-          </button>
-        ) : null}
+        {product ? (
+          <>
+            <button
+              type="button"
+              disabled={pending}
+              onClick={() => router.push('/seller/products')}
+            >
+              Hủy
+            </button>
+            <button
+              className="seller-product-primary"
+              type="button"
+              disabled={pending || product.lifecycle === 'archived'}
+              onClick={() => void save(false)}
+            >
+              {pending ? 'Đang cập nhật…' : 'Cập nhật'}
+            </button>
+          </>
+        ) : (
+          <>
+            <button type="button" disabled={pending} onClick={() => void save(false)}>
+              Lưu nháp
+            </button>
+            <button
+              className="seller-product-primary"
+              type="button"
+              disabled={pending}
+              onClick={() => void save(true)}
+            >
+              Đăng bán
+            </button>
+          </>
+        )}
       </div>
       {message ? <p role="status">{message}</p> : null}
-      <SellerProductDeleteDialog
-        item={archiveDialogOpen && product ? { id: product.id, name: product.name, primaryMediaUrl: product.media[0]?.url ?? null } : null}
-        pending={archivePending}
-        error={archiveDialogError}
-        eyebrow="Xác nhận lưu trữ"
-        title={`Lưu trữ “${product?.name ?? ''}”?`}
-        description="Sản phẩm sẽ ngừng bán và không còn xuất hiện trong các luồng mua sắm. Bạn có thể quản lý lại trạng thái trong Seller Center."
-        confirmLabel="Lưu trữ sản phẩm"
-        onCancel={() => { if (!archivePending) setArchiveDialogOpen(false); }}
-        onConfirm={() => void confirmArchive()}
-      />
     </section>
   );
 }

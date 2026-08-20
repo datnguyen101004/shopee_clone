@@ -1,4 +1,5 @@
 import type { CatalogProductCard } from './catalog';
+import { isPublicScheduledPriceBreakdown, type PublicScheduledPriceBreakdown } from './pricing';
 
 export type ProductAvailability = 'in-stock' | 'unavailable';
 
@@ -23,6 +24,7 @@ export interface ProductDetailVariant {
   priceMinor: number;
   compareAtPriceMinor?: number;
   discountPercent?: number;
+  scheduledPrice?: PublicScheduledPriceBreakdown;
   availableQuantity: number;
   availability: ProductAvailability;
   preferredImageId: string | null;
@@ -119,7 +121,8 @@ function isVariant(value: unknown, galleryIds: Set<string>): value is ProductDet
     !(
       value.preferredImageId === null ||
       (isUuid(value.preferredImageId) && galleryIds.has(value.preferredImageId))
-    )
+    ) ||
+    !(value.scheduledPrice === undefined || isPublicScheduledPriceBreakdown(value.scheduledPrice))
   ) {
     return false;
   }

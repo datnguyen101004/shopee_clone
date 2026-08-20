@@ -110,6 +110,8 @@ See [Inventory and checkout reservations](docs/inventory-management.md) for sell
 
 See [Buyer favorites and recently viewed products](docs/buyer-engagement.md) for the T14 private engagement endpoints, concurrency and retention rules, account screens, privacy boundary, and focused verification commands.
 
+See [Seller dashboard and promotions](docs/seller-analytics-promotions.md) for owner-scoped analytics, shop voucher/campaign APIs, ETag/idempotency requirements, scheduled-price ordering, and focused verification commands.
+
 See [Public shop storefront and following](docs/shop-storefront.md) for the T15 shop profile/catalog, weighted aggregates, follow policy, privacy/cache boundary, screen checks, and pinned quick verification commands.
 
 ## Database workflows

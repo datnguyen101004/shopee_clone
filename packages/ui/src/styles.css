@@ -662,6 +662,7 @@
   }
   .sc-toast-viewport {
     right: var(--sc-space-3);
+    left: auto;
     bottom: var(--sc-space-3);
     width: calc(100vw - 1.5rem);
   }

@@ -38,6 +38,27 @@ describe('SellerProductsService authoring rules', () => {
     expect(prisma.sellerProductMediaAsset.deleteMany).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ state: 'STAGED' }) }));
   });
 
+  it('reuses existing product images when the seller did not change media', () => {
+    const service = new SellerProductsService({} as never);
+    const current = [
+      { id: 'image-1', altText: null, sortOrder: 0, url: '/api/v1/product-media/a' },
+      { id: 'image-2', altText: 'Cover', sortOrder: 1, url: '/api/v1/product-media/b' },
+    ];
+    const unchanged = [
+      { imageId: 'image-1', altText: null, sortOrder: 0 },
+      { imageId: 'image-2', altText: 'Cover', sortOrder: 1 },
+    ];
+    expect(
+      (service as never as { existingMediaUnchanged: (current: unknown, media: unknown) => boolean }).existingMediaUnchanged(current, unchanged),
+    ).toBe(true);
+    expect(
+      (service as never as { existingMediaUnchanged: (current: unknown, media: unknown) => boolean }).existingMediaUnchanged(current, [
+        { imageId: 'image-1', altText: null, sortOrder: 0 },
+        { assetId: 'asset-2', altText: 'Cover', sortOrder: 1 },
+      ]),
+    ).toBe(false);
+  });
+
   it('maps one first-group image to every generated combination', async () => {
     const prisma = { productOptionGroup: { findMany: jest.fn().mockResolvedValue([{ sortOrder: 0, values: [{ id: 'value-red', value: 'Red' }] }, { sortOrder: 1, values: [{ id: 'value-m', value: 'M' }] }]) }, productOptionValue: { update: jest.fn().mockResolvedValue(undefined) } };
     const service = new SellerProductsService(prisma as never);

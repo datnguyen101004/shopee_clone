@@ -221,10 +221,13 @@ export class SellerProductsService {
       if (current.status === ProductStatus.ARCHIVED) throw new SellerProductConflictError(['lifecycle']);
       const protectedVariants = await transaction.productVariant.findMany({ where: { productId, OR: [{ orderLines: { some: {} } }, { cartLines: { some: {} } }] }, select: { id: true, sku: true, combinationKey: true } });
       await this.validateCategoryInput(transaction, input);
-      const resolvedMedia = await this.resolveMedia(transaction, userId, current.shopId, productId, input);
+      const reuseMedia = this.existingMediaUnchanged(current.images, input.media);
+      const resolvedMedia = reuseMedia ? null : await this.resolveMedia(transaction, userId, current.shopId, productId, input);
       try {
         await transaction.product.update({ where: { id: productId }, data: { categoryId: input.categoryId, name: input.name, description: input.description, packageLengthMm: input.packageLengthMm, packageWidthMm: input.packageWidthMm, packageHeightMm: input.packageHeightMm, attributes: { deleteMany: {}, create: input.attributes.map((attribute) => ({ definitionId: attribute.definitionId, value: attribute.value })) }, optionGroups: { deleteMany: {}, create: input.optionGroups.map((group, index) => ({ name: group.name, sortOrder: index, values: { create: group.values.map((value, valueIndex) => ({ value, sortOrder: valueIndex })) } })) } } });
-        const mediaMap = await this.replaceProductMedia(transaction, productId, resolvedMedia);
+        const mediaMap = reuseMedia
+          ? this.imageAliasesFromCurrent(current.images)
+          : await this.replaceProductMedia(transaction, productId, resolvedMedia!);
         await this.applyOptionValueMedia(transaction, productId, input, mediaMap);
         await transaction.productVariant.deleteMany({ where: { productId, ...(protectedVariants.length ? { id: { notIn: protectedVariants.map((variant) => variant.id) } } : {}) } });
         await this.replaceVariants(transaction, productId, current.slug, current.shopId, input, protectedVariants, userId);
@@ -308,6 +311,31 @@ export class SellerProductsService {
       if (value !== undefined && Array.isArray(definition.allowedValues) && !definition.allowedValues.includes(value)) throw new SellerProductInputError([`attributes.${definition.code}`]);
     }
     for (const id of given.keys()) if (!definitions.has(id)) throw new SellerProductInputError(['attributes']);
+  }
+
+  private existingMediaUnchanged(
+    current: Array<{ id: string; altText: string | null; sortOrder: number }>,
+    media: SellerProductUpsertRequest['media'],
+  ): boolean {
+    if (current.length !== media.length) return false;
+    return media.every((item, index) => {
+      const image = current[index];
+      return Boolean(
+        image &&
+          item.imageId === image.id &&
+          (item.altText?.trim() || null) === image.altText &&
+          item.sortOrder === image.sortOrder,
+      );
+    });
+  }
+
+  private imageAliasesFromCurrent(current: Array<{ id: string; url: string }>): Map<string, string> {
+    const imageIds = new Map<string, string>();
+    for (const image of current) {
+      imageIds.set(`image:${image.id}`, image.id);
+      imageIds.set(`url:${image.url}`, image.id);
+    }
+    return imageIds;
   }
 
   private async resolveMedia(client: Transaction, userId: string, shopId: string, productId: string | null, input: SellerProductUpsertRequest): Promise<ResolvedMedia[]> {

@@ -203,7 +203,6 @@ const record = (value: unknown): value is Record<string, unknown> => typeof valu
 const isUuid = (value: unknown): value is string => typeof value === 'string' && uuid.test(value);
 const isSafeNonNegative = (value: unknown): value is number => typeof value === 'number' && Number.isSafeInteger(value) && value >= 0;
 const isInstant = (value: unknown): value is string => typeof value === 'string' && Number.isFinite(Date.parse(value)) && new Date(value).toISOString() === value;
-const isText = (value: unknown, max: number): value is string => typeof value === 'string' && value.length <= max && ![...value].some((char) => char.charCodeAt(0) < 32);
 const hasValue = <T extends string>(values: readonly T[], value: unknown): value is T => typeof value === 'string' && values.includes(value as T);
 
 export function normalizeSellerOrderNote(value: unknown): string | null | undefined {

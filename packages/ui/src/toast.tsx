@@ -35,7 +35,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
 
   return (
     <ToastContext.Provider value={{ toast }}>
-      <ToastPrimitive.Provider swipeDirection="right">
+      <ToastPrimitive.Provider swipeDirection="right" duration={5000}>
         {children}
         {toasts.map((item) => {
           const variant = item.variant ?? 'info';
@@ -45,8 +45,8 @@ export function ToastProvider({ children }: { children: ReactNode }) {
               key={item.id}
               className="sc-toast"
               data-variant={variant}
-              duration={item.duration ?? 4500}
-              type={variant === 'danger' || variant === 'warning' ? 'foreground' : 'background'}
+              duration={item.duration ?? 5000}
+              type="background"
               onOpenChange={(open) => {
                 if (!open) setToasts((current) => current.filter(({ id }) => id !== item.id));
               }}

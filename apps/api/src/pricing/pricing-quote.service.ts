@@ -16,6 +16,9 @@ import { PrismaService } from '../prisma/prisma.service';
 import { SystemUtcClock } from '../vouchers/utc-clock';
 import {
   VoucherPricingCalculator,
+  listAvailablePlatformVouchers,
+  listAvailableShippingVouchers,
+  listAvailableShopVouchers,
   type AppliedVoucherSnapshot,
   type VoucherDefinitionSnapshot,
 } from '../vouchers/voucher-pricing.calculator';
@@ -30,6 +33,7 @@ import {
   PricingUnavailableError,
   PricingValidationError,
 } from './pricing.errors';
+import { ScheduledDiscountService } from './scheduled-discount.service';
 
 const quoteCartSelect = {
   id: true,
@@ -113,6 +117,7 @@ export class PricingQuoteService {
     @Inject(VoucherPricingCalculator)
     private readonly voucherCalculator: VoucherPricingCalculator,
     @Inject(SystemUtcClock) private readonly clock: SystemUtcClock,
+    @Inject(ScheduledDiscountService) private readonly scheduledDiscounts?: ScheduledDiscountService,
   ) {}
 
   async quote(
@@ -183,7 +188,17 @@ export class PricingQuoteService {
     const version = cart?.version ?? 0;
     if (version !== input.expectedVersion) throw new PricingConflictError();
 
-    const { lines, exclusions, snapshots } = this.currentFacts(cart);
+    const facts = this.currentFacts(cart);
+    const discounts = this.scheduledDiscounts
+      ? await this.scheduledDiscounts.resolveVariants(transaction, facts.lines.map((line) => ({ id: line.variantId, productId: line.productId, priceMinor: line.sellingUnitPriceMinor, compareAtPriceMinor: line.compareAtUnitPriceMinor })), input.evaluatedAt)
+      : new Map();
+    const lines = facts.lines.map((line) => {
+      const discount = discounts.get(line.variantId);
+      if (!discount || discount.effectivePriceMinor === discount.basePriceMinor) return line;
+      const listPrice = line.compareAtUnitPriceMinor === null || line.compareAtUnitPriceMinor < discount.basePriceMinor ? discount.basePriceMinor : line.compareAtUnitPriceMinor;
+      return { ...line, sellingUnitPriceMinor: discount.effectivePriceMinor, compareAtUnitPriceMinor: listPrice };
+    });
+    const { exclusions, snapshots } = facts;
     const selectedShopIds = new Set(lines.map((line) => line.shop.id));
     const seen = new Set<string>();
     for (const selection of input.services) {
@@ -212,6 +227,8 @@ export class PricingQuoteService {
       transaction,
       input.userId,
       input.vouchers,
+      [...selectedShopIds],
+      input.evaluatedAt,
     );
     const calculated = this.voucherCalculator.apply(
       baseQuote,
@@ -221,6 +238,24 @@ export class PricingQuoteService {
     );
     return {
       ...calculated,
+      quote: {
+        ...calculated.quote,
+        availableShopVouchers: listAvailableShopVouchers(
+          baseQuote,
+          definitions,
+          input.evaluatedAt,
+        ),
+        availablePlatformVouchers: listAvailablePlatformVouchers(
+          baseQuote,
+          definitions,
+          input.evaluatedAt,
+        ),
+        availableShippingVouchers: listAvailableShippingVouchers(
+          baseQuote,
+          definitions,
+          input.evaluatedAt,
+        ),
+      },
       facts: {
         address: {
           id: address.id,
@@ -240,22 +275,43 @@ export class PricingQuoteService {
   private async loadVoucherDefinitions(
     transaction: Prisma.TransactionClient,
     userId: string,
-    selection?: VoucherCodeSelection,
+    selection: VoucherCodeSelection | undefined,
+    shopIds: string[],
+    evaluatedAt: Date,
   ): Promise<VoucherDefinitionSnapshot[]> {
     const codes = [
       selection?.platformCode,
       ...(selection?.shopCodes ?? []).map(({ code }) => code),
       selection?.freeShippingCode,
     ].filter((code): code is string => Boolean(code));
-    if (codes.length === 0) return [];
+    const filters: Prisma.VoucherWhereInput[] = [];
+    if (codes.length) filters.push({ code: { in: codes } });
+    if (shopIds.length) {
+      filters.push({
+        issuer: 'SHOP',
+        shopId: { in: shopIds },
+        isEnabled: true,
+        archivedAt: null,
+        startsAt: { lte: evaluatedAt },
+        endsAt: { gt: evaluatedAt },
+      });
+    }
+    filters.push({
+      issuer: 'PLATFORM',
+      isEnabled: true,
+      archivedAt: null,
+      startsAt: { lte: evaluatedAt },
+      endsAt: { gt: evaluatedAt },
+    });
+    if (filters.length === 0) return [];
     const definitions = await transaction.voucher.findMany({
-      where: { code: { in: codes } },
+      where: { OR: filters },
       include: {
         productScopes: { select: { productId: true } },
         userUsages: { where: { userId }, select: { usedCount: true } },
       },
     });
-    return definitions.map((definition) => ({
+    const mapped = definitions.map((definition) => ({
       id: definition.id,
       code: definition.code,
       name: definition.name,
@@ -281,6 +337,7 @@ export class PricingQuoteService {
       buyerUsedCount: definition.userUsages[0]?.usedCount ?? 0,
       productIds: definition.productScopes.map(({ productId }) => productId),
     }));
+    return [...new Map(mapped.map((definition) => [definition.id, definition])).values()];
   }
 
   private currentFacts(cart: QuoteCart | null): {

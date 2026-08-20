@@ -218,6 +218,15 @@ describe('multi-shop cart screen', () => {
     expect(screen.getByText('222.000₫')).toBeVisible();
     expect(screen.getByText(/Giảm 40.000₫/)).toBeVisible();
     expect(screen.getByRole('button', { name: 'Mua hàng' })).toBeEnabled();
+    expect(screen.getByRole('combobox', { name: 'Địa chỉ nhận hàng' })).toHaveTextContent(
+      'Nhà riêng · Buyer · 0900000000 · 1 Nguyễn Huệ, Phường Bến Nghé, Quận 1, Thành phố Hồ Chí Minh',
+    );
+    expect(screen.getByText('Buyer')).toBeVisible();
+    expect(screen.getByText('0900000000')).toBeVisible();
+    expect(
+      screen.getByText('1 Nguyễn Huệ, Phường Bến Nghé, Quận 1, Thành phố Hồ Chí Minh'),
+    ).toBeVisible();
+    expect(screen.getByText('Địa chỉ mặc định')).toBeVisible();
   });
 
   it('stores an ID-only draft and navigates to checkout', async () => {

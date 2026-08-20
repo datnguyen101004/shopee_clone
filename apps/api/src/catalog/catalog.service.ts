@@ -13,7 +13,8 @@ import { relevanceScore, normalizeDiscoveryText } from './catalog-discovery';
 import { CatalogPublicFacade, type PublicShopCatalogSummary } from './catalog-public.facade';
 import type { NormalizedCatalogQuery } from './catalog-query';
 import { CatalogRepository } from './catalog.repository';
-import { mapCatalogProductCard } from './catalog-presentation';
+import { mapCatalogProductCard, publicScheduledPrice } from './catalog-presentation';
+import { ScheduledDiscountService } from '../pricing/scheduled-discount.service';
 
 type CatalogCandidate = Awaited<ReturnType<CatalogRepository['findCandidates']>>[number];
 type ActiveCategory = Awaited<ReturnType<CatalogRepository['findActiveCategories']>>[number];
@@ -113,18 +114,26 @@ function compareCandidates(
 
 @Injectable()
 export class CatalogService extends CatalogPublicFacade {
-  constructor(@Inject(CatalogRepository) private readonly repository: CatalogRepository) {
+  constructor(@Inject(CatalogRepository) private readonly repository: CatalogRepository, @Inject(ScheduledDiscountService) private readonly scheduledDiscounts?: ScheduledDiscountService) {
     super();
+  }
+
+  private async applyScheduledDiscounts(products: CatalogCandidate[], evaluatedAt: Date): Promise<CatalogCandidate[]> {
+    if (!this.scheduledDiscounts || products.length === 0) return products;
+    const variants = products.flatMap((product) => product.variants.map((variant) => ({ id: variant.id, productId: product.id, priceMinor: variant.priceMinor, compareAtPriceMinor: variant.compareAtPriceMinor })));
+    const discounts = await this.scheduledDiscounts.resolveVariants(undefined, variants, evaluatedAt);
+    return products.map((product) => ({ ...product, variants: product.variants.map((variant) => { const discount = discounts.get(variant.id); if (!discount || discount.effectivePriceMinor === discount.basePriceMinor) return variant; const list = variant.compareAtPriceMinor === null || variant.compareAtPriceMinor < discount.basePriceMinor ? discount.basePriceMinor : variant.compareAtPriceMinor; return { ...variant, priceMinor: discount.effectivePriceMinor, compareAtPriceMinor: list, scheduledPrice: publicScheduledPrice(discount) }; }) }));
   }
 
   private async shopSnapshot(shopId: string): Promise<{
     categories: ActiveCategory[];
     displayable: DisplayableCatalogCandidate[];
   }> {
-    const [categories, rawCandidates] = await Promise.all([
+    const [categories, foundCandidates] = await Promise.all([
       this.repository.findActiveCategories(),
       this.repository.findCandidatesForShop(shopId),
     ]);
+    const rawCandidates = await this.applyScheduledDiscounts(foundCandidates, new Date());
     return {
       categories,
       displayable: rawCandidates
@@ -166,10 +175,11 @@ export class CatalogService extends CatalogPublicFacade {
   }
 
   async getProducts(query: NormalizedCatalogQuery): Promise<CatalogProductsResponse> {
-    const [categories, rawCandidates] = await Promise.all([
+    const [categories, foundCandidates] = await Promise.all([
       this.repository.findActiveCategories(),
       this.repository.findCandidates(),
     ]);
+    const rawCandidates = await this.applyScheduledDiscounts(foundCandidates, new Date());
     const displayable = rawCandidates
       .map(mapDisplayableCandidate)
       .filter((candidate): candidate is DisplayableCatalogCandidate => candidate !== null);

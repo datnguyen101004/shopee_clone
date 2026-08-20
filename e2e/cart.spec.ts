@@ -312,4 +312,18 @@ test.describe('authenticated multi-shop cart', () => {
       ),
     ).toEqual([]);
   });
+
+  test('buy now adds the product then navigates to cart', async ({ page, request }) => {
+    await restoreBuyer(page);
+    await routeAuthenticatedCart(page, createCart());
+    const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://127.0.0.1:3001';
+    const catalog = await request.get(`${apiBaseUrl}/api/v1/catalog/products?pageSize=1`);
+    expect(catalog.ok()).toBe(true);
+    const product = (await catalog.json()).items[0] as { id: string };
+
+    await page.goto(`/products/${product.id}`);
+    await page.getByRole('button', { name: 'Mua ngay' }).click();
+    await expect(page).toHaveURL(/\/cart$/);
+    await expect(page.getByRole('heading', { name: 'Giỏ hàng của bạn' })).toBeVisible();
+  });
 });

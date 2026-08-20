@@ -1,10 +1,11 @@
-import type { CatalogProductCard } from '@shopee-clone/contracts';
+import type { CatalogProductCard, PublicScheduledPriceBreakdown } from '@shopee-clone/contracts';
 
 export interface CatalogueOffer {
   id: string;
   priceMinor: bigint;
   compareAtPriceMinor: bigint | null;
   inventory: { quantityOnHand: number; quantityReserved: number } | null;
+  scheduledPrice?: PublicScheduledPriceBreakdown;
 }
 
 export interface CatalogueCandidate {
@@ -50,6 +51,29 @@ export function promotionFor(
     : null;
 }
 
+export function publicScheduledPrice(discount: {
+  basePriceMinor: bigint;
+  effectivePriceMinor: bigint;
+  compareAtPriceMinor: bigint | null;
+  discountBasisPoints: number;
+  campaignId: string | null;
+  evaluatedAt: Date;
+}): PublicScheduledPriceBreakdown | undefined {
+  if (discount.campaignId === null || discount.effectivePriceMinor >= discount.basePriceMinor) return undefined;
+  const base = safeMinor(discount.basePriceMinor);
+  const effective = safeMinor(discount.effectivePriceMinor);
+  const compare = discount.compareAtPriceMinor === null ? null : safeMinor(discount.compareAtPriceMinor);
+  if (base === null || effective === null || effective <= 0 || effective >= base) return undefined;
+  return {
+    basePriceMinor: base,
+    effectivePriceMinor: effective,
+    compareAtPriceMinor: compare,
+    discountBasisPoints: discount.discountBasisPoints,
+    campaignId: discount.campaignId,
+    evaluatedAt: discount.evaluatedAt.toISOString(),
+  };
+}
+
 export function representativeOffer(variants: CatalogueOffer[]): {
   offer: CatalogueOffer;
   priceMinor: number;
@@ -80,6 +104,7 @@ export function mapCatalogProductCard(product: CatalogueCandidate): CatalogProdu
     imageAlt: image?.altText ?? product.name,
     priceMinor: representative.priceMinor,
     ...(promotion ?? {}),
+    ...(representative.offer.scheduledPrice ? { scheduledPrice: representative.offer.scheduledPrice } : {}),
     ratingAverageBasisPoints: product.ratingAverageBasisPoints,
     ratingCount: product.ratingCount,
     soldCount: product.soldCount,

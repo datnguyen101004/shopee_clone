@@ -28,6 +28,7 @@ export function MarketplaceHeader({
   menuButtonRef,
 }: MarketplaceHeaderProps) {
   const [searchError, setSearchError] = useState('');
+  const userMenuId = 'marketplace-user-menu';
 
   function handleSearchSubmit(event: FormEvent<HTMLFormElement>) {
     const form = event.currentTarget;
@@ -92,19 +93,32 @@ export function MarketplaceHeader({
           ) : null}
         </form>
         <div className="market-actions">
+          <Link className="market-cart" href="/cart" aria-label={`Giỏ hàng, ${cartCount} sản phẩm`}>
+            <span className="market-cart-icon">
+              <ShoppingCart aria-hidden="true" />
+              <b aria-hidden="true">{cartCount}</b>
+            </span>
+          </Link>
           {account.status === 'authenticated' ? (
-            <div className="market-account">
-              <Link href="/account/profile" aria-label={`Tài khoản ${account.user.displayName}`}>
+            <div className="market-user-menu">
+              <button
+                type="button"
+                className="market-user"
+                aria-label={`Tài khoản ${account.user.displayName}`}
+                aria-haspopup="menu"
+                aria-controls={userMenuId}
+              >
                 <UserRound aria-hidden="true" />
                 <span>{account.user.displayName}</span>
-              </Link>
-              <Link href="/account/addresses">Địa chỉ</Link>
-              <Link href="/account/favorites">Yêu thích</Link>
-              <Link href="/account/followed-shops">Shop đang theo dõi</Link>
-              <Link href="/account/orders">Đơn mua</Link>
-              <button type="button" onClick={onLogout}>
-                Đăng xuất
               </button>
+              <div className="market-user-menu__popup" id={userMenuId} role="menu">
+                <Link role="menuitem" href="/account/profile">
+                  Tài khoản của tôi
+                </Link>
+                <button role="menuitem" type="button" onClick={() => onLogout?.()}>
+                  Đăng xuất
+                </button>
+              </div>
             </div>
           ) : account.status === 'loading' ? (
             <span className="market-account__loading">Đang kiểm tra phiên…</span>
@@ -114,13 +128,6 @@ export function MarketplaceHeader({
               <span>Đăng nhập</span>
             </Link>
           )}
-          <Link href="/cart" aria-label={`Giỏ hàng, ${cartCount} sản phẩm`}>
-            <span className="market-cart-icon">
-              <ShoppingCart aria-hidden="true" />
-              <b aria-hidden="true">{cartCount}</b>
-            </span>
-            <span>Giỏ hàng</span>
-          </Link>
           <button
             ref={menuButtonRef}
             className="market-menu-button"

@@ -193,4 +193,33 @@ describe('cart pricing coordination', () => {
       freeShippingCode: 'FREESHIP-30K',
     });
   });
+
+  it('clears a shop voucher when the quote rejects it after the invoice amount changes', async () => {
+    const accepted = quote(22_000);
+    const rejected = {
+      ...quote(22_000),
+      vouchers: [
+        {
+          code: 'SHOP-15',
+          slot: 'SHOP' as const,
+          shopId,
+          status: 'REJECTED' as const,
+          name: 'Giảm 15%',
+          issuer: 'SHOP' as const,
+          benefitType: 'PERCENTAGE' as const,
+          rejectionReason: 'MINIMUM_SPEND_NOT_MET' as const,
+          discountMinor: 0,
+          merchandiseDiscountMinor: 0,
+          shippingDiscountMinor: 0,
+          allocations: [],
+        },
+      ],
+      availableShopVouchers: [],
+    };
+    vi.mocked(getPricingQuote).mockResolvedValueOnce(accepted).mockResolvedValue(rejected);
+    const { result } = renderHook(() => useCartPricing(cart, refresh));
+    await waitFor(() => expect(getPricingQuote).toHaveBeenCalledTimes(1));
+    act(() => result.current.setShopVoucher(shopId, 'SHOP-15'));
+    await waitFor(() => expect(result.current.vouchers.shopCodes).toBeUndefined());
+  });
 });

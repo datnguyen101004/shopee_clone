@@ -1,6 +1,6 @@
 'use client';
 
-import { SHIPPING_SERVICES, type CartResponse } from '@shopee-clone/contracts';
+import { SHIPPING_SERVICES, type CartResponse, type ShippingAddress } from '@shopee-clone/contracts';
 import Link from 'next/link';
 
 import type { CartPricingState } from './use-cart-pricing';
@@ -14,6 +14,23 @@ const serviceLabels = {
   STANDARD: 'Nhanh',
   EXPRESS: 'Hỏa tốc',
 } as const;
+
+function formatAddressLine(address: ShippingAddress): string {
+  return [address.addressLine, address.ward, address.district, address.province]
+    .filter(Boolean)
+    .join(', ');
+}
+
+function formatAddressOption(address: ShippingAddress): string {
+  return [
+    address.label,
+    address.recipientName,
+    address.phoneNumber,
+    formatAddressLine(address),
+  ]
+    .filter(Boolean)
+    .join(' · ');
+}
 
 export function CartPricingPanel({
   cart,
@@ -45,6 +62,10 @@ export function CartPricingPanel({
   }
 
   const quoteCurrent = pricing.quote?.cartVersion === cart.version;
+  const selectedAddress =
+    pricing.addresses.find((address) => address.id === pricing.selectedAddressId) ??
+    pricing.addresses[0] ??
+    null;
   return (
     <section className="cart-pricing" aria-labelledby="cart-pricing-title">
       <header>
@@ -61,14 +82,24 @@ export function CartPricingPanel({
             >
               {pricing.addresses.map((address) => (
                 <option key={address.id} value={address.id}>
-                  {address.label ? `${address.label} · ` : ''}
-                  {address.district}, {address.province}
+                  {formatAddressOption(address)}
                 </option>
               ))}
             </select>
           </label>
         ) : null}
       </header>
+      {selectedAddress ? (
+        <div className="cart-pricing__address">
+          <div className="cart-pricing__address-heading">
+            <strong>{selectedAddress.recipientName}</strong>
+            <span>{selectedAddress.phoneNumber}</span>
+            {selectedAddress.isDefault ? <b>Địa chỉ mặc định</b> : null}
+          </div>
+          <p>{formatAddressLine(selectedAddress)}</p>
+          {selectedAddress.label ? <small>{selectedAddress.label}</small> : null}
+        </div>
+      ) : null}
 
       {cart.groups
         .filter(({ selectedEligibleLineCount }) => selectedEligibleLineCount > 0)

@@ -216,13 +216,15 @@ export const seedHomepageBanners = [
     eyebrow: '8.8 SIÊU HỘI',
     title: 'Mua sắm thả ga, deal về đầy nhà',
     description: 'Khám phá ưu đãi nổi bật từ các gian hàng trên Shopee Clone.',
-    imageUrl: '/media/homepage/campaign-88.webp',
-    altText: 'Hộp quà chiến dịch 8.8',
+    imageUrl: '/media/homepage/campaign-banner.jpg',
+    altText: 'Shopee Clone Siêu Sale Đại Tiệc',
     destinationPath: '/search?q=flash+sale',
     themeKey: 'brand',
     sortOrder: 10,
   },
 ] as const;
+
+
 
 export const seedUnavailableEngagementProduct = {
   id: '00000000-0000-4000-8000-000000000901',

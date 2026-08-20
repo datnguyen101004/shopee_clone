@@ -5,15 +5,145 @@ import type {
   HomepageProductModule,
   HomepageProductSummary,
 } from '@shopee-clone/contracts';
-import { Badge, Card, Container, Truck } from '@shopee-clone/ui';
+import { Badge, Card, Container, RotateCcw, ShieldCheck, Truck } from '@shopee-clone/ui';
 import Image from 'next/image';
 import Link from 'next/link';
+
 
 import { MarketplaceProductImage } from '../marketplace-product-image';
 import { FavoriteButton } from '../engagement/favorite-button';
 import { FavoriteStateProvider } from '../engagement/favorite-state-provider';
 
-const icons: Record<string, string> = { device: '⚡', phone: '📱', home: '🏠', kitchen: '🍳' };
+function normalizeText(text: string): string {
+  return text
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/đ/g, 'd')
+    .replace(/Đ/g, 'D')
+    .replace(/[^a-z0-9]/g, '');
+}
+
+const iconMatcherList: Array<{ keywords: string[]; path: string }> = [
+  {
+    keywords: ['bachhoa', 'grocery', 'taphoa', 'thucpham', 'anvat', 'sieuthi'],
+    path: '/media/categories/grocery.png',
+  },
+  {
+    keywords: ['mypham', 'lamdep', 'sacdep', 'beauty', 'skincare', 'son', 'makeup'],
+    path: '/media/categories/beauty-personal-care.png',
+  },
+  {
+    keywords: ['noithat', 'nhacua', 'doisong', 'homeliving', 'living', 'furniture', 'nhabep'],
+    path: '/media/categories/home-living.png',
+  },
+  {
+    keywords: ['thethao', 'dulich', 'sport', 'outdoor', 'gym', 'bongda', 'chaybo'],
+    path: '/media/categories/sport-outdoor.png',
+  },
+  {
+    keywords: ['thoitrang', 'quanao', 'fashion', 'clothes', 'nam', 'nu', 'aothun', 'vay', 'dam', 'ao', 'quan'],
+    path: '/media/categories/men-clothes.png',
+  },
+  {
+    keywords: ['thietbidientu', 'dientu', 'electronic', 'amthanh', 'tivi', 'loa'],
+    path: '/media/categories/consumer-electronics.png',
+  },
+  {
+    keywords: ['dienthoai', 'phukien', 'gadget', 'smartphone', 'iphone', 'samsung', 'tainghe', 'phone', 'device'],
+    path: '/media/categories/mobile-gadgets.png',
+  },
+  {
+    keywords: ['giadung', 'dogiadung', 'kitchen', 'appliance', 'noicom', 'mayxay', 'bep'],
+    path: '/media/categories/home-appliances.png',
+  },
+  {
+    keywords: ['suckhoe', 'health', 'thuoc', 'vitamin', 'khautrang', 'yte'],
+    path: '/media/categories/health.png',
+  },
+  {
+    keywords: ['maytinh', 'laptop', 'pc', 'computer', 'banphim', 'chuot', 'manhinh'],
+    path: '/media/categories/computer-accessories.png',
+  },
+  {
+    keywords: ['mayanh', 'camera', 'quayphim', 'lens', 'flycam'],
+    path: '/media/categories/cameras.png',
+  },
+  {
+    keywords: ['dongho', 'watch', 'smartwatch'],
+    path: '/media/categories/watches.png',
+  },
+  {
+    keywords: ['giay', 'giaydep', 'shoes', 'sneaker', 'sandal', 'dep'],
+    path: '/media/categories/men-shoes.png',
+  },
+  {
+    keywords: ['tuivi', 'balo', 'tui', 'vi', 'bag', 'wallet', 'backpack', 'cap'],
+    path: '/media/categories/women-bags.png',
+  },
+  {
+    keywords: ['mebe', 'treem', 'sosinh', 'bim', 'sua', 'baby', 'mom', 'kids'],
+    path: '/media/categories/moms-kids-babies.png',
+  },
+  {
+    keywords: ['dochoi', 'toy', 'lego', 'figure', 'mohinh', 'bupbe'],
+    path: '/media/categories/toys.png',
+  },
+  {
+    keywords: ['thucung', 'pet', 'chomeo', 'poodle', 'meo', 'cho'],
+    path: '/media/categories/pets.png',
+  },
+  {
+    keywords: ['sach', 'nhasach', 'book', 'vanphongpham', 'truyen', 'vo', 'but'],
+    path: '/media/categories/books-stationery.png',
+  },
+  {
+    keywords: ['oto', 'xemay', 'xedap', 'motor', 'car', 'bike', 'auto', 'phutung'],
+    path: '/media/categories/automotive.png',
+  },
+  {
+    keywords: ['voucher', 'dichvu', 'service', 've', 'coupon', 'napthe'],
+    path: '/media/categories/tickets-vouchers-services.png',
+  },
+  {
+    keywords: ['dungcu', 'thietbi', 'tool', 'khoan', 'kem', 'tovit', 'suachua'],
+    path: '/media/categories/tools-home-improvement.png',
+  },
+  {
+    keywords: ['trangsuc', 'phukiennu', 'jewelry', 'nhan', 'daychuyen', 'vongtay', 'bongtai'],
+    path: '/media/categories/fashion-accessories.png',
+  },
+  {
+    keywords: ['giatgiu', 'vesinh', 'tayrua', 'homecare', 'nuocgiat', 'nuocxa'],
+    path: '/media/categories/home-care.png',
+  },
+];
+
+function getCategoryIcon(iconKey?: string, href?: string, label?: string): string {
+  const combined = [iconKey, href, label].filter(Boolean).join(' ');
+  const normalized = normalizeText(combined);
+
+  for (const entry of iconMatcherList) {
+    if (entry.keywords.some((k) => normalized.includes(k))) {
+      return entry.path;
+    }
+  }
+  return '/media/categories/grocery.png';
+}
+
+function getBannerImage(url?: string | null): string {
+  if (
+    !url ||
+    url.includes('campaign-88') ||
+    url.includes('campaign-mega-sale') ||
+    url.includes('campaign-compact') ||
+    url.includes('campaign-square') ||
+    url.includes('campaign-wide')
+  ) {
+    return '/media/homepage/campaign-banner.jpg';
+  }
+  return url;
+}
 
 function CampaignSection({ module }: { module: HomepageCampaignModule }) {
   return (
@@ -23,33 +153,46 @@ function CampaignSection({ module }: { module: HomepageCampaignModule }) {
       data-module-type={module.type}
     >
       {module.banners.map((banner) => (
-        <div className="hero" key={banner.id}>
-          <div className="hero__content">
-            {banner.eyebrow ? <Badge variant="brand">{banner.eyebrow}</Badge> : null}
-            <h1 id={`module-${module.id}`}>{banner.title}</h1>
-            {banner.description ? <p>{banner.description}</p> : null}
-            <Link className="homepage-primary-action" href={banner.href}>
-              Săn deal ngay
-            </Link>
+        <Link
+          key={banner.id}
+          href={banner.href}
+          className="hero-banner-link"
+          aria-label={banner.title || 'Chiến dịch siêu hội mua sắm'}
+        >
+          <h1 id={`module-${module.id}`} className="sr-only">
+            {banner.title}
+          </h1>
+          <div className="hero-banner-container">
+            <Image
+              src={getBannerImage(banner.imageUrl)}
+              alt={banner.altText || banner.title || 'Shopee Clone Siêu Sale Đại Tiệc'}
+              width={1400}
+              height={410}
+              priority
+              unoptimized
+              className="hero-banner-img"
+            />
           </div>
-          <div className="hero__art">
-            {banner.imageUrl ? (
-              <Image src={banner.imageUrl} alt={banner.altText} width={420} height={320} priority />
-            ) : (
-              <span className="homepage-media-fallback" role="img" aria-label={banner.altText}>
-                88
-              </span>
-            )}
-          </div>
-        </div>
+        </Link>
       ))}
+
       <div className="benefit-strip" aria-label="Quyền lợi mua sắm" tabIndex={0}>
+
+
+
+
+
         <span>
           <Truck aria-hidden="true" /> Miễn phí vận chuyển
         </span>
-        <span>✓ Thanh toán an toàn</span>
-        <span>↩ Đổi trả dễ dàng</span>
+        <span>
+          <ShieldCheck aria-hidden="true" /> Thanh toán an toàn
+        </span>
+        <span>
+          <RotateCcw aria-hidden="true" /> Đổi trả dễ dàng
+        </span>
       </div>
+
     </section>
   );
 }
@@ -62,21 +205,34 @@ function CategorySection({ module }: { module: HomepageCategoryModule }) {
         <p>{module.subtitle}</p>
       </div>
       <div className="category-grid">
-        {module.categories.map((category) => (
-          <Link
-            className="category-card"
-            href={category.href}
-            key={category.id}
-            aria-label={`Xem danh mục ${category.label}`}
-          >
-            <span aria-hidden="true">{icons[category.icon] ?? '🛍️'}</span>
-            <strong>{category.label}</strong>
-          </Link>
-        ))}
+        {module.categories.map((category) => {
+          const iconSrc = getCategoryIcon(category.icon, category.href, category.label);
+          return (
+            <Link
+              className="category-card"
+              href={category.href}
+              key={category.id}
+              aria-label={`Xem danh mục ${category.label}`}
+            >
+              <span aria-hidden="true" className="category-card__icon">
+                <Image
+                  src={iconSrc}
+                  alt={category.label}
+                  width={48}
+                  height={48}
+                  className="category-card__img"
+                />
+              </span>
+              <strong>{category.label}</strong>
+            </Link>
+          );
+        })}
       </div>
     </section>
   );
 }
+
+
 
 function formatMoney(value: number): string {
   return new Intl.NumberFormat('vi-VN').format(value);

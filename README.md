@@ -1,6 +1,6 @@
 # Shopee Clone
 
-Shopee Clone is a TypeScript monorepo for incrementally reproducing the core Shopee shopping experience. T02 provides the runnable foundation: a Next.js web application, a NestJS API, and framework-neutral shared contracts.
+Shopee Clone is a TypeScript monorepo for incrementally reproducing the core Shopee shopping experience. It provides a runnable foundation: a Next.js web application, a NestJS API, PostgreSQL database, and framework-neutral shared contracts.
 
 ## Prerequisites
 
@@ -42,7 +42,7 @@ pnpm db:seed
 
 `infra:up` waits for PostgreSQL to become healthy. Running it again is safe and does not duplicate the service or erase the named development volume.
 
-## Development
+## Development (Local Machine)
 
 ```bash
 pnpm dev       # web and API together
@@ -55,13 +55,66 @@ Health checks:
 - Web: `http://localhost:3000/health`
 - API: `http://localhost:3001/api/v1/health`
 
-Stop the applications with `Ctrl+C`, then stop infrastructure without deleting development data:
+Stop the applications with `Ctrl+C`, then stop database infrastructure without deleting development data:
 
 ```bash
 pnpm infra:down
 ```
 
 See [Local Development](docs/local-development.md) for lifecycle commands, destructive reset behavior, smoke verification, and troubleshooting.
+
+## Docker Deployment (Dev & Production)
+
+The repository provides multi-stage, environment-agnostic Dockerfiles for the Backend API and Frontend Web, configured via Docker Compose (`compose.yaml`).
+
+### 1. Run Full Stack with Docker Compose
+
+#### Development Mode (uses `.env` or `.env.development`)
+
+```bash
+# Build and start all services (Postgres + API + Web)
+pnpm app:docker:build
+pnpm app:docker:up
+
+# Or with docker compose directly
+docker compose --profile full up --build -d
+
+# Or specify a custom dev environment file
+docker compose --env-file .env.development --profile full up --build -d
+```
+
+#### Production Mode (uses `.env.production`)
+
+```bash
+# Build and start all services with production configuration
+docker compose --env-file .env.production --profile full up --build -d
+```
+
+#### Stop Containers
+
+```bash
+# Stop full stack
+pnpm app:docker:down
+
+# Or with specific environment file
+docker compose --env-file .env.production --profile full down
+```
+
+### 2. Service Endpoints
+
+- **Frontend Web**: [http://localhost:3000](http://localhost:3000)
+- **Backend API**: [http://localhost:3001](http://localhost:3001)
+- **PostgreSQL**: `localhost:5432`
+
+### 3. Build Individual Docker Images
+
+```bash
+# Build API image
+docker build -f docker/Dockerfile.api -t shopee-clone-api .
+
+# Build Web image
+docker build -f docker/Dockerfile.web --build-arg NEXT_PUBLIC_API_BASE_URL=http://localhost:3001 -t shopee-clone-web .
+```
 
 ## Local infrastructure commands
 

@@ -8,12 +8,11 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER is required}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
       POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB is required}
-      POSTGRES_TEST_DB: ${POSTGRES_TEST_DB:?POSTGRES_TEST_DB is required}
+      POSTGRES_TEST_DB: ${POSTGRES_TEST_DB:-shopee_clone_test}
     ports:
       - '127.0.0.1:${POSTGRES_PORT:?POSTGRES_PORT is required}:5432'
     volumes:
       - postgres-data:/var/lib/postgresql
-      - ./docker/postgres/init/01-create-test-database.sh:/docker-entrypoint-initdb.d/01-create-test-database.sh:ro
     healthcheck:
       test: ['CMD-SHELL', 'pg_isready -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}"']
       interval: 2s
@@ -22,6 +21,77 @@ services:
       start_period: 5s
     labels:
       com.shopee-clone.component: postgres
+      com.shopee-clone.scope: ${SHOPEE_COMPOSE_SCOPE:-development}
+
+  api:
+    image: datnguyen10102004/shopee-clone-api:${IMAGE_TAG:-0.1.0}
+    profiles:
+      - app
+      - full
+      - api
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.api
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      PORT: ${PORT:-3001}
+      DATABASE_URL: ${DATABASE_CONTAINER_URL:-postgresql://${POSTGRES_USER:-shopee_local}:${POSTGRES_PASSWORD:-local_only_change_me}@postgres:5432/${POSTGRES_DB:-shopee_clone}}
+      AUTH_ACCESS_TOKEN_SECRET: ${AUTH_ACCESS_TOKEN_SECRET:-replace_with_at_least_32_random_bytes_for_shared_environments}
+      AUTH_LIMITER_SECRET: ${AUTH_LIMITER_SECRET:-replace_with_a_different_32_byte_random_value}
+      AUTH_ALLOWED_ORIGINS: ${AUTH_ALLOWED_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}
+      AUTH_WEB_BASE_URL: ${AUTH_WEB_BASE_URL:-http://localhost:3000}
+      AUTH_COOKIE_SECURE: ${AUTH_COOKIE_SECURE:-false}
+      AUTH_RECOVERY_MODE: ${AUTH_RECOVERY_MODE:-file}
+      AUTH_RECOVERY_OUTBOX_DIR: ${AUTH_RECOVERY_OUTBOX_DIR:-.runtime/mail-outbox}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      GOOGLE_CALLBACK_URL: ${GOOGLE_CALLBACK_URL:-http://localhost:3001/login/oauth2/code/google}
+      RBAC_BOOTSTRAP_ADMIN_EMAIL: ${RBAC_BOOTSTRAP_ADMIN_EMAIL:-}
+      RBAC_BOOTSTRAP_REASON: ${RBAC_BOOTSTRAP_REASON:-}
+      AWS_S3_ACCESS_KEY_ID: ${AWS_S3_ACCESS_KEY_ID:-}
+      AWS_S3_SECRET_ACCESS_KEY: ${AWS_S3_SECRET_ACCESS_KEY:-}
+      AWS_S3_BUCKET: ${AWS_S3_BUCKET:-${AWS_S3_BUCKET_NAME:-}}
+      AWS_S3_REGION: ${AWS_S3_REGION:-ap-southeast-1}
+      AWS_S3_PREFIX: ${AWS_S3_PREFIX:-}
+      AWS_S3_ENDPOINT: ${AWS_S3_ENDPOINT:-}
+      AWS_S3_FORCE_PATH_STYLE: ${AWS_S3_FORCE_PATH_STYLE:-false}
+      SELLER_PRODUCT_MEDIA_ROOT: ${SELLER_PRODUCT_MEDIA_ROOT:-.runtime/seller-product-media}
+    ports:
+      - '${PORT:-3001}:3001'
+    labels:
+      com.shopee-clone.component: api
+      com.shopee-clone.scope: ${SHOPEE_COMPOSE_SCOPE:-development}
+
+  web:
+    image: datnguyen10102004/shopee-clone-web:${IMAGE_TAG:-0.1.0}
+    profiles:
+      - app
+      - full
+      - web
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.web
+      args:
+        NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://localhost:3001}
+    restart: unless-stopped
+    depends_on:
+      - api
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      PORT: 3000
+      HOSTNAME: 0.0.0.0
+      HOMEPAGE_API_BASE_URL: ${HOMEPAGE_API_BASE_URL:-http://api:3001}
+      NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://localhost:3001}
+      AWS_S3_BUCKET: ${AWS_S3_BUCKET:-${AWS_S3_BUCKET_NAME:-}}
+      AWS_S3_REGION: ${AWS_S3_REGION:-ap-southeast-1}
+    ports:
+      - '3000:3000'
+    labels:
+      com.shopee-clone.component: web
       com.shopee-clone.scope: ${SHOPEE_COMPOSE_SCOPE:-development}
 
 volumes:

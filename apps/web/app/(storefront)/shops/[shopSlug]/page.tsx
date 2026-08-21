@@ -6,6 +6,7 @@ import { notFound } from 'next/navigation';
 
 import { ShopCatalog } from '../../../../components/shop-storefront/shop-catalog';
 import { ShopFollowControl } from '../../../../components/shop-storefront/shop-follow-control';
+import { ReportButton } from '../../../../components/reporting/report-button';
 import {
   fetchPublicShopCatalog,
   fetchPublicShopProfile,
@@ -107,11 +108,19 @@ export default async function ShopStorefrontPage({ params, searchParams }: ShopP
               {shop.location} · Tham gia {formatDate(shop.joinedAt)}
             </p>
           </div>
-          <ShopFollowControl
-            shopId={shop.id}
-            initialFollowerCount={shop.followerCount}
-            loginHref={shopLoginHref(shopSlug, currentQuery)}
-          />
+          <div className="shop-profile__actions">
+            <ShopFollowControl
+              shopId={shop.id}
+              initialFollowerCount={shop.followerCount}
+              loginHref={shopLoginHref(shopSlug, currentQuery)}
+            />
+            <ReportButton
+              targetType="SHOP"
+              targetId={shop.id}
+              targetName={shop.name}
+              label="Tố cáo Shop"
+            />
+          </div>
         </div>
         <dl className="shop-profile__metrics">
           <div>

@@ -11,6 +11,12 @@ Một buyer chỉ tạo được một đánh giá cho mỗi `OrderLine` thuộc
 
 Mọi mutation browser phải có Origin trong allowlist của ứng dụng. Không gửi URL ảnh tùy ý: chỉ gửi ID ảnh staged của chính tài khoản. `409` với cùng idempotency key và payload giống nhau replay dữ liệu canonical; cùng key nhưng payload khác bị từ chối.
 
+## Seller báo cáo review
+
+Seller Center có mục **Đánh giá** tại `/seller/reviews`. Trang này chỉ liệt kê đánh giá của các sản phẩm thuộc shop mà người bán hiện sở hữu và không hiển thị thông tin liên hệ người mua. Người bán có thể gửi một báo cáo đang mở cho mỗi review với một trong bốn lý do: `ABUSIVE_CONTENT`, `IRRELEVANT_CONTENT`, `SPAM_OR_FRAUD`, hoặc `OTHER`; báo cáo chỉ là tín hiệu cho admin, không tự ẩn review.
+
+`POST /api/v1/seller/reviews/{reviewId}/reports` yêu cầu UUID `Idempotency-Key`, dùng `Cache-Control: private, no-store`, và trả cùng một `404` cho review không tồn tại hoặc không thuộc shop của seller. Admin quyết định `HIDE` hoặc `KEEP_VISIBLE`; cả hai đều đóng báo cáo đang mở và ghi một audit event không có danh tính seller hay nội dung review.
+
 ## API công khai
 
 - `GET /api/v1/catalog/products/{productId}/reviews?rating=1..5&limit=1..30&cursor=...`

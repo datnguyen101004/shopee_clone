@@ -1,8 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createHash } from 'node:crypto';
 import { Inject, Injectable } from '@nestjs/common';
-import type { CreateProductReviewRequest, AuthorProductReview, PublicProductReviewPage, ReviewEligibility, ReviewRating, UpdateProductReviewRequest } from '@shopee-clone/contracts';
-import { REVIEW_VERSION } from '@shopee-clone/contracts';
+import type { CreateProductReviewRequest, AuthorProductReview, PublicProductReviewPage, ReviewEligibility, ReviewRating, SellerShopReviewListResponse, UpdateProductReviewRequest } from '@shopee-clone/contracts';
+import { REVIEW_VERSION, SELLER_REVIEWS_MAX_LIMIT } from '@shopee-clone/contracts';
 
 import { PrismaService } from '../prisma/prisma.service';
 import type { Prisma } from '../generated/prisma/client';
@@ -52,6 +52,46 @@ export class ReviewsService {
     const review = await this.prisma.productReview.findFirst({ where: { id: reviewId, buyerUserId: userId }, include: reviewInclude });
     if (!review) throw new ReviewNotFoundError();
     return this.authorReview(review);
+  }
+
+  async listSellerShopReviews(sellerUserId: string): Promise<SellerShopReviewListResponse> {
+    const reviews = await this.prisma.productReview.findMany({
+      where: { shop: { ownerId: sellerUserId } },
+      take: SELLER_REVIEWS_MAX_LIMIT,
+      orderBy: [{ updatedAt: 'desc' }, { id: 'desc' }],
+      select: {
+        id: true,
+        productId: true,
+        rating: true,
+        text: true,
+        visibility: true,
+        createdAt: true,
+        updatedAt: true,
+        product: { select: { name: true } },
+        sellerReports: {
+          where: { sellerUserId },
+          orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+          take: 1,
+          select: { status: true },
+        },
+      },
+    });
+
+    return {
+      items: reviews.map((review) => ({
+        id: review.id,
+        productId: review.productId,
+        productName: review.product.name,
+        rating: review.rating,
+        comment: review.text,
+        visibility: review.visibility as 'VISIBLE' | 'HIDDEN',
+        createdAt: review.createdAt.toISOString(),
+        updatedAt: review.updatedAt.toISOString(),
+        reportStatus: review.sellerReports[0]
+          ? (review.sellerReports[0].status as 'OPEN' | 'RESOLVED')
+          : 'NOT_REPORTED',
+      })),
+    };
   }
 
   async eligibility(userId: string, orderLineId: string, status: string): Promise<ReviewEligibility> {
@@ -119,6 +159,214 @@ export class ReviewsService {
       await tx.product.updateMany({ data: { ratingCount: 0, ratingAverageBasisPoints: 0 } });
       await tx.shop.updateMany({ data: { ratingCount: 0, ratingAverageBasisPoints: 0 } });
       for (const row of products) await this.refreshAggregates(tx, row.productId, row.shopId);
+    });
+  }
+
+  async adminGetReview(reviewId: string): Promise<any> {
+    const review = await this.prisma.productReview.findUnique({
+      where: { id: reviewId },
+      include: {
+        buyer: { select: { displayName: true } },
+        product: { select: { id: true, name: true } },
+        shop: { select: { id: true, name: true } },
+        media: { select: { ...mediaSelect, id: true }, orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }] },
+        moderationEvents: {
+          orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+          include: { actor: { select: { id: true, displayName: true } } },
+        },
+        sellerReports: {
+          where: { status: 'OPEN' as any },
+          orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+          select: { id: true, reasonCode: true, details: true, createdAt: true },
+        },
+      },
+    });
+
+    if (!review) throw new ReviewNotFoundError();
+
+    return {
+      id: review.id,
+      productId: review.productId,
+      productName: review.product.name,
+      authorUserId: review.buyerUserId,
+      authorDisplayName: review.buyer.displayName,
+      rating: review.rating,
+      comment: review.text,
+      visibility: review.visibility,
+      version: review.version,
+      createdAt: review.createdAt.toISOString(),
+      updatedAt: review.updatedAt.toISOString(),
+      sellerReportCount: review.sellerReports.length,
+      sellerReports: review.sellerReports.map((report) => ({
+        id: report.id,
+        reasonCode: report.reasonCode,
+        details: report.details,
+        createdAt: report.createdAt.toISOString(),
+      })),
+    };
+  }
+
+  async submitSellerReviewReport(
+    sellerUserId: string,
+    reviewId: string,
+    input: { reasonCode: string; details?: string },
+    idempotencyKey: string,
+    requestDigest: string,
+  ): Promise<{ id: string; reviewId: string; status: 'SUBMITTED' | 'ALREADY_SUBMITTED'; createdAt: string }> {
+    return this.prisma.$transaction(async (tx) => {
+      const prior = await tx.sellerReviewReport.findUnique({
+        where: { sellerUserId_idempotencyKey: { sellerUserId, idempotencyKey } },
+      });
+      if (prior) {
+        if (prior.requestDigest !== requestDigest) throw new ReviewIdempotencyConflictError();
+        return { id: prior.id, reviewId: prior.reviewId, status: 'SUBMITTED' as const, createdAt: prior.createdAt.toISOString() };
+      }
+
+      await tx.$queryRawUnsafe('SELECT id FROM product_reviews WHERE id = $1 FOR UPDATE', reviewId);
+      const review = await tx.productReview.findFirst({
+        where: { id: reviewId, shop: { ownerId: sellerUserId } },
+        select: { id: true, shopId: true },
+      });
+      if (!review) throw new ReviewNotFoundError();
+
+      const openReport = await tx.sellerReviewReport.findFirst({
+        where: { sellerUserId, reviewId, status: 'OPEN' as any },
+      });
+      if (openReport) {
+        return { id: openReport.id, reviewId, status: 'ALREADY_SUBMITTED' as const, createdAt: openReport.createdAt.toISOString() };
+      }
+
+      const report = await tx.sellerReviewReport.create({
+        data: {
+          sellerUserId,
+          reviewId,
+          shopId: review.shopId,
+          reasonCode: input.reasonCode as any,
+          details: input.details?.trim() || null,
+          idempotencyKey,
+          requestDigest,
+        },
+      });
+      return { id: report.id, reviewId, status: 'SUBMITTED' as const, createdAt: report.createdAt.toISOString() };
+    });
+  }
+
+  async adminListReportedReviews(): Promise<any[]> {
+    const reports = await this.prisma.sellerReviewReport.findMany({
+      where: { status: 'OPEN' as any },
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      distinct: ['reviewId'],
+      include: {
+        review: {
+          include: {
+            product: { select: { id: true, name: true } },
+            shop: { select: { id: true, name: true } },
+            _count: { select: { sellerReports: { where: { status: 'OPEN' as any } } } },
+          },
+        },
+      },
+    });
+    return reports.map((report) => ({
+      reviewId: report.review.id,
+      productId: report.review.product.id,
+      productName: report.review.product.name,
+      shopId: report.review.shop.id,
+      shopName: report.review.shop.name,
+      rating: report.review.rating,
+      comment: report.review.text,
+      visibility: report.review.visibility,
+      reportCount: report.review._count.sellerReports,
+      latestReportedAt: report.createdAt.toISOString(),
+    }));
+  }
+
+  async adminExecuteReviewAction(
+    actorAdminId: string,
+    reviewId: string,
+    action: 'HIDE' | 'RESTORE' | 'KEEP_VISIBLE',
+    reason: string,
+    expectedVersion: number,
+    idempotencyKey: string,
+    requestDigest: string,
+  ): Promise<any> {
+    return this.prisma.$transaction(async (tx) => {
+      // 1. Idempotency replay check
+      const existingCmd = await tx.moderationCommand.findUnique({
+        where: {
+          actorUserId_idempotencyKey: {
+            actorUserId: actorAdminId,
+            idempotencyKey,
+          },
+        },
+      });
+
+      if (existingCmd) {
+        if (existingCmd.requestDigest === requestDigest) {
+          return existingCmd.responseBody;
+        }
+        throw new ReviewIdempotencyConflictError();
+      }
+
+      // 2. Lock review row
+      await tx.$queryRawUnsafe('SELECT id FROM product_reviews WHERE id = $1 FOR UPDATE', reviewId);
+      const review = await tx.productReview.findUnique({
+        where: { id: reviewId },
+      });
+
+      if (!review) throw new ReviewNotFoundError();
+      if (review.version !== expectedVersion) throw new ReviewStaleError(review.version);
+
+      const newVisibility = action === 'HIDE' ? 'HIDDEN' : action === 'RESTORE' ? 'VISIBLE' : review.visibility;
+      const now = new Date();
+      const nextVersion = action === 'KEEP_VISIBLE' ? review.version : review.version + 1;
+
+      const modEvent = action === 'KEEP_VISIBLE' ? null : await tx.reviewModerationEvent.create({
+        data: { reviewId, actorUserId: actorAdminId, previousVisibility: review.visibility, visibility: newVisibility, reason: reason.trim(), createdAt: now },
+      });
+      if (action !== 'KEEP_VISIBLE') {
+        await tx.productReview.update({ where: { id: reviewId }, data: { visibility: newVisibility, version: nextVersion } });
+        await this.refreshAggregates(tx, review.productId, review.shopId);
+      }
+      await tx.sellerReviewReport.updateMany({ where: { reviewId, status: 'OPEN' as any }, data: { status: 'RESOLVED' as any, resolvedAt: now } });
+
+      // 6. Record PrivilegedAuditEvent
+      await tx.privilegedAuditEvent.create({
+        data: {
+          actorUserId: actorAdminId,
+          targetType: 'REVIEW' as any,
+          targetId: reviewId,
+          action: action === 'HIDE' ? ('HIDE' as any) : action === 'RESTORE' ? ('RESTORE' as any) : ('NO_ACTION' as any),
+          reason: reason.trim(),
+          beforeSummary: { visibility: review.visibility },
+          afterSummary: { visibility: newVisibility, sellerReports: 'RESOLVED' },
+          reviewModerationEventId: modEvent?.id,
+          createdAt: now,
+        },
+      });
+
+      const responsePayload = {
+        reviewId,
+        visibility: newVisibility,
+        version: nextVersion,
+        updatedAt: now.toISOString(),
+      };
+
+      // 7. Save moderation command
+      await tx.moderationCommand.create({
+        data: {
+          actorUserId: actorAdminId,
+          idempotencyKey,
+          requestDigest,
+          resourceType: 'REVIEW',
+          resourceId: reviewId,
+          actionName: action,
+          responseStatus: 200,
+          responseBody: responsePayload,
+          createdAt: now,
+        },
+      });
+
+      return responsePayload;
     });
   }
 

@@ -19,6 +19,11 @@ import {
   sendBrowserMutationProblem,
 } from '../security/browser-mutation.error';
 import {
+  ReviewIdempotencyConflictError,
+  ReviewNotFoundError,
+  ReviewStaleError,
+} from '../reviews/reviews.errors';
+import {
   AdminError,
   AdminInvalidInputError,
   AdminNotFoundError,
@@ -107,7 +112,8 @@ export class AdminExceptionFilter implements ExceptionFilter {
 
     if (
       exception instanceof AdminNotFoundError ||
-      exception instanceof NotFoundException
+      exception instanceof NotFoundException ||
+      exception instanceof ReviewNotFoundError
     ) {
       this.problem(
         response,
@@ -115,6 +121,29 @@ export class AdminExceptionFilter implements ExceptionFilter {
         'admin-resource-not-found',
         'Resource not found',
         (exception as Error).message || 'The requested admin resource was not found.',
+      );
+      return;
+    }
+
+    if (exception instanceof ReviewStaleError) {
+      this.problem(
+        response,
+        409,
+        'review-version-conflict',
+        'Review changed',
+        'Reload the latest review before retrying.',
+        { currentVersion: exception.currentVersion },
+      );
+      return;
+    }
+
+    if (exception instanceof ReviewIdempotencyConflictError) {
+      this.problem(
+        response,
+        409,
+        'review-idempotency-conflict',
+        'Idempotency key conflict',
+        'This key was already used for a different review action.',
       );
       return;
     }
@@ -160,6 +189,22 @@ export class AdminExceptionFilter implements ExceptionFilter {
         'category-cycle-conflict',
         'Category cycle conflict',
         exception.message,
+      );
+      return;
+    }
+
+    if (
+      (exception as Error)?.name === 'ModerationConflictError' ||
+      (exception as Error)?.name === 'ModerationIdempotencyConflictError'
+    ) {
+      this.problem(
+        response,
+        409,
+        (exception as Error).name === 'ModerationIdempotencyConflictError'
+          ? 'idempotency-conflict'
+          : 'case-version-conflict',
+        'Moderation conflict',
+        (exception as Error).message,
       );
       return;
     }

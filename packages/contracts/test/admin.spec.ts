@@ -34,6 +34,8 @@ describe('Admin Contracts', () => {
       'BANNER',
       'HOMEPAGE_MODULE',
       'PRODUCT',
+      'REVIEW',
+      'MODERATION_CASE',
     ]);
 
     expect(ADMIN_PRIVILEGED_ACTIONS).toEqual([
@@ -45,6 +47,8 @@ describe('Admin Contracts', () => {
       'REORDER',
       'APPROVE',
       'REJECT',
+      'HIDE',
+      'NO_ACTION',
     ]);
   });
 

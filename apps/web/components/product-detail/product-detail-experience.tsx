@@ -8,6 +8,7 @@ import { useState } from 'react';
 import { FavoriteButton } from '../engagement/favorite-button';
 import { FavoriteStateProvider } from '../engagement/favorite-state-provider';
 import { RecentlyViewedRecorder } from '../engagement/recently-viewed-recorder';
+import { ReportButton } from '../reporting/report-button';
 import { useAuthSession } from '../auth-session-provider';
 import { useCart } from '../cart/cart-provider';
 import { ProductReviews } from './product-reviews';
@@ -132,7 +133,10 @@ function ProductDetailInner({ product }: { product: ProductDetailResponse }) {
 
       <div className="product-detail-offer__selection">
         <RecentlyViewedRecorder productId={product.id} />
-        <FavoriteButton productId={product.id} />
+        <div className="product-detail-actions-row">
+          <FavoriteButton productId={product.id} />
+          <ReportButton targetType="PRODUCT" targetId={product.id} targetName={product.name} />
+        </div>
         <div className="product-detail-price" aria-label="Giá sản phẩm">
           <strong>
             {selectedVariant ? formatCurrency(selectedVariant.priceMinor) : 'Liên hệ shop'}

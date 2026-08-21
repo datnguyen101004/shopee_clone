@@ -24,6 +24,8 @@ export const ADMIN_PRIVILEGED_TARGET_TYPES = [
   'BANNER',
   'HOMEPAGE_MODULE',
   'PRODUCT',
+  'REVIEW',
+  'MODERATION_CASE',
 ] as const;
 
 export type AdminPrivilegedTargetType = (typeof ADMIN_PRIVILEGED_TARGET_TYPES)[number];
@@ -37,6 +39,8 @@ export const ADMIN_PRIVILEGED_ACTIONS = [
   'REORDER',
   'APPROVE',
   'REJECT',
+  'HIDE',
+  'NO_ACTION',
 ] as const;
 export type AdminPrivilegedAction = (typeof ADMIN_PRIVILEGED_ACTIONS)[number];
 
@@ -242,6 +246,8 @@ export interface AdminPrivilegedAuditEventSummary {
   reason: string;
   beforeSummary: Record<string, unknown> | null;
   afterSummary: Record<string, unknown> | null;
+  decisionId?: string | null;
+  reviewModerationEventId?: string | null;
   createdAt: string;
 }
 
@@ -314,16 +320,7 @@ export interface AdminProductActionResult {
 const isRecord = (val: unknown): val is Record<string, unknown> =>
   typeof val === 'object' && val !== null;
 const isString = (val: unknown): val is string => typeof val === 'string';
-const isOptionalString = (val: unknown): val is string | undefined =>
-  val === undefined || isString(val);
 const isSafeInteger = (val: unknown): val is number => Number.isSafeInteger(val);
-const isOptionalSafeInteger = (val: unknown): val is number | undefined =>
-  val === undefined || isSafeInteger(val);
-const isBoolean = (val: unknown): val is boolean => typeof val === 'boolean';
-const isOptionalBoolean = (val: unknown): val is boolean | undefined =>
-  val === undefined || isBoolean(val);
-const isNullableString = (val: unknown): val is string | null =>
-  val === null || isString(val);
 
 export function isValidAdminReason(val: unknown): val is string {
   if (!isString(val)) return false;

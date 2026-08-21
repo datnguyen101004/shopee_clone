@@ -23,6 +23,8 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { SellerAnalyticsModule } from './seller-analytics/seller-analytics.module';
 import { SellerPromotionsModule } from './seller-promotions/seller-promotions.module';
 import { AdminModule } from './admin/admin.module';
+import { ReportingModule } from './reporting/reporting.module';
+import { SellerModerationNoticesModule } from './seller-moderation-notices/seller-moderation-notices.module';
 
 @Module({
   imports: [
@@ -49,6 +51,8 @@ import { AdminModule } from './admin/admin.module';
     SellerAnalyticsModule,
     SellerPromotionsModule,
     AdminModule,
+    ReportingModule,
+    SellerModerationNoticesModule,
   ],
 })
 export class AppModule {}

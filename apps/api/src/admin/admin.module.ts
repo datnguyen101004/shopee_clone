@@ -12,8 +12,14 @@ import { AdminService } from './admin.service';
 import { AdminShopsController } from './admin-shops.controller';
 import { AdminUsersController } from './admin-users.controller';
 
+import { ReviewsModule } from '../reviews/reviews.module';
+import { AdminModerationController } from './admin-moderation.controller';
+import { AdminModerationRepository } from './admin-moderation.repository';
+import { AdminModerationService } from './admin-moderation.service';
+import { AdminReviewsController } from './admin-reviews.controller';
+
 @Module({
-  imports: [PrismaModule, AuthModule],
+  imports: [PrismaModule, AuthModule, ReviewsModule],
   controllers: [
     AdminDashboardController,
     AdminUsersController,
@@ -22,9 +28,16 @@ import { AdminUsersController } from './admin-users.controller';
     AdminCategoriesController,
     AdminHomepageController,
     AdminAuditController,
+    AdminModerationController,
+    AdminReviewsController,
   ],
-  providers: [AdminRepository, AdminService],
-  exports: [AdminService, AdminRepository],
+  providers: [
+    AdminRepository,
+    AdminService,
+    AdminModerationRepository,
+    AdminModerationService,
+  ],
+  exports: [AdminService, AdminRepository, AdminModerationService, AdminModerationRepository],
 })
 
 export class AdminModule {}

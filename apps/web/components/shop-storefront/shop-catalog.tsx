@@ -1,3 +1,5 @@
+'use client';
+
 import type { PublicShopCatalogPage, ShopCatalogQuery } from '@shopee-clone/contracts';
 import Link from 'next/link';
 

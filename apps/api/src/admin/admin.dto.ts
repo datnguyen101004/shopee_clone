@@ -26,7 +26,6 @@ import {
   ArrayMinSize,
   IsArray,
   IsBoolean,
-  IsEnum,
   IsIn,
   IsInt,
   IsNotEmpty,
@@ -362,4 +361,3 @@ export class AdminProductActionDto {
   @MaxLength(240)
   reason!: string;
 }
-

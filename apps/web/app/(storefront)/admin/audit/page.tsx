@@ -5,48 +5,57 @@ import type {
   AdminPrivilegedAuditEventSummary,
   AdminPrivilegedTargetType,
 } from '@shopee-clone/contracts';
-import { useEffect, useState } from 'react';
+import { Fragment, useCallback, useEffect, useState } from 'react';
 
 import { useAuthSession } from '../../../../components/auth-session-provider';
+import {
+  AUDIT_ACTION_LABELS,
+  AUDIT_TARGET_LABELS,
+  formatAuditDate,
+  getAuditTargetIdLabel,
+  getAuditSummaryChanges,
+} from '../../../../lib/admin-audit-display';
 import { fetchAdminAudit } from '../../../../lib/admin-api';
+
+const TARGET_TYPE_OPTIONS = Object.entries(AUDIT_TARGET_LABELS) as Array<[
+  AdminPrivilegedTargetType,
+  string,
+]>;
+const ACTION_OPTIONS = Object.entries(AUDIT_ACTION_LABELS) as Array<[AdminPrivilegedAction, string]>;
 
 export default function AdminAuditPage() {
   const { authenticatedFetch } = useAuthSession();
   const [events, setEvents] = useState<AdminPrivilegedAuditEventSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
-  // Filters
   const [targetTypeFilter, setTargetTypeFilter] = useState<'ALL' | AdminPrivilegedTargetType>('ALL');
   const [actionFilter, setActionFilter] = useState<'ALL' | AdminPrivilegedAction>('ALL');
-
-  // Expanded payload
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
-  const loadAudit = () => {
+  const loadAudit = useCallback(async () => {
     setLoading(true);
     setError(null);
-    fetchAdminAudit(authenticatedFetch, {
-      targetType: targetTypeFilter === 'ALL' ? undefined : targetTypeFilter,
-      action: actionFilter === 'ALL' ? undefined : actionFilter,
-      limit: 50,
-    })
-      .then((res) => {
-        setEvents(res.items);
-        setLoading(false);
-      })
-      .catch((err) => {
-        setError(err.message || 'Không thể tải nhật ký kiểm toán');
-        setLoading(false);
+
+    try {
+      const response = await fetchAdminAudit(authenticatedFetch, {
+        targetType: targetTypeFilter === 'ALL' ? undefined : targetTypeFilter,
+        action: actionFilter === 'ALL' ? undefined : actionFilter,
+        limit: 50,
       });
-  };
+      setEvents(response.items);
+    } catch (caughtError) {
+      setError(caughtError instanceof Error ? caughtError.message : 'Không thể tải nhật ký kiểm toán');
+    } finally {
+      setLoading(false);
+    }
+  }, [actionFilter, authenticatedFetch, targetTypeFilter]);
 
   useEffect(() => {
-    loadAudit();
-  }, [targetTypeFilter, actionFilter]);
+    void loadAudit();
+  }, [loadAudit]);
 
   const toggleExpand = (id: string) => {
-    setExpandedId((prev) => (prev === id ? null : id));
+    setExpandedId((previous) => (previous === id ? null : id));
   };
 
   const getActionColor = (action: AdminPrivilegedAction) => {
@@ -54,6 +63,7 @@ export default function AdminAuditPage() {
       case 'SUSPEND':
       case 'DELETE':
       case 'REJECT':
+      case 'HIDE':
         return { bg: '#fee2e2', color: '#991b1b' };
       case 'RESTORE':
       case 'CREATE':
@@ -70,13 +80,12 @@ export default function AdminAuditPage() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
       <div>
-        <h1 style={{ fontSize: '24px', fontWeight: 700, color: '#111827' }}>Nhật ký Thao tác Đặc quyền (Audit Trail)</h1>
+        <h1 style={{ fontSize: '24px', fontWeight: 700, color: '#111827' }}>Nhật ký kiểm toán</h1>
         <p style={{ color: '#6b7280', fontSize: '14px', marginTop: '4px' }}>
-          Lưu vết bất biến (Append-only) mọi hành động can thiệp của Quản trị viên đối với User, Shop, Danh mục và Trang chủ.
+          Lưu vết bất biến mọi thao tác đặc quyền của quản trị viên.
         </p>
       </div>
 
-      {/* Filter Bar */}
       <div
         style={{
           background: '#ffffff',
@@ -90,42 +99,42 @@ export default function AdminAuditPage() {
         }}
       >
         <div>
-          <label style={{ fontSize: '13px', color: '#4b5563', marginRight: '6px' }}>Đối tượng tác động:</label>
+          <label htmlFor="audit-target-type" style={{ fontSize: '13px', color: '#4b5563', marginRight: '6px' }}>
+            Đối tượng tác động:
+          </label>
           <select
+            id="audit-target-type"
+            aria-label="Lọc theo đối tượng tác động"
             value={targetTypeFilter}
-            onChange={(e) => setTargetTypeFilter(e.target.value as any)}
+            onChange={(event) => setTargetTypeFilter(event.target.value as 'ALL' | AdminPrivilegedTargetType)}
             style={{ padding: '6px 10px', borderRadius: '6px', border: '1px solid #d1d5db', fontSize: '13px' }}
           >
             <option value="ALL">Tất cả đối tượng</option>
-            <option value="USER">Người dùng (USER)</option>
-            <option value="SHOP">Cửa hàng (SHOP)</option>
-            <option value="CATEGORY">Danh mục (CATEGORY)</option>
-            <option value="BANNER">Banner (BANNER)</option>
-            <option value="HOMEPAGE_MODULE">Module trang chủ (HOMEPAGE_MODULE)</option>
+            {TARGET_TYPE_OPTIONS.map(([value, label]) => (
+              <option key={value} value={value}>{label}</option>
+            ))}
           </select>
         </div>
 
         <div>
-          <label style={{ fontSize: '13px', color: '#4b5563', marginRight: '6px' }}>Hành động:</label>
+          <label htmlFor="audit-action" style={{ fontSize: '13px', color: '#4b5563', marginRight: '6px' }}>
+            Hành động:
+          </label>
           <select
+            id="audit-action"
+            aria-label="Lọc theo hành động"
             value={actionFilter}
-            onChange={(e) => setActionFilter(e.target.value as any)}
+            onChange={(event) => setActionFilter(event.target.value as 'ALL' | AdminPrivilegedAction)}
             style={{ padding: '6px 10px', borderRadius: '6px', border: '1px solid #d1d5db', fontSize: '13px' }}
           >
             <option value="ALL">Tất cả hành động</option>
-            <option value="SUSPEND">Khóa (SUSPEND)</option>
-            <option value="RESTORE">Mở khóa (RESTORE)</option>
-            <option value="APPROVE">Phê duyệt (APPROVE)</option>
-            <option value="REJECT">Từ chối (REJECT)</option>
-            <option value="CREATE">Tạo mới (CREATE)</option>
-            <option value="UPDATE">Cập nhật (UPDATE)</option>
-            <option value="DELETE">Xóa (DELETE)</option>
-            <option value="REORDER">Sắp xếp lại (REORDER)</option>
+            {ACTION_OPTIONS.map(([value, label]) => (
+              <option key={value} value={value}>{label}</option>
+            ))}
           </select>
         </div>
       </div>
 
-      {/* Audit Table */}
       <div
         style={{
           background: '#ffffff',
@@ -142,104 +151,117 @@ export default function AdminAuditPage() {
         ) : events.length === 0 ? (
           <div style={{ padding: '32px', textAlign: 'center', color: '#6b7280' }}>Chưa có bản ghi nhật ký nào.</div>
         ) : (
-          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '14px' }}>
-            <thead>
-              <tr style={{ background: '#f9fafb', borderBottom: '1px solid #e5e7eb', color: '#4b5563', fontSize: '13px' }}>
-                <th style={{ padding: '12px 16px' }}>Thời gian (UTC+7)</th>
-                <th style={{ padding: '12px 16px' }}>Admin thực hiện</th>
-                <th style={{ padding: '12px 16px' }}>Hành động</th>
-                <th style={{ padding: '12px 16px' }}>Đối tượng tác động</th>
-                <th style={{ padding: '12px 16px' }}>Lý do</th>
-                <th style={{ padding: '12px 16px', textAlign: 'right' }}>Chi tiết</th>
-              </tr>
-            </thead>
-            <tbody>
-              {events.map((ev) => {
-                const actionBadge = getActionColor(ev.action);
-                const isExpanded = expandedId === ev.id;
-                return (
-                  <tr key={ev.id} style={{ borderBottom: '1px solid #f3f4f6', verticalAlign: 'top' }}>
-                    <td style={{ padding: '14px 16px', color: '#4b5563', fontSize: '13px', whiteSpace: 'nowrap' }}>
-                      {new Date(ev.createdAt).toLocaleString('vi-VN')}
-                    </td>
-                    <td style={{ padding: '14px 16px' }}>
-                      <div style={{ fontWeight: 600, color: '#111827' }}>{ev.actorDisplayName || 'Administrator'}</div>
-                      <div style={{ fontSize: '12px', color: '#6b7280' }}>{ev.actorEmail || ev.actorUserId}</div>
-                    </td>
-                    <td style={{ padding: '14px 16px' }}>
-                      <span
-                        style={{
-                          display: 'inline-block',
-                          padding: '3px 10px',
-                          borderRadius: '12px',
-                          fontSize: '11px',
-                          fontWeight: 700,
-                          background: actionBadge.bg,
-                          color: actionBadge.color,
-                        }}
-                      >
-                        {ev.action}
-                      </span>
-                    </td>
-                    <td style={{ padding: '14px 16px' }}>
-                      <div style={{ fontWeight: 600, color: '#374151' }}>{ev.targetType}</div>
-                      <div style={{ fontSize: '11px', color: '#9ca3af', fontFamily: 'monospace' }}>{ev.targetId}</div>
-                    </td>
-                    <td style={{ padding: '14px 16px', color: '#111827', maxWidth: '300px' }}>
-                      {ev.reason}
-                    </td>
-                    <td style={{ padding: '14px 16px', textAlign: 'right' }}>
-                      {(ev.beforeSummary || ev.afterSummary) && (
-                        <button
-                          onClick={() => toggleExpand(ev.id)}
-                          style={{
-                            padding: '4px 10px',
-                            fontSize: '12px',
-                            color: '#4f46e5',
-                            background: '#eef2ff',
-                            border: 'none',
-                            borderRadius: '6px',
-                            cursor: 'pointer',
-                          }}
-                        >
-                          {isExpanded ? 'Ẩn Diff' : 'Xem Diff'}
-                        </button>
-                      )}
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', minWidth: '960px', borderCollapse: 'collapse', textAlign: 'left', fontSize: '14px' }}>
+              <thead>
+                <tr style={{ background: '#f9fafb', borderBottom: '1px solid #e5e7eb', color: '#4b5563', fontSize: '13px' }}>
+                  <th style={{ padding: '12px 16px' }}>Thời gian (UTC+7)</th>
+                  <th style={{ padding: '12px 16px' }}>Admin thực hiện</th>
+                  <th style={{ padding: '12px 16px' }}>Hành động</th>
+                  <th style={{ padding: '12px 16px' }}>Đối tượng tác động</th>
+                  <th style={{ padding: '12px 16px' }}>Lý do</th>
+                  <th style={{ padding: '12px 16px', textAlign: 'right' }}>Chi tiết</th>
+                </tr>
+              </thead>
+              <tbody>
+                {events.map((event) => {
+                  const actionBadge = getActionColor(event.action);
+                  const changes = getAuditSummaryChanges(event.beforeSummary, event.afterSummary);
+                  const isExpanded = expandedId === event.id;
+                  const detailId = `audit-change-${event.id}`;
 
-                      {isExpanded && (
-                        <div
-                          style={{
-                            marginTop: '12px',
-                            padding: '12px',
-                            background: '#1e293b',
-                            color: '#f8fafc',
-                            borderRadius: '8px',
-                            fontSize: '12px',
-                            textAlign: 'left',
-                            fontFamily: 'monospace',
-                            overflowX: 'auto',
-                          }}
-                        >
-                          {ev.beforeSummary && (
-                            <div style={{ marginBottom: '8px' }}>
-                              <div style={{ color: '#f87171', fontWeight: 600 }}>// Trước thay đổi:</div>
-                              <pre style={{ margin: 0 }}>{JSON.stringify(ev.beforeSummary, null, 2)}</pre>
-                            </div>
+                  return (
+                    <Fragment key={event.id}>
+                      <tr style={{ borderBottom: isExpanded ? 'none' : '1px solid #f3f4f6', verticalAlign: 'top' }}>
+                        <td style={{ padding: '14px 16px', color: '#4b5563', fontSize: '13px', whiteSpace: 'nowrap' }}>
+                          {formatAuditDate(event.createdAt)}
+                        </td>
+                        <td style={{ padding: '14px 16px' }}>
+                          <div style={{ fontWeight: 600, color: '#111827' }}>{event.actorDisplayName || 'Quản trị viên'}</div>
+                          <div style={{ fontSize: '12px', color: '#6b7280' }}>{event.actorEmail || event.actorUserId}</div>
+                        </td>
+                        <td style={{ padding: '14px 16px' }}>
+                          <span
+                            title={event.action}
+                            style={{
+                              display: 'inline-block',
+                              padding: '3px 10px',
+                              borderRadius: '12px',
+                              fontSize: '11px',
+                              fontWeight: 700,
+                              background: actionBadge.bg,
+                              color: actionBadge.color,
+                            }}
+                          >
+                            {AUDIT_ACTION_LABELS[event.action]}
+                          </span>
+                        </td>
+                        <td style={{ padding: '14px 16px', minWidth: '210px' }}>
+                          <div style={{ fontWeight: 600, color: '#374151' }}>{AUDIT_TARGET_LABELS[event.targetType]}</div>
+                          <div style={{ marginTop: '3px', fontSize: '11px', color: '#6b7280' }}>{getAuditTargetIdLabel(event.targetType)}</div>
+                          <code
+                            title={event.targetId}
+                            style={{ display: 'block', marginTop: '2px', fontSize: '11px', color: '#374151', wordBreak: 'break-all' }}
+                          >
+                            {event.targetId}
+                          </code>
+                        </td>
+                        <td style={{ padding: '14px 16px', color: '#111827', maxWidth: '300px' }}>{event.reason}</td>
+                        <td style={{ padding: '14px 16px', textAlign: 'right', whiteSpace: 'nowrap' }}>
+                          {changes.length > 0 ? (
+                            <button
+                              type="button"
+                              aria-controls={detailId}
+                              aria-expanded={isExpanded}
+                              onClick={() => toggleExpand(event.id)}
+                              style={{
+                                padding: '4px 10px',
+                                fontSize: '12px',
+                                color: '#4f46e5',
+                                background: '#eef2ff',
+                                border: 'none',
+                                borderRadius: '6px',
+                                cursor: 'pointer',
+                              }}
+                            >
+                              {isExpanded ? 'Ẩn thay đổi' : 'Xem thay đổi'}
+                            </button>
+                          ) : (
+                            <span style={{ fontSize: '12px', color: '#9ca3af' }}>Không có thay đổi trạng thái</span>
                           )}
-                          {ev.afterSummary && (
-                            <div>
-                              <div style={{ color: '#4ade80', fontWeight: 600 }}>// Sau thay đổi:</div>
-                              <pre style={{ margin: 0 }}>{JSON.stringify(ev.afterSummary, null, 2)}</pre>
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                        </td>
+                      </tr>
+                      {isExpanded ? (
+                        <tr style={{ borderBottom: '1px solid #f3f4f6' }}>
+                          <td colSpan={6} style={{ padding: '0 16px 16px' }}>
+                            <section
+                              id={detailId}
+                              aria-label={`Chi tiết thay đổi của ${AUDIT_TARGET_LABELS[event.targetType]}`}
+                              style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '14px 16px' }}
+                            >
+                              <div style={{ color: '#334155', fontWeight: 700, fontSize: '13px', marginBottom: '10px' }}>Thay đổi đã ghi nhận</div>
+                              <dl style={{ display: 'grid', gridTemplateColumns: 'minmax(150px, 0.8fr) minmax(180px, 1fr) minmax(180px, 1fr)', gap: '8px 16px', margin: 0 }}>
+                                <dt style={{ color: '#475569', fontWeight: 600 }}>Trường</dt>
+                                <dt style={{ color: '#991b1b', fontWeight: 600 }}>Trước</dt>
+                                <dt style={{ color: '#166534', fontWeight: 600 }}>Sau</dt>
+                                {changes.map((change) => (
+                                  <Fragment key={change.key}>
+                                    <dd style={{ margin: 0, color: '#334155', fontWeight: 600 }}>{change.label}</dd>
+                                    <dd style={{ margin: 0, color: '#7f1d1d' }}>{change.before ?? '—'}</dd>
+                                    <dd style={{ margin: 0, color: '#166534' }}>{change.after ?? '—'}</dd>
+                                  </Fragment>
+                                ))}
+                              </dl>
+                            </section>
+                          </td>
+                        </tr>
+                      ) : null}
+                    </Fragment>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
     </div>

@@ -8,6 +8,7 @@ import {
   AuditIcon,
   DashboardIcon,
   HomepageIcon,
+  ModerationIcon,
   ProductIcon,
   ShopIcon,
   UsersIcon,
@@ -17,6 +18,7 @@ import { OperationalRoleGate } from '../operational-role-gate';
 
 const navigation = [
   { href: '/admin', label: 'Tổng quan', Icon: DashboardIcon },
+  { href: '/admin/moderation', label: 'Kiểm duyệt & Tố cáo', Icon: ModerationIcon },
   { href: '/admin/users', label: 'Người dùng', Icon: UsersIcon },
   { href: '/admin/shops', label: 'Cửa hàng', Icon: ShopIcon },
   { href: '/admin/products', label: 'Kiểm soát sản phẩm', Icon: ProductIcon },
@@ -32,7 +34,7 @@ export function AdminCenterLayout({ children }: { children: ReactNode }) {
 
   return (
     <OperationalRoleGate role="admin">
-      <div style={{ background: '#f3f4f6', minHeight: 'calc(100vh - 120px)', padding: '24px 48px' }}>
+      <div className="admin-page-frame" style={{ background: '#f3f4f6', minHeight: 'calc(100vh - 120px)', padding: '24px 48px' }}>
         <div
           className="admin-shell"
           style={{
@@ -61,7 +63,7 @@ export function AdminCenterLayout({ children }: { children: ReactNode }) {
             }}
           >
             <div style={{ paddingBottom: '16px', borderBottom: '1px solid #e5e7eb' }}>
-              <div style={{ fontSize: '11px', fontWeight: 700, color: '#ee4d2d', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+              <div style={{ fontSize: '11px', fontWeight: 700, color: '#c2410c', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
                 Admin Console
               </div>
               <div style={{ fontSize: '18px', fontWeight: 700, color: '#111827', marginTop: '4px' }}>
@@ -119,4 +121,3 @@ export function AdminCenterLayout({ children }: { children: ReactNode }) {
     </OperationalRoleGate>
   );
 }
-

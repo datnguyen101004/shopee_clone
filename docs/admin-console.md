@@ -11,6 +11,8 @@ T27 adds the operational Admin Console, enabling platform administrators to over
 | **Shop Moderation** | `GET /api/v1/admin/shops`, `POST .../actions` | `AuthGuard` + `RolesGuard('admin')` + Trusted Origin | Restore rejected shop prevention, reason bounded 8-240 chars |
 | **Category Hierarchy** | `GET /api/v1/admin/categories`, `POST`, `PATCH`, `DELETE` | `AuthGuard` + `RolesGuard('admin')` + Trusted Origin | Max 3 depth levels, parent cycle conflict detection, product/child integrity locks |
 | **Homepage & Banners**| `GET /api/v1/admin/homepage/banners`, `POST`, `PATCH`, `DELETE` | `AuthGuard` + `RolesGuard('admin')` + Trusted Origin | Open-redirect defense (relative path `/...`), media URL allowlist |
+| **Moderation Cases** | `GET /api/v1/admin/moderation/cases`, `GET /:caseId`, `POST .../assign`, `POST .../notes`, `POST .../decisions` | `AuthGuard` + `RolesGuard('admin')` + Trusted Origin + Idempotency | Optimistic locking, opaque reporter IDs, non-exclusive coordination, enforcement actions, seller notice correlation |
+| **Review Moderation** | `GET /api/v1/admin/reviews/reported`, `GET /api/v1/admin/reviews/:reviewId`, `POST .../actions` | `AuthGuard` + `RolesGuard('admin')` + Trusted Origin + Idempotency | Private seller-report queue, safe report context without seller identity, atomic hide/keep-visible resolution, rating aggregate refresh and optimistic locking |
 | **Privileged Audit** | `GET /api/v1/admin/audit` | `AuthGuard` + `RolesGuard('admin')` | Append-only in PostgreSQL, transactional writes, no update/delete routes |
 
 ## Multi-Device Session Invalidation on Suspend

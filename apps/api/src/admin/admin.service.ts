@@ -37,11 +37,10 @@ import {
   type UpdateAdminHomepageModuleSettingsRequest,
 } from '@shopee-clone/contracts';
 
-import { BadRequestException, Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import {
   PrivilegedAction,
   PrivilegedTargetType,
-  ShopOnboardingStatus,
   ShopStatus,
   UserStatus,
 } from '../generated/prisma/client';
@@ -1108,5 +1107,4 @@ export class AdminService {
     });
   }
 }
-
 

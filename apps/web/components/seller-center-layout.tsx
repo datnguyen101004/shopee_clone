@@ -11,6 +11,7 @@ const navigation = [
   { href: '/seller/products', label: 'Sản phẩm', icon: '▦' },
   { href: '/seller/inventory', label: 'Tồn kho', icon: '◫' },
   { href: '/seller/orders', label: 'Đơn hàng', icon: '▤' },
+  { href: '/seller/reviews', label: 'Đánh giá', icon: '★' },
   { href: '/seller/promotions', label: 'Khuyến mãi', icon: '％' },
 ];
 

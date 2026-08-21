@@ -10,13 +10,12 @@ import {
   type AdminUserStatus,
 } from '@shopee-clone/contracts';
 import { Inject, Injectable } from '@nestjs/common';
-import type { Prisma } from '../generated/prisma/client';
+import type { Prisma ,
+  PrivilegedAction,
+  PrivilegedTargetType} from '../generated/prisma/client';
 import {
   MarketplaceRole,
-  PrivilegedAction,
-  PrivilegedTargetType,
   ProductModerationStatus,
-  ProductStatus,
   ShopOnboardingStatus,
   ShopStatus,
   UserStatus,
@@ -387,7 +386,7 @@ export class AdminRepository {
     });
   }
 
-  async listBanners(): Promise<any[]> {
+  async listBanners() {
     const campaignModule = await this.prisma.homepageModule.findFirst({
       where: { type: 'CAMPAIGN_BANNER' },
     });
@@ -481,6 +480,8 @@ export class AdminRepository {
         reason: event.reason,
         beforeSummary: (event.beforeSummary as Record<string, unknown> | null) ?? null,
         afterSummary: (event.afterSummary as Record<string, unknown> | null) ?? null,
+        decisionId: event.decisionId ?? null,
+        reviewModerationEventId: event.reviewModerationEventId ?? null,
         createdAt: event.createdAt.toISOString(),
       })),
       nextCursor,
@@ -576,4 +577,3 @@ export class AdminRepository {
     return this.prisma.$transaction(fn);
   }
 }
-

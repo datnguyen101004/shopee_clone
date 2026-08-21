@@ -10,5 +10,6 @@ describe('SellerCenterLayout', () => {
     expect(screen.getByRole('link', { name: /Sản phẩm/ })).toHaveAttribute('aria-current', 'page');
     expect(screen.getByRole('link', { name: /Hồ sơ shop/ })).toHaveAttribute('href', '/seller/shop');
     expect(screen.getByRole('link', { name: /Đơn hàng/ })).toHaveAttribute('href', '/seller/orders');
+    expect(screen.getByRole('link', { name: /Đánh giá/ })).toHaveAttribute('href', '/seller/reviews');
   });
 });

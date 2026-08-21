@@ -13,7 +13,7 @@ import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { AuthGuard } from '../auth/auth.guard';
 import { RequireRoles, RolesGuard } from '../auth/role-authorization.guard';
 import { AdminExceptionFilter } from './admin-exception.filter';
-import { AdminPrivilegedAuditQueryDto } from './admin.dto';
+import type { AdminPrivilegedAuditQueryDto } from './admin.dto';
 import { AdminService } from './admin.service';
 
 @ApiTags('admin privileged audit')

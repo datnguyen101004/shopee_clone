@@ -112,22 +112,88 @@ enum PrivilegedTargetType {
   BANNER          @map("banner")
   HOMEPAGE_MODULE @map("homepage_module")
   PRODUCT         @map("product")
+  REVIEW          @map("review")
+  MODERATION_CASE @map("moderation_case")
 
   @@map("privileged_target_type")
 }
 
-
 enum PrivilegedAction {
-  SUSPEND @map("suspend")
-  RESTORE @map("restore")
-  CREATE  @map("create")
-  UPDATE  @map("update")
-  DELETE  @map("delete")
-  REORDER @map("reorder")
-  APPROVE @map("approve")
-  REJECT  @map("reject")
+  SUSPEND   @map("suspend")
+  RESTORE   @map("restore")
+  CREATE    @map("create")
+  UPDATE    @map("update")
+  DELETE    @map("delete")
+  REORDER   @map("reorder")
+  APPROVE   @map("approve")
+  REJECT    @map("reject")
+  HIDE      @map("hide")
+  NO_ACTION @map("no_action")
 
   @@map("privileged_action")
+}
+
+enum ReportTargetType {
+  PRODUCT @map("product")
+  SHOP    @map("shop")
+
+  @@map("report_target_type")
+}
+
+enum ReportReasonCode {
+  PROHIBITED_ITEM        @map("prohibited_item")
+  COUNTERFEIT            @map("counterfeit")
+  MISLEADING_INFORMATION @map("misleading_information")
+  INAPPROPRIATE_CONTENT  @map("inappropriate_content")
+  FRAUD_SCAM             @map("fraud_scam")
+  ABUSIVE_BEHAVIOR       @map("abusive_behavior")
+  PROHIBITED_SELLER      @map("prohibited_seller")
+  OTHER                  @map("other")
+
+  @@map("report_reason_code")
+}
+
+enum ReportStatus {
+  SUBMITTED @map("submitted")
+  REVIEWED  @map("reviewed")
+
+  @@map("report_status")
+}
+
+enum ModerationCaseStatus {
+  OPEN      @map("open")
+  IN_REVIEW @map("in_review")
+  RESOLVED  @map("resolved")
+
+  @@map("moderation_case_status")
+}
+
+enum ModerationCaseOutcome {
+  NO_ACTION      @map("no_action")
+  SUSPEND_TARGET @map("suspend_target")
+  RESTORE_TARGET @map("restore_target")
+
+  @@map("moderation_case_outcome")
+}
+
+enum ModerationCaseEventType {
+  REPORT_ATTACHED   @map("report_attached")
+  ASSIGNED          @map("assigned")
+  UNASSIGNED        @map("unassigned")
+  NOTE_ADDED        @map("note_added")
+  DECISION_MADE     @map("decision_made")
+  DECISION_REVERSED @map("decision_reversed")
+
+  @@map("moderation_case_event_type")
+}
+
+enum SellerModerationNoticeAction {
+  PRODUCT_SUSPENDED @map("product_suspended")
+  PRODUCT_RESTORED  @map("product_restored")
+  SHOP_SUSPENDED    @map("shop_suspended")
+  SHOP_RESTORED     @map("shop_restored")
+
+  @@map("seller_moderation_notice_action")
 }
 
 
@@ -299,12 +365,20 @@ model User {
   sellerFulfillmentEvents  SellerOrderFulfillmentEvent[] @relation("SellerOrderFulfillmentActorUser")
   sellerCompensations      SellerOrderInventoryCompensation[] @relation("SellerOrderCompensationActor")
   productReviews           ProductReview[]           @relation("ReviewBuyer")
+  sellerReviewReports      SellerReviewReport[]      @relation("SellerReviewReporter")
   stagedReviewMedia        ReviewMedia[]             @relation("ReviewMediaUploader")
   stagedSellerProductMedia SellerProductMediaAsset[] @relation("SellerProductMediaUploader")
   reviewModeration         ReviewModerationEvent[]   @relation("ReviewModerationActor")
   inventoryAdjustments     InventoryAdjustment[]     @relation("InventoryAdjustmentActor")
   inventoryReservations    InventoryReservation[]    @relation("InventoryReservationBuyer")
   privilegedAuditActions   PrivilegedAuditEvent[]    @relation("PrivilegedAuditActor")
+  userReports              UserReport[]              @relation("UserReportsSubmitted")
+  moderationAssignments    ModerationCase[]          @relation("ModerationCaseAssignee")
+  moderationCaseEvents     ModerationCaseEvent[]     @relation("ModerationCaseEventActor")
+  moderationDecisions      ModerationDecision[]      @relation("ModerationDecisionActor")
+  moderationCommands       ModerationCommand[]       @relation("ModerationCommandActor")
+  reportRateLimitEvents    ReportRateLimitEvent[]    @relation("ReportRateLimitReporter")
+  sellerModerationNotices  SellerModerationNotice[]  @relation("SellerModerationNoticeOwner")
 
   @@index([status])
   @@index([deletedAt])
@@ -367,21 +441,27 @@ model RoleAuditEvent {
 }
 
 model PrivilegedAuditEvent {
-  id            String               @id @default(uuid()) @db.Uuid
-  actorUserId   String               @map("actor_user_id") @db.Uuid
-  targetType    PrivilegedTargetType @map("target_type")
-  targetId      String               @map("target_id") @db.Uuid
-  action        PrivilegedAction
-  reason        String               @db.VarChar(240)
-  beforeSummary Json?                @map("before_summary")
-  afterSummary  Json?                @map("after_summary")
-  createdAt     DateTime             @default(now()) @map("created_at") @db.Timestamptz(3)
-  actorUser     User                 @relation("PrivilegedAuditActor", fields: [actorUserId], references: [id], onDelete: Restrict)
+  id                      String                 @id @default(uuid()) @db.Uuid
+  actorUserId             String                 @map("actor_user_id") @db.Uuid
+  targetType              PrivilegedTargetType   @map("target_type")
+  targetId                String                 @map("target_id") @db.Uuid
+  action                  PrivilegedAction
+  reason                  String                 @db.VarChar(240)
+  beforeSummary           Json?                  @map("before_summary")
+  afterSummary            Json?                  @map("after_summary")
+  decisionId              String?                @map("decision_id") @db.Uuid
+  reviewModerationEventId String?                @map("review_moderation_event_id") @db.Uuid
+  createdAt               DateTime               @default(now()) @map("created_at") @db.Timestamptz(3)
+  actorUser               User                   @relation("PrivilegedAuditActor", fields: [actorUserId], references: [id], onDelete: Restrict)
+  decision                ModerationDecision?    @relation(fields: [decisionId], references: [id], onDelete: Restrict)
+  reviewModerationEvent   ReviewModerationEvent? @relation(fields: [reviewModerationEventId], references: [id], onDelete: Restrict)
 
   @@index([createdAt, id])
   @@index([targetType, targetId, createdAt])
   @@index([actorUserId, createdAt])
   @@index([action, createdAt])
+  @@index([decisionId])
+  @@index([reviewModerationEventId])
   @@map("privileged_audit_events")
 }
 
@@ -497,6 +577,10 @@ model Shop {
   reviews                  ProductReview[]
   productMediaAssets       SellerProductMediaAsset[]
   inventoryAdjustments     InventoryAdjustment[]
+  reports                  UserReport[]
+  sellerReviewReports      SellerReviewReport[]
+  moderationCases          ModerationCase[]
+  moderationNotices        SellerModerationNotice[]
 
   @@index([ownerId])
   @@index([status])
@@ -562,6 +646,9 @@ model Product {
   attributes               ProductAttributeValue[]
   optionGroups             ProductOptionGroup[]
   mediaAssets              SellerProductMediaAsset[]
+  reports                  UserReport[]
+  moderationCases          ModerationCase[]
+  moderationNotices        SellerModerationNotice[]
 
   @@unique([shopId, slug])
   @@index([shopId, status])
@@ -1004,6 +1091,7 @@ model ProductReview {
   shop             Shop                    @relation(fields: [shopId], references: [id], onDelete: Restrict)
   media            ReviewMedia[]
   moderationEvents ReviewModerationEvent[]
+  sellerReports    SellerReviewReport[]
 
   @@unique([buyerUserId, idempotencyKey])
   @@index([buyerUserId, updatedAt(sort: Desc), id])
@@ -1042,12 +1130,51 @@ model ReviewModerationEvent {
   visibility         ReviewVisibility
   reason             String           @db.VarChar(500)
   createdAt          DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
-  review             ProductReview    @relation(fields: [reviewId], references: [id], onDelete: Restrict)
-  actor              User?            @relation("ReviewModerationActor", fields: [actorUserId], references: [id], onDelete: Restrict)
+  review             ProductReview          @relation(fields: [reviewId], references: [id], onDelete: Restrict)
+  actor              User?                  @relation("ReviewModerationActor", fields: [actorUserId], references: [id], onDelete: Restrict)
+  auditEvents        PrivilegedAuditEvent[]
 
   @@index([reviewId, createdAt, id])
   @@index([actorUserId, createdAt, id])
   @@map("review_moderation_events")
+}
+
+enum SellerReviewReportReason {
+  ABUSIVE_CONTENT     @map("abusive_content")
+  IRRELEVANT_CONTENT  @map("irrelevant_content")
+  SPAM_OR_FRAUD       @map("spam_or_fraud")
+  OTHER               @map("other")
+
+  @@map("seller_review_report_reason")
+}
+
+enum SellerReviewReportStatus {
+  OPEN     @map("open")
+  RESOLVED @map("resolved")
+
+  @@map("seller_review_report_status")
+}
+
+model SellerReviewReport {
+  id             String                   @id @default(uuid()) @db.Uuid
+  reviewId       String                   @map("review_id") @db.Uuid
+  sellerUserId   String                   @map("seller_user_id") @db.Uuid
+  shopId         String                   @map("shop_id") @db.Uuid
+  reasonCode     SellerReviewReportReason @map("reason_code")
+  details        String?                  @db.VarChar(1000)
+  idempotencyKey String                   @map("idempotency_key") @db.Uuid
+  requestDigest  String                   @map("request_digest") @db.Char(64)
+  status         SellerReviewReportStatus @default(OPEN)
+  resolvedAt     DateTime?                @map("resolved_at") @db.Timestamptz(3)
+  createdAt      DateTime                 @default(now()) @map("created_at") @db.Timestamptz(3)
+  review         ProductReview            @relation(fields: [reviewId], references: [id], onDelete: Restrict)
+  seller         User                     @relation("SellerReviewReporter", fields: [sellerUserId], references: [id], onDelete: Restrict)
+  shop           Shop                     @relation(fields: [shopId], references: [id], onDelete: Restrict)
+
+  @@unique([sellerUserId, idempotencyKey])
+  @@index([reviewId, status, createdAt(sort: Desc), id])
+  @@index([shopId, sellerUserId, createdAt(sort: Desc), id])
+  @@map("seller_review_reports")
 }
 
 model OrderTimelineEvent {
@@ -1458,4 +1585,173 @@ model HomepageModuleProduct {
   @@unique([moduleId, productId])
   @@unique([moduleId, sortOrder])
   @@map("homepage_module_products")
+}
+
+model UserReport {
+  id                 String                    @id @default(uuid()) @db.Uuid
+  reporterUserId     String                    @map("reporter_user_id") @db.Uuid
+  caseId             String                    @map("case_id") @db.Uuid
+  targetType         ReportTargetType          @map("target_type")
+  productId          String?                   @map("product_id") @db.Uuid
+  shopId             String?                   @map("shop_id") @db.Uuid
+  reasonCode         ReportReasonCode          @map("reason_code")
+  details            String                    @db.VarChar(1000)
+  targetSnapshot     Json                      @map("target_snapshot")
+  idempotencyKey     String                    @map("idempotency_key") @db.Uuid
+  requestDigest      String                    @map("request_digest") @db.Char(64)
+  status             ReportStatus              @default(SUBMITTED)
+  resolvedAt         DateTime?                 @map("resolved_at") @db.Timestamptz(3)
+  createdAt          DateTime                  @default(now()) @map("created_at") @db.Timestamptz(3)
+  reporter           User                      @relation("UserReportsSubmitted", fields: [reporterUserId], references: [id], onDelete: Restrict)
+  case               ModerationCase            @relation(fields: [caseId], references: [id], onDelete: Restrict)
+  product            Product?                  @relation(fields: [productId], references: [id], onDelete: Restrict)
+  shop               Shop?                     @relation(fields: [shopId], references: [id], onDelete: Restrict)
+  evidenceReferences ReportEvidenceReference[]
+
+  @@unique([reporterUserId, idempotencyKey])
+  @@index([reporterUserId, createdAt(sort: Desc), id])
+  @@index([caseId, createdAt])
+  @@index([productId])
+  @@index([shopId])
+  @@map("user_reports")
+}
+
+model ReportEvidenceReference {
+  id        String     @id @default(uuid()) @db.Uuid
+  reportId  String     @map("report_id") @db.Uuid
+  url       String     @db.VarChar(2048)
+  sortOrder Int        @default(0) @map("sort_order")
+  createdAt DateTime   @default(now()) @map("created_at") @db.Timestamptz(3)
+  report    UserReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
+
+  @@unique([reportId, sortOrder])
+  @@map("report_evidence_references")
+}
+
+model ModerationCase {
+  id              String                  @id @default(uuid()) @db.Uuid
+  targetType      ReportTargetType        @map("target_type")
+  productId       String?                 @map("product_id") @db.Uuid
+  shopId          String?                 @map("shop_id") @db.Uuid
+  targetSnapshot  Json                    @map("target_snapshot")
+  status          ModerationCaseStatus    @default(OPEN)
+  reportCount     Int                     @default(1) @map("report_count")
+  primaryReason   ReportReasonCode        @map("primary_reason")
+  assignedAdminId String?                 @map("assigned_admin_id") @db.Uuid
+  currentOutcome  ModerationCaseOutcome?  @map("current_outcome")
+  version         Int                     @default(0)
+  firstReportAt   DateTime                @default(now()) @map("first_report_at") @db.Timestamptz(3)
+  lastActivityAt  DateTime                @default(now()) @map("last_activity_at") @db.Timestamptz(3)
+  resolvedAt      DateTime?               @map("resolved_at") @db.Timestamptz(3)
+  createdAt       DateTime                @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt       DateTime                @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  product         Product?                @relation(fields: [productId], references: [id], onDelete: Restrict)
+  shop            Shop?                   @relation(fields: [shopId], references: [id], onDelete: Restrict)
+  assignedAdmin   User?                   @relation("ModerationCaseAssignee", fields: [assignedAdminId], references: [id], onDelete: Restrict)
+  reports         UserReport[]
+  events          ModerationCaseEvent[]
+  decisions       ModerationDecision[]
+
+  @@index([status, lastActivityAt(sort: Desc), id])
+  @@index([targetType, lastActivityAt(sort: Desc)])
+  @@index([assignedAdminId, status])
+  @@index([productId])
+  @@index([shopId])
+  @@map("moderation_cases")
+}
+
+model ModerationCaseEvent {
+  id          String                  @id @default(uuid()) @db.Uuid
+  caseId      String                  @map("case_id") @db.Uuid
+  eventType   ModerationCaseEventType @map("event_type")
+  actorUserId String?                 @map("actor_user_id") @db.Uuid
+  version     Int
+  note        String?                 @db.VarChar(2000)
+  metadata    Json?
+  createdAt   DateTime                @default(now()) @map("created_at") @db.Timestamptz(3)
+  case        ModerationCase          @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  actorUser   User?                   @relation("ModerationCaseEventActor", fields: [actorUserId], references: [id], onDelete: Restrict)
+
+  @@index([caseId, createdAt, id])
+  @@index([actorUserId, createdAt])
+  @@map("moderation_case_events")
+}
+
+model ModerationDecision {
+  id                   String                 @id @default(uuid()) @db.Uuid
+  caseId               String                 @map("case_id") @db.Uuid
+  outcome              ModerationCaseOutcome
+  publicReason         String                 @map("public_reason") @db.VarChar(240)
+  privateNote          String?                @map("private_note") @db.VarChar(2000)
+  previousTargetStatus String                 @map("previous_target_status") @db.VarChar(50)
+  nextTargetStatus     String                 @map("next_target_status") @db.VarChar(50)
+  reversesDecisionId   String?                @map("reverses_decision_id") @db.Uuid
+  actorUserId          String                 @map("actor_user_id") @db.Uuid
+  createdAt            DateTime               @default(now()) @map("created_at") @db.Timestamptz(3)
+  case                 ModerationCase         @relation(fields: [caseId], references: [id], onDelete: Restrict)
+  actorUser            User                   @relation("ModerationDecisionActor", fields: [actorUserId], references: [id], onDelete: Restrict)
+  reversesDecision     ModerationDecision?    @relation("DecisionReversal", fields: [reversesDecisionId], references: [id], onDelete: Restrict)
+  reversedByDecisions  ModerationDecision[]   @relation("DecisionReversal")
+  sellerNotice         SellerModerationNotice?
+  auditEvents          PrivilegedAuditEvent[]
+
+  @@index([caseId, createdAt(sort: Desc)])
+  @@index([actorUserId, createdAt])
+  @@index([reversesDecisionId])
+  @@map("moderation_decisions")
+}
+
+model ModerationCommand {
+  id             String   @id @default(uuid()) @db.Uuid
+  actorUserId    String   @map("actor_user_id") @db.Uuid
+  idempotencyKey String   @map("idempotency_key") @db.Uuid
+  requestDigest  String   @map("request_digest") @db.Char(64)
+  resourceType   String   @map("resource_type") @db.VarChar(60)
+  resourceId     String   @map("resource_id") @db.Uuid
+  actionName     String   @map("action_name") @db.VarChar(60)
+  responseStatus Int      @map("response_status")
+  responseBody   Json     @map("response_body")
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  actorUser      User     @relation("ModerationCommandActor", fields: [actorUserId], references: [id], onDelete: Restrict)
+
+  @@unique([actorUserId, idempotencyKey])
+  @@index([resourceType, resourceId])
+  @@map("moderation_commands")
+}
+
+model ReportRateLimitEvent {
+  id             String   @id @default(uuid()) @db.Uuid
+  reporterUserId String   @map("reporter_user_id") @db.Uuid
+  accepted       Boolean  @default(false)
+  attemptedAt    DateTime @default(now()) @map("attempted_at") @db.Timestamptz(3)
+  reporter       User     @relation("ReportRateLimitReporter", fields: [reporterUserId], references: [id], onDelete: Cascade)
+
+  @@index([reporterUserId, attemptedAt(sort: Desc)])
+  @@index([attemptedAt])
+  @@map("report_rate_limit_events")
+}
+
+model SellerModerationNotice {
+  id             String                       @id @default(uuid()) @db.Uuid
+  ownerUserId    String                       @map("owner_user_id") @db.Uuid
+  targetType     ReportTargetType             @map("target_type")
+  productId      String?                      @map("product_id") @db.Uuid
+  shopId         String?                      @map("shop_id") @db.Uuid
+  targetSnapshot Json                         @map("target_snapshot")
+  action         SellerModerationNoticeAction
+  reason         String                       @db.VarChar(240)
+  decisionId     String?                      @unique @map("decision_id") @db.Uuid
+  readAt         DateTime?                    @map("read_at") @db.Timestamptz(3)
+  effectiveAt    DateTime                     @default(now()) @map("effective_at") @db.Timestamptz(3)
+  createdAt      DateTime                     @default(now()) @map("created_at") @db.Timestamptz(3)
+  ownerUser      User                         @relation("SellerModerationNoticeOwner", fields: [ownerUserId], references: [id], onDelete: Restrict)
+  product        Product?                     @relation(fields: [productId], references: [id], onDelete: SetNull)
+  shop           Shop?                        @relation(fields: [shopId], references: [id], onDelete: SetNull)
+  decision       ModerationDecision?          @relation(fields: [decisionId], references: [id], onDelete: Restrict)
+
+  @@index([ownerUserId, readAt, effectiveAt(sort: Desc)])
+  @@index([ownerUserId, effectiveAt(sort: Desc)])
+  @@index([productId])
+  @@index([shopId])
+  @@map("seller_moderation_notices")
 }

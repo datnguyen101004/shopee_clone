@@ -5,8 +5,10 @@ import {
   SelfActionForbiddenError,
   ShopRestoreNotApprovedError,
 } from './admin.errors';
-import { AdminRepository } from './admin.repository';
+import type { AdminRepository } from './admin.repository';
 import { AdminService } from './admin.service';
+
+type CategoryWithCounts = Awaited<ReturnType<AdminRepository['findCategoryById']>>;
 
 describe('AdminService', () => {
   let service: AdminService;
@@ -42,7 +44,7 @@ describe('AdminService', () => {
           homepageBanner: { create: jest.fn(), update: jest.fn(), delete: jest.fn(), findMany: jest.fn() },
           homepageModule: { update: jest.fn() },
           privilegedAuditEvent: { create: jest.fn() },
-        } as any),
+        } as unknown),
       ),
     } as unknown as jest.Mocked<AdminRepository>;
 
@@ -172,10 +174,10 @@ describe('AdminService', () => {
 
       repository.findCategoryById.mockImplementation(async (id) => {
         if (id === catA) {
-          return { id: catA, parentId: null, slug: 'cat-a', name: 'Cat A', sortOrder: 0, isActive: true, createdAt: new Date(), updatedAt: new Date(), _count: { products: 0, children: 0, homepageEntries: 0 } } as any;
+          return { id: catA, parentId: null, slug: 'cat-a', name: 'Cat A', sortOrder: 0, isActive: true, createdAt: new Date(), updatedAt: new Date(), deletedAt: null, _count: { products: 0, children: 0, homepageEntries: 0 } } as CategoryWithCounts;
         }
         if (id === catB) {
-          return { id: catB, parentId: catA, slug: 'cat-b', name: 'Cat B', sortOrder: 0, isActive: true, createdAt: new Date(), updatedAt: new Date(), _count: { products: 0, children: 0, homepageEntries: 0 } } as any;
+          return { id: catB, parentId: catA, slug: 'cat-b', name: 'Cat B', sortOrder: 0, isActive: true, createdAt: new Date(), updatedAt: new Date(), deletedAt: null, _count: { products: 0, children: 0, homepageEntries: 0 } } as CategoryWithCounts;
         }
         return null;
       });
@@ -198,7 +200,7 @@ describe('AdminService', () => {
         createdAt: new Date(),
         updatedAt: new Date(),
         _count: { products: 15, children: 0, homepageEntries: 0 },
-      } as any);
+      } as CategoryWithCounts);
 
       await expect(service.deleteCategory(adminUserId, catId)).rejects.toThrow(
         CategoryIntegrityConflictError,

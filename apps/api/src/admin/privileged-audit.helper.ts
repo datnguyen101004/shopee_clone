@@ -11,6 +11,8 @@ export interface RecordPrivilegedAuditInput {
   reason: string;
   beforeSummary?: Record<string, unknown> | null;
   afterSummary?: Record<string, unknown> | null;
+  decisionId?: string | null;
+  reviewModerationEventId?: string | null;
   now?: Date;
 }
 
@@ -38,6 +40,8 @@ export async function recordPrivilegedAudit(
         reason: trimmedReason,
         beforeSummary: (input.beforeSummary ?? undefined) as Prisma.InputJsonValue | undefined,
         afterSummary: (input.afterSummary ?? undefined) as Prisma.InputJsonValue | undefined,
+        decisionId: input.decisionId ?? null,
+        reviewModerationEventId: input.reviewModerationEventId ?? null,
         createdAt: input.now ?? new Date(),
       },
     });

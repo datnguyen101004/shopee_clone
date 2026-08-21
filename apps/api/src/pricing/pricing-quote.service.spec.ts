@@ -1,6 +1,7 @@
 import { isPricingQuoteResponse } from '@shopee-clone/contracts';
 
 import {
+  ProductModerationStatus,
   ProductStatus,
   ShopOnboardingStatus,
   ShopStatus,
@@ -45,6 +46,7 @@ function fixtureCart() {
             id: '00000000-0000-4000-8000-000000000007',
             name: 'Fixture product',
             status: ProductStatus.ACTIVE,
+            moderationStatus: ProductModerationStatus.ACTIVE as ProductModerationStatus,
             deletedAt: null,
             category: { isActive: true, deletedAt: null },
             images: [{ url: '/media/products/fixture.webp' }],
@@ -150,6 +152,18 @@ describe('pricing quote orchestration', () => {
   it('revalidates a once-sellable cart line after its shop approval is withdrawn', async () => {
     const cart = fixtureCart();
     cart.lines[0]!.variant.product.shop.onboardingStatus = ShopOnboardingStatus.REJECTED;
+
+    const quote = await serviceWith({ cart }).quote(userId, 2, addressId, []);
+
+    expect(quote.shops).toEqual([]);
+    expect(quote.exclusions).toEqual([
+      expect.objectContaining({ lineId: cart.lines[0]!.id, code: 'unavailable' }),
+    ]);
+  });
+
+  it('rejects checkout of a cart line after product moderation suspends it', async () => {
+    const cart = fixtureCart();
+    cart.lines[0]!.variant.product.moderationStatus = ProductModerationStatus.SUSPENDED;
 
     const quote = await serviceWith({ cart }).quote(userId, 2, addressId, []);
 

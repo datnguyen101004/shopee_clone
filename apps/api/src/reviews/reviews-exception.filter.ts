@@ -1,7 +1,7 @@
-import { BadRequestException, Catch, type ArgumentsHost, type ExceptionFilter } from '@nestjs/common';
+import { BadRequestException, Catch, ForbiddenException, type ArgumentsHost, type ExceptionFilter } from '@nestjs/common';
 import type { Response } from 'express';
 
-import { AuthenticationFailedError } from '../auth/auth.errors';
+import { AuthenticationFailedError, AuthorizationDeniedError } from '../auth/auth.errors';
 import { BrowserMutationSecurityError, sendBrowserMutationProblem } from '../security/browser-mutation.error';
 import { ReviewDuplicateError, ReviewEligibilityError, ReviewIdempotencyConflictError, ReviewMediaError, ReviewNotFoundError, ReviewStaleError, ReviewUnavailableError, ReviewValidationError } from './reviews.errors';
 
@@ -12,6 +12,7 @@ export class ReviewsExceptionFilter implements ExceptionFilter {
     response.setHeader('Cache-Control', 'private, no-store');
     if (exception instanceof BrowserMutationSecurityError) return sendBrowserMutationProblem(response, exception);
     if (exception instanceof AuthenticationFailedError) return this.problem(response, 401, 'authentication-failed', 'Authentication failed', 'A valid buyer session is required.');
+    if (exception instanceof AuthorizationDeniedError || exception instanceof ForbiddenException) return this.problem(response, 403, 'authorization-denied', 'Authorization denied', 'The current account does not have permission to access this review resource.');
     if (exception instanceof ReviewValidationError || exception instanceof BadRequestException) return this.problem(response, 400, 'invalid-review-request', 'Invalid review request', 'One or more review parameters are invalid.', { invalidParameters: exception instanceof ReviewValidationError ? exception.invalidParameters : ['request'] });
     if (exception instanceof ReviewNotFoundError || exception instanceof ReviewEligibilityError) return this.problem(response, 404, 'review-unavailable', 'Review unavailable', 'The requested review or order line is unavailable.');
     if (exception instanceof ReviewDuplicateError) return this.problem(response, 409, 'review-already-exists', 'Review already exists', 'This delivered order line has already been reviewed.');

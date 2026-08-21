@@ -1,0 +1,727 @@
+import {
+  MODERATION_DEFAULT_LIMIT,
+  MODERATION_MAX_LIMIT,
+  type ModerationCaseDetail,
+  type ModerationCaseListQuery,
+  type ModerationCaseListResponse,
+  type ModerationCaseSummary,
+  type ModerationCaseEventType as ContractModerationCaseEventType,
+  type ModerationCaseOutcome as ContractModerationCaseOutcome,
+  type ModerationCaseTargetDetails,
+  type ModerationDecisionOutcome as ContractModerationDecisionOutcome,
+  type ModerationDecisionResult,
+  type ReportReasonCode as ContractReportReasonCode,
+} from '@shopee-clone/contracts';
+import { Inject, Injectable } from '@nestjs/common';
+import type { Prisma } from '../generated/prisma/client';
+import type { ReportReasonCode as PrismaReportReasonCode } from '../generated/prisma/enums';
+import {
+  MarketplaceRole,
+  ModerationCaseEventType,
+  ModerationCaseOutcome,
+  ModerationCaseStatus,
+  PrivilegedAction,
+  PrivilegedTargetType,
+  ProductModerationStatus,
+  ReportStatus,
+  ReportTargetType,
+  SellerModerationNoticeAction,
+  ShopOnboardingStatus,
+  ShopStatus,
+  UserStatus,
+} from '../generated/prisma/enums';
+import { PrismaService } from '../prisma/prisma.service';
+import {
+  AdminInvalidInputError,
+  AdminNotFoundError,
+} from './admin.errors';
+import { recordPrivilegedAudit } from './privileged-audit.helper';
+
+export class ModerationConflictError extends Error {
+  constructor(message: string = 'The moderation case has been modified by another operation.') {
+    super(message);
+    this.name = 'ModerationConflictError';
+  }
+}
+
+export class ModerationIdempotencyConflictError extends Error {
+  constructor(message: string = 'The idempotency key has already been used with different request parameters.') {
+    super(message);
+    this.name = 'ModerationIdempotencyConflictError';
+  }
+}
+
+@Injectable()
+export class AdminModerationRepository {
+  constructor(@Inject(PrismaService) private readonly prisma: PrismaService) {}
+
+  async listCases(query: ModerationCaseListQuery): Promise<ModerationCaseListResponse> {
+    const limit = Math.min(query.limit ?? MODERATION_DEFAULT_LIMIT, MODERATION_MAX_LIMIT);
+    const where: Prisma.ModerationCaseWhereInput = {};
+
+    if (query.status) {
+      where.status = query.status as unknown as ModerationCaseStatus;
+    }
+    if (query.targetType) {
+      where.targetType = query.targetType as unknown as ReportTargetType;
+    }
+    if (query.targetId) {
+      if (query.targetType === 'PRODUCT') {
+        where.productId = query.targetId;
+      } else if (query.targetType === 'SHOP') {
+        where.shopId = query.targetId;
+      } else {
+        where.OR = [{ productId: query.targetId }, { shopId: query.targetId }];
+      }
+    }
+    if (query.searchId) {
+      where.OR = [
+        { id: query.searchId },
+        { productId: query.searchId },
+        { shopId: query.searchId },
+      ];
+    }
+    if (query.reasonCode) {
+      where.primaryReason = query.reasonCode as unknown as PrismaReportReasonCode;
+    }
+    if (query.assignedAdminId) {
+      where.assignedAdminId = query.assignedAdminId;
+    }
+
+    const rows = await this.prisma.moderationCase.findMany({
+      where,
+      take: limit + 1,
+      ...(query.cursor ? { skip: 1, cursor: { id: query.cursor } } : {}),
+      orderBy: [{ lastActivityAt: 'desc' }, { id: 'desc' }],
+      include: {
+        assignedAdmin: {
+          select: {
+            id: true,
+            email: true,
+            displayName: true,
+          },
+        },
+      },
+    });
+
+    const hasMore = rows.length > limit;
+    const items = hasMore ? rows.slice(0, limit) : rows;
+    const nextCursor = hasMore && items.length > 0 ? items[items.length - 1]!.id : null;
+
+    return {
+      items: items.map((c): ModerationCaseSummary => {
+        const snap = c.targetSnapshot as Record<string, unknown>;
+        return {
+          id: c.id,
+          targetType: c.targetType as unknown as 'PRODUCT' | 'SHOP',
+          targetId: (c.productId ?? c.shopId)!,
+          targetName: (snap?.name as string) ?? 'Unknown',
+          targetStatus: (snap?.status as string) ?? 'ACTIVE',
+          status: c.status as unknown as 'OPEN' | 'IN_REVIEW' | 'RESOLVED',
+          reportCount: c.reportCount,
+          primaryReasonCode: c.primaryReason as unknown as ContractReportReasonCode,
+          assignedAdminId: c.assignedAdminId,
+          assignedAdminName: c.assignedAdmin?.displayName ?? null,
+          currentOutcome: (c.currentOutcome as unknown as ContractModerationCaseOutcome) ?? null,
+          version: c.version,
+          createdAt: c.createdAt.toISOString(),
+          lastActivityAt: c.lastActivityAt.toISOString(),
+          resolvedAt: c.resolvedAt ? c.resolvedAt.toISOString() : null,
+        };
+      }),
+      nextCursor,
+    };
+  }
+
+  async getCaseDetail(caseId: string): Promise<ModerationCaseDetail> {
+    const c = await this.prisma.moderationCase.findUnique({
+      where: { id: caseId },
+      include: {
+        assignedAdmin: {
+          select: { id: true, email: true, displayName: true },
+        },
+        reports: {
+          orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+          include: {
+            evidenceReferences: {
+              orderBy: { sortOrder: 'asc' },
+            },
+          },
+        },
+        events: {
+          orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+          include: {
+            actorUser: {
+              select: { id: true, email: true, displayName: true },
+            },
+          },
+        },
+        decisions: {
+          orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+          include: {
+            actorUser: {
+              select: { id: true, email: true, displayName: true },
+            },
+          },
+        },
+        product: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            status: true,
+            moderationStatus: true,
+            shop: { select: { id: true, name: true, slug: true, status: true } },
+          },
+        },
+        shop: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            status: true,
+            onboardingStatus: true,
+          },
+        },
+      },
+    });
+
+    if (!c) {
+      throw new AdminNotFoundError('Moderation case not found');
+    }
+
+    const snap = c.targetSnapshot as Record<string, unknown>;
+
+    // Generate deterministic opaque reporter identifiers (reporter-1, reporter-2, etc.)
+    const reporterMap = new Map<string, string>();
+    let reporterCounter = 1;
+    for (const r of c.reports) {
+      if (!reporterMap.has(r.reporterUserId)) {
+        reporterMap.set(r.reporterUserId, `reporter-${reporterCounter++}`);
+      }
+    }
+
+    let targetDetails: ModerationCaseTargetDetails & { onboardingStatus?: string };
+    if (c.targetType === ReportTargetType.PRODUCT) {
+      targetDetails = {
+        targetType: 'PRODUCT',
+        id: (c.productId ?? snap?.id as string)!,
+        name: c.product?.name ?? (snap?.name as string) ?? 'Unknown',
+        slug: c.product?.slug ?? (snap?.slug as string) ?? null,
+        currentStatus: c.product?.status ?? 'UNKNOWN',
+        moderationStatus: c.product?.moderationStatus ?? 'ACTIVE',
+        shopId: c.product?.shop?.id ?? (snap?.shopId as string) ?? 'Unknown',
+        shopName: c.product?.shop?.name ?? (snap?.shopName as string) ?? 'Unknown',
+      };
+    } else {
+      targetDetails = {
+        targetType: 'SHOP',
+        id: (c.shopId ?? snap?.id as string)!,
+        name: c.shop?.name ?? (snap?.name as string) ?? 'Unknown',
+        slug: c.shop?.slug ?? (snap?.slug as string) ?? null,
+        currentStatus: c.shop?.status ?? 'UNKNOWN',
+        onboardingStatus: c.shop?.onboardingStatus ?? 'APPROVED',
+      };
+    }
+
+    return {
+      id: c.id,
+      targetType: c.targetType as unknown as 'PRODUCT' | 'SHOP',
+      targetId: (c.productId ?? c.shopId)!,
+      targetName: (snap?.name as string) ?? 'Unknown',
+      targetStatus: (snap?.status as string) ?? 'ACTIVE',
+      status: c.status as unknown as 'OPEN' | 'IN_REVIEW' | 'RESOLVED',
+      reportCount: c.reportCount,
+      primaryReasonCode: c.primaryReason as unknown as ContractReportReasonCode,
+      assignedAdminId: c.assignedAdminId,
+      assignedAdminName: c.assignedAdmin?.displayName ?? null,
+      currentOutcome: (c.currentOutcome as unknown as ContractModerationCaseOutcome) ?? null,
+      version: c.version,
+      createdAt: c.createdAt.toISOString(),
+      lastActivityAt: c.lastActivityAt.toISOString(),
+      resolvedAt: c.resolvedAt ? c.resolvedAt.toISOString() : null,
+      targetDetails,
+      reports: c.reports.map((r) => ({
+        id: r.id,
+        reporterOpaqueId: reporterMap.get(r.reporterUserId)!,
+        reasonCode: r.reasonCode as unknown as ContractReportReasonCode,
+        details: r.details,
+        evidenceUrls: r.evidenceReferences.map((e) => e.url),
+        createdAt: r.createdAt.toISOString(),
+      })),
+      events: c.events.map((e) => ({
+        id: e.id,
+        eventType: e.eventType as unknown as ContractModerationCaseEventType,
+        actorUserId: e.actorUserId,
+        actorName: e.actorUser?.displayName ?? null,
+        version: e.version,
+        note: e.note ?? null,
+        metadata: (e.metadata as Record<string, unknown> | null) ?? null,
+        createdAt: e.createdAt.toISOString(),
+      })),
+      decisions: c.decisions.map((d) => ({
+        id: d.id,
+        outcome: d.outcome as unknown as ContractModerationDecisionOutcome,
+        publicReason: d.publicReason,
+        privateNote: d.privateNote ?? null,
+        previousTargetStatus: d.previousTargetStatus,
+        nextTargetStatus: d.nextTargetStatus,
+        reversesDecisionId: d.reversesDecisionId ?? null,
+        actorUserId: d.actorUserId,
+        actorName: d.actorUser.displayName,
+        createdAt: d.createdAt.toISOString(),
+      })),
+    };
+  }
+
+  async assignCase(
+    actorAdminId: string,
+    caseId: string,
+    assignedAdminId: string | null,
+    expectedVersion: number,
+    idempotencyKey: string,
+    requestDigest: string,
+  ): Promise<{ caseDetail: ModerationCaseDetail }> {
+    return this.prisma.$transaction(async (tx) => {
+      // 1. Check idempotency command replay
+      const existingCmd = await tx.moderationCommand.findUnique({
+        where: {
+          actorUserId_idempotencyKey: {
+            actorUserId: actorAdminId,
+            idempotencyKey,
+          },
+        },
+      });
+
+      if (existingCmd) {
+        if (existingCmd.requestDigest === requestDigest) {
+          return existingCmd.responseBody as unknown as { caseDetail: ModerationCaseDetail };
+        }
+        throw new ModerationIdempotencyConflictError();
+      }
+
+      // 2. Lock case row
+      const targetCase = await tx.moderationCase.findUnique({
+        where: { id: caseId },
+      });
+
+      if (!targetCase) {
+        throw new AdminNotFoundError('Moderation case not found');
+      }
+
+      if (targetCase.version !== expectedVersion) {
+        throw new ModerationConflictError(
+          `Case version mismatch: expected ${expectedVersion}, found ${targetCase.version}`,
+        );
+      }
+
+      // 3. Verify assignee if present
+      if (assignedAdminId) {
+        const adminUser = await tx.user.findFirst({
+          where: {
+            id: assignedAdminId,
+            status: UserStatus.ACTIVE,
+            roleAssignments: { some: { role: MarketplaceRole.ADMIN } },
+          },
+        });
+        if (!adminUser) {
+          throw new AdminInvalidInputError('Target assignee must be an active admin user');
+        }
+      }
+
+      const now = new Date();
+      const nextVersion = targetCase.version + 1;
+      const nextStatus = assignedAdminId
+        ? ModerationCaseStatus.IN_REVIEW
+        : targetCase.status === ModerationCaseStatus.IN_REVIEW
+          ? ModerationCaseStatus.OPEN
+          : targetCase.status;
+
+      await tx.moderationCase.update({
+        where: { id: caseId },
+        data: {
+          assignedAdminId,
+          status: nextStatus,
+          version: nextVersion,
+          lastActivityAt: now,
+        },
+      });
+
+      await tx.moderationCaseEvent.create({
+        data: {
+          caseId,
+          eventType: assignedAdminId
+            ? ModerationCaseEventType.ASSIGNED
+            : ModerationCaseEventType.UNASSIGNED,
+          actorUserId: actorAdminId,
+          version: nextVersion,
+          createdAt: now,
+        },
+      });
+
+      const updatedDetail = await this.getCaseDetail(caseId);
+      const responsePayload = { caseDetail: updatedDetail };
+
+      await tx.moderationCommand.create({
+        data: {
+          actorUserId: actorAdminId,
+          idempotencyKey,
+          requestDigest,
+          resourceType: 'MODERATION_CASE',
+          resourceId: caseId,
+          actionName: 'ASSIGN',
+          responseStatus: 200,
+          responseBody: responsePayload as unknown as Prisma.InputJsonValue,
+          createdAt: now,
+        },
+      });
+
+      return responsePayload;
+    });
+  }
+
+  async addNote(
+    actorAdminId: string,
+    caseId: string,
+    note: string,
+    expectedVersion: number,
+    idempotencyKey: string,
+    requestDigest: string,
+  ): Promise<{ caseDetail: ModerationCaseDetail }> {
+    return this.prisma.$transaction(async (tx) => {
+      // 1. Check idempotency command replay
+      const existingCmd = await tx.moderationCommand.findUnique({
+        where: {
+          actorUserId_idempotencyKey: {
+            actorUserId: actorAdminId,
+            idempotencyKey,
+          },
+        },
+      });
+
+      if (existingCmd) {
+        if (existingCmd.requestDigest === requestDigest) {
+          return existingCmd.responseBody as unknown as { caseDetail: ModerationCaseDetail };
+        }
+        throw new ModerationIdempotencyConflictError();
+      }
+
+      // 2. Lock case row
+      const targetCase = await tx.moderationCase.findUnique({
+        where: { id: caseId },
+      });
+
+      if (!targetCase) {
+        throw new AdminNotFoundError('Moderation case not found');
+      }
+
+      if (targetCase.version !== expectedVersion) {
+        throw new ModerationConflictError(
+          `Case version mismatch: expected ${expectedVersion}, found ${targetCase.version}`,
+        );
+      }
+
+      const now = new Date();
+      const nextVersion = targetCase.version + 1;
+
+      await tx.moderationCase.update({
+        where: { id: caseId },
+        data: {
+          version: nextVersion,
+          lastActivityAt: now,
+        },
+      });
+
+      await tx.moderationCaseEvent.create({
+        data: {
+          caseId,
+          eventType: ModerationCaseEventType.NOTE_ADDED,
+          actorUserId: actorAdminId,
+          version: nextVersion,
+          note: note.trim(),
+          createdAt: now,
+        },
+      });
+
+      const updatedDetail = await this.getCaseDetail(caseId);
+      const responsePayload = { caseDetail: updatedDetail };
+
+      await tx.moderationCommand.create({
+        data: {
+          actorUserId: actorAdminId,
+          idempotencyKey,
+          requestDigest,
+          resourceType: 'MODERATION_CASE',
+          resourceId: caseId,
+          actionName: 'NOTE_ADDED',
+          responseStatus: 200,
+          responseBody: responsePayload as unknown as Prisma.InputJsonValue,
+          createdAt: now,
+        },
+      });
+
+      return responsePayload;
+    });
+  }
+
+  async makeDecision(
+    actorAdminId: string,
+    caseId: string,
+    input: {
+      outcome: ModerationCaseOutcome;
+      publicReason: string;
+      privateNote?: string;
+      reversesDecisionId?: string;
+      expectedVersion: number;
+    },
+    idempotencyKey: string,
+    requestDigest: string,
+  ): Promise<ModerationDecisionResult> {
+    return this.prisma.$transaction(async (tx) => {
+      // 1. Check idempotency command replay
+      const existingCmd = await tx.moderationCommand.findUnique({
+        where: {
+          actorUserId_idempotencyKey: {
+            actorUserId: actorAdminId,
+            idempotencyKey,
+          },
+        },
+      });
+
+      if (existingCmd) {
+        if (existingCmd.requestDigest === requestDigest) {
+          return existingCmd.responseBody as unknown as ModerationDecisionResult;
+        }
+        throw new ModerationIdempotencyConflictError();
+      }
+
+      // 2. Lock case row
+      const targetCase = await tx.moderationCase.findUnique({
+        where: { id: caseId },
+        include: {
+          reports: true,
+          decisions: {
+            orderBy: { createdAt: 'desc' },
+            take: 1,
+          },
+        },
+      });
+
+      if (!targetCase) {
+        throw new AdminNotFoundError('Moderation case not found');
+      }
+
+      if (targetCase.version !== input.expectedVersion) {
+        throw new ModerationConflictError(
+          `Case version mismatch: expected ${input.expectedVersion}, found ${targetCase.version}`,
+        );
+      }
+
+      // 3. If reversal, validate reversesDecisionId
+      if (input.reversesDecisionId) {
+        const priorDecision = await tx.moderationDecision.findUnique({
+          where: { id: input.reversesDecisionId },
+        });
+        if (!priorDecision || priorDecision.caseId !== caseId) {
+          throw new AdminInvalidInputError('Reversed decision not found for this case');
+        }
+      }
+
+      const now = new Date();
+      let previousTargetStatus: string;
+      let nextTargetStatus: string;
+      let privilegedAction: PrivilegedAction;
+      let targetOwnerUserId: string | null = null;
+      const targetSnapshot = targetCase.targetSnapshot as Prisma.InputJsonValue;
+
+      // 4. Lock target row and determine status changes
+      if (targetCase.targetType === ReportTargetType.PRODUCT) {
+        const product = await tx.product.findUnique({
+          where: { id: targetCase.productId! },
+          include: { shop: { select: { ownerId: true, name: true } } },
+        });
+        if (!product) {
+          throw new AdminNotFoundError('Target product not found');
+        }
+        targetOwnerUserId = product.shop.ownerId;
+        previousTargetStatus = product.moderationStatus;
+
+        if (input.outcome === ModerationCaseOutcome.SUSPEND_TARGET) {
+          nextTargetStatus = ProductModerationStatus.SUSPENDED;
+          privilegedAction = PrivilegedAction.SUSPEND;
+          await tx.product.update({
+            where: { id: product.id },
+            data: { moderationStatus: ProductModerationStatus.SUSPENDED },
+          });
+        } else if (input.outcome === ModerationCaseOutcome.RESTORE_TARGET) {
+          nextTargetStatus = ProductModerationStatus.ACTIVE;
+          privilegedAction = PrivilegedAction.RESTORE;
+          await tx.product.update({
+            where: { id: product.id },
+            data: { moderationStatus: ProductModerationStatus.ACTIVE },
+          });
+        } else {
+          nextTargetStatus = previousTargetStatus;
+          privilegedAction = PrivilegedAction.NO_ACTION;
+        }
+      } else {
+        const shop = await tx.shop.findUnique({
+          where: { id: targetCase.shopId! },
+        });
+        if (!shop) {
+          throw new AdminNotFoundError('Target shop not found');
+        }
+        targetOwnerUserId = shop.ownerId;
+        previousTargetStatus = shop.status;
+
+        if (input.outcome === ModerationCaseOutcome.SUSPEND_TARGET) {
+          nextTargetStatus = ShopStatus.SUSPENDED;
+          privilegedAction = PrivilegedAction.SUSPEND;
+          await tx.shop.update({
+            where: { id: shop.id },
+            data: { status: ShopStatus.SUSPENDED },
+          });
+        } else if (input.outcome === ModerationCaseOutcome.RESTORE_TARGET) {
+          if (shop.onboardingStatus !== ShopOnboardingStatus.APPROVED) {
+            throw new AdminInvalidInputError('Cannot restore shop that is not approved');
+          }
+          nextTargetStatus = ShopStatus.ACTIVE;
+          privilegedAction = PrivilegedAction.RESTORE;
+          await tx.shop.update({
+            where: { id: shop.id },
+            data: { status: ShopStatus.ACTIVE },
+          });
+        } else {
+          nextTargetStatus = previousTargetStatus;
+          privilegedAction = PrivilegedAction.NO_ACTION;
+        }
+      }
+
+      // 5. Create ModerationDecision
+      const decision = await tx.moderationDecision.create({
+        data: {
+          caseId,
+          outcome: input.outcome,
+          publicReason: input.publicReason.trim(),
+          privateNote: input.privateNote?.trim() ?? null,
+          previousTargetStatus,
+          nextTargetStatus,
+          reversesDecisionId: input.reversesDecisionId ?? null,
+          actorUserId: actorAdminId,
+          createdAt: now,
+        },
+      });
+
+      // 6. Create SellerModerationNotice if target was suspended or restored
+      if (
+        input.outcome === ModerationCaseOutcome.SUSPEND_TARGET ||
+        input.outcome === ModerationCaseOutcome.RESTORE_TARGET
+      ) {
+        let noticeAction: SellerModerationNoticeAction;
+        if (targetCase.targetType === ReportTargetType.PRODUCT) {
+          noticeAction =
+            input.outcome === ModerationCaseOutcome.SUSPEND_TARGET
+              ? SellerModerationNoticeAction.PRODUCT_SUSPENDED
+              : SellerModerationNoticeAction.PRODUCT_RESTORED;
+        } else {
+          noticeAction =
+            input.outcome === ModerationCaseOutcome.SUSPEND_TARGET
+              ? SellerModerationNoticeAction.SHOP_SUSPENDED
+              : SellerModerationNoticeAction.SHOP_RESTORED;
+        }
+
+        if (targetOwnerUserId) {
+          await tx.sellerModerationNotice.create({
+            data: {
+              ownerUserId: targetOwnerUserId,
+              targetType: targetCase.targetType,
+              productId: targetCase.productId,
+              shopId: targetCase.shopId,
+              targetSnapshot,
+              action: noticeAction,
+              reason: input.publicReason.trim(),
+              decisionId: decision.id,
+              effectiveAt: now,
+              createdAt: now,
+            },
+          });
+        }
+      }
+
+      // 7. Update case & reports to resolved
+      const nextVersion = targetCase.version + 1;
+      await tx.moderationCase.update({
+        where: { id: caseId },
+        data: {
+          status: ModerationCaseStatus.RESOLVED,
+          currentOutcome: input.outcome,
+          version: nextVersion,
+          resolvedAt: now,
+          lastActivityAt: now,
+        },
+      });
+
+      await tx.userReport.updateMany({
+        where: { caseId },
+        data: {
+          status: ReportStatus.REVIEWED,
+          resolvedAt: now,
+        },
+      });
+
+      await tx.moderationCaseEvent.create({
+        data: {
+          caseId,
+          eventType: input.reversesDecisionId
+            ? ModerationCaseEventType.DECISION_REVERSED
+            : ModerationCaseEventType.DECISION_MADE,
+          actorUserId: actorAdminId,
+          version: nextVersion,
+          note: input.privateNote?.trim() ?? null,
+          metadata: {
+            decisionId: decision.id,
+            outcome: input.outcome,
+          },
+          createdAt: now,
+        },
+      });
+
+      // 8. Record privileged audit log
+      await recordPrivilegedAudit(tx, {
+        actorUserId: actorAdminId,
+        targetType: PrivilegedTargetType.MODERATION_CASE,
+        targetId: caseId,
+        action: privilegedAction,
+        reason: input.publicReason.trim(),
+        beforeSummary: { status: targetCase.status, targetStatus: previousTargetStatus },
+        afterSummary: { status: ModerationCaseStatus.RESOLVED, targetStatus: nextTargetStatus, outcome: input.outcome },
+        decisionId: decision.id,
+        now,
+      });
+
+      const result: ModerationDecisionResult = {
+        caseId,
+        outcome: decision.outcome as unknown as ContractModerationDecisionOutcome,
+        version: nextVersion,
+        targetStatus: nextTargetStatus,
+        resolvedAt: now.toISOString(),
+      };
+
+      await tx.moderationCommand.create({
+        data: {
+          actorUserId: actorAdminId,
+          idempotencyKey,
+          requestDigest,
+          resourceType: 'MODERATION_CASE',
+          resourceId: caseId,
+          actionName: 'DECISION',
+          responseStatus: 200,
+          responseBody: result as unknown as Prisma.InputJsonValue,
+          createdAt: now,
+        },
+      });
+
+      return result;
+    });
+  }
+}

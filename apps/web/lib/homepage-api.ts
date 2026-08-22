@@ -11,7 +11,7 @@ export class HomepageApiError extends Error {
 
 export async function fetchHomepage(
   fetcher: typeof fetch = fetch,
-  timeoutMs = 4_000,
+  timeoutMs = 20_000,
 ): Promise<HomepageResponse> {
   const baseUrl = process.env.HOMEPAGE_API_BASE_URL ?? 'http://127.0.0.1:3001';
   const controller = new AbortController();

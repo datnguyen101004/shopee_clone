@@ -20,7 +20,7 @@ export class ProductDetailApiError extends Error {
 export async function fetchProductDetail(
   productId: string,
   fetcher: typeof fetch = fetch,
-  timeoutMs = 4_000,
+  timeoutMs = 20_000,
 ): Promise<ProductDetailResponse> {
   if (!isCanonicalProductId(productId)) throw new ProductDetailApiError('invalid-id');
   const baseUrl =

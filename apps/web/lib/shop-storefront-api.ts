@@ -55,7 +55,7 @@ async function getJson(url: URL, fetcher: typeof fetch, timeoutMs: number): Prom
 export async function fetchPublicShopProfile(
   shopSlug: string,
   fetcher: typeof fetch = fetch,
-  timeoutMs = 4_000,
+  timeoutMs = 20_000,
 ): Promise<PublicShopProfile> {
   const parsed = parsePublicShopProfile(
     await getJson(endpoint(`/api/v1/shops/${encodeURIComponent(shopSlug)}`), fetcher, timeoutMs),
@@ -68,7 +68,7 @@ export async function fetchPublicShopCatalog(
   shopSlug: string,
   query: ShopCatalogQuery,
   fetcher: typeof fetch = fetch,
-  timeoutMs = 4_000,
+  timeoutMs = 20_000,
 ): Promise<PublicShopCatalogPage> {
   const url = endpoint(`/api/v1/shops/${encodeURIComponent(shopSlug)}/products`);
   if (query.q) url.searchParams.set('q', query.q);

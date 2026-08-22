@@ -19,7 +19,7 @@ export type CatalogApiQuery = CatalogUrlQuery;
 export async function fetchCatalogProducts(
   query: CatalogApiQuery,
   fetcher: typeof fetch = fetch,
-  timeoutMs = 4_000,
+  timeoutMs = 20_000,
 ): Promise<CatalogProductsResponse> {
   const baseUrl =
     process.env.CATALOG_API_BASE_URL ??

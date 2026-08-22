@@ -78,7 +78,7 @@ describe('SellerReviewManagement', () => {
         rating: 1,
         comment: 'Đánh giá vi phạm đã bị ẩn',
         visibility: 'HIDDEN',
-        reportStatus: 'ACCEPTED',
+        reportStatus: 'RESOLVED',
         createdAt: '2026-08-21T12:00:00.000Z',
         updatedAt: '2026-08-21T12:00:00.000Z',
       }],

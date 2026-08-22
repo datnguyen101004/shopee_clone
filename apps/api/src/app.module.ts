@@ -25,6 +25,7 @@ import { SellerPromotionsModule } from './seller-promotions/seller-promotions.mo
 import { AdminModule } from './admin/admin.module';
 import { ReportingModule } from './reporting/reporting.module';
 import { SellerModerationNoticesModule } from './seller-moderation-notices/seller-moderation-notices.module';
+import { ReturnsModule } from './returns/returns.module';
 
 @Module({
   imports: [
@@ -53,6 +54,7 @@ import { SellerModerationNoticesModule } from './seller-moderation-notices/selle
     AdminModule,
     ReportingModule,
     SellerModerationNoticesModule,
+    ReturnsModule,
   ],
 })
 export class AppModule {}

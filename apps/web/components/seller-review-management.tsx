@@ -182,14 +182,16 @@ export function SellerReviewManagement() {
                     </p>
                   ) : null}
                 </div>
-                <button
-                  type="button"
-                  className="seller-review-card__report"
-                  disabled={review.reportStatus === 'OPEN'}
-                  onClick={() => openReportDialog(review)}
-                >
-                  {review.reportStatus === 'OPEN' ? 'Đã báo cáo' : 'Báo cáo đánh giá'}
-                </button>
+                {review.visibility !== 'HIDDEN' ? (
+                  <button
+                    type="button"
+                    className="seller-review-card__report"
+                    disabled={review.reportStatus === 'OPEN'}
+                    onClick={() => openReportDialog(review)}
+                  >
+                    {review.reportStatus === 'OPEN' ? 'Đã báo cáo' : 'Báo cáo đánh giá'}
+                  </button>
+                ) : null}
               </article>
             );
           })}

@@ -33,6 +33,7 @@ export const sellerOrderInclude = {
   shipment: {
     include: { events: { orderBy: [{ occurredAt: 'asc' as const }, { id: 'asc' as const }] } },
   },
+  returnRequest: { select: { id: true, status: true } },
 } satisfies Prisma.ShopOrderInclude;
 
 export type SellerOrderGraph = Prisma.ShopOrderGetPayload<{ include: typeof sellerOrderInclude }>;

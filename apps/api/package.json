@@ -28,7 +28,9 @@
     "seller-products:media:cleanup": "tsx scripts/cleanup-seller-product-media.ts",
     "reviews:aggregates:repair": "tsx scripts/repair-review-aggregates.ts",
     "seller-analytics:benchmark": "tsx scripts/benchmark-seller-analytics.ts",
-    "reporting:rate-limit:cleanup": "tsx scripts/cleanup-report-rate-limits.ts"
+    "reporting:rate-limit:cleanup": "tsx scripts/cleanup-report-rate-limits.ts",
+    "returns:deadlines": "tsx scripts/process-return-deadlines.ts",
+    "returns:evidence:cleanup": "tsx scripts/cleanup-return-evidence.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1111.0",

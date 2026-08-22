@@ -10,11 +10,7 @@ export type AdminUserStatus = (typeof ADMIN_USER_STATUSES)[number];
 export const ADMIN_SHOP_STATUSES = ['ACTIVE', 'INACTIVE', 'SUSPENDED'] as const;
 export type AdminShopStatus = (typeof ADMIN_SHOP_STATUSES)[number];
 
-export const ADMIN_SHOP_ONBOARDING_STATUSES = [
-  'PENDING_APPROVAL',
-  'APPROVED',
-  'REJECTED',
-] as const;
+export const ADMIN_SHOP_ONBOARDING_STATUSES = ['PENDING_APPROVAL', 'APPROVED', 'REJECTED'] as const;
 export type AdminShopOnboardingStatus = (typeof ADMIN_SHOP_ONBOARDING_STATUSES)[number];
 
 export const ADMIN_PRIVILEGED_TARGET_TYPES = [
@@ -26,6 +22,7 @@ export const ADMIN_PRIVILEGED_TARGET_TYPES = [
   'PRODUCT',
   'REVIEW',
   'MODERATION_CASE',
+  'RETURN_REQUEST',
 ] as const;
 
 export type AdminPrivilegedTargetType = (typeof ADMIN_PRIVILEGED_TARGET_TYPES)[number];
@@ -41,6 +38,8 @@ export const ADMIN_PRIVILEGED_ACTIONS = [
   'REJECT',
   'HIDE',
   'NO_ACTION',
+  'APPROVE_RETURN',
+  'APPROVE_REFUND',
 ] as const;
 export type AdminPrivilegedAction = (typeof ADMIN_PRIVILEGED_ACTIONS)[number];
 
@@ -247,6 +246,7 @@ export interface AdminPrivilegedAuditEventSummary {
   beforeSummary: Record<string, unknown> | null;
   afterSummary: Record<string, unknown> | null;
   decisionId?: string | null;
+  returnDecisionId?: string | null;
   reviewModerationEventId?: string | null;
   createdAt: string;
 }
@@ -314,8 +314,6 @@ export interface AdminProductActionResult {
   updatedAt: string;
 }
 
-
-
 // Helpers / Validators
 const isRecord = (val: unknown): val is Record<string, unknown> =>
   typeof val === 'object' && val !== null;
@@ -342,12 +340,15 @@ export function isAllowedMediaUrl(val: unknown): boolean {
   if (!isString(val)) return false;
   const trimmed = val.trim();
   if (trimmed.startsWith('/media/')) return true;
-  if (/^https?:\/\/(?:localhost|127\.0\.0\.1|[\w.-]+\.s3\.amazonaws\.com|[\w.-]+\.shopee\.vn|[\w.-]+\.shopeemobile\.com)(?::\d+)?(?:\/.*)?$/i.test(trimmed)) {
+  if (
+    /^https?:\/\/(?:localhost|127\.0\.0\.1|[\w.-]+\.s3\.amazonaws\.com|[\w.-]+\.shopee\.vn|[\w.-]+\.shopeemobile\.com)(?::\d+)?(?:\/.*)?$/i.test(
+      trimmed,
+    )
+  ) {
     return true;
   }
   return false;
 }
-
 
 export function isIsoDateString(val: unknown): val is string {
   if (!isString(val)) return false;

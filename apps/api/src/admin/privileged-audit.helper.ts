@@ -13,6 +13,7 @@ export interface RecordPrivilegedAuditInput {
   afterSummary?: Record<string, unknown> | null;
   decisionId?: string | null;
   reviewModerationEventId?: string | null;
+  returnDecisionId?: string | null;
   now?: Date;
 }
 
@@ -42,9 +43,9 @@ export async function recordPrivilegedAudit(
         afterSummary: (input.afterSummary ?? undefined) as Prisma.InputJsonValue | undefined,
         decisionId: input.decisionId ?? null,
         reviewModerationEventId: input.reviewModerationEventId ?? null,
+        returnDecisionId: input.returnDecisionId ?? null,
         createdAt: input.now ?? new Date(),
       },
     });
   }
 }
-

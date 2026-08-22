@@ -23,10 +23,7 @@ export const SELLER_FULFILLMENT_STATES = [
   'REJECTED',
   'CANCELLED',
 ] as const;
-export const SELLER_ORDER_FULFILLMENT_FILTERS = [
-  'ALL',
-  ...SELLER_FULFILLMENT_STATES,
-] as const;
+export const SELLER_ORDER_FULFILLMENT_FILTERS = ['ALL', ...SELLER_FULFILLMENT_STATES] as const;
 export const SELLER_ORDER_ACTIONS = [
   'CONFIRM',
   'START_PREPARING',
@@ -137,6 +134,18 @@ export interface SellerOrderSummary {
   deadline: SellerOrderDeadline;
   lines: SellerOrderLine[];
   availableActions: SellerOrderAvailableAction[];
+  returnInfo?: {
+    returnReference: string;
+    status:
+      | 'REQUESTED'
+      | 'AWAITING_RETURN'
+      | 'IN_TRANSIT'
+      | 'ESCALATED'
+      | 'CANCELLED'
+      | 'EXPIRED'
+      | 'REJECTED'
+      | 'REFUNDED';
+  };
 }
 
 export interface SellerOrderDetail {
@@ -197,13 +206,22 @@ const cursor = /^[A-Za-z0-9_-]{1,2048}$/;
 const date = /^\d{4}-\d{2}-\d{2}$/;
 const exact = (value: Record<string, unknown>, required: string[], optional: string[] = []) => {
   const allowed = new Set([...required, ...optional]);
-  return required.every((key) => Object.hasOwn(value, key)) && Object.keys(value).every((key) => allowed.has(key));
+  return (
+    required.every((key) => Object.hasOwn(value, key)) &&
+    Object.keys(value).every((key) => allowed.has(key))
+  );
 };
-const record = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value);
+const record = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
 const isUuid = (value: unknown): value is string => typeof value === 'string' && uuid.test(value);
-const isSafeNonNegative = (value: unknown): value is number => typeof value === 'number' && Number.isSafeInteger(value) && value >= 0;
-const isInstant = (value: unknown): value is string => typeof value === 'string' && Number.isFinite(Date.parse(value)) && new Date(value).toISOString() === value;
-const hasValue = <T extends string>(values: readonly T[], value: unknown): value is T => typeof value === 'string' && values.includes(value as T);
+const isSafeNonNegative = (value: unknown): value is number =>
+  typeof value === 'number' && Number.isSafeInteger(value) && value >= 0;
+const isInstant = (value: unknown): value is string =>
+  typeof value === 'string' &&
+  Number.isFinite(Date.parse(value)) &&
+  new Date(value).toISOString() === value;
+const hasValue = <T extends string>(values: readonly T[], value: unknown): value is T =>
+  typeof value === 'string' && values.includes(value as T);
 
 export function normalizeSellerOrderNote(value: unknown): string | null | undefined {
   if (value === undefined) return undefined;
@@ -213,9 +231,13 @@ export function normalizeSellerOrderNote(value: unknown): string | null | undefi
 }
 
 export function parseSellerOrderQueueQuery(value: unknown): SellerOrderQueueQuery | null {
-  if (!record(value) || !exact(value, [], ['status', 'fulfillment', 'from', 'to', 'orderReference', 'limit', 'cursor'])) return null;
+  if (
+    !record(value) ||
+    !exact(value, [], ['status', 'fulfillment', 'from', 'to', 'orderReference', 'limit', 'cursor'])
+  )
+    return null;
   if (Object.values(value).some((item) => Array.isArray(item))) return null;
-  const one = (item: unknown) => typeof item === 'string' ? item : undefined;
+  const one = (item: unknown) => (typeof item === 'string' ? item : undefined);
   const status = one(value.status) ?? 'ALL';
   const fulfillment = one(value.fulfillment) ?? 'ALL';
   const rawLimit = one(value.limit) ?? String(SELLER_ORDER_DEFAULT_LIMIT);
@@ -224,25 +246,49 @@ export function parseSellerOrderQueueQuery(value: unknown): SellerOrderQueueQuer
   const orderReference = one(value.orderReference) ?? null;
   const rawCursor = one(value.cursor) ?? null;
   const limit = Number(rawLimit);
-  if (!hasValue(SELLER_ORDER_QUEUE_FILTERS, status) || !hasValue(SELLER_ORDER_FULFILLMENT_FILTERS, fulfillment) || !/^[1-9]\d*$/.test(rawLimit) || !Number.isSafeInteger(limit) || limit > SELLER_ORDER_MAX_LIMIT) return null;
-  if ((from !== null && !date.test(from)) || (to !== null && !date.test(to)) || (from !== null && to !== null && from > to) || (orderReference !== null && !isUuid(orderReference)) || (rawCursor !== null && !cursor.test(rawCursor))) return null;
+  if (
+    !hasValue(SELLER_ORDER_QUEUE_FILTERS, status) ||
+    !hasValue(SELLER_ORDER_FULFILLMENT_FILTERS, fulfillment) ||
+    !/^[1-9]\d*$/.test(rawLimit) ||
+    !Number.isSafeInteger(limit) ||
+    limit > SELLER_ORDER_MAX_LIMIT
+  )
+    return null;
+  if (
+    (from !== null && !date.test(from)) ||
+    (to !== null && !date.test(to)) ||
+    (from !== null && to !== null && from > to) ||
+    (orderReference !== null && !isUuid(orderReference)) ||
+    (rawCursor !== null && !cursor.test(rawCursor))
+  )
+    return null;
   return { status, fulfillment, from, to, orderReference, limit, cursor: rawCursor };
 }
 
-export function parseSellerOrderReference(value: unknown): string | null { return isUuid(value) ? value : null; }
+export function parseSellerOrderReference(value: unknown): string | null {
+  return isUuid(value) ? value : null;
+}
 
-export function formatSellerOrderVersionEtag(orderVersion: number, fulfillmentVersion: number): string {
-  if (!isSafeNonNegative(orderVersion) || !isSafeNonNegative(fulfillmentVersion)) throw new RangeError('Invalid seller order version');
+export function formatSellerOrderVersionEtag(
+  orderVersion: number,
+  fulfillmentVersion: number,
+): string {
+  if (!isSafeNonNegative(orderVersion) || !isSafeNonNegative(fulfillmentVersion))
+    throw new RangeError('Invalid seller order version');
   return `"seller-order-${orderVersion}-${fulfillmentVersion}"`;
 }
 
-export function parseSellerOrderVersionEtag(value: unknown): { orderVersion: number; fulfillmentVersion: number } | null {
+export function parseSellerOrderVersionEtag(
+  value: unknown,
+): { orderVersion: number; fulfillmentVersion: number } | null {
   if (typeof value !== 'string') return null;
   const match = /^"seller-order-(0|[1-9]\d*)-(0|[1-9]\d*)"$/.exec(value);
   if (!match) return null;
   const orderVersion = Number(match[1]);
   const fulfillmentVersion = Number(match[2]);
-  return isSafeNonNegative(orderVersion) && isSafeNonNegative(fulfillmentVersion) ? { orderVersion, fulfillmentVersion } : null;
+  return isSafeNonNegative(orderVersion) && isSafeNonNegative(fulfillmentVersion)
+    ? { orderVersion, fulfillmentVersion }
+    : null;
 }
 
 export function parseSellerOrderIdempotencyKey(value: unknown): string | null {
@@ -250,24 +296,172 @@ export function parseSellerOrderIdempotencyKey(value: unknown): string | null {
 }
 
 export function parseSellerOrderActionRequest(value: unknown): SellerOrderActionRequest | null {
-  if (!record(value) || !exact(value, ['action'], ['reasonCode', 'reasonNote']) || !hasValue(SELLER_ORDER_ACTIONS, value.action)) return null;
+  if (
+    !record(value) ||
+    !exact(value, ['action'], ['reasonCode', 'reasonNote']) ||
+    !hasValue(SELLER_ORDER_ACTIONS, value.action)
+  )
+    return null;
   const reasonCode = value.reasonCode;
   const note = normalizeSellerOrderNote(value.reasonNote);
-  if (note === null || (reasonCode !== undefined && !hasValue(SELLER_ORDER_REJECTION_REASONS, reasonCode)) || (value.action === 'REJECT' && reasonCode === undefined)) return null;
-  if (value.action !== 'REJECT' && (reasonCode !== undefined || value.reasonNote !== undefined)) return null;
+  if (
+    note === null ||
+    (reasonCode !== undefined && !hasValue(SELLER_ORDER_REJECTION_REASONS, reasonCode)) ||
+    (value.action === 'REJECT' && reasonCode === undefined)
+  )
+    return null;
+  if (value.action !== 'REJECT' && (reasonCode !== undefined || value.reasonNote !== undefined))
+    return null;
   if (value.action === 'REJECT' && reasonCode === 'OTHER' && !note) return null;
-  return { action: value.action, ...(reasonCode === undefined ? {} : { reasonCode }), ...(note && note.length > 0 ? { reasonNote: note } : {}) };
+  return {
+    action: value.action,
+    ...(reasonCode === undefined ? {} : { reasonCode }),
+    ...(note && note.length > 0 ? { reasonNote: note } : {}),
+  };
 }
 
 export function isSellerOrderSummary(value: unknown): value is SellerOrderSummary {
-  if (!record(value) || !exact(value, ['orderReference', 'purchaseReference', 'shopId', 'status', 'paymentStatus', 'fulfillmentState', 'orderVersion', 'fulfillmentVersion', 'createdAt', 'updatedAt', 'lineCount', 'itemQuantity', 'payableTotalMinor', 'shippingService', 'deadline', 'lines', 'availableActions'])) return false;
-  return isUuid(value.orderReference) && isUuid(value.purchaseReference) && isUuid(value.shopId) && hasValue(['PENDING_CONFIRMATION', 'AWAITING_PICKUP', 'SHIPPING', 'DELIVERED', 'CANCELLED', 'RETURN_REQUESTED', 'RETURNED', 'REFUNDED'] as const, value.status) && value.paymentStatus === 'UNPAID' && hasValue(SELLER_FULFILLMENT_STATES, value.fulfillmentState) && isSafeNonNegative(value.orderVersion) && isSafeNonNegative(value.fulfillmentVersion) && isInstant(value.createdAt) && isInstant(value.updatedAt) && isSafeNonNegative(value.lineCount) && value.lineCount > 0 && isSafeNonNegative(value.itemQuantity) && value.itemQuantity > 0 && isSafeNonNegative(value.payableTotalMinor) && hasValue(['ECONOMY', 'STANDARD', 'EXPRESS'] as const, value.shippingService) && record(value.deadline) && exact(value.deadline, ['confirmationAt', 'handoffAt', 'confirmationOverdue', 'handoffOverdue']) && isInstant(value.deadline.confirmationAt) && (value.deadline.handoffAt === null || isInstant(value.deadline.handoffAt)) && typeof value.deadline.confirmationOverdue === 'boolean' && typeof value.deadline.handoffOverdue === 'boolean' && Array.isArray(value.lines) && value.lines.length === value.lineCount && Array.isArray(value.availableActions) && value.availableActions.every((action) => record(action) && exact(action, ['action', 'reasonCodes']) && hasValue(SELLER_ORDER_ACTIONS, action.action) && Array.isArray(action.reasonCodes) && action.reasonCodes.every((reason) => hasValue(SELLER_ORDER_REJECTION_REASONS, reason)));
+  if (
+    !record(value) ||
+    !exact(
+      value,
+      [
+        'orderReference',
+        'purchaseReference',
+        'shopId',
+        'status',
+        'paymentStatus',
+        'fulfillmentState',
+        'orderVersion',
+        'fulfillmentVersion',
+        'createdAt',
+        'updatedAt',
+        'lineCount',
+        'itemQuantity',
+        'payableTotalMinor',
+        'shippingService',
+        'deadline',
+        'lines',
+        'availableActions',
+      ],
+      ['returnInfo'],
+    )
+  )
+    return false;
+  return (
+    isUuid(value.orderReference) &&
+    isUuid(value.purchaseReference) &&
+    isUuid(value.shopId) &&
+    hasValue(
+      [
+        'PENDING_CONFIRMATION',
+        'AWAITING_PICKUP',
+        'SHIPPING',
+        'DELIVERED',
+        'CANCELLED',
+        'RETURN_REQUESTED',
+        'RETURNED',
+        'REFUNDED',
+      ] as const,
+      value.status,
+    ) &&
+    value.paymentStatus === 'UNPAID' &&
+    hasValue(SELLER_FULFILLMENT_STATES, value.fulfillmentState) &&
+    isSafeNonNegative(value.orderVersion) &&
+    isSafeNonNegative(value.fulfillmentVersion) &&
+    isInstant(value.createdAt) &&
+    isInstant(value.updatedAt) &&
+    isSafeNonNegative(value.lineCount) &&
+    value.lineCount > 0 &&
+    isSafeNonNegative(value.itemQuantity) &&
+    value.itemQuantity > 0 &&
+    isSafeNonNegative(value.payableTotalMinor) &&
+    hasValue(['ECONOMY', 'STANDARD', 'EXPRESS'] as const, value.shippingService) &&
+    record(value.deadline) &&
+    exact(value.deadline, [
+      'confirmationAt',
+      'handoffAt',
+      'confirmationOverdue',
+      'handoffOverdue',
+    ]) &&
+    isInstant(value.deadline.confirmationAt) &&
+    (value.deadline.handoffAt === null || isInstant(value.deadline.handoffAt)) &&
+    typeof value.deadline.confirmationOverdue === 'boolean' &&
+    typeof value.deadline.handoffOverdue === 'boolean' &&
+    Array.isArray(value.lines) &&
+    value.lines.length === value.lineCount &&
+    Array.isArray(value.availableActions) &&
+    value.availableActions.every(
+      (action) =>
+        record(action) &&
+        exact(action, ['action', 'reasonCodes']) &&
+        hasValue(SELLER_ORDER_ACTIONS, action.action) &&
+        Array.isArray(action.reasonCodes) &&
+        action.reasonCodes.every((reason) => hasValue(SELLER_ORDER_REJECTION_REASONS, reason)),
+    ) &&
+    (value.returnInfo === undefined ||
+      (record(value.returnInfo) &&
+        exact(value.returnInfo, ['returnReference', 'status']) &&
+        isUuid(value.returnInfo.returnReference) &&
+        hasValue(
+          [
+            'REQUESTED',
+            'AWAITING_RETURN',
+            'IN_TRANSIT',
+            'ESCALATED',
+            'CANCELLED',
+            'EXPIRED',
+            'REJECTED',
+            'REFUNDED',
+          ] as const,
+          value.returnInfo.status,
+        )))
+  );
 }
 
 export function isSellerOrderListResponse(value: unknown): value is SellerOrderListResponse {
-  return record(value) && exact(value, ['sellerOrderVersion', 'items', 'page']) && value.sellerOrderVersion === SELLER_ORDER_VERSION && Array.isArray(value.items) && value.items.every(isSellerOrderSummary) && record(value.page) && exact(value.page, ['limit', 'nextCursor']) && isSafeNonNegative(value.page.limit) && (value.page.nextCursor === null || (typeof value.page.nextCursor === 'string' && cursor.test(value.page.nextCursor)));
+  return (
+    record(value) &&
+    exact(value, ['sellerOrderVersion', 'items', 'page']) &&
+    value.sellerOrderVersion === SELLER_ORDER_VERSION &&
+    Array.isArray(value.items) &&
+    value.items.every(isSellerOrderSummary) &&
+    record(value.page) &&
+    exact(value.page, ['limit', 'nextCursor']) &&
+    isSafeNonNegative(value.page.limit) &&
+    (value.page.nextCursor === null ||
+      (typeof value.page.nextCursor === 'string' && cursor.test(value.page.nextCursor)))
+  );
 }
 
 export function isSellerOrderDetailResponse(value: unknown): value is SellerOrderDetailResponse {
-  return record(value) && exact(value, ['sellerOrderVersion', 'currency', 'order']) && value.sellerOrderVersion === SELLER_ORDER_VERSION && value.currency === 'VND' && record(value.order) && exact(value.order, ['summary', 'shop', 'buyerNote', 'address', 'shipping', 'listSubtotalMinor', 'productDiscountMinor', 'merchandiseSubtotalMinor', 'voucherDiscountMinor', 'shippingPayableMinor', 'payableTotalMinor', 'fulfillmentTimeline', 'orderTimeline', 'shipment']) && isSellerOrderSummary(value.order.summary) && record(value.order.shop) && record(value.order.address) && Array.isArray(value.order.fulfillmentTimeline) && Array.isArray(value.order.orderTimeline) && (value.order.shipment === null || record(value.order.shipment));
+  return (
+    record(value) &&
+    exact(value, ['sellerOrderVersion', 'currency', 'order']) &&
+    value.sellerOrderVersion === SELLER_ORDER_VERSION &&
+    value.currency === 'VND' &&
+    record(value.order) &&
+    exact(value.order, [
+      'summary',
+      'shop',
+      'buyerNote',
+      'address',
+      'shipping',
+      'listSubtotalMinor',
+      'productDiscountMinor',
+      'merchandiseSubtotalMinor',
+      'voucherDiscountMinor',
+      'shippingPayableMinor',
+      'payableTotalMinor',
+      'fulfillmentTimeline',
+      'orderTimeline',
+      'shipment',
+    ]) &&
+    isSellerOrderSummary(value.order.summary) &&
+    record(value.order.shop) &&
+    record(value.order.address) &&
+    Array.isArray(value.order.fulfillmentTimeline) &&
+    Array.isArray(value.order.orderTimeline) &&
+    (value.order.shipment === null || record(value.order.shipment))
+  );
 }

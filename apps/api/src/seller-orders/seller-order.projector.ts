@@ -165,6 +165,14 @@ function projectSummary(graph: SellerOrderGraph, now: Date): SellerOrderSummary 
             ]
           : [],
     })),
+    ...(graph.returnRequest
+      ? {
+          returnInfo: {
+            returnReference: graph.returnRequest.id,
+            status: graph.returnRequest.status,
+          },
+        }
+      : {}),
   };
 }
 

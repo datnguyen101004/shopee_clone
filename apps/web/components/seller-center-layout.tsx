@@ -13,6 +13,7 @@ const navigation = [
   { href: '/seller/orders', label: 'Đơn hàng', icon: '▤' },
   { href: '/seller/reviews', label: 'Đánh giá', icon: '★' },
   { href: '/seller/promotions', label: 'Khuyến mãi', icon: '％' },
+  { href: '/seller/returns', label: 'Trả hàng / Hoàn tiền', icon: '↩' },
 ];
 
 export function SellerCenterLayout({ children }: { children: ReactNode }) {

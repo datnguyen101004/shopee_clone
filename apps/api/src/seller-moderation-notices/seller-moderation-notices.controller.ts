@@ -26,7 +26,7 @@ import {
 
 import { AuthGuard, type AuthenticatedRequest } from '../auth/auth.guard';
 import { RequireRoles, RolesGuard } from '../auth/role-authorization.guard';
-import type { SellerModerationNoticesQueryDto } from './seller-moderation-notices.dto';
+import { SellerModerationNoticesQueryDto } from './seller-moderation-notices.dto';
 import { SellerModerationNoticesExceptionFilter } from './seller-moderation-notices-exception.filter';
 import { SellerModerationNoticesService } from './seller-moderation-notices.service';
 

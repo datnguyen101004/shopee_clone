@@ -24,6 +24,7 @@ const navigation = [
   { href: '/admin/products', label: 'Kiểm soát sản phẩm', Icon: ProductIcon },
   { href: '/admin/homepage', label: 'Trang chủ & Banner', Icon: HomepageIcon },
   { href: '/admin/audit', label: 'Nhật ký kiểm toán', Icon: AuditIcon },
+  { href: '/admin/returns', label: 'Trả hàng / Hoàn tiền', Icon: ModerationIcon },
 ];
 
 

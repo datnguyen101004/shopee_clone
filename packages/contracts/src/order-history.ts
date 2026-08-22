@@ -52,6 +52,13 @@ export interface BuyerOrderCancellationCapability {
   reasonCodes: OrderCancellationReasonCode[];
 }
 
+/** Server-authoritative post-delivery return capability. */
+export interface BuyerOrderReturnCapability {
+  allowed: boolean;
+  deadlineAt: string | null;
+  returnReference: string | null;
+}
+
 export interface BuyerOrderInventoryHold {
   status: InventoryHoldStatus;
   expiresAt: string | null;
@@ -111,6 +118,7 @@ export interface BuyerOrderSummary {
   shippingPayableMinor: number;
   payableTotalMinor: number;
   cancellation: BuyerOrderCancellationCapability;
+  returnCapability?: BuyerOrderReturnCapability;
   inventoryHold?: BuyerOrderInventoryHold;
 }
 
@@ -256,28 +264,32 @@ export function parseCancelOrderRequest(value: unknown): CancelOrderRequest | nu
 function isLine(value: unknown): value is BuyerOrderLine {
   if (
     !isRecord(value) ||
-    !exact(value, [
-      'lineId',
-      'productId',
-      'variantId',
-      'quantity',
-      'unitWeightGrams',
-      'shipmentWeightGrams',
-      'listUnitPriceMinor',
-      'sellingUnitPriceMinor',
-      'listSubtotalMinor',
-      'productDiscountMinor',
-      'merchandiseSubtotalMinor',
-      'shopVoucherDiscountMinor',
-      'platformVoucherDiscountMinor',
-      'merchandiseVoucherDiscountMinor',
-      'payableMerchandiseMinor',
-      'productName',
-      'productImageUrl',
-      'productAvailable',
-      'variantName',
-      'variantSku',
-    ], ['review'])
+    !exact(
+      value,
+      [
+        'lineId',
+        'productId',
+        'variantId',
+        'quantity',
+        'unitWeightGrams',
+        'shipmentWeightGrams',
+        'listUnitPriceMinor',
+        'sellingUnitPriceMinor',
+        'listSubtotalMinor',
+        'productDiscountMinor',
+        'merchandiseSubtotalMinor',
+        'shopVoucherDiscountMinor',
+        'platformVoucherDiscountMinor',
+        'merchandiseVoucherDiscountMinor',
+        'payableMerchandiseMinor',
+        'productName',
+        'productImageUrl',
+        'productAvailable',
+        'variantName',
+        'variantSku',
+      ],
+      ['review'],
+    )
   )
     return false;
   const line = value as unknown as BuyerOrderLine;
@@ -318,7 +330,7 @@ function isLine(value: unknown): value is BuyerOrderLine {
         exact(line.review, ['state', 'reviewId']) &&
         ['ELIGIBLE', 'REVIEWED', 'INELIGIBLE'].includes(String(line.review.state)) &&
         (line.review.reviewId === null || isUuid(line.review.reviewId)) &&
-        ((line.review.state === 'REVIEWED') === (line.review.reviewId !== null))))
+        (line.review.state === 'REVIEWED') === (line.review.reviewId !== null)))
   );
 }
 
@@ -381,6 +393,17 @@ function isCancellation(value: unknown): value is BuyerOrderCancellationCapabili
     : value.reasonCodes.length === 0;
 }
 
+function isReturnCapability(value: unknown): value is BuyerOrderReturnCapability {
+  return (
+    isRecord(value) &&
+    exact(value, ['allowed', 'deadlineAt', 'returnReference']) &&
+    typeof value.allowed === 'boolean' &&
+    (value.deadlineAt === null || isInstant(value.deadlineAt)) &&
+    (value.returnReference === null || isUuid(value.returnReference)) &&
+    (!value.allowed || (value.deadlineAt !== null && value.returnReference === null))
+  );
+}
+
 function isInventoryHold(value: unknown): value is BuyerOrderInventoryHold {
   return (
     isRecord(value) &&
@@ -399,30 +422,34 @@ function sum(values: number[]): number | null {
 export function isBuyerOrderSummary(value: unknown): value is BuyerOrderSummary {
   if (
     !isRecord(value) ||
-    !exact(value, [
-      'orderReference',
-      'purchaseReference',
-      'status',
-      'paymentStatus',
-      'version',
-      'createdAt',
-      'updatedAt',
-      'shop',
-      'note',
-      'lines',
-      'shipping',
-      'listSubtotalMinor',
-      'productDiscountMinor',
-      'merchandiseSubtotalMinor',
-      'shopVoucherDiscountMinor',
-      'platformVoucherDiscountMinor',
-      'merchandiseVoucherDiscountMinor',
-      'shippingVoucherDiscountMinor',
-      'voucherDiscountMinor',
-      'shippingPayableMinor',
-      'payableTotalMinor',
-      'cancellation',
-    ], ['inventoryHold'])
+    !exact(
+      value,
+      [
+        'orderReference',
+        'purchaseReference',
+        'status',
+        'paymentStatus',
+        'version',
+        'createdAt',
+        'updatedAt',
+        'shop',
+        'note',
+        'lines',
+        'shipping',
+        'listSubtotalMinor',
+        'productDiscountMinor',
+        'merchandiseSubtotalMinor',
+        'shopVoucherDiscountMinor',
+        'platformVoucherDiscountMinor',
+        'merchandiseVoucherDiscountMinor',
+        'shippingVoucherDiscountMinor',
+        'voucherDiscountMinor',
+        'shippingPayableMinor',
+        'payableTotalMinor',
+        'cancellation',
+      ],
+      ['inventoryHold', 'returnCapability'],
+    )
   )
     return false;
   const order = value as unknown as BuyerOrderSummary;
@@ -449,7 +476,8 @@ export function isBuyerOrderSummary(value: unknown): value is BuyerOrderSummary 
     !isShipping(order.shipping) ||
     order.shipping.shopId !== order.shop.id ||
     !isCancellation(order.cancellation) ||
-    (order.inventoryHold !== undefined && !isInventoryHold(order.inventoryHold))
+    (order.inventoryHold !== undefined && !isInventoryHold(order.inventoryHold)) ||
+    (order.returnCapability !== undefined && !isReturnCapability(order.returnCapability))
   )
     return false;
   const money = [

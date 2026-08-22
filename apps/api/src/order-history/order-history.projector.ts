@@ -14,6 +14,7 @@ import { Injectable } from '@nestjs/common';
 
 import type { Prisma } from '../generated/prisma/client';
 import { checkedMoneyFromBigInt } from '../pricing/money';
+import { returnEligibilityDeadline } from '../returns/return-policy';
 import type { BuyerOrderDetailGraph, BuyerOrderSummaryGraph } from './order-history.repository';
 import { OrderHistoryUnavailableError } from './order-history.errors';
 
@@ -26,6 +27,11 @@ function jsonObject<T>(value: Prisma.JsonValue): T {
 
 function projectSummary(order: BuyerOrderSummaryGraph | BuyerOrderDetailGraph): BuyerOrderSummary {
   const status = order.status;
+  const delivery = [...order.timelineEvents]
+    .reverse()
+    .find((event) => event.status === 'DELIVERED');
+  const returnDeadline =
+    !order.returnRequest && delivery ? returnEligibilityDeadline(delivery.occurredAt) : null;
   return {
     orderReference: order.id,
     purchaseReference: order.purchase.id,
@@ -59,7 +65,10 @@ function projectSummary(order: BuyerOrderSummaryGraph | BuyerOrderDetailGraph): 
       variantSku: line.variantSku,
       review: line.review
         ? { state: 'REVIEWED' as const, reviewId: line.review.id }
-        : { state: status === 'DELIVERED' ? 'ELIGIBLE' as const : 'INELIGIBLE' as const, reviewId: null },
+        : {
+            state: status === 'DELIVERED' ? ('ELIGIBLE' as const) : ('INELIGIBLE' as const),
+            reviewId: null,
+          },
     })),
     shipping: jsonObject<MockShippingBreakdown>(order.shippingSnapshot),
     listSubtotalMinor: checkedMoneyFromBigInt(order.listSubtotalMinor),
@@ -75,6 +84,11 @@ function projectSummary(order: BuyerOrderSummaryGraph | BuyerOrderDetailGraph): 
     cancellation: {
       allowed: status === 'PENDING_CONFIRMATION',
       reasonCodes: status === 'PENDING_CONFIRMATION' ? [...ORDER_CANCELLATION_REASON_CODES] : [],
+    },
+    returnCapability: {
+      allowed: status === 'DELIVERED' && returnDeadline !== null && returnDeadline >= new Date(),
+      deadlineAt: returnDeadline?.toISOString() ?? null,
+      returnReference: order.returnRequest?.id ?? null,
     },
     ...(order.purchase.inventoryReservation
       ? {

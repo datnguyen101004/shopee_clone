@@ -29,7 +29,7 @@ import {
 } from '@nestjs/swagger';
 import { AuthGuard, type AuthenticatedRequest } from '../auth/auth.guard';
 import { RequireRoles, RolesGuard } from '../auth/role-authorization.guard';
-import type {
+import {
   AddModerationCaseNoteDto,
   AssignModerationCaseDto,
   CreateModerationDecisionDto,

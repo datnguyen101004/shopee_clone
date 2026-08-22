@@ -20,7 +20,7 @@ import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { AuthGuard, type AuthenticatedRequest } from '../auth/auth.guard';
 import { RequireRoles, RolesGuard } from '../auth/role-authorization.guard';
 import { AdminExceptionFilter } from './admin-exception.filter';
-import type {
+import {
   CreateAdminCategoryDto,
   ReorderAdminCategoriesDto,
   UpdateAdminCategoryDto,

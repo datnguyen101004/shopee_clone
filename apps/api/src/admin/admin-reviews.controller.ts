@@ -29,7 +29,7 @@ import { AuthGuard, type AuthenticatedRequest } from '../auth/auth.guard';
 import { RequireRoles, RolesGuard } from '../auth/role-authorization.guard';
 import { ReviewsService } from '../reviews/reviews.service';
 import { AdminExceptionFilter } from './admin-exception.filter';
-import type { AdminReviewActionDto } from './admin-reviews.dto';
+import { AdminReviewActionDto } from './admin-reviews.dto';
 import { AdminInvalidInputError } from './admin.errors';
 
 @ApiTags('admin-reviews')

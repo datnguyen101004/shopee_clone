@@ -10,9 +10,7 @@ import {
   type AdminUserStatus,
 } from '@shopee-clone/contracts';
 import { Inject, Injectable } from '@nestjs/common';
-import type { Prisma ,
-  PrivilegedAction,
-  PrivilegedTargetType} from '../generated/prisma/client';
+import type { Prisma, PrivilegedAction, PrivilegedTargetType } from '../generated/prisma/client';
 import {
   MarketplaceRole,
   ProductModerationStatus,
@@ -21,7 +19,6 @@ import {
   UserStatus,
 } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
-
 
 export interface AdminUserListItem {
   id: string;
@@ -482,6 +479,7 @@ export class AdminRepository {
         afterSummary: (event.afterSummary as Record<string, unknown> | null) ?? null,
         decisionId: event.decisionId ?? null,
         reviewModerationEventId: event.reviewModerationEventId ?? null,
+        returnDecisionId: event.returnDecisionId ?? null,
         createdAt: event.createdAt.toISOString(),
       })),
       nextCursor,
@@ -490,7 +488,8 @@ export class AdminRepository {
 
   async findProductBySlugOrId(identifier: string) {
     const trimmed = identifier.trim();
-    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(trimmed);
+    const isUuid =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(trimmed);
 
     return this.prisma.product.findFirst({
       where: {
@@ -557,7 +556,6 @@ export class AdminRepository {
     });
   }
 
-
   async updateProductModeration(
     id: string,
     moderationStatus: 'ACTIVE' | 'SUSPENDED',
@@ -568,7 +566,9 @@ export class AdminRepository {
       where: { id },
       data: {
         moderationStatus:
-          moderationStatus === 'ACTIVE' ? ProductModerationStatus.ACTIVE : ProductModerationStatus.SUSPENDED,
+          moderationStatus === 'ACTIVE'
+            ? ProductModerationStatus.ACTIVE
+            : ProductModerationStatus.SUSPENDED,
       },
     });
   }

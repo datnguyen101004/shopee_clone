@@ -27,6 +27,7 @@ import {
   AccountWorkspace,
   ProtectedAccountState,
 } from '../protected-account-state';
+import { BuyerReturnForm } from '../returns/buyer-return-form';
 
 const statusLabels: Record<ShopOrderStatus, string> = {
   PENDING_CONFIRMATION: 'Chờ xác nhận',
@@ -509,6 +510,14 @@ export function BuyerOrderDetailScreen({ orderReference }: { orderReference: str
                 ))}
               </ol>
             </Card>
+            {detail.order.returnCapability?.returnReference ? (
+              <p className="buyer-order-notice">
+                <Link href={`/account/returns/${detail.order.returnCapability.returnReference}`}>
+                  Xem yêu cầu trả hàng / hoàn tiền
+                </Link>
+              </p>
+            ) : null}
+            {detail.order.returnCapability?.allowed ? <BuyerReturnForm order={detail.order} /> : null}
             <div className="buyer-order-detail__actions">
               <Link href="/account/orders">Về đơn mua</Link>
               {detail.order.cancellation.allowed ? (

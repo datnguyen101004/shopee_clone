@@ -17,7 +17,7 @@ import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { AuthGuard, type AuthenticatedRequest } from '../auth/auth.guard';
 import { RequireRoles, RolesGuard } from '../auth/role-authorization.guard';
 import { AdminExceptionFilter } from './admin-exception.filter';
-import type { AdminShopActionDto, AdminShopListQueryDto } from './admin.dto';
+import { AdminShopActionDto, AdminShopListQueryDto } from './admin.dto';
 import { AdminService } from './admin.service';
 
 @ApiTags('admin shops')

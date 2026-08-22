@@ -12,6 +12,7 @@ const maximumBodyBytes = 100 * 1024;
 // Multipart adds a boundary and part headers around the permitted 5 MiB file.
 const maximumReviewMediaRequestBytes = 5 * 1024 * 1024 + 64 * 1024;
 const maximumSellerProductMediaRequestBytes = 5 * 1024 * 1024 + 64 * 1024;
+const maximumReturnEvidenceRequestBytes = 5 * 1024 * 1024 + 64 * 1024;
 const overrideHeaders = ['x-http-method-override', 'x-method-override', 'x-http-method'] as const;
 
 function canonicalOrigin(value: string): string | null {
@@ -73,10 +74,25 @@ export class BrowserMutationGuard implements CanActivate {
     const contentLength = request.headers['content-length'];
     const bodyBytes = typeof contentLength === 'string' ? Number(contentLength) : 0;
     const isReviewMediaUpload =
-      request.method === 'POST' && /\/api\/v1\/account\/review-media$/.test((request.originalUrl ?? '').split('?')[0] ?? '');
+      request.method === 'POST' &&
+      /\/api\/v1\/account\/review-media$/.test((request.originalUrl ?? '').split('?')[0] ?? '');
     const isSellerProductMediaUpload =
-      request.method === 'POST' && /\/api\/v1\/seller\/products\/media$/.test((request.originalUrl ?? '').split('?')[0] ?? '');
-    if (Number.isFinite(bodyBytes) && bodyBytes > (isReviewMediaUpload ? maximumReviewMediaRequestBytes : isSellerProductMediaUpload ? maximumSellerProductMediaRequestBytes : maximumBodyBytes)) {
+      request.method === 'POST' &&
+      /\/api\/v1\/seller\/products\/media$/.test((request.originalUrl ?? '').split('?')[0] ?? '');
+    const isReturnEvidenceUpload =
+      request.method === 'POST' &&
+      /\/api\/v1\/account\/return-evidence$/.test((request.originalUrl ?? '').split('?')[0] ?? '');
+    if (
+      Number.isFinite(bodyBytes) &&
+      bodyBytes >
+        (isReviewMediaUpload
+          ? maximumReviewMediaRequestBytes
+          : isSellerProductMediaUpload
+            ? maximumSellerProductMediaRequestBytes
+            : isReturnEvidenceUpload
+              ? maximumReturnEvidenceRequestBytes
+              : maximumBodyBytes)
+    ) {
       throw new BrowserMutationSecurityError(
         413,
         'mutation-body-too-large',
@@ -89,7 +105,14 @@ export class BrowserMutationGuard implements CanActivate {
       request.headers['transfer-encoding'] !== undefined ||
       (Number.isFinite(bodyBytes) && bodyBytes > 0);
     const contentType = request.headers['content-type']?.split(';', 1)[0]?.trim().toLowerCase();
-    if (hasBody && contentType !== 'application/json' && !((isReviewMediaUpload || isSellerProductMediaUpload) && contentType === 'multipart/form-data')) {
+    if (
+      hasBody &&
+      contentType !== 'application/json' &&
+      !(
+        (isReviewMediaUpload || isSellerProductMediaUpload || isReturnEvidenceUpload) &&
+        contentType === 'multipart/form-data'
+      )
+    ) {
       throw new BrowserMutationSecurityError(
         415,
         'mutation-media-type-unsupported',

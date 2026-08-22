@@ -49,13 +49,19 @@ export class AdminExceptionFilter implements ExceptionFilter {
       exception instanceof AdminInvalidInputError ||
       exception instanceof BadRequestException
     ) {
+      const validation =
+        exception instanceof BadRequestException ? exception.getResponse() : undefined;
       this.problem(
         response,
         400,
         'invalid-admin-request',
         'Invalid request',
         (exception as Error).message || 'One or more admin fields are invalid.',
-        exception instanceof AdminInvalidInputError ? exception.details : undefined,
+        exception instanceof AdminInvalidInputError
+          ? exception.details
+          : typeof validation === 'object' && validation
+            ? { validation }
+            : undefined,
       );
       return;
     }

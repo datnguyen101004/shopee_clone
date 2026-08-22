@@ -12,7 +12,15 @@ export const buyerOrderSummaryInclude = {
       inventoryReservation: { select: { status: true, expiresAt: true, terminalReason: true } },
     },
   },
-  lines: { orderBy: [{ sourceCartLineId: 'asc' as const }, { id: 'asc' as const }], include: { review: { select: { id: true } }, product: { select: { deletedAt: true } } } },
+  lines: {
+    orderBy: [{ sourceCartLineId: 'asc' as const }, { id: 'asc' as const }],
+    include: { review: { select: { id: true } }, product: { select: { deletedAt: true } } },
+  },
+  returnRequest: { select: { id: true } },
+  timelineEvents: {
+    orderBy: [{ orderVersion: 'asc' as const }, { id: 'asc' as const }],
+    select: { status: true, occurredAt: true },
+  },
 } satisfies Prisma.ShopOrderInclude;
 
 export const buyerOrderDetailInclude = {
@@ -24,8 +32,12 @@ export const buyerOrderDetailInclude = {
       inventoryReservation: { select: { status: true, expiresAt: true, terminalReason: true } },
     },
   },
-  lines: { orderBy: [{ sourceCartLineId: 'asc' as const }, { id: 'asc' as const }], include: { review: { select: { id: true } }, product: { select: { deletedAt: true } } } },
+  lines: {
+    orderBy: [{ sourceCartLineId: 'asc' as const }, { id: 'asc' as const }],
+    include: { review: { select: { id: true } }, product: { select: { deletedAt: true } } },
+  },
   timelineEvents: { orderBy: [{ orderVersion: 'asc' as const }, { id: 'asc' as const }] },
+  returnRequest: { select: { id: true } },
   voucherAllocations: {
     orderBy: [
       { purchaseVoucherId: 'asc' as const },

@@ -30,6 +30,7 @@ export function AccountWorkspace({
           <Link href="/account/recently-viewed">Sản phẩm đã xem</Link>
           <Link href="/account/followed-shops">Shop đang theo dõi</Link>
           <Link href="/account/orders">Đơn mua</Link>
+          <Link href="/account/returns">Trả hàng / Hoàn tiền</Link>
         </nav>
         <div className="buyer-account-content">{children}</div>
       </div>
@@ -50,7 +51,9 @@ export function ProtectedAccountState({
     | '/account/recently-viewed'
     | '/account/followed-shops'
     | '/account/orders'
-    | `/account/orders/${string}`;
+    | `/account/orders/${string}`
+    | '/account/returns'
+    | `/account/returns/${string}`;
   children: ReactNode;
 }) {
   if (account.status === 'loading') {

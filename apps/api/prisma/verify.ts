@@ -122,6 +122,9 @@ async function verifyDatabase(databaseUrl: string): Promise<void> {
       orderLines: await prisma.orderLine.count(),
       purchaseVouchers: await prisma.purchaseVoucher.count(),
       purchaseVoucherAllocations: await prisma.purchaseVoucherAllocation.count(),
+      returnRequests: await prisma.returnRequest.count(),
+      returnEvidenceAssets: await prisma.returnEvidenceAsset.count(),
+      refundLedgerEntries: await prisma.refundLedgerEntry.count(),
     };
     assert.deepEqual(counts, {
       ...seedExpectedCounts,
@@ -134,6 +137,9 @@ async function verifyDatabase(databaseUrl: string): Promise<void> {
       orderLines: 0,
       purchaseVouchers: 0,
       purchaseVoucherAllocations: 0,
+      returnRequests: 0,
+      returnEvidenceAssets: 0,
+      refundLedgerEntries: 0,
       roleAssignments:
         seedUsers.length +
         new Set(seedShops.map(({ ownerId }) => ownerId)).size +

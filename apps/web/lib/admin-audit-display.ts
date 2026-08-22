@@ -1,6 +1,7 @@
 import type { AdminPrivilegedAction, AdminPrivilegedTargetType } from '@shopee-clone/contracts';
 
 export const AUDIT_TARGET_LABELS: Record<AdminPrivilegedTargetType, string> = {
+  RETURN_REQUEST: 'Yêu cầu trả hàng',
   USER: 'Người dùng',
   SHOP: 'Cửa hàng',
   CATEGORY: 'Danh mục',
@@ -12,6 +13,8 @@ export const AUDIT_TARGET_LABELS: Record<AdminPrivilegedTargetType, string> = {
 };
 
 export const AUDIT_ACTION_LABELS: Record<AdminPrivilegedAction, string> = {
+  APPROVE_RETURN: 'Chấp thuận trả hàng',
+  APPROVE_REFUND: 'Duyệt hoàn tiền',
   SUSPEND: 'Tạm ngưng',
   RESTORE: 'Khôi phục',
   CREATE: 'Tạo mới',

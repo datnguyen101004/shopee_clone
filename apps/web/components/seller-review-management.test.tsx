@@ -68,4 +68,25 @@ describe('SellerReviewManagement', () => {
     expect(await screen.findAllByText(/Đã gửi báo cáo/)).toHaveLength(2);
     expect(screen.getByRole('button', { name: 'Đã báo cáo' })).toBeDisabled();
   });
+
+  it('omits report button when review visibility is hidden', async () => {
+    vi.mocked(listSellerShopReviews).mockResolvedValue({
+      items: [{
+        id: reviewId,
+        productId: '123e4567-e89b-12d3-a456-426614174002',
+        productName: 'Áo khoác của shop',
+        rating: 1,
+        comment: 'Đánh giá vi phạm đã bị ẩn',
+        visibility: 'HIDDEN',
+        reportStatus: 'ACCEPTED',
+        createdAt: '2026-08-21T12:00:00.000Z',
+        updatedAt: '2026-08-21T12:00:00.000Z',
+      }],
+    });
+
+    render(<SellerReviewManagement />);
+    expect(await screen.findByText('Áo khoác của shop')).toBeInTheDocument();
+    expect(screen.getByText('Đánh giá này hiện đang bị ẩn công khai.')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /báo cáo/i })).not.toBeInTheDocument();
+  });
 });

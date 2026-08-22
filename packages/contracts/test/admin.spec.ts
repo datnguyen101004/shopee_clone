@@ -36,6 +36,7 @@ describe('Admin Contracts', () => {
       'PRODUCT',
       'REVIEW',
       'MODERATION_CASE',
+      'RETURN_REQUEST',
     ]);
 
     expect(ADMIN_PRIVILEGED_ACTIONS).toEqual([
@@ -49,6 +50,8 @@ describe('Admin Contracts', () => {
       'REJECT',
       'HIDE',
       'NO_ACTION',
+      'APPROVE_RETURN',
+      'APPROVE_REFUND',
     ]);
   });
 

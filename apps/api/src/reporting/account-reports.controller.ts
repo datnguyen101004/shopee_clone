@@ -23,7 +23,7 @@ import {
 
 import { AuthGuard, type AuthenticatedRequest } from '../auth/auth.guard';
 import { RequireRoles, RolesGuard } from '../auth/role-authorization.guard';
-import type { ReporterReportQueryDto } from './reporting.dto';
+import { ReporterReportQueryDto } from './reporting.dto';
 import { ReportingExceptionFilter } from './reporting-exception.filter';
 import { ReportingService } from './reporting.service';
 

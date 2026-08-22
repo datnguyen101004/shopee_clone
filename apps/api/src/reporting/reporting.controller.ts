@@ -21,7 +21,7 @@ import type { Response } from 'express';
 
 import { AuthGuard, type AuthenticatedRequest } from '../auth/auth.guard';
 import { RequireRoles, RolesGuard } from '../auth/role-authorization.guard';
-import type { CreateReportDto } from './reporting.dto';
+import { CreateReportDto } from './reporting.dto';
 import { ReportingExceptionFilter } from './reporting-exception.filter';
 import { ReportingService } from './reporting.service';
 

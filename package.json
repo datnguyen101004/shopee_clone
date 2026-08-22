@@ -27,6 +27,8 @@
     "auth:roles:bootstrap-admin": "pnpm --filter @shopee-clone/api auth:roles:bootstrap-admin",
     "reviews:media:cleanup": "pnpm --filter @shopee-clone/api reviews:media:cleanup",
     "reviews:aggregates:repair": "pnpm --filter @shopee-clone/api reviews:aggregates:repair",
+    "returns:deadlines": "pnpm --filter @shopee-clone/api returns:deadlines",
+    "returns:evidence:cleanup": "pnpm --filter @shopee-clone/api returns:evidence:cleanup",
     "seller-analytics:benchmark": "pnpm --filter @shopee-clone/api seller-analytics:benchmark",
     "db:generate": "pnpm --filter @shopee-clone/api db:generate",
     "db:format": "pnpm --filter @shopee-clone/api db:format",

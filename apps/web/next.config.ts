@@ -16,6 +16,7 @@ const catalogImageHostnames = [
   'myshoes.vn',
   'product.hstatic.net',
   'static.spacet.vn',
+  'cdn.videod.me',
 ];
 
 const nextConfig: NextConfig = {
@@ -39,12 +40,12 @@ const nextConfig: NextConfig = {
       },
       ...(s3Hostname
         ? [
-            {
-              protocol: 'https' as const,
-              hostname: s3Hostname,
-              pathname: '/**',
-            },
-          ]
+          {
+            protocol: 'https' as const,
+            hostname: s3Hostname,
+            pathname: '/**',
+          },
+        ]
         : []),
     ],
   },

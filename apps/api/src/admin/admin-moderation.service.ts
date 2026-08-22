@@ -12,6 +12,9 @@ import {
 } from '@shopee-clone/contracts';
 import { Inject, Injectable } from '@nestjs/common';
 import type { ModerationCaseOutcome } from '../generated/prisma/enums';
+import { PrismaService } from '../prisma/prisma.service';
+import { moderationNotificationEvent } from '../notifications/notification-events';
+import { NotificationService } from '../notifications/notification.service';
 import { AdminInvalidInputError } from './admin.errors';
 import { AdminModerationRepository } from './admin-moderation.repository';
 
@@ -20,6 +23,8 @@ export class AdminModerationService {
   constructor(
     @Inject(AdminModerationRepository)
     private readonly repository: AdminModerationRepository,
+    @Inject(PrismaService) private readonly prisma: PrismaService,
+    @Inject(NotificationService) private readonly notifications: NotificationService,
   ) {}
 
   async listCases(query: ModerationCaseListQuery): Promise<ModerationCaseListResponse> {
@@ -128,7 +133,7 @@ export class AdminModerationService {
       )
       .digest('hex');
 
-    return this.repository.makeDecision(
+    const result = await this.repository.makeDecision(
       actorAdminId,
       caseId,
       {
@@ -141,5 +146,45 @@ export class AdminModerationService {
       idempotencyKey,
       digest,
     );
+    await this.emitProductModerationNotification(caseId, input.outcome, trimmedReason);
+    return result;
+  }
+
+  private async emitProductModerationNotification(
+    caseId: string,
+    outcome: CreateModerationDecisionRequest['outcome'],
+    reason: string,
+  ): Promise<void> {
+    if (outcome !== 'SUSPEND_TARGET' && outcome !== 'RESTORE_TARGET') return;
+    try {
+      const moderationCase = await this.prisma.moderationCase.findUnique({
+        where: { id: caseId },
+        select: {
+          targetType: true,
+          productId: true,
+          product: {
+            select: {
+              id: true,
+              name: true,
+              shop: { select: { ownerId: true } },
+            },
+          },
+        },
+      });
+      if (!moderationCase || moderationCase.targetType !== 'PRODUCT' || !moderationCase.product) {
+        return;
+      }
+      await this.notifications.notify(
+        moderationNotificationEvent({
+          type: outcome === 'RESTORE_TARGET' ? 'PRODUCT_APPROVED' : 'PRODUCT_REJECTED',
+          productId: moderationCase.product.id,
+          ownerUserId: moderationCase.product.shop.ownerId,
+          productName: moderationCase.product.name,
+          reason,
+        }),
+      );
+    } catch (error) {
+      console.error('[notifications] moderation emit failed', error);
+    }
   }
 }

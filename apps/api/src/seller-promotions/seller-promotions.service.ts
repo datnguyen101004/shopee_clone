@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from 'node:crypto';
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Optional } from '@nestjs/common';
 import { Prisma } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import {
@@ -17,6 +17,8 @@ import {
 } from '@shopee-clone/contracts';
 import { SellerPromotionConflictError, SellerPromotionIdempotencyConflictError, SellerPromotionNotFoundError, SellerPromotionStaleError, SellerPromotionUnavailableError, SellerPromotionValidationError } from './seller-promotions.errors';
 import { SellerShopScopeNotFoundError, SellerShopScopeService } from '../seller-scope/seller-shop-scope.service';
+import { voucherAssignedNotificationEvent } from '../notifications/notification-events';
+import { NotificationService } from '../notifications/notification.service';
 
 type ShopRef = { id: string };
 type VoucherGraph = Prisma.VoucherGetPayload<{ include: { productScopes: { select: { productId: true } } } }>;
@@ -46,7 +48,11 @@ function decodeCursor(value: string | null): { createdAt: Date; id: string } | n
 
 @Injectable()
 export class SellerPromotionsService {
-  constructor(@Inject(PrismaService) private readonly prisma: PrismaService, @Inject(SellerShopScopeService) private readonly sellerScope?: SellerShopScopeService) {}
+  constructor(
+    @Inject(PrismaService) private readonly prisma: PrismaService,
+    @Optional() @Inject(SellerShopScopeService) private readonly sellerScope?: SellerShopScopeService,
+    @Optional() @Inject(NotificationService) private readonly notifications?: NotificationService,
+  ) {}
 
   private async shopFor(userId: string): Promise<ShopRef> {
     if (this.sellerScope) {
@@ -105,16 +111,31 @@ export class SellerPromotionsService {
 
   async createVoucher(userId: string, input: SellerVoucherCreateRequest, idempotencyKey: string): Promise<SellerVoucherSummary> {
     const shop = await this.shopFor(userId); const digest = jsonDigest(input);
-    return this.prisma.$transaction(async (tx) => {
+    const summary = await this.prisma.$transaction(async (tx) => {
       const existing = await tx.sellerPromotionCommand.findUnique({ where: { shopId_idempotencyKey: { shopId: shop.id, idempotencyKey } } });
-      if (existing) { if (existing.requestDigest !== digest) throw new SellerPromotionIdempotencyConflictError(); return existing.response as unknown as SellerVoucherSummary; }
+      if (existing) { if (existing.requestDigest !== digest) throw new SellerPromotionIdempotencyConflictError(); return { summary: existing.response as unknown as SellerVoucherSummary, created: false as const }; }
       const products = await tx.product.findMany({ where: { id: { in: input.productIds }, shopId: shop.id, deletedAt: null }, select: { id: true } });
       if (products.length !== input.productIds.length) throw new SellerPromotionValidationError(['productIds'], 'One or more product IDs are invalid for this shop.');
       const voucher = await tx.voucher.create({ data: { code: input.code, name: input.name, issuer: 'SHOP', shopId: shop.id, benefitType: input.benefitType, fixedAmountMinor: input.fixedAmountMinor === null ? null : BigInt(input.fixedAmountMinor), percentageBasisPoints: input.percentageBasisPoints, maximumDiscountMinor: input.maximumDiscountMinor === null ? null : BigInt(input.maximumDiscountMinor), minimumSpendMinor: BigInt(input.minimumSpendMinor), startsAt: new Date(input.startsAt), endsAt: new Date(input.endsAt), isEnabled: true, usageLimit: input.usageLimit, perBuyerLimit: input.perBuyerLimit, productScopes: { createMany: { data: input.productIds.map((productId) => ({ productId })) } } }, include: this.voucherInclude });
-      const summary = this.voucherSummary(voucher, new Date());
-      await tx.sellerPromotionCommand.create({ data: { id: randomUUID(), shopId: shop.id, resource: 'VOUCHER', resourceId: voucher.id, idempotencyKey, requestDigest: digest, response: summary as unknown as Prisma.InputJsonValue } });
-      return summary;
+      const createdSummary = this.voucherSummary(voucher, new Date());
+      await tx.sellerPromotionCommand.create({ data: { id: randomUUID(), shopId: shop.id, resource: 'VOUCHER', resourceId: voucher.id, idempotencyKey, requestDigest: digest, response: createdSummary as unknown as Prisma.InputJsonValue } });
+      return { summary: createdSummary, created: true as const, voucherId: voucher.id, code: voucher.code, shopId: shop.id };
     }).catch((error) => { if (error instanceof SellerPromotionValidationError || error instanceof SellerPromotionConflictError || error instanceof SellerPromotionIdempotencyConflictError) throw error; if (error?.code === 'P2002') throw new SellerPromotionConflictError('VOUCHER_CODE_CONFLICT', 'Voucher code is already in use.'); throw new SellerPromotionUnavailableError(); });
+    if (summary.created && this.notifications) {
+      try {
+        await this.notifications.notify(
+          voucherAssignedNotificationEvent({
+            voucherId: summary.voucherId,
+            ownerUserId: userId,
+            code: summary.code,
+            shopId: summary.shopId,
+          }),
+        );
+      } catch (error) {
+        console.error('[notifications] voucher emit failed', error);
+      }
+    }
+    return summary.summary;
   }
 
   async updateVoucher(userId: string, id: string, expectedVersion: number, input: SellerVoucherUpdateRequest): Promise<SellerVoucherSummary> {

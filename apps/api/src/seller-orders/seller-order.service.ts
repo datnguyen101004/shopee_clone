@@ -35,6 +35,8 @@ import {
 import { decodeSellerOrderCursor, encodeSellerOrderCursor } from './seller-order-cursor';
 import { SellerOrderProjector } from './seller-order.projector';
 import { SellerOrderRepository } from './seller-order.repository';
+import { orderNotificationEvent } from '../notifications/notification-events';
+import { NotificationService } from '../notifications/notification.service';
 
 @Injectable()
 export class SellerOrderService {
@@ -45,6 +47,7 @@ export class SellerOrderService {
     @Inject(OrderLifecycleService) private readonly lifecycle: OrderLifecycleService,
     @Inject(SellerOrderCompensationService)
     private readonly compensation: SellerOrderCompensationService,
+    @Inject(NotificationService) private readonly notifications: NotificationService,
   ) {}
 
   async list(userId: string, query: SellerOrderQueueQuery): Promise<SellerOrderListResponse> {
@@ -140,7 +143,7 @@ export class SellerOrderService {
       input,
     );
     try {
-      return await this.prisma.$transaction(
+      const result = await this.prisma.$transaction(
         async (tx) => {
           await this.lockOwnedOrder(tx, userId, orderReference);
           let current = await this.repository.detail(userId, orderReference, tx);
@@ -155,7 +158,12 @@ export class SellerOrderService {
               !sellerOrderDigestsEqual(replay.requestDigest, requestDigest)
             )
               throw new SellerOrderIdempotencyConflictError();
-            return this.projector.detail(current);
+            return {
+              detail: this.projector.detail(current),
+              action: input.action,
+              orderId: orderReference,
+              replay: true as const,
+            };
           }
           const fulfillment =
             current.fulfillment ??
@@ -291,10 +299,17 @@ export class SellerOrderService {
           });
           current = await this.repository.detail(userId, orderReference, tx);
           if (!current) throw new SellerOrderNotFoundError();
-          return this.projector.detail(current, now);
+          return {
+            detail: this.projector.detail(current, now),
+            action: input.action,
+            orderId: orderReference,
+            replay: false as const,
+          };
         },
         { isolationLevel: 'ReadCommitted', maxWait: 5_000, timeout: 15_000 },
       );
+      if (!result.replay) await this.emitLifecycleNotification(result.orderId, result.action);
+      return result.detail;
     } catch (error) {
       if (
         error instanceof SellerOrderNotFoundError ||
@@ -309,6 +324,46 @@ export class SellerOrderService {
       )
         throw error;
       throw new SellerOrderUnavailableError();
+    }
+  }
+
+  private async emitLifecycleNotification(
+    orderId: string,
+    action: SellerOrderActionRequest['action'],
+  ): Promise<void> {
+    const type =
+      action === 'CONFIRM'
+        ? ('ORDER_CONFIRMED' as const)
+        : action === 'HAND_OFF'
+          ? ('ORDER_SHIPPING' as const)
+          : action === 'REJECT'
+            ? ('ORDER_CANCELLED' as const)
+            : null;
+    if (!type) return;
+    try {
+      const order = await this.prisma.shopOrder.findUnique({
+        where: { id: orderId },
+        select: {
+          id: true,
+          payableTotalMinor: true,
+          shop: { select: { ownerId: true } },
+          purchase: { select: { buyerId: true } },
+          lines: { take: 1, select: { productImageUrl: true } },
+        },
+      });
+      if (!order) return;
+      await this.notifications.notify(
+        orderNotificationEvent({
+          type,
+          orderId: order.id,
+          buyerId: order.purchase.buyerId,
+          sellerOwnerId: order.shop.ownerId,
+          amountMinor: Number(order.payableTotalMinor),
+          thumbnailUrl: order.lines[0]?.productImageUrl ?? null,
+        }),
+      );
+    } catch (error) {
+      console.error('[notifications] seller-order emit failed', error);
     }
   }
 }

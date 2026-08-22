@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 
 import { OrderHistoryModule } from '../order-history/order-history.module';
 import { AuthModule } from '../auth/auth.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 import { ReturnsController } from './returns.controller';
 import { SystemReturnClock } from './return-clock';
 import { ReturnEvidenceStorage } from './return-evidence.storage';
@@ -11,7 +12,7 @@ import { ReturnRepository } from './return-repository';
 import { ReturnService } from './return.service';
 
 @Module({
-  imports: [AuthModule, OrderHistoryModule],
+  imports: [AuthModule, OrderHistoryModule, NotificationsModule],
   controllers: [ReturnsController],
   providers: [
     SystemReturnClock,

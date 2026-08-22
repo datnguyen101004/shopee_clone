@@ -5,8 +5,9 @@ import { Container, Search, ShoppingCart, Store, UserRound } from '@shopee-clone
 import Link from 'next/link';
 import { useEffect, useRef, useState, type FormEvent, type RefObject } from 'react';
 
-import { marketplaceCategories } from './marketplace-navigation';
 import type { AuthSessionState } from './auth-session-provider';
+import { marketplaceCategories } from './marketplace-navigation';
+import { NotificationBell } from './notifications/notification-bell';
 
 const mobileNavigationId = 'marketplace-mobile-categories';
 
@@ -63,7 +64,7 @@ export function MarketplaceHeader({
         {account.status === 'authenticated' && hasMarketplaceRole(account.user, 'admin') ? (
           <Link href="/admin">Quản trị</Link>
         ) : null}
-        <span>Kết nối · Hỗ trợ</span>
+        <span className="market-topline__meta">Kết nối · Hỗ trợ</span>
       </div>
       <div className="market-header__main">
         <Link className="market-logo" href="/" aria-label="Shopee Clone - Trang chủ">
@@ -102,6 +103,7 @@ export function MarketplaceHeader({
           ) : null}
         </form>
         <div className="market-actions">
+          {account.status === 'authenticated' ? <NotificationBell /> : null}
           <Link className="market-cart" href="/cart" aria-label={`Giỏ hàng, ${cartCount} sản phẩm`}>
             <span className="market-cart-icon">
               <ShoppingCart aria-hidden="true" />
@@ -121,6 +123,16 @@ export function MarketplaceHeader({
                 <span>{account.user.displayName}</span>
               </button>
               <div className="market-user-menu__popup" id={userMenuId} role="menu">
+                {hasMarketplaceRole(account.user, 'seller') ? (
+                  <Link role="menuitem" href="/seller">
+                    Kênh người bán
+                  </Link>
+                ) : null}
+                {hasMarketplaceRole(account.user, 'admin') ? (
+                  <Link role="menuitem" href="/admin">
+                    Quản trị
+                  </Link>
+                ) : null}
                 <Link role="menuitem" href="/account/profile">
                   Tài khoản của tôi
                 </Link>
@@ -134,7 +146,7 @@ export function MarketplaceHeader({
           ) : (
             <Link href="/login" aria-label="Đăng nhập · Chưa đăng nhập">
               <UserRound aria-hidden="true" />
-              <span>Đăng nhập</span>
+              <span className="market-action-label">Đăng nhập</span>
             </Link>
           )}
           <button

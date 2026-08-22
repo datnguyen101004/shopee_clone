@@ -43,6 +43,9 @@ import {
 import { ReturnProjector } from './return-projector';
 import { ReturnRepository, type ReturnRequestGraph } from './return-repository';
 import { transitionFor, type ReturnDomainAction } from './return-state-machine';
+import { returnNotificationEvent } from '../notifications/notification-events';
+import { NotificationService } from '../notifications/notification.service';
+import type { NotificationType } from '@shopee-clone/contracts';
 
 type Viewer = 'BUYER' | 'SELLER' | 'ADMIN';
 
@@ -68,6 +71,7 @@ export class ReturnService {
     @Inject(ReturnProjector) private readonly projector: ReturnProjector,
     @Inject(OrderLifecycleService) private readonly lifecycle: OrderLifecycleService,
     @Inject(SystemReturnClock) private readonly clock: ReturnClock,
+    @Inject(NotificationService) private readonly notifications: NotificationService,
   ) {}
 
   async list(
@@ -191,7 +195,7 @@ export class ReturnService {
   ): Promise<ReturnDetailResponse> {
     const requestDigest = returnCreateDigest(orderReference, expectedOrderVersion, input);
     try {
-      return await this.prisma.$transaction(
+      const created = await this.prisma.$transaction(
         async (tx) => {
           await this.repository.lockBuyerOrder(tx, userId, orderReference);
           const replay = await tx.returnRequest.findFirst({
@@ -202,7 +206,12 @@ export class ReturnService {
               throw new ReturnIdempotencyConflictError();
             const graph = await this.repository.detailBuyer(userId, replay.id, tx);
             if (!graph) throw new ReturnNotFoundError();
-            return this.projector.detail(graph, 'BUYER');
+            return {
+              detail: this.projector.detail(graph, 'BUYER'),
+              returnId: replay.id,
+              notifyType: 'RETURN_REQUESTED' as const,
+              replay: true as const,
+            };
           }
           const order = await tx.shopOrder.findFirst({
             where: { id: orderReference, purchase: { buyerId: userId } },
@@ -316,10 +325,17 @@ export class ReturnService {
           });
           const graph = await this.repository.detailBuyer(userId, request.id, tx);
           if (!graph) throw new ReturnNotFoundError();
-          return this.projector.detail(graph, 'BUYER');
+          return {
+            detail: this.projector.detail(graph, 'BUYER'),
+            returnId: request.id,
+            notifyType: 'RETURN_REQUESTED' as const,
+            replay: false as const,
+          };
         },
         { isolationLevel: 'ReadCommitted', maxWait: 5_000, timeout: 15_000 },
       );
+      if (!created.replay) await this.emitReturnNotification(created.returnId, created.notifyType);
+      return created.detail;
     } catch (error) {
       if (
         error instanceof ReturnNotFoundError ||
@@ -387,7 +403,7 @@ export class ReturnService {
   ): Promise<ReturnDetailResponse | ReturnType<ReturnProjector['adminDetail']>> {
     const requestDigest = returnMutationDigest(reference, expectedVersion, input);
     try {
-      return await this.prisma.$transaction(
+      const mutated = await this.prisma.$transaction(
         async (tx) => {
           let graph = await this.graphFor(viewer, userId, reference, tx);
           if (!graph) throw new ReturnNotFoundError();
@@ -401,9 +417,18 @@ export class ReturnService {
           if (replay) {
             if (!returnDigestsEqual(replay.requestDigest, requestDigest))
               throw new ReturnIdempotencyConflictError();
-            return viewer === 'ADMIN'
-              ? this.projector.adminDetail(graph)
-              : this.projector.detail(graph, viewer);
+            return {
+              detail:
+                viewer === 'ADMIN'
+                  ? this.projector.adminDetail(graph)
+                  : this.projector.detail(graph, viewer),
+              returnId: graph.id,
+              notifyType: null as Extract<
+                NotificationType,
+                'RETURN_REQUESTED' | 'RETURN_ACCEPTED' | 'DISPUTE_ESCALATED' | 'REFUNDED'
+              > | null,
+              replay: true as const,
+            };
           }
           if (graph.version !== expectedVersion) throw new ReturnStaleError(graph.version);
           const now = this.clock.now();
@@ -509,12 +534,30 @@ export class ReturnService {
           }
           const current = await this.graphFor(viewer, userId, reference, tx);
           if (!current) throw new ReturnNotFoundError();
-          return viewer === 'ADMIN'
-            ? this.projector.adminDetail(current)
-            : this.projector.detail(current, viewer);
+          const notifyType =
+            target === 'AWAITING_RETURN'
+              ? ('RETURN_ACCEPTED' as const)
+              : target === 'ESCALATED'
+                ? ('DISPUTE_ESCALATED' as const)
+                : target === 'REFUNDED'
+                  ? ('REFUNDED' as const)
+                  : null;
+          return {
+            detail:
+              viewer === 'ADMIN'
+                ? this.projector.adminDetail(current)
+                : this.projector.detail(current, viewer),
+            returnId: current.id,
+            notifyType,
+            replay: false as const,
+          };
         },
         { isolationLevel: 'ReadCommitted', maxWait: 5_000, timeout: 15_000 },
       );
+      if (!mutated.replay && mutated.notifyType) {
+        await this.emitReturnNotification(mutated.returnId, mutated.notifyType);
+      }
+      return mutated.detail;
     } catch (error) {
       if (
         error instanceof ReturnNotFoundError ||
@@ -525,6 +568,57 @@ export class ReturnService {
       )
         throw error;
       throw new ReturnUnavailableError();
+    }
+  }
+
+  private async emitReturnNotification(
+    returnId: string,
+    type: Extract<
+      NotificationType,
+      'RETURN_REQUESTED' | 'RETURN_ACCEPTED' | 'DISPUTE_ESCALATED' | 'REFUNDED'
+    >,
+  ): Promise<void> {
+    try {
+      const row = await this.prisma.returnRequest.findUnique({
+        where: { id: returnId },
+        select: {
+          id: true,
+          orderId: true,
+          buyerId: true,
+          refundAmountMinor: true,
+          currency: true,
+          shop: { select: { ownerId: true } },
+          items: {
+            take: 1,
+            select: { orderLine: { select: { productImageUrl: true } } },
+          },
+        },
+      });
+      if (!row) return;
+      const adminUserIds =
+        type === 'DISPUTE_ESCALATED'
+          ? (
+              await this.prisma.userRoleAssignment.findMany({
+                where: { role: 'ADMIN' },
+                select: { userId: true },
+              })
+            ).map((assignment) => assignment.userId)
+          : [];
+      await this.notifications.notify(
+        returnNotificationEvent({
+          type,
+          returnId: row.id,
+          orderId: row.orderId,
+          buyerId: row.buyerId,
+          sellerOwnerId: row.shop.ownerId,
+          adminUserIds,
+          amountMinor: Number(row.refundAmountMinor),
+          currency: row.currency,
+          thumbnailUrl: row.items[0]?.orderLine.productImageUrl ?? null,
+        }),
+      );
+    } catch (error) {
+      console.error('[notifications] return emit failed', error);
     }
   }
 

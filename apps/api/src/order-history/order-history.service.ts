@@ -26,6 +26,8 @@ import { OrderHistoryProjector } from './order-history.projector';
 import { OrderHistoryRepository } from './order-history.repository';
 import { OrderLifecycleService } from './order-lifecycle.service';
 import { SellerOrderCompensationService } from '../seller-orders/seller-order-compensation.service';
+import { orderNotificationEvent } from '../notifications/notification-events';
+import { NotificationService } from '../notifications/notification.service';
 
 @Injectable()
 export class OrderHistoryService {
@@ -35,6 +37,7 @@ export class OrderHistoryService {
     @Inject(OrderHistoryProjector) private readonly projector: OrderHistoryProjector,
     @Inject(OrderLifecycleService) private readonly lifecycle: OrderLifecycleService,
     @Inject(SellerOrderCompensationService) private readonly compensation: SellerOrderCompensationService,
+    @Inject(NotificationService) private readonly notifications: NotificationService,
   ) {}
 
   async list(userId: string, query: BuyerOrderListQuery): Promise<BuyerOrderListResponse> {
@@ -66,7 +69,7 @@ export class OrderHistoryService {
   ): Promise<BuyerOrderDetailResponse> {
     const digest = cancellationRequestDigest(userId, orderReference, expectedVersion, input);
     try {
-      return await this.prisma.$transaction(
+      const result = await this.prisma.$transaction(
         async (transaction) => {
           const locked = await transaction.$queryRaw<{ id: string }[]>(Prisma.sql`
           SELECT so."id"
@@ -88,7 +91,11 @@ export class OrderHistoryService {
             }
             const replayGraph = await this.repository.detail(userId, orderReference, transaction);
             if (!replayGraph) throw new OrderNotFoundError();
-            return this.projector.detail(replayGraph);
+            return {
+              detail: this.projector.detail(replayGraph),
+              orderId: orderReference,
+              replay: true as const,
+            };
           }
 
           const current = await transaction.shopOrder.findUnique({
@@ -127,10 +134,12 @@ export class OrderHistoryService {
           });
           const updated = await this.repository.detail(userId, orderReference, transaction);
           if (!updated) throw new OrderNotFoundError();
-          return this.projector.detail(updated);
+          return { detail: this.projector.detail(updated), orderId: orderReference, replay: false as const };
         },
         { isolationLevel: 'ReadCommitted', maxWait: 5_000, timeout: 15_000 },
       );
+      if (!result.replay) await this.emitCancelledNotification(result.orderId, userId);
+      return result.detail;
     } catch (error) {
       if (
         error instanceof OrderNotFoundError ||
@@ -141,6 +150,33 @@ export class OrderHistoryService {
       )
         throw error;
       throw new OrderHistoryUnavailableError();
+    }
+  }
+
+  private async emitCancelledNotification(orderId: string, buyerId: string): Promise<void> {
+    try {
+      const order = await this.prisma.shopOrder.findUnique({
+        where: { id: orderId },
+        select: {
+          id: true,
+          payableTotalMinor: true,
+          shop: { select: { ownerId: true } },
+          lines: { take: 1, select: { productImageUrl: true } },
+        },
+      });
+      if (!order) return;
+      await this.notifications.notify(
+        orderNotificationEvent({
+          type: 'ORDER_CANCELLED',
+          orderId: order.id,
+          buyerId,
+          sellerOwnerId: order.shop.ownerId,
+          amountMinor: Number(order.payableTotalMinor),
+          thumbnailUrl: order.lines[0]?.productImageUrl ?? null,
+        }),
+      );
+    } catch (error) {
+      console.error('[notifications] buyer-cancel emit failed', error);
     }
   }
 }

@@ -26,6 +26,7 @@ import { AdminModule } from './admin/admin.module';
 import { ReportingModule } from './reporting/reporting.module';
 import { SellerModerationNoticesModule } from './seller-moderation-notices/seller-moderation-notices.module';
 import { ReturnsModule } from './returns/returns.module';
+import { NotificationsModule } from './notifications/notifications.module';
 
 @Module({
   imports: [
@@ -55,6 +56,8 @@ import { ReturnsModule } from './returns/returns.module';
     ReportingModule,
     SellerModerationNoticesModule,
     ReturnsModule,
+    NotificationsModule,
   ],
 })
 export class AppModule {}
+

@@ -13,13 +13,14 @@ import { AdminShopsController } from './admin-shops.controller';
 import { AdminUsersController } from './admin-users.controller';
 
 import { ReviewsModule } from '../reviews/reviews.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 import { AdminModerationController } from './admin-moderation.controller';
 import { AdminModerationRepository } from './admin-moderation.repository';
 import { AdminModerationService } from './admin-moderation.service';
 import { AdminReviewsController } from './admin-reviews.controller';
 
 @Module({
-  imports: [PrismaModule, AuthModule, ReviewsModule],
+  imports: [PrismaModule, AuthModule, ReviewsModule, NotificationsModule],
   controllers: [
     AdminDashboardController,
     AdminUsersController,

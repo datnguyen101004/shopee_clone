@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { AuthModule } from '../auth/auth.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 import { OrderHistoryModule } from '../order-history/order-history.module';
 import { SellerOrderCompensationModule } from './seller-order-compensation.module';
 import { SellerOrderExceptionFilter } from './seller-order-exception.filter';
@@ -9,7 +10,7 @@ import { SellerOrderRepository } from './seller-order.repository';
 import { SellerOrderService } from './seller-order.service';
 
 @Module({
-  imports: [AuthModule, OrderHistoryModule, SellerOrderCompensationModule],
+  imports: [AuthModule, OrderHistoryModule, SellerOrderCompensationModule, NotificationsModule],
   controllers: [SellerOrdersController],
   providers: [
     SellerOrderExceptionFilter,

@@ -25,6 +25,8 @@ export function AccountWorkspace({
       <div className="buyer-account-layout">
         <nav className="buyer-account-nav" aria-label="Quản lý tài khoản">
           <Link href="/account/profile">Hồ sơ</Link>
+          <Link href="/account/profile/notifications">Cài đặt thông báo</Link>
+          <Link href="/account/notifications">Thông báo</Link>
           <Link href="/account/addresses">Địa chỉ nhận hàng</Link>
           <Link href="/account/favorites">Sản phẩm yêu thích</Link>
           <Link href="/account/recently-viewed">Sản phẩm đã xem</Link>
@@ -46,6 +48,8 @@ export function ProtectedAccountState({
   account: AuthSessionState;
   returnTo:
     | '/account/profile'
+    | '/account/profile/notifications'
+    | '/account/notifications'
     | '/account/addresses'
     | '/account/favorites'
     | '/account/recently-viewed'

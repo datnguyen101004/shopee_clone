@@ -31,6 +31,7 @@ describe('StorefrontShell', () => {
       'href',
       '/cart',
     );
+    expect(document.querySelector('.market-cart .market-cart-icon')).not.toBeNull();
     expect(marketplaceCategories).toHaveLength(6);
     expect(marketplaceCategories.map(({ slug }) => slug)).toEqual([
       ...new Set(marketplaceCategories.map(({ slug }) => slug)),
@@ -159,7 +160,9 @@ describe('StorefrontShell', () => {
       />,
     );
     expect(screen.getByRole('link', { name: 'Kênh người bán' })).toHaveAttribute('href', '/seller');
+    expect(screen.getByRole('menuitem', { name: 'Kênh người bán' })).toHaveAttribute('href', '/seller');
     expect(screen.queryByRole('link', { name: 'Quản trị' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: 'Quản trị' })).not.toBeInTheDocument();
 
     rerender(
       <MarketplaceHeader
@@ -173,6 +176,8 @@ describe('StorefrontShell', () => {
       />,
     );
     expect(screen.queryByRole('link', { name: 'Kênh người bán' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: 'Kênh người bán' })).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Quản trị' })).toHaveAttribute('href', '/admin');
+    expect(screen.getByRole('menuitem', { name: 'Quản trị' })).toHaveAttribute('href', '/admin');
   });
 });

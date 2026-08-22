@@ -199,6 +199,47 @@ enum SellerModerationNoticeAction {
   @@map("seller_moderation_notice_action")
 }
 
+enum NotificationCategory {
+  ORDERS     @map("orders")
+  PROMOTIONS @map("promotions")
+  ACCOUNT    @map("account")
+  SYSTEM     @map("system")
+
+  @@map("notification_category")
+}
+
+enum NotificationChannel {
+  IN_APP @map("in_app")
+  EMAIL  @map("email")
+
+  @@map("notification_channel")
+}
+
+enum NotificationType {
+  ORDER_CONFIRMED    @map("order_confirmed")
+  ORDER_SHIPPING     @map("order_shipping")
+  ORDER_DELIVERED    @map("order_delivered")
+  ORDER_CANCELLED    @map("order_cancelled")
+  RETURN_REQUESTED   @map("return_requested")
+  RETURN_ACCEPTED    @map("return_accepted")
+  DISPUTE_ESCALATED  @map("dispute_escalated")
+  REFUNDED           @map("refunded")
+  PRODUCT_APPROVED   @map("product_approved")
+  PRODUCT_REJECTED   @map("product_rejected")
+  VOUCHER_ASSIGNED   @map("voucher_assigned")
+  SYSTEM_NOTICE      @map("system_notice")
+
+  @@map("notification_type")
+}
+
+enum NotificationDeliveryStatus {
+  PENDING   @map("pending")
+  DELIVERED @map("delivered")
+  FAILED    @map("failed")
+
+  @@map("notification_delivery_status")
+}
+
 enum VoucherIssuer {
   PLATFORM @map("platform")
   SHOP     @map("shop")
@@ -448,6 +489,8 @@ model User {
   stagedReturnEvidence     ReturnEvidenceAsset[]              @relation("ReturnEvidenceUploader")
   returnDecisions          ReturnDecision[]                   @relation("ReturnDecisionActor")
   refundLedgerEntries      RefundLedgerEntry[]                @relation("RefundLedgerBuyer")
+  notifications            Notification[]                     @relation("NotificationRecipient")
+  notificationPreferences  NotificationPreference[]           @relation("NotificationPreferenceOwner")
 
   @@index([status])
   @@index([deletedAt])
@@ -1991,4 +2034,76 @@ model SellerModerationNotice {
   @@index([productId])
   @@index([shopId])
   @@map("seller_moderation_notices")
+}
+
+model Notification {
+  id               String                         @id @default(uuid()) @db.Uuid
+  recipientId      String                         @map("recipient_id") @db.Uuid
+  category         NotificationCategory
+  type             NotificationType
+  title            String                         @db.VarChar(160)
+  body             String                         @db.VarChar(500)
+  metadata         Json
+  deduplicationKey String                         @unique @map("deduplication_key") @db.VarChar(240)
+  isRead           Boolean                        @default(false) @map("is_read")
+  readAt           DateTime?                      @map("read_at") @db.Timestamptz(3)
+  isArchived       Boolean                        @default(false) @map("is_archived")
+  createdAt        DateTime                       @default(now()) @map("created_at") @db.Timestamptz(3)
+  recipient        User                           @relation("NotificationRecipient", fields: [recipientId], references: [id], onDelete: Cascade)
+  deliveryAttempts NotificationDeliveryAttempt[]
+
+  @@index([recipientId, isArchived, createdAt(sort: Desc), id])
+  @@index([recipientId, isRead, isArchived])
+  @@index([recipientId, category, isArchived, createdAt(sort: Desc), id])
+  @@map("notifications")
+}
+
+model NotificationPreference {
+  id        String              @id @default(uuid()) @db.Uuid
+  userId    String              @map("user_id") @db.Uuid
+  category  NotificationCategory
+  channel   NotificationChannel
+  enabled   Boolean             @default(true)
+  updatedAt DateTime            @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  createdAt DateTime            @default(now()) @map("created_at") @db.Timestamptz(3)
+  user      User                @relation("NotificationPreferenceOwner", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, category, channel])
+  @@index([userId])
+  @@map("notification_preferences")
+}
+
+model NotificationDeliveryAttempt {
+  id             String                     @id @default(uuid()) @db.Uuid
+  notificationId String                     @map("notification_id") @db.Uuid
+  channel        NotificationChannel
+  status         NotificationDeliveryStatus @default(PENDING)
+  attemptCount   Int                        @default(0) @map("attempt_count")
+  nextRetryAt    DateTime?                  @map("next_retry_at") @db.Timestamptz(3)
+  lastError      String?                    @map("last_error") @db.VarChar(500)
+  deliveredAt    DateTime?                  @map("delivered_at") @db.Timestamptz(3)
+  createdAt      DateTime                   @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime                   @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  notification   Notification               @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+
+  @@unique([notificationId, channel])
+  @@index([status, nextRetryAt, createdAt, id])
+  @@index([notificationId])
+  @@map("notification_delivery_attempts")
+}
+
+model NotificationTemplate {
+  id        String              @id @default(uuid()) @db.Uuid
+  type      NotificationType
+  channel   NotificationChannel
+  locale    String              @default("vi-VN") @db.VarChar(16)
+  version   Int                 @default(1)
+  subject   String              @db.VarChar(200)
+  htmlBody  String              @map("html_body") @db.Text
+  textBody  String              @map("text_body") @db.Text
+  createdAt DateTime            @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime            @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@unique([type, channel, locale, version])
+  @@map("notification_templates")
 }

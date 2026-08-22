@@ -32,6 +32,7 @@ async function getJson(url: URL, fetcher: typeof fetch, timeoutMs: number): Prom
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
   try {
     let response: Response;
+    console.info('[storefront-api]', url.href);
     try {
       response = await fetcher(url, {
         cache: 'no-store',
@@ -39,9 +40,10 @@ async function getJson(url: URL, fetcher: typeof fetch, timeoutMs: number): Prom
         headers: { Accept: 'application/json' },
       });
     } catch (error) {
-      throw new ShopStorefrontApiError(
-        error instanceof DOMException && error.name === 'AbortError' ? 'timeout' : 'transport',
-      );
+      const kind =
+        error instanceof DOMException && error.name === 'AbortError' ? 'timeout' : 'transport';
+      console.error('[storefront-api] failed', { url: url.href, kind });
+      throw new ShopStorefrontApiError(kind);
     }
     if (response.status === 404) throw new ShopStorefrontApiError('not-found');
     if (response.status === 400) throw new ShopStorefrontApiError('validation');

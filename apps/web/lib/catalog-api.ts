@@ -27,6 +27,7 @@ export async function fetchCatalogProducts(
     'http://127.0.0.1:3001';
   const url = new URL('/api/v1/catalog/products', baseUrl);
   url.search = serializeCatalogQuery(query);
+  console.info('[storefront-api]', url.href);
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
   try {
@@ -38,11 +39,15 @@ export async function fetchCatalogProducts(
         headers: { Accept: 'application/json' },
       });
     } catch (error) {
-      throw new CatalogApiError(
-        error instanceof DOMException && error.name === 'AbortError' ? 'timeout' : 'transport',
-      );
+      const kind =
+        error instanceof DOMException && error.name === 'AbortError' ? 'timeout' : 'transport';
+      console.error('[storefront-api] failed', { url: url.href, kind });
+      throw new CatalogApiError(kind);
     }
-    if (!response.ok) throw new CatalogApiError('status');
+    if (!response.ok) {
+      console.error('[storefront-api] failed', { url: url.href, kind: 'status', status: response.status });
+      throw new CatalogApiError('status');
+    }
     const parsed = parseCatalogProductsResponse(await response.json());
     if (!parsed) throw new CatalogApiError('contract');
     return parsed;

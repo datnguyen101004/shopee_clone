@@ -29,6 +29,7 @@ export async function fetchProductDetail(
     process.env.HOMEPAGE_API_BASE_URL ??
     'http://127.0.0.1:3001';
   const url = new URL(`/api/v1/catalog/products/${encodeURIComponent(productId)}`, baseUrl);
+  console.info('[storefront-api]', url.href);
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
   try {
@@ -40,9 +41,10 @@ export async function fetchProductDetail(
         headers: { Accept: 'application/json' },
       });
     } catch (error) {
-      throw new ProductDetailApiError(
-        error instanceof DOMException && error.name === 'AbortError' ? 'timeout' : 'transport',
-      );
+      const kind =
+        error instanceof DOMException && error.name === 'AbortError' ? 'timeout' : 'transport';
+      console.error('[storefront-api] failed', { url: url.href, kind });
+      throw new ProductDetailApiError(kind);
     }
     const body = await response.json().catch(() => null);
     if (response.status === 404) throw new ProductDetailApiError('not-found');

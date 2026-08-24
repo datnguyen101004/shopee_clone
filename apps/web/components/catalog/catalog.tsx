@@ -21,6 +21,55 @@ import {
 
 export type CatalogRouteContext = CatalogQueryContext & { pageSize: number };
 
+// Font Awesome SVG Icons
+function FaFilter({ className }: { className?: string }) {
+  return (
+    <svg className={className} width="14" height="14" viewBox="0 0 512 512" fill="currentColor" aria-hidden="true">
+      <path d="M3.9 54.9C10.5 36.5 28 24 48 24l416 0c19.9 0 37.5 12.5 44.1 30.9s2.4 38.8-10.9 51.8L320 284.1 320 432c0 14.7-6.7 28.5-18.1 37.6l-64 51.2c-15.5 12.4-37.9 10-50.3-5.5s-10-37.9 5.5-50.3l42.9-34.3 0-146.6L3.9 106.7C-9.4 93.7-12.7 73.3 3.9 54.9z" />
+    </svg>
+  );
+}
+
+function FaListUl({ className }: { className?: string }) {
+  return (
+    <svg className={className} width="14" height="14" viewBox="0 0 512 512" fill="currentColor" aria-hidden="true">
+      <path d="M64 144a48 48 0 1 0 0-96 48 48 0 1 0 0 96zM192 64c-17.7 0-32 14.3-32 32s14.3 32 32 32l288 0c17.7 0 32-14.3 32-32s-14.3-32-32-32L192 64zm0 160c-17.7 0-32 14.3-32 32s14.3 32 32 32l288 0c17.7 0 32-14.3 32-32s-14.3-32-32-32l-288 0zm0 160c-17.7 0-32 14.3-32 32s14.3 32 32 32l288 0c17.7 0 32-14.3 32-32s-14.3-32-32-32l-288 0zM64 304a48 48 0 1 0 0-96 48 48 0 1 0 0 96zm48 112a48 48 0 1 0 -96 0 48 48 0 1 0 96 0z" />
+    </svg>
+  );
+}
+
+function FaLocationDot({ className }: { className?: string }) {
+  return (
+    <svg className={className} width="14" height="14" viewBox="0 0 384 512" fill="currentColor" aria-hidden="true">
+      <path d="M215.7 499.2C267 435 384 279.4 384 192C384 86 298 0 192 0S0 86 0 192c0 87.4 117 243 168.3 307.2c12.3 15.3 35.1 15.3 47.4 0zM192 128a64 64 0 1 1 0 128 64 64 0 1 1 0-128z" />
+    </svg>
+  );
+}
+
+function FaTag({ className }: { className?: string }) {
+  return (
+    <svg className={className} width="14" height="14" viewBox="0 0 448 512" fill="currentColor" aria-hidden="true">
+      <path d="M0 80L0 229.5c0 17 6.7 33.3 18.7 45.3l176 176c25 25 65.5 25 90.5 0L414.5 321.5c25-25 25-65.5 0-90.5l-176-176C226.5 42.7 210.2 36 193.2 36L44 36c-24.3 0-44 19.7-44 44zm112 56a32 32 0 1 1 0-64 32 32 0 1 1 0 64z" />
+    </svg>
+  );
+}
+
+function FaStar({ className }: { className?: string }) {
+  return (
+    <svg className={className} width="12" height="12" viewBox="0 0 576 512" fill="currentColor" aria-hidden="true">
+      <path d="M316.9 18C311.6 7 300.4 0 288 0s-23.6 7-28.9 18L201 135.3 52.4 163.6c-12.1 2.3-21.7 11.6-24.8 23.6s1.5 24.6 11.6 32.1L149.9 313 118.8 459.8c-2.6 12 2.3 24.3 12.5 31.6s23.4 6.8 33.7 .8L288 418.7l123 73.5c10.3 6.1 23.5 6.5 33.7 .8s15.1-19.6 12.5-31.6L426.1 313l110.7-93.7c10.1-7.5 14.7-20.1 11.6-32.1s-12.7-21.3-24.8-23.6L375 135.3 316.9 18z" />
+    </svg>
+  );
+}
+
+function FaRotateLeft({ className }: { className?: string }) {
+  return (
+    <svg className={className} width="12" height="12" viewBox="0 0 512 512" fill="currentColor" aria-hidden="true">
+      <path d="M125.7 160l50.3 0c17.7 0 32 14.3 32 32s-14.3 32-32 32L48 224c-17.7 0-32-14.3-32-32L16 64c0-17.7 14.3-32 32-32s32 14.3 32 32l0 51.2L97.6 97.6c87.5-87.5 229.3-87.5 316.8 0s87.5 229.3 0 316.8s-229.3 87.5-316.8 0c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0c62.5 62.5 163.8 62.5 226.3 0s62.5-163.8 0-226.3s-163.8-62.5-226.3 0L125.7 160z" />
+    </svg>
+  );
+}
+
 function formatNumber(value: number): string {
   return new Intl.NumberFormat('vi-VN').format(value);
 }
@@ -60,7 +109,8 @@ function FormattedPriceInput({
   };
 
   return (
-    <>
+    <div className="shopee-price-input-box">
+      <span className="shopee-price-currency" aria-hidden="true">₫</span>
       <input type="hidden" name={name} value={rawValue} />
       <input
         aria-label={ariaLabel}
@@ -69,11 +119,11 @@ function FormattedPriceInput({
         value={displayValue}
         onChange={handleChange}
         placeholder={placeholder}
+        className="shopee-price-control"
       />
-    </>
+    </div>
   );
 }
-
 
 export function ProductCard({ product }: { product: CatalogProductCard }) {
   return (
@@ -93,7 +143,10 @@ export function ProductCard({ product }: { product: CatalogProductCard }) {
             </span>
           )}
           {product.discountPercent ? (
-            <Badge variant="danger">-{product.discountPercent}%</Badge>
+            <div className="shopee-discount-badge" aria-label={`Giảm ${product.discountPercent}%`}>
+              <span className="shopee-discount-badge__percent">-{product.discountPercent}%</span>
+              <span className="shopee-discount-badge__label">GIẢM</span>
+            </div>
           ) : null}
         </div>
         <div className="catalog-card__body">
@@ -105,17 +158,27 @@ export function ProductCard({ product }: { product: CatalogProductCard }) {
               <del>₫{formatNumber(product.compareAtPriceMinor)}</del>
             ) : null}
           </div>
-          {product.scheduledPrice ? <small aria-label={`Giảm giá sản phẩm ${Math.floor(product.scheduledPrice.discountBasisPoints / 100)} phần trăm`}>Đang giảm {Math.floor(product.scheduledPrice.discountBasisPoints / 100)}%</small> : null}
+          {product.scheduledPrice ? (
+            <small
+              className="shopee-scheduled-deal"
+              aria-label={`Giảm giá sản phẩm ${Math.floor(product.scheduledPrice.discountBasisPoints / 100)} phần trăm`}
+            >
+              Đang giảm {Math.floor(product.scheduledPrice.discountBasisPoints / 100)}%
+            </small>
+          ) : null}
           <div className="catalog-card__facts">
             {product.ratingCount === 0 ? (
               <span aria-label="Chưa có đánh giá">Chưa có đánh giá</span>
             ) : (
-              <span aria-label={`${(product.ratingAverageBasisPoints / 100).toFixed(1)} trên 5 sao`}>
-                ★ {(product.ratingAverageBasisPoints / 100).toFixed(1)} (
+              <span
+                className="shopee-card-rating"
+                aria-label={`${(product.ratingAverageBasisPoints / 100).toFixed(1)} trên 5 sao`}
+              >
+                <FaStar className="shopee-star-icon" /> {(product.ratingAverageBasisPoints / 100).toFixed(1)} (
                 {formatNumber(product.ratingCount)})
               </span>
             )}
-            <span>Đã bán {formatNumber(product.soldCount)}</span>
+            <span className="shopee-card-sold">Đã bán {formatNumber(product.soldCount)}</span>
           </div>
           <span className="catalog-card__location">{product.shop.location}</span>
         </div>
@@ -167,17 +230,18 @@ export function CatalogPagination({
         <Link
           href={pageHrefBuilder ? pageHrefBuilder(page - 1) : catalogPageHref(context!, page - 1)}
           aria-label="Trang trước"
+          className="shopee-pagination-btn"
         >
           ‹
         </Link>
       ) : (
-        <span aria-disabled="true" aria-label="Trang trước">
+        <span aria-disabled="true" aria-label="Trang trước" className="shopee-pagination-btn disabled">
           ‹
         </span>
       )}
       {pageNumbers(page, totalPages).map((number) =>
         number === page ? (
-          <span key={number} aria-current="page" aria-label={`Trang ${number}`}>
+          <span key={number} aria-current="page" aria-label={`Trang ${number}`} className="shopee-pagination-page active">
             {number}
           </span>
         ) : (
@@ -185,6 +249,7 @@ export function CatalogPagination({
             key={number}
             href={pageHrefBuilder ? pageHrefBuilder(number) : catalogPageHref(context!, number)}
             aria-label={`Trang ${number}`}
+            className="shopee-pagination-page"
           >
             {number}
           </Link>
@@ -194,11 +259,12 @@ export function CatalogPagination({
         <Link
           href={pageHrefBuilder ? pageHrefBuilder(page + 1) : catalogPageHref(context!, page + 1)}
           aria-label="Trang sau"
+          className="shopee-pagination-btn"
         >
           ›
         </Link>
       ) : (
-        <span aria-disabled="true" aria-label="Trang sau">
+        <span aria-disabled="true" aria-label="Trang sau" className="shopee-pagination-btn disabled">
           ›
         </span>
       )}
@@ -217,7 +283,7 @@ const filterLabels: Partial<Record<CatalogQueryKey, string>> = {
   promotion: 'Đang giảm giá',
 };
 
-function ActiveFilters({ context }: { context: CatalogRouteContext }) {
+export function ActiveFilters({ context }: { context: CatalogRouteContext }) {
   const query = contextQuery(context);
   const entries = (Object.keys(filterLabels) as CatalogQueryKey[]).flatMap((key) => {
     const value = query[key];
@@ -229,17 +295,20 @@ function ActiveFilters({ context }: { context: CatalogRouteContext }) {
 
   return (
     <div className="catalog-active-filters" aria-label="Bộ lọc đang áp dụng">
+      <span className="shopee-active-filter-label">Bộ lọc:</span>
       {entries.map(({ key, display }) => (
         <Link
           key={key}
           href={catalogSearchHref(replaceCatalogQuery(query, { [key]: undefined }))}
           aria-label={`Bỏ ${filterLabels[key]} ${display}`}
+          className="shopee-active-filter-tag"
         >
-          {filterLabels[key]}: {display} ×
+          <span>{filterLabels[key]}: <strong>{display}</strong></span>
+          <span className="shopee-filter-remove" aria-hidden="true">✕</span>
         </Link>
       ))}
-      <Link className="catalog-clear" href="/search">
-        Xóa tất cả
+      <Link className="catalog-clear shopee-active-clear" href="/search">
+        <FaRotateLeft className="shopee-clear-icon" /> Xóa tất cả
       </Link>
     </div>
   );
@@ -267,14 +336,25 @@ export function DiscoveryControls({
   return (
     <FavoriteStateProvider productIds={response.items.map(({ id }) => id)}>
       <form
-        className="catalog-discovery"
+        className="catalog-discovery shopee-filter-panel"
         action="/search"
         method="get"
         role="search"
         aria-label="Tìm và lọc sản phẩm"
       >
-        <div className="catalog-field catalog-field--keyword">
-          <label htmlFor="catalog-q">Từ khóa</label>
+        {/* Filter Panel Header */}
+        <div className="shopee-filter-heading">
+          <div className="shopee-filter-heading__title">
+            <FaFilter className="shopee-filter-icon" />
+            <h2>BỘ LỌC TÌM KIẾM</h2>
+          </div>
+        </div>
+
+        {/* Search Keyword */}
+        <div className="catalog-field catalog-field--keyword shopee-filter-group">
+          <label htmlFor="catalog-q" className="shopee-group-title">
+            Từ khóa
+          </label>
           <input
             id="catalog-q"
             name="q"
@@ -282,11 +362,22 @@ export function DiscoveryControls({
             defaultValue={query.q ?? ''}
             maxLength={120}
             placeholder="Tìm trong Shopee Clone"
+            className="shopee-form-input"
           />
         </div>
-        <div className="catalog-field">
-          <label htmlFor="catalog-category">Danh mục</label>
-          <select id="catalog-category" name="category" defaultValue={query.category ?? ''}>
+
+        {/* Category Filter */}
+        <div className="catalog-field shopee-filter-group">
+          <label htmlFor="catalog-category" className="shopee-group-title">
+            <FaListUl className="shopee-group-icon" /> Danh mục
+          </label>
+          <select
+            id="catalog-category"
+            name="category"
+            aria-label="Danh mục"
+            defaultValue={query.category ?? ''}
+            className="shopee-form-select"
+          >
             <option value="">Tất cả danh mục</option>
             {facets.categories.map((category) => (
               <option key={category.slug} value={category.slug}>
@@ -295,37 +386,19 @@ export function DiscoveryControls({
             ))}
           </select>
         </div>
-        <fieldset className="catalog-price">
-          <legend>Khoảng giá (₫)</legend>
-          <FormattedPriceInput
-            ariaLabel="Giá thấp nhất"
-            name="minPrice"
-            initialValue={query.minPrice}
-            placeholder={facets.priceRange.min === null ? 'Từ' : formatPriceDisplay(facets.priceRange.min)}
-          />
-          <span>–</span>
-          <FormattedPriceInput
-            ariaLabel="Giá cao nhất"
-            name="maxPrice"
-            initialValue={query.maxPrice}
-            placeholder={facets.priceRange.max === null ? 'Đến' : formatPriceDisplay(facets.priceRange.max)}
-          />
-        </fieldset>
 
-        <div className="catalog-field">
-          <label htmlFor="catalog-rating">Đánh giá</label>
-          <select id="catalog-rating" name="rating" defaultValue={query.rating ?? ''}>
-            <option value="">Tất cả</option>
-            {[5, 4, 3, 2, 1].map((rating) => (
-              <option key={rating} value={rating}>
-                {rating} sao trở lên
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="catalog-field">
-          <label htmlFor="catalog-location">Nơi bán</label>
-          <select id="catalog-location" name="location" defaultValue={query.location ?? ''}>
+        {/* Location Filter */}
+        <div className="catalog-field shopee-filter-group">
+          <label htmlFor="catalog-location" className="shopee-group-title">
+            <FaLocationDot className="shopee-group-icon" /> Nơi bán
+          </label>
+          <select
+            id="catalog-location"
+            name="location"
+            aria-label="Nơi bán"
+            defaultValue={query.location ?? ''}
+            className="shopee-form-select"
+          >
             <option value="">Toàn quốc</option>
             {facets.locations.map((location) => (
               <option key={location} value={location}>
@@ -334,29 +407,89 @@ export function DiscoveryControls({
             ))}
           </select>
         </div>
-        <div className="catalog-checks">
-          <label>
+
+        {/* Price Range Filter */}
+        <fieldset className="catalog-price shopee-filter-group shopee-price-group">
+          <legend className="shopee-group-title">
+            <FaTag className="shopee-group-icon" /> Khoảng Giá (₫)
+          </legend>
+          <div className="shopee-price-inputs">
+            <FormattedPriceInput
+              ariaLabel="Giá thấp nhất"
+              name="minPrice"
+              initialValue={query.minPrice}
+              placeholder={facets.priceRange.min === null ? 'TỪ' : formatPriceDisplay(facets.priceRange.min)}
+            />
+            <span className="shopee-price-dash">–</span>
+            <FormattedPriceInput
+              ariaLabel="Giá cao nhất"
+              name="maxPrice"
+              initialValue={query.maxPrice}
+              placeholder={facets.priceRange.max === null ? 'ĐẾN' : formatPriceDisplay(facets.priceRange.max)}
+            />
+          </div>
+          <button type="submit" className="shopee-btn-apply">
+            Áp dụng
+          </button>
+        </fieldset>
+
+        {/* Rating Filter */}
+        <div className="catalog-field shopee-filter-group">
+          <label htmlFor="catalog-rating" className="shopee-group-title">
+            <FaStar className="shopee-group-icon" /> Đánh giá
+          </label>
+          <select
+            id="catalog-rating"
+            name="rating"
+            aria-label="Đánh giá"
+            defaultValue={query.rating ?? ''}
+            className="shopee-form-select"
+          >
+            <option value="">Tất cả đánh giá</option>
+            {[5, 4, 3, 2, 1].map((rating) => (
+              <option key={rating} value={rating}>
+                {rating} sao trở lên
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* Availability & Promotion Checks */}
+        <div className="catalog-checks shopee-filter-group shopee-checks-group">
+          <div className="shopee-group-title">Dịch Vụ & Khuyến Mãi</div>
+          <label className="shopee-checkbox-label">
             <input
               name="availability"
               type="checkbox"
               value="in-stock"
               defaultChecked={query.availability === 'in-stock'}
-            />{' '}
-            Còn hàng
+              className="shopee-checkbox"
+            />
+            <span>Còn hàng</span>
           </label>
-          <label>
+          <label className="shopee-checkbox-label">
             <input
               name="promotion"
               type="checkbox"
               value="discounted"
               defaultChecked={query.promotion === 'discounted'}
-            />{' '}
-            Đang giảm giá
+              className="shopee-checkbox"
+            />
+            <span>Đang giảm giá</span>
           </label>
         </div>
-        <div className="catalog-field">
-          <label htmlFor="catalog-sort">Sắp xếp</label>
-          <select id="catalog-sort" name="sort" defaultValue={query.sort}>
+
+        {/* Sorting Dropdown */}
+        <div className="catalog-field shopee-filter-group">
+          <label htmlFor="catalog-sort" className="shopee-group-title">
+            Sắp xếp
+          </label>
+          <select
+            id="catalog-sort"
+            name="sort"
+            defaultValue={query.sort}
+            className="shopee-form-select"
+          >
             <option value="relevance">Liên quan nhất</option>
             <option value="newest">Mới nhất</option>
             <option value="best-selling">Bán chạy</option>
@@ -364,18 +497,25 @@ export function DiscoveryControls({
             <option value="price-desc">Giá cao đến thấp</option>
           </select>
         </div>
+
         {context.pageSize !== 12 ? (
           <input type="hidden" name="pageSize" value={context.pageSize} />
         ) : null}
-        <div className="catalog-discovery__actions">
-          <button type="submit">Áp dụng</button>
-          <Link href="/search">Xóa lọc</Link>
+
+        {/* Actions */}
+        <div className="catalog-discovery__actions shopee-filter-actions">
+          <Link href="/search" className="shopee-btn-clear">
+            Xóa lọc
+          </Link>
         </div>
       </form>
+
+      {/* Result Status Summary */}
       <div className="catalog-result-summary" role="status" aria-live="polite">
         <strong>{formatNumber(pagination.totalItems)} sản phẩm</strong>
         <span>Sắp xếp: {sortDescription}</span>
       </div>
+
       <ActiveFilters context={context} />
     </FavoriteStateProvider>
   );
@@ -392,12 +532,14 @@ export function CatalogContent({
 }) {
   return (
     <FavoriteStateProvider productIds={response.items.map(({ id }) => id)}>
-      <div className="catalog-grid" aria-label="Danh sách sản phẩm">
-        {response.items.map((product) => (
-          <ProductCard key={product.id} product={product} />
-        ))}
+      <div className="shopee-catalog-content">
+        <div className="catalog-grid" aria-label="Danh sách sản phẩm">
+          {response.items.map((product) => (
+            <ProductCard key={product.id} product={product} />
+          ))}
+        </div>
+        <CatalogPagination response={response} context={context} pageHrefBuilder={pageHrefBuilder} />
       </div>
-      <CatalogPagination response={response} context={context} pageHrefBuilder={pageHrefBuilder} />
     </FavoriteStateProvider>
   );
 }

@@ -7,7 +7,7 @@ import {
   normalizeVietnamesePhone,
   type BuyerProfile,
 } from '@shopee-clone/contracts';
-import { Button, Card, InputField } from '@shopee-clone/ui';
+import { Button, InputField } from '@shopee-clone/ui';
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 
 import { getBuyerProfile, updateBuyerProfile } from '../lib/account-api';
@@ -17,6 +17,31 @@ import {
   AccountWorkspace,
   ProtectedAccountState,
 } from './protected-account-state';
+
+// Font Awesome SVG Icons
+function FaUser({ className }: { className?: string }) {
+  return (
+    <svg className={className} width="48" height="48" viewBox="0 0 448 512" fill="currentColor" aria-hidden="true">
+      <path d="M224 256A128 128 0 1 0 224 0a128 128 0 1 0 0 256zm-45.7 48C79.8 304 0 383.8 0 482.3C0 498.7 13.3 512 29.7 512l388.6 0c16.4 0 29.7-13.3 29.7-29.7C448 383.8 368.2 304 269.7 304l-91.4 0z" />
+    </svg>
+  );
+}
+
+function FaCheckCircle({ className }: { className?: string }) {
+  return (
+    <svg className={className} width="16" height="16" viewBox="0 0 512 512" fill="currentColor" aria-hidden="true">
+      <path d="M256 512A256 256 0 1 0 256 0a256 256 0 1 0 0 512zM369 209L241 337c-9.4 9.4-24.6 9.4-33.9 0l-64-64c-9.4-9.4-9.4-24.6 0-33.9s24.6-9.4 33.9 0l47 47L335 175c9.4-9.4 24.6-9.4 33.9 0s9.4 24.6 0 33.9z" />
+    </svg>
+  );
+}
+
+function FaExclamationCircle({ className }: { className?: string }) {
+  return (
+    <svg className={className} width="16" height="16" viewBox="0 0 512 512" fill="currentColor" aria-hidden="true">
+      <path d="M256 512A256 256 0 1 0 256 0a256 256 0 1 0 0 512zm0-384c13.3 0 24 10.7 24 24l0 112c0 13.3-10.7 24-24 24s-24-10.7-24-24l0-112c0-13.3 10.7-24 24-24zm32 224a32 32 0 1 0 -64 0 32 32 0 1 0 64 0z" />
+    </svg>
+  );
+}
 
 type FieldErrors = { displayName?: string; phoneNumber?: string };
 
@@ -29,6 +54,12 @@ export function ProfileManagement() {
   const [message, setMessage] = useState('');
   const [errors, setErrors] = useState<FieldErrors>({});
   const errorReference = useRef<HTMLDivElement>(null);
+
+  // Decorative UI state for gender and birth date (Shopee profile standard)
+  const [gender, setGender] = useState<'male' | 'female' | 'other'>('male');
+  const [birthDay, setBirthDay] = useState('10');
+  const [birthMonth, setBirthMonth] = useState('10');
+  const [birthYear, setBirthYear] = useState('2004');
 
   const load = useCallback(async () => {
     if (auth.state.status !== 'authenticated') return;
@@ -109,59 +140,202 @@ export function ProfileManagement() {
         ) : loadFailed && !profile ? (
           <AccountLoadFailure onRetry={() => void load()} />
         ) : profile ? (
-          <Card className="buyer-account-card">
-            <form className="buyer-account-form" noValidate onSubmit={submit} aria-busy={pending}>
-              <div className="buyer-account-readonly">
-                <div>
-                  <span>Email</span>
-                  <strong>{profile.email}</strong>
+          <div className="shopee-profile-card">
+            {/* Header section */}
+            <header className="shopee-profile-head">
+              <h1 className="shopee-profile-head__title">Hồ sơ cá nhân</h1>
+              <p className="shopee-profile-head__subtitle">Quản lý thông tin hồ sơ để bảo mật tài khoản</p>
+            </header>
+            <hr className="shopee-profile-divider" />
+
+            {/* Body: Form + Avatar Split */}
+            <div className="shopee-profile-body">
+              {/* Left Column: Form Details */}
+              <form className="shopee-profile-form" noValidate onSubmit={submit} aria-busy={pending}>
+                {/* Row: Tên đăng nhập / Email */}
+                <div className="shopee-form-row">
+                  <span className="shopee-form-row__label">Tên đăng nhập</span>
+                  <div className="shopee-form-row__value">
+                    <span className="shopee-form-text">{profile.email.split('@')[0]}</span>
+                  </div>
                 </div>
-                <div>
-                  <span>Trạng thái</span>
-                  <strong>{profile.status === 'active' ? 'Đang hoạt động' : 'Tạm ngưng'}</strong>
+
+                {/* Row: Tên hiển thị */}
+                <div className="shopee-form-row">
+                  <span className="shopee-form-row__label">
+                    Tên hiển thị <span className="shopee-required" aria-hidden="true">*</span>
+                  </span>
+                  <div className="shopee-form-row__value">
+                    <InputField
+                      id="profile-display-name"
+                      name="displayName"
+                      label="Tên hiển thị"
+                      defaultValue={profile.displayName}
+                      minLength={ACCOUNT_NAME_MIN_LENGTH}
+                      maxLength={ACCOUNT_NAME_MAX_LENGTH}
+                      autoComplete="name"
+                      error={errors.displayName}
+                      required
+                    />
+                  </div>
+                </div>
+
+                {/* Row: Email */}
+                <div className="shopee-form-row">
+                  <span className="shopee-form-row__label">Email</span>
+                  <div className="shopee-form-row__value">
+                    <span className="shopee-form-text">{profile.email}</span>
+                  </div>
+                </div>
+
+                {/* Row: Số điện thoại */}
+                <div className="shopee-form-row">
+                  <span className="shopee-form-row__label">
+                    Số điện thoại
+                  </span>
+                  <div className="shopee-form-row__value">
+                    <InputField
+                      id="profile-phone-number"
+                      name="phoneNumber"
+                      label="Số điện thoại"
+                      defaultValue={profile.phoneNumber ?? ''}
+                      autoComplete="tel"
+                      inputMode="tel"
+                      hint="Ví dụ: 0912 345 678 hoặc +84 912 345 678."
+                      error={errors.phoneNumber}
+                      optional
+                    />
+                  </div>
+                </div>
+
+                {/* Row: Trạng thái tài khoản */}
+                <div className="shopee-form-row">
+                  <span className="shopee-form-row__label">Trạng thái</span>
+                  <div className="shopee-form-row__value">
+                    <span className={`shopee-status-badge ${profile.status === 'active' ? 'is-active' : 'is-suspended'}`}>
+                      <FaCheckCircle />
+                      <strong>{profile.status === 'active' ? 'Đang hoạt động' : 'Tạm ngưng'}</strong>
+                    </span>
+                  </div>
+                </div>
+
+                {/* Row: Giới tính */}
+                <div className="shopee-form-row">
+                  <span className="shopee-form-row__label">Giới tính</span>
+                  <div className="shopee-form-row__value">
+                    <div className="shopee-radio-group">
+                      <label className="shopee-radio-label">
+                        <input
+                          type="radio"
+                          name="gender"
+                          value="male"
+                          checked={gender === 'male'}
+                          onChange={() => setGender('male')}
+                        />
+                        <span>Nam</span>
+                      </label>
+                      <label className="shopee-radio-label">
+                        <input
+                          type="radio"
+                          name="gender"
+                          value="female"
+                          checked={gender === 'female'}
+                          onChange={() => setGender('female')}
+                        />
+                        <span>Nữ</span>
+                      </label>
+                      <label className="shopee-radio-label">
+                        <input
+                          type="radio"
+                          name="gender"
+                          value="other"
+                          checked={gender === 'other'}
+                          onChange={() => setGender('other')}
+                        />
+                        <span>Khác</span>
+                      </label>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Row: Ngày sinh */}
+                <div className="shopee-form-row">
+                  <span className="shopee-form-row__label">Ngày sinh</span>
+                  <div className="shopee-form-row__value">
+                    <div className="shopee-birthdate-group">
+                      <select
+                        aria-label="Ngày sinh"
+                        value={birthDay}
+                        onChange={(e) => setBirthDay(e.target.value)}
+                        className="shopee-select"
+                      >
+                        {Array.from({ length: 31 }, (_, i) => String(i + 1).padStart(2, '0')).map((d) => (
+                          <option key={d} value={d}>Ngày {d}</option>
+                        ))}
+                      </select>
+                      <select
+                        aria-label="Tháng sinh"
+                        value={birthMonth}
+                        onChange={(e) => setBirthMonth(e.target.value)}
+                        className="shopee-select"
+                      >
+                        {Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, '0')).map((m) => (
+                          <option key={m} value={m}>Tháng {m}</option>
+                        ))}
+                      </select>
+                      <select
+                        aria-label="Năm sinh"
+                        value={birthYear}
+                        onChange={(e) => setBirthYear(e.target.value)}
+                        className="shopee-select"
+                      >
+                        {Array.from({ length: 80 }, (_, i) => String(2024 - i)).map((y) => (
+                          <option key={y} value={y}>{y}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Status / Error Message */}
+                {message ? (
+                  <div
+                    ref={errorReference}
+                    className={`shopee-form-alert ${message.startsWith('Đã') ? 'is-success' : 'is-error'}`}
+                    role={message.startsWith('Đã') ? 'status' : 'alert'}
+                    tabIndex={-1}
+                  >
+                    {message.startsWith('Đã') ? <FaCheckCircle /> : <FaExclamationCircle />}
+                    <span>{message}</span>
+                  </div>
+                ) : null}
+
+                {/* Submit button */}
+                <div className="shopee-form-row shopee-form-row--submit">
+                  <div className="shopee-form-row__label" />
+                  <div className="shopee-form-row__value">
+                    <Button type="submit" className="shopee-btn-save" loading={pending} disabled={pending}>
+                      Lưu thay đổi
+                    </Button>
+                  </div>
+                </div>
+              </form>
+
+              {/* Right Column: Avatar Upload Preview */}
+              <div className="shopee-profile-avatar">
+                <div className="shopee-avatar-preview" aria-hidden="true">
+                  <FaUser className="shopee-avatar-icon" />
+                </div>
+                <button type="button" className="shopee-btn-avatar">
+                  Chọn Ảnh
+                </button>
+                <div className="shopee-avatar-hint">
+                  <p>Dụng lượng file tối đa 1 MB</p>
+                  <p>Định dạng: .JPEG, .PNG</p>
                 </div>
               </div>
-              <InputField
-                id="profile-display-name"
-                name="displayName"
-                label="Tên hiển thị"
-                defaultValue={profile.displayName}
-                minLength={ACCOUNT_NAME_MIN_LENGTH}
-                maxLength={ACCOUNT_NAME_MAX_LENGTH}
-                autoComplete="name"
-                error={errors.displayName}
-                required
-              />
-              <InputField
-                id="profile-phone-number"
-                name="phoneNumber"
-                label="Số điện thoại"
-                defaultValue={profile.phoneNumber ?? ''}
-                autoComplete="tel"
-                inputMode="tel"
-                hint="Ví dụ: 0912 345 678 hoặc +84 912 345 678."
-                error={errors.phoneNumber}
-                optional
-              />
-              {message ? (
-                <div
-                  ref={errorReference}
-                  className={
-                    message.startsWith('Đã')
-                      ? 'buyer-account-message is-success'
-                      : 'buyer-account-message is-error'
-                  }
-                  role={message.startsWith('Đã') ? 'status' : 'alert'}
-                  tabIndex={-1}
-                >
-                  {message}
-                </div>
-              ) : null}
-              <Button type="submit" loading={pending} disabled={pending}>
-                Lưu thay đổi
-              </Button>
-            </form>
-          </Card>
+            </div>
+          </div>
         ) : null}
       </ProtectedAccountState>
     </AccountWorkspace>

@@ -227,6 +227,7 @@ enum NotificationType {
   PRODUCT_APPROVED   @map("product_approved")
   PRODUCT_REJECTED   @map("product_rejected")
   VOUCHER_ASSIGNED   @map("voucher_assigned")
+  CHAT_MESSAGE       @map("chat_message")
   SYSTEM_NOTICE      @map("system_notice")
 
   @@map("notification_type")

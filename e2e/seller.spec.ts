@@ -68,10 +68,13 @@ test('approved seller can create, publish, then hide a product listing', async (
     const request = route.request(); const path = new URL(request.url()).pathname;
     if (request.method() === 'POST' && path === '/api/v1/auth/refresh') return json(route, { accessToken: 'header.payload.signature', expiresAt: '2099-08-17T00:00:00.000Z', user: { id: '30000000-0000-4000-8000-000000000002', email: 'seller@example.test', displayName: 'Seller Test', status: 'active', roles: ['buyer', 'seller'] } });
     if (request.method() === 'GET' && path === '/api/v1/cart') return route.fulfill({ status: 404 });
+    if (request.method() === 'GET' && path === '/api/v1/seller/shop/workspace') return json(route, { shop: { ...shop, canSell: true, status: 'active', onboardingStatus: 'approved' }, defaultAddress: null });
     if (request.method() === 'GET' && path === '/api/v1/seller/products') return json(route, { items: deleted ? [] : [{ id: product.id, slug: product.slug, name: product.name, categoryName: 'Thiết bị điện tử', lifecycle, moderationStatus: 'active', primaryMediaUrl: product.media[0]?.url ?? null, variantCount: 1, stockQuantity: 5, updatedAt: product.updatedAt }], nextCursor: null });
     if (request.method() === 'GET' && path === '/api/v1/seller/products/categories') return json(route, [{ id: product.categoryId, name: 'Thiết bị điện tử', slug: 'thiet-bi-dien-tu', parentId: null, isLeaf: true, attributes: [] }]);
     if (request.method() === 'GET' && path === `/api/v1/seller/products/${product.id}`) return json(route, { ...product, lifecycle });
-    if (request.method() === 'POST' && path === '/api/v1/seller/products/media') return json(route, { id: '30000000-0000-4000-8000-000000000205', mimeType: 'image/png', byteSize: 24, width: 1, height: 1, previewUrl: '/api/v1/seller/products/media/30000000-0000-4000-8000-000000000205/preview', expiresAt: '2026-08-18T00:00:00.000Z' }, 201);
+    if (request.method() === 'POST' && path === '/api/v1/seller/products/media/upload-intents') return json(route, { mediaId: '30000000-0000-4000-8000-000000000205', upload: { method: 'PUT', url: 'http://localhost:3000/api/v1/mock-upload', headers: { 'Content-Type': 'image/png', 'x-amz-checksum-sha256': 'checksum' }, expiresAt: '2026-08-18T00:00:00.000Z' } }, 201);
+    if (request.method() === 'PUT' && path === '/api/v1/mock-upload') return route.fulfill({ status: 200 });
+    if (request.method() === 'POST' && path === '/api/v1/seller/products/media/30000000-0000-4000-8000-000000000205/complete') return json(route, { id: '30000000-0000-4000-8000-000000000205', mimeType: 'image/png', byteSize: 24, width: 1, height: 1, previewUrl: '/api/v1/seller/products/media/30000000-0000-4000-8000-000000000205/preview', expiresAt: '2026-08-18T00:00:00.000Z' }, 201);
     if (request.method() === 'POST' && path === '/api/v1/seller/products') { creates += 1; lifecycle = 'draft'; return json(route, { ...product, lifecycle }, 201); }
     if (request.method() === 'PATCH' && path.endsWith('/lifecycle')) { lifecycle = (request.postDataJSON() as { lifecycle: 'published' | 'hidden' }).lifecycle; return json(route, { ...product, lifecycle }); }
     if (request.method() === 'DELETE' && path === `/api/v1/seller/products/${product.id}`) { deleted = true; return route.fulfill({ status: 204 }); }
@@ -152,6 +155,7 @@ test('seller gets a stock row for every generated classification combination', a
     const request = route.request(); const path = new URL(request.url()).pathname;
     if (request.method() === 'POST' && path === '/api/v1/auth/refresh') return json(route, { accessToken: 'header.payload.signature', expiresAt: '2099-08-17T00:00:00.000Z', user: { id: '30000000-0000-4000-8000-000000000002', email: 'seller@example.test', displayName: 'Seller Test', status: 'active', roles: ['buyer', 'seller'] } });
     if (request.method() === 'GET' && path === '/api/v1/cart') return route.fulfill({ status: 404 });
+    if (request.method() === 'GET' && path === '/api/v1/seller/shop/workspace') return json(route, { shop: { ...shop, canSell: true, status: 'active', onboardingStatus: 'approved' }, defaultAddress: null });
     if (request.method() === 'GET' && path === '/api/v1/seller/products/categories') return json(route, [{ id: categoryId, name: 'Thiết bị điện tử', slug: 'thiet-bi-dien-tu', parentId: null, isLeaf: true, attributes: [] }]);
     return route.fulfill({ status: 404 });
   });
@@ -200,6 +204,7 @@ test('seller inventory supports adjustment, availability refresh, history, and i
     const path = new URL(request.url()).pathname;
     if (request.method() === 'POST' && path === '/api/v1/auth/refresh') return json(route, { accessToken: 'header.payload.signature', expiresAt: '2099-08-18T00:00:00.000Z', user: { id: '30000000-0000-4000-8000-000000000002', email: 'seller@example.test', displayName: 'Seller Test', status: 'active', roles: ['buyer', 'seller'] } });
     if (request.method() === 'GET' && path === '/api/v1/cart') return route.fulfill({ status: 404 });
+    if (request.method() === 'GET' && path === '/api/v1/seller/shop/workspace') return json(route, { shop: { ...shop, canSell: true, status: 'active', onboardingStatus: 'approved' }, defaultAddress: null });
     if (request.method() === 'GET' && path === '/api/v1/seller/inventory') return json(route, { items: [current], nextCursor: null });
     if (request.method() === 'GET' && path === `/api/v1/seller/inventory/${variantId}/adjustments`) return json(route, { items: [{ id: '30000000-0000-4000-8000-000000000403', variantId, actorUserId: '30000000-0000-4000-8000-000000000002', reason: 'RESTOCK', note: 'Bổ sung hàng', delta: 2, quantityOnHandBefore: 5, quantityOnHandAfter: 7, quantityReserved: 0, quantitySold: 0, availableQuantity: 7, inventoryVersion: 1, idempotencyKey: null, occurredAt: '2026-08-18T00:01:00.000Z' }], nextCursor: null });
     if (request.method() === 'POST' && path === `/api/v1/seller/inventory/${variantId}/adjustments`) {

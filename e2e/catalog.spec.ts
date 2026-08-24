@@ -21,8 +21,8 @@ test.describe('API-driven product discovery', () => {
     const form = page.getByRole('search', { name: 'Tìm và lọc sản phẩm' });
     await form.getByRole('searchbox', { name: 'Từ khóa' }).fill('nuoc kiem');
     await form.getByRole('combobox', { name: 'Danh mục' }).selectOption('bach-hoa');
-    await form.getByRole('spinbutton', { name: 'Giá thấp nhất' }).fill('1000');
-    await form.getByRole('spinbutton', { name: 'Giá cao nhất' }).fill('1000000');
+    await form.getByRole('textbox', { name: 'Giá thấp nhất' }).fill('1000');
+    await form.getByRole('textbox', { name: 'Giá cao nhất' }).fill('1000000');
     await form.getByRole('combobox', { name: 'Đánh giá' }).selectOption('4');
     await form
       .getByRole('combobox', { name: 'Nơi bán' })

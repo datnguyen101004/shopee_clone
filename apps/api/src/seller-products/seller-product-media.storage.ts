@@ -101,7 +101,8 @@ function managedMediaKey(key: string): string | null {
  */
 export function publicSellerProductMediaUrl(key: string): string | null {
   const remoteKey = managedMediaKey(key);
-  const publicBase = envValue('AWS_S3_PUBLIC_BASE_URL');
+  const publicBase =
+    envValue('AWS_CLOUDFRONT_BASE_URL', 'AWS_S3_PUBLIC_BASE_URL') || cloudFrontDefaultBaseUrl;
   if (!remoteKey || !publicBase) return null;
   return `${publicBase.replace(/\/$/, '')}/${remoteKey.split('/').map((part) => encodeURIComponent(part)).join('/')}`;
 }

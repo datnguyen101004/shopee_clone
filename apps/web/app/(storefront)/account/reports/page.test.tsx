@@ -42,7 +42,7 @@ describe('AccountReportsPage', () => {
     render(<AccountReportsPage />);
 
     expect(await screen.findByRole('heading', { name: 'Báo cáo đã gửi' })).toBeInTheDocument();
-    expect(screen.getByText('Sản phẩm bị báo cáo')).toBeInTheDocument();
+    expect(await screen.findByText('Sản phẩm bị báo cáo')).toBeInTheDocument();
     expect(screen.queryByText('private-case-id')).not.toBeInTheDocument();
     expect(screen.queryByText('https://private.example/evidence')).not.toBeInTheDocument();
 

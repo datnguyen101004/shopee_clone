@@ -27,18 +27,13 @@ import {
   transitionSellerProduct,
   updateSellerProduct,
 } from '../lib/seller-products-api';
+import { marketplaceMediaUrl } from '../lib/marketplace-media-url';
 import { useAuthSession } from './auth-session-provider';
 
-const sellerProductApiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:3001';
 const excludedSellerCategorySlugs = new Set(['mobile-accessories', 'kitchen-appliances']);
 
 function sellerProductMediaUrl(value: string | null | undefined): string {
-  if (!value) return '';
-  try {
-    return new URL(value, sellerProductApiBaseUrl).toString();
-  } catch {
-    return value;
-  }
+  return marketplaceMediaUrl(value);
 }
 
 const emptyVariant = (): SellerProductVariantInput => ({
@@ -292,6 +287,21 @@ function SellerProductDeleteDialog({
   );
 }
 
+function SellerProductItemImage({ src, alt }: { src: string | null | undefined; alt: string }) {
+  const [failed, setFailed] = useState(false);
+  const resolved = src ? sellerProductMediaUrl(src) : '';
+  if (!resolved || failed) {
+    return (
+      <div className="seller-product-image-fallback" aria-hidden="true">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="#94a3b8">
+          <path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z" />
+        </svg>
+      </div>
+    );
+  }
+  return <img src={resolved} alt={alt} onError={() => setFailed(true)} />;
+}
+
 export function SellerProductList() {
   const { authenticatedFetch, state } = useAuthSession();
   const [items, setItems] = useState<Awaited<ReturnType<typeof fetchSellerProducts>>['items']>([]);
@@ -430,11 +440,7 @@ export function SellerProductList() {
             <div className="seller-product-row" key={item.id}>
               <Link className="seller-product-row-main" href={`/seller/products/${item.id}`}>
                 <div>
-                  {item.primaryMediaUrl ? (
-                    <img src={sellerProductMediaUrl(item.primaryMediaUrl)} alt="" />
-                  ) : (
-                    <span className="seller-product-image-placeholder">Ảnh</span>
-                  )}
+                  <SellerProductItemImage src={item.primaryMediaUrl} alt="" />
                 </div>
                 <div>
                   <strong>{item.name}</strong>
@@ -444,7 +450,7 @@ export function SellerProductList() {
                 </div>
               </Link>
               <div className="seller-product-row-actions">
-                <b>
+                <b className={`seller-product-status seller-product-status--${item.lifecycle}`}>
                   {item.lifecycle === 'published'
                     ? 'Đang bán'
                     : item.lifecycle === 'hidden'
@@ -474,8 +480,8 @@ export function SellerProductList() {
                       disabled={publishingId !== null || deletingId !== null}
                       onClick={(event) => requestDelete(item, event.currentTarget)}
                     >
-                      <svg aria-hidden="true" viewBox="0 0 24 24" focusable="false">
-                        <path d="M9 3h6l1 2h4v2H4V5h4l1-2Zm-2 6h2v9H7V9Zm4 0h2v9h-2V9Zm4 0h2v9h-2V9ZM6 21V8h12v13H6Z" />
+                      <svg aria-hidden="true" viewBox="0 0 24 24" focusable="false" width="18" height="18" fill="currentColor">
+                        <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z" />
                       </svg>
                       <span className="seller-product-visually-hidden">{deletingId === item.id ? 'Đang xóa' : 'Xóa'}</span>
                     </button>
@@ -501,10 +507,9 @@ export function SellerProductList() {
                       disabled={publishingId !== null || deletingId !== null}
                       onClick={(event) => requestHide(item, event.currentTarget)}
                     >
-                      <svg aria-hidden="true" viewBox="0 0 24 24" focusable="false">
-                        <path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z" />
-                        <circle cx="12" cy="12" r="3.1" />
-                        <path d="M4.2 19.8 19.8 4.2" />
+                      <svg aria-hidden="true" viewBox="0 0 24 24" focusable="false" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
+                        <line x1="1" y1="1" x2="23" y2="23" />
                       </svg>
                       <span className="seller-product-visually-hidden">
                         {publishingId === item.id ? 'Đang ẩn' : 'Ẩn sản phẩm'}
@@ -518,8 +523,8 @@ export function SellerProductList() {
                       disabled={publishingId !== null || deletingId !== null}
                       onClick={(event) => requestDelete(item, event.currentTarget)}
                     >
-                      <svg aria-hidden="true" viewBox="0 0 24 24" focusable="false">
-                        <path d="M9 3h6l1 2h4v2H4V5h4l1-2Zm-2 6h2v9H7V9Zm4 0h2v9h-2V9Zm4 0h2v9h-2V9ZM6 21V8h12v13H6Z" />
+                      <svg aria-hidden="true" viewBox="0 0 24 24" focusable="false" width="18" height="18" fill="currentColor">
+                        <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z" />
                       </svg>
                       <span className="seller-product-visually-hidden">{deletingId === item.id ? 'Đang xóa' : 'Xóa'}</span>
                     </button>
@@ -534,8 +539,8 @@ export function SellerProductList() {
                     disabled={publishingId !== null || deletingId !== null}
                     onClick={(event) => requestDelete(item, event.currentTarget)}
                   >
-                    <svg aria-hidden="true" viewBox="0 0 24 24" focusable="false">
-                      <path d="M9 3h6l1 2h4v2H4V5h4l1-2Zm-2 6h2v9H7V9Zm4 0h2v9h-2V9Zm4 0h2v9h-2V9ZM6 21V8h12v13H6Z" />
+                    <svg aria-hidden="true" viewBox="0 0 24 24" focusable="false" width="18" height="18" fill="currentColor">
+                      <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z" />
                     </svg>
                     <span className="seller-product-visually-hidden">{deletingId === item.id ? 'Đang xóa' : 'Xóa'}</span>
                   </button>

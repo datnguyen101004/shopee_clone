@@ -61,12 +61,14 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
         <h1>{response.query.q ? `Kết quả cho “${response.query.q}”` : 'Khám phá sản phẩm'}</h1>
         <p>Tìm kiếm, lọc và sắp xếp sản phẩm từ các gian hàng đang hoạt động.</p>
       </header>
-      <DiscoveryControls response={response} context={context} />
-      {response.items.length ? (
-        <CatalogContent response={response} context={context} />
-      ) : (
-        <CatalogEmptyState filtered={isFiltered} />
-      )}
+      <div className="shopee-search-layout">
+        <DiscoveryControls response={response} context={context} />
+        {response.items.length ? (
+          <CatalogContent response={response} context={context} />
+        ) : (
+          <CatalogEmptyState filtered={isFiltered} />
+        )}
+      </div>
     </Container>
   );
 }

@@ -2,6 +2,7 @@
 
 import type {
   CartLine,
+  CartResponse,
   CartShopGroup,
   PricingQuoteLine,
   PricingQuoteShop,
@@ -27,6 +28,76 @@ function formatCurrency(value: number): string {
 
 function ignoreRejected(operation: Promise<unknown>) {
   void operation.catch(() => undefined);
+}
+
+function uniqueMessages(messages: string[]): string[] {
+  return [...new Set(messages.map((message) => message.trim()).filter(Boolean))];
+}
+
+function purchaseBlockers(
+  current: CartResponse,
+  pricing: CartPricingState,
+  cartStatus: 'ready' | 'error',
+  cartPending: boolean,
+): string[] {
+  const blockers: string[] = [];
+  const selectedLines = current.groups.flatMap((group) => group.lines).filter((line) => line.selected);
+
+  if (current.summary.selectedValidLineCount === 0) {
+    const lineIssueMessages = selectedLines.flatMap((line) =>
+      line.issues
+        .filter((issue) => issue.code === 'unavailable' || issue.code === 'insufficient-stock')
+        .map((issue) => issue.message),
+    );
+    blockers.push(
+      ...(lineIssueMessages.length
+        ? lineIssueMessages
+        : selectedLines.length
+          ? ['Sản phẩm đã chọn không còn đủ điều kiện để đặt hàng.']
+          : ['Hãy chọn ít nhất một sản phẩm hợp lệ để mua hàng.']),
+    );
+  }
+
+  if (cartPending) blockers.push('Đang cập nhật giỏ hàng, vui lòng chờ trong giây lát.');
+  if (cartStatus === 'error') {
+    blockers.push('Giỏ hàng chưa được đồng bộ. Hãy thử tải lại trước khi mua hàng.');
+  }
+
+  switch (pricing.status) {
+    case 'missing-address':
+      blockers.push('Bạn cần thêm địa chỉ nhận hàng trước khi mua hàng.');
+      break;
+    case 'loading-addresses':
+      blockers.push('Đang kiểm tra địa chỉ nhận hàng.');
+      break;
+    case 'loading':
+      blockers.push('Đang tính giá và phí vận chuyển.');
+      break;
+    case 'stale':
+      blockers.push('Giá hoặc phí vận chuyển đang được cập nhật.');
+      break;
+    case 'error':
+      blockers.push(pricing.message || 'Không thể xác nhận giá và phí vận chuyển.');
+      break;
+    case 'idle':
+      blockers.push('Đang chuẩn bị bảng giá và phí vận chuyển.');
+      break;
+    case 'ready':
+      if (!pricing.selectedAddressId || !pricing.addresses.some(({ id }) => id === pricing.selectedAddressId)) {
+        blockers.push('Bạn cần chọn một địa chỉ nhận hàng hợp lệ.');
+      }
+      if (!pricing.quote) {
+        blockers.push('Chưa nhận được bảng giá mới nhất từ máy chủ.');
+      } else if (pricing.quote.cartVersion !== current.version) {
+        blockers.push('Giỏ hàng đã thay đổi. Hãy chờ bảng giá được cập nhật.');
+      } else if (pricing.quote.summary.selectedLineCount !== current.summary.selectedValidLineCount) {
+        blockers.push('Bảng giá chưa bao gồm đầy đủ sản phẩm đã chọn.');
+      }
+      blockers.push(...(pricing.quote?.exclusions ?? []).map((exclusion) => exclusion.message));
+      break;
+  }
+
+  return uniqueMessages(blockers);
 }
 
 function CartLineRow({ line, pricingLine }: { line: CartLine; pricingLine?: PricingQuoteLine }) {
@@ -351,6 +422,26 @@ export function CartScreen() {
         group.eligibleLineCount === 0 ||
         group.selectedEligibleLineCount === group.eligibleLineCount,
     );
+  const purchaseBlockerMessages = purchaseBlockers(
+    current,
+    pricing,
+    cart.state.status,
+    cart.pending,
+  );
+  const canPurchase =
+    current.summary.selectedValidLineCount > 0 &&
+    cart.state.status === 'ready' &&
+    !cart.pending &&
+    pricing.status === 'ready' &&
+    Boolean(pricing.selectedAddressId) &&
+    pricing.quote?.cartVersion === current.version &&
+    pricing.quote.summary.selectedLineCount === current.summary.selectedValidLineCount &&
+    pricing.quote.exclusions.length === 0;
+  const displayedPurchaseBlockers = canPurchase
+    ? []
+    : purchaseBlockerMessages.length
+      ? purchaseBlockerMessages
+      : ['Hãy hoàn tất các điều kiện trước khi mua hàng.'];
 
   return (
     <Container className="cart-page">
@@ -403,7 +494,7 @@ export function CartScreen() {
           Chọn tất cả ({current.summary.distinctLineCount})
         </label>
         <div>
-          {pricing.status === 'ready' && pricing.quote?.cartVersion === current.version ? (
+          {canPurchase && pricing.status === 'ready' && pricing.quote?.cartVersion === current.version ? (
             <>
               <span>Tổng thanh toán ({pricing.quote.summary.selectedLineCount} sản phẩm)</span>
               <strong>{formatCurrency(pricing.quote.summary.payableTotalMinor)}</strong>
@@ -420,20 +511,22 @@ export function CartScreen() {
             <>
               <span>Tổng thanh toán</span>
               <strong>Chưa khả dụng</strong>
-              <small>Chờ máy chủ xác nhận giá hiện tại và phí vận chuyển.</small>
+              <ul className="cart-summary__blockers" aria-label="Lý do chưa thể mua hàng">
+                {displayedPurchaseBlockers.map((message) => (
+                  <li key={message}>{message}</li>
+                ))}
+              </ul>
             </>
           )}
         </div>
         <button
           type="button"
-          disabled={
-            current.summary.selectedValidLineCount === 0 ||
-            pricing.status !== 'ready' ||
-            pricing.quote?.cartVersion !== current.version
-          }
+          disabled={!canPurchase}
           onClick={() => {
-            if (pricing.status !== 'ready' || !pricing.quote || !pricing.selectedAddressId) {
-              setCheckoutMessage('Hãy chờ máy chủ xác nhận giá trước khi thanh toán.');
+            if (!canPurchase || pricing.status !== 'ready' || !pricing.quote || !pricing.selectedAddressId) {
+              setCheckoutMessage(
+                displayedPurchaseBlockers[0] ?? 'Hãy chờ máy chủ xác nhận giá trước khi thanh toán.',
+              );
               return;
             }
             writeCheckoutDraft(window.sessionStorage, {

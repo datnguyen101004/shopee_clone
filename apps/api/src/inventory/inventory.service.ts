@@ -7,9 +7,10 @@ import { Prisma } from '../generated/prisma/client';
 import { INVENTORY_LOW_STOCK_THRESHOLD, INVENTORY_RESERVATION_TTL_MS } from './inventory.constants';
 import { InventoryIdempotencyConflictError, InventoryInsufficientError, InventoryNotFoundError, InventoryStaleError } from './inventory.errors';
 import { InventoryReservationQueueService } from './inventory-reservation-queue.service';
+import { publicSellerProductMediaUrl } from '../seller-products/seller-product-media.storage';
 
 type Tx = Prisma.TransactionClient;
-const inventoryInclude = { variant: { include: { product: { include: { images: { select: { url: true, sortOrder: true, id: true }, orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }], take: 1 } } } } } } satisfies Prisma.InventoryInclude;
+const inventoryInclude = { variant: { include: { product: { include: { images: { select: { url: true, sortOrder: true, id: true, sellerProductMediaAsset: { select: { storageKey: true } } }, orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }], take: 1 } } } } } } satisfies Prisma.InventoryInclude;
 type InventoryRow = Prisma.InventoryGetPayload<{ include: typeof inventoryInclude }>;
 
 function sellerInventoryEligibility(userId: string, variantId?: string): Prisma.ProductVariantWhereInput {
@@ -81,7 +82,9 @@ export class InventoryService {
     const reserved = row?.quantityReserved ?? 0;
     const sold = row?.quantitySold ?? 0;
     const version = row?.version ?? 0;
-    return { variantId: item.id, productId: item.productId, productName: item.product.name, productImageUrl: item.product.images[0]?.url ?? null, variantName: item.name, sku: item.sku, lifecycle: item.status === 'ACTIVE' && !item.deletedAt ? 'active' : 'inactive', quantityOnHand: onHand, quantityReserved: reserved, quantitySold: sold, availableQuantity: onHand - reserved, lowStock: onHand - reserved <= INVENTORY_LOW_STOCK_THRESHOLD, version, updatedAt: (row?.updatedAt ?? item.updatedAt).toISOString() };
+    const image = item.product.images[0];
+    const cdnUrl = image?.sellerProductMediaAsset?.storageKey ? publicSellerProductMediaUrl(image.sellerProductMediaAsset.storageKey) : null;
+    return { variantId: item.id, productId: item.productId, productName: item.product.name, productImageUrl: cdnUrl ?? image?.url ?? null, variantName: item.name, sku: item.sku, lifecycle: item.status === 'ACTIVE' && !item.deletedAt ? 'active' : 'inactive', quantityOnHand: onHand, quantityReserved: reserved, quantitySold: sold, availableQuantity: onHand - reserved, lowStock: onHand - reserved <= INVENTORY_LOW_STOCK_THRESHOLD, version, updatedAt: (row?.updatedAt ?? item.updatedAt).toISOString() };
   }
 
   async list(userId: string, query: { cursor: string | null; limit: number; productId: string | null; lowStock: boolean | null }): Promise<InventoryPage> {

@@ -13,8 +13,9 @@ Seller Center lets an approved, active seller shop create product drafts and sub
 ## Endpoints
 
 Seller management endpoints use `/api/v1`, require the authenticated `seller` role, and return
-`Cache-Control: no-store`. The staged preview is private to its uploader; the attached-media route is
-the intentionally public, immutable image exception.
+`Cache-Control: no-store`. Staged previews are private to the owning seller. Attached product images
+are served from the configured CDN viewer URL; the S3 origin remains private and CloudFront may cache
+the validated object at the edge.
 
 - `GET /seller/products/categories` — active categories and controlled attribute definitions.
 - `GET /seller/products?cursor=&lifecycle=` — owner-scoped product page.
@@ -23,8 +24,14 @@ the intentionally public, immutable image exception.
 - `PATCH /seller/products/{productId}` — replace seller-authored fields for a non-archived product.
 - `PATCH /seller/products/{productId}/lifecycle` — `{ "lifecycle": "published" | "hidden" | "archived" }`.
 - `POST /seller/products/media` — authenticated multipart upload (`file`) of one JPG/PNG/WebP image. The editor keeps selected files in local `blob:` previews and calls this endpoint only when the seller saves a draft or publishes.
+- `POST /seller/products/media/upload-intents` — creates a pending upload and returns an S3 presigned `PUT` URL valid for exactly 300 seconds.
+- `POST /seller/products/media/{mediaId}/complete` — verifies the direct S3 object and moves it from pending to staged before product attachment.
 - `GET /seller/products/media/{mediaId}/preview` — private preview for the seller who staged the unexpired asset.
-- `GET /product-media/{mediaId}` — public image bytes after the asset is attached to a saved product.
+- `GET /product-media/{mediaId}` — backwards-compatible attached-media reference. When
+  `AWS_S3_PUBLIC_BASE_URL=https://cdn.videod.me` is configured, newly attached S3 images are
+  persisted with and returned as their CDN object URL (`https://cdn.videod.me/seller-product-media/{uuid}.ext`).
+  Older API-relative references remain supported as a migration fallback. Staged seller previews
+  continue to use the authenticated preview endpoint.
 
 Product uploads are staged for 24 hours under `SELLER_PRODUCT_MEDIA_ROOT` (default `.runtime/seller-product-media`) and are attached atomically with the product save. Each file is limited to 5 MB and 5,000 × 5,000 pixels; a product can retain at most 9 unique images. Existing HTTPS images remain compatible. Run `pnpm --filter @shopee-clone/api seller-products:media:cleanup` on a schedule to delete expired staged files. Publishing requires media, package dimensions, an active variant, a valid active leaf category, valid controlled attributes, and an approved active shop. Hidden, archived, or moderation-suspended products are excluded by buyer catalogue and purchaseability checks.
 
@@ -34,7 +41,7 @@ in the `postgres-data` volume, but it does not persist the API process or its fi
 `.runtime/seller-product-media` outside a disposable container). If the API is containerized, mount a
 named volume at that path and back it up together with PostgreSQL; otherwise a container restart can
 leave database rows pointing at missing image bytes. Staged files may be removed after 24 hours, while
-attached files must remain available for public product URLs.
+attached files must remain available for the stable product-media route.
 
 ## Classification and identifiers
 
@@ -47,6 +54,18 @@ and validation exclude `mobile` and `kitchen`, while public buyer catalogue read
 Each value in the first classification group can optionally reuse one selected gallery image. For
 example, the image assigned to `Đỏ` is resolved by both `Đỏ · M` and `Đỏ · L`; the second group does
 not create extra image uploads.
+
+## Private S3 delivery configuration
+
+Keep S3 Block Public Access enabled and grant the CloudFront distribution an Origin Access Control
+with a prefix-scoped bucket policy. The browser uploads directly to
+`seller-product-media/{uuid}.{ext}` using the five-minute S3 presigned `PUT`; the API stores that
+object key and metadata, never the presigned URL. Set `AWS_S3_PUBLIC_BASE_URL=https://cdn.videod.me`
+so attached product responses expose the CDN object URL. This makes the CDN viewer path public while
+the S3 bucket remains private; CloudFront, not S3, is the only public origin. Staged seller previews
+remain authenticated and may use CloudFront viewer signing when
+`AWS_CLOUDFRONT_KEY_PAIR_ID` and `AWS_CLOUDFRONT_PRIVATE_KEY_PATH` are configured. Never persist or
+log presigned or signed URL query parameters.
 
 ## Local verification
 

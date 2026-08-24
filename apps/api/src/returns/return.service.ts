@@ -46,6 +46,7 @@ import { transitionFor, type ReturnDomainAction } from './return-state-machine';
 import { returnNotificationEvent } from '../notifications/notification-events';
 import { NotificationService } from '../notifications/notification.service';
 import type { NotificationType } from '@shopee-clone/contracts';
+import { publicSellerProductMediaUrl } from '../seller-products/seller-product-media.storage';
 
 type Viewer = 'BUYER' | 'SELLER' | 'ADMIN';
 
@@ -590,11 +591,34 @@ export class ReturnService {
           shop: { select: { ownerId: true } },
           items: {
             take: 1,
-            select: { orderLine: { select: { productImageUrl: true } } },
+            select: {
+              orderLine: {
+                select: {
+                  productImageUrl: true,
+                  product: {
+                    select: {
+                      images: {
+                        where: { variantId: null },
+                        orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }],
+                        take: 1,
+                        select: {
+                          url: true,
+                          sellerProductMediaAsset: { select: { storageKey: true } },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
           },
         },
       });
       if (!row) return;
+      const image = row.items[0]?.orderLine.product.images[0];
+      const cdnUrl = image?.sellerProductMediaAsset?.storageKey
+        ? publicSellerProductMediaUrl(image.sellerProductMediaAsset.storageKey)
+        : null;
       const adminUserIds =
         type === 'DISPUTE_ESCALATED'
           ? (
@@ -614,7 +638,8 @@ export class ReturnService {
           adminUserIds,
           amountMinor: Number(row.refundAmountMinor),
           currency: row.currency,
-          thumbnailUrl: row.items[0]?.orderLine.productImageUrl ?? null,
+          thumbnailUrl:
+            cdnUrl ?? row.items[0]?.orderLine.productImageUrl ?? image?.url ?? null,
         }),
       );
     } catch (error) {

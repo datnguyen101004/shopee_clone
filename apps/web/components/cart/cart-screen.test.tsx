@@ -65,6 +65,7 @@ describe('multi-shop cart screen', () => {
   const removeItem = vi.fn();
   const refresh = vi.fn();
   let cartContext: ReturnType<typeof useCart>;
+  let pricingContext: ReturnType<typeof useCartPricing>;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -97,7 +98,7 @@ describe('multi-shop cart screen', () => {
       selectAll,
     };
     vi.mocked(useCart).mockReturnValue(cartContext);
-    vi.mocked(useCartPricing).mockReturnValue({
+    pricingContext = {
       status: 'ready',
       addresses: [
         {
@@ -204,7 +205,8 @@ describe('multi-shop cart screen', () => {
       setShopVoucher: vi.fn(),
       setFreeShippingVoucher: vi.fn(),
       retry: vi.fn(),
-    });
+    };
+    vi.mocked(useCartPricing).mockReturnValue(pricingContext);
   });
 
   it('groups lines by shop and exposes confirmed authenticated totals', () => {
@@ -238,6 +240,48 @@ describe('multi-shop cart screen', () => {
     expect(draft).toContain('00000000-0000-4000-8000-000000000050');
     expect(draft).not.toContain('Buyer');
     expect(draft).not.toContain('222000');
+  });
+
+  it('disables purchase and explains why a selected line is unavailable', () => {
+    const blockedCart: CartResponse = {
+      ...cart,
+      groups: cart.groups.map((group) => ({
+        ...group,
+        selectedEligibleLineCount: 0,
+        lines: group.lines.map((line) => ({
+          ...line,
+          selected: true,
+          effectivelySelected: false,
+          availableQuantity: 0,
+          issues: [
+            {
+              code: 'insufficient-stock' as const,
+              message: 'Sản phẩm này đã hết hàng.',
+              previousUnitPriceMinor: null,
+              currentUnitPriceMinor: null,
+              availableQuantity: 0,
+            },
+          ],
+        })),
+      })),
+      summary: {
+        ...cart.summary,
+        selectedValidLineCount: 0,
+        selectedValidQuantity: 0,
+        selectedMerchandiseSubtotalMinor: 0,
+      },
+    };
+    vi.mocked(useCart).mockReturnValue({
+      ...cartContext,
+      state: { status: 'ready', cart: blockedCart },
+    });
+
+    render(<CartScreen />);
+
+    expect(screen.getByRole('button', { name: 'Mua hàng' })).toBeDisabled();
+    expect(screen.getByRole('list', { name: 'Lý do chưa thể mua hàng' })).toHaveTextContent(
+      'Sản phẩm này đã hết hàng.',
+    );
   });
 
   it('wires line quantity, selection and removal controls to authoritative actions', async () => {
@@ -292,6 +336,10 @@ describe('multi-shop cart screen', () => {
     expect(missingAddress).not.toBeNull();
     expect(product.compareDocumentPosition(missingAddress!)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
     expect(missingAddress!.compareDocumentPosition(summary)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(screen.getByRole('button', { name: 'Mua hàng' })).toBeDisabled();
+    expect(screen.getByRole('list', { name: 'Lý do chưa thể mua hàng' })).toHaveTextContent(
+      'Bạn cần thêm địa chỉ nhận hàng',
+    );
   });
 
   it('requires login before exposing private cart state', () => {

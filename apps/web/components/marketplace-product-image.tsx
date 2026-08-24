@@ -12,20 +12,26 @@ export function MarketplaceProductImage({
   alt,
   width,
   height,
+  fill = false,
+  sizes,
 }: {
   src: string;
   alt: string;
-  width: number;
-  height: number;
+  width?: number;
+  height?: number;
+  fill?: boolean;
+  sizes?: string;
 }) {
   const [failed, setFailed] = useState(false);
   const resolvedSrc = marketplaceMediaUrl(src);
+  const sizingProps = fill
+    ? { fill: true as const, sizes: sizes ?? '100vw' }
+    : { width, height };
   return (
     <Image
       src={failed ? PRODUCT_PLACEHOLDER : resolvedSrc}
       alt={alt}
-      width={width}
-      height={height}
+      {...sizingProps}
       unoptimized={failed || src.endsWith('.gif') || isApiMediaUrl(resolvedSrc)}
       onError={() => setFailed(true)}
     />

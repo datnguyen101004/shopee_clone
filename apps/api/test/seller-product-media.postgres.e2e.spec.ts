@@ -22,6 +22,9 @@ const databaseTest = process.env.RUN_SELLER_PRODUCT_MEDIA_DATABASE_TESTS === '1'
 
 loadRepositoryEnvironment();
 if (process.env.TEST_DATABASE_URL) process.env.DATABASE_URL = process.env.TEST_DATABASE_URL;
+// This integration suite owns a temporary filesystem fixture; do not let a developer's
+// workspace S3 settings turn it into an external-cloud test.
+for (const key of ['AWS_S3_ACCESS_KEY_ID', 'AWS_S3_SECRET_ACCESS_KEY', 'AWS_S3_BUCKET', 'AWS_S3_BUCKET_NAME', 'AWS_BUCKET_NAME', 'AWS_S3_ENDPOINT']) delete process.env[key];
 
 const ownerToken = 'valid.seller.product.media.owner';
 const otherToken = 'valid.seller.product.media.other';
@@ -80,6 +83,8 @@ databaseTest('seller product media HTTP with PostgreSQL', () => {
 
   async function cleanup() {
     if (productIds.length) {
+      const variants = await prisma.productVariant.findMany({ where: { productId: { in: productIds } }, select: { id: true } });
+      if (variants.length) await prisma.inventoryAdjustment.deleteMany({ where: { variantId: { in: variants.map((variant) => variant.id) } } });
       await prisma.productVariant.deleteMany({ where: { productId: { in: productIds } } });
       await prisma.product.deleteMany({ where: { id: { in: productIds } } });
     }
@@ -108,7 +113,7 @@ databaseTest('seller product media HTTP with PostgreSQL', () => {
     ownerId = shops[0]!.ownerId;
     otherShopId = shops[1]!.id;
     otherOwnerId = shops[1]!.ownerId;
-    categoryId = (await prisma.category.findFirstOrThrow({ where: { isActive: true, deletedAt: null, children: { none: {} } }, select: { id: true } })).id;
+    categoryId = (await prisma.category.findFirstOrThrow({ where: { isActive: true, deletedAt: null, slug: { notIn: ['mobile-accessories', 'kitchen-appliances'] }, children: { none: {} } }, select: { id: true } })).id;
     void ownerShopId;
     void otherShopId;
   });
@@ -132,7 +137,10 @@ databaseTest('seller product media HTTP with PostgreSQL', () => {
     if (created.status !== 201) throw new Error(`create failed: ${created.status} ${JSON.stringify(created.body)}`);
     productIds.push(created.body.id);
     expect(created.body.media[0].url).toBe(`/api/v1/product-media/${staged.id}`);
-    await request(app.getHttpServer()).get(`/api/v1/product-media/${staged.id}`).expect('Content-Type', /image\/png/).expect('Cache-Control', /public, max-age=31536000, immutable/).expect(200);
+    const persistedImage = await prisma.productImage.findFirstOrThrow({ where: { productId: created.body.id }, select: { url: true } });
+    expect(persistedImage.url).toBe(`/api/v1/product-media/${staged.id}`);
+    expect(persistedImage.url).not.toMatch(/(?:Expires|Signature|Key-Pair-Id|X-Amz-|seller-product-media\/)/i);
+    await request(app.getHttpServer()).get(`/api/v1/product-media/${staged.id}`).expect('Content-Type', /image\/png/).expect('Cache-Control', /private, no-store/).expect('Pragma', 'no-cache').expect('Referrer-Policy', 'no-referrer').expect(200);
     expect((await prisma.sellerProductMediaAsset.findUniqueOrThrow({ where: { id: staged.id } })).state).toBe('ATTACHED');
 
     const foreignAsset = await stage();

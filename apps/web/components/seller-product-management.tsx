@@ -167,6 +167,8 @@ function errorMessage(error: unknown) {
       ? 'Thông tin sản phẩm chưa hợp lệ. Hãy kiểm tra các trường được nhập.'
       : error.status === 403
         ? 'Tài khoản chưa có quyền seller hoặc shop chưa đủ điều kiện hoạt động.'
+        : error.status === 404
+          ? 'Sản phẩm không tồn tại hoặc không thuộc shop hiện tại.'
         : error.status === 409
           ? 'Sản phẩm hoặc mã định danh đang xung đột với dữ liệu hiện có.'
           : 'Không thể lưu sản phẩm. Hãy thử lại.';
@@ -789,6 +791,8 @@ export function SellerProductEditor({ productId }: { productId?: string }) {
   function mediaUploadError(error: unknown) {
     return error instanceof RoleApiError && error.status === 413
       ? 'Ảnh vượt quá 5 MB.'
+      : error instanceof RoleApiError && error.status === 403
+        ? 'Liên kết upload S3 đã hết hạn hoặc không còn hợp lệ. Hãy bấm lưu lại để tạo liên kết mới.'
       : 'Không thể tải ảnh lên khi lưu sản phẩm.';
   }
   function hasPendingMediaUploads(items = mediaItems) {

@@ -84,8 +84,8 @@ export function ProductCard({ product }: { product: CatalogProductCard }) {
             <MarketplaceProductImage
               src={product.imageUrl}
               alt={product.imageAlt}
-              width={360}
-              height={360}
+              fill
+              sizes="(max-width: 599px) 50vw, (max-width: 899px) 33vw, 25vw"
             />
           ) : (
             <span role="img" aria-label={product.imageAlt} className="catalog-card__fallback">

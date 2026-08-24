@@ -10,6 +10,7 @@ import {
   markAllNotificationsRead,
   markNotificationRead,
 } from '../../lib/notifications-api';
+import { marketplaceMediaUrl } from '../../lib/marketplace-media-url';
 import { useAuthSession } from '../auth-session-provider';
 import {
   AccountLoadFailure,
@@ -293,7 +294,12 @@ export function NotificationInbox() {
                         onClick={() => void handleOpen(item)}
                       >
                         {item.metadata.thumbnailUrl ? (
-                          <img src={item.metadata.thumbnailUrl} alt="" width={48} height={48} />
+                          <img
+                            src={marketplaceMediaUrl(item.metadata.thumbnailUrl)}
+                            alt=""
+                            width={48}
+                            height={48}
+                          />
                         ) : (
                           <span className="notification-inbox__thumb" aria-hidden="true">
                             🔔

@@ -57,6 +57,34 @@ export interface SellerProductMediaStageResponse {
   expiresAt: string;
 }
 
+export type SellerProductImageMimeType = 'image/jpeg' | 'image/png' | 'image/webp';
+
+export interface SellerProductMediaUploadIntentRequest {
+  mimeType: SellerProductImageMimeType;
+  byteSize: number;
+  checksumSha256: string;
+}
+
+export interface SellerProductMediaUploadIntentResponse {
+  mediaId: string;
+  upload: {
+    url: string;
+    method: 'PUT';
+    headers: { 'Content-Type': SellerProductImageMimeType; 'x-amz-checksum-sha256': string };
+    expiresAt: string;
+  };
+}
+
+export interface SellerProductMediaCompletionResponse {
+  id: string;
+  mimeType: SellerProductImageMimeType;
+  byteSize: number;
+  width: number;
+  height: number;
+  previewUrl: string;
+  expiresAt: string;
+}
+
 export interface SellerProductOptionInput {
   name: string;
   values: string[];

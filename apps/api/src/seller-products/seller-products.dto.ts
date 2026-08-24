@@ -5,7 +5,7 @@ import {
 } from '@shopee-clone/contracts';
 import { ApiProperty } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsArray, IsBoolean, IsIn, IsInt, IsOptional, IsString, IsUrl, IsUUID, Length, Max, Min, ValidateIf, ValidateNested } from 'class-validator';
+import { IsArray, IsBoolean, IsIn, IsInt, IsOptional, IsString, IsUrl, IsUUID, Length, Matches, Max, Min, ValidateIf, ValidateNested } from 'class-validator';
 
 export class SellerProductAttributeDto {
   @ApiProperty() @IsString() definitionId!: string;
@@ -18,6 +18,14 @@ export class SellerProductMediaDto {
   @ApiProperty({ nullable: true }) @ValidateIf((_object, value: unknown) => value !== null) @IsString() @Length(0, 240) altText!: string | null;
   @ApiProperty() @IsInt() @Min(0) @Max(SELLER_PRODUCT_MAX_MEDIA) sortOrder!: number;
 }
+
+export class SellerProductMediaUploadIntentDto {
+  @ApiProperty({ enum: ['image/jpeg', 'image/png', 'image/webp'] }) @IsIn(['image/jpeg', 'image/png', 'image/webp']) mimeType!: 'image/jpeg' | 'image/png' | 'image/webp';
+  @ApiProperty({ minimum: 1, maximum: 5 * 1024 * 1024 }) @IsInt() @Min(1) @Max(5 * 1024 * 1024) byteSize!: number;
+  @ApiProperty({ description: 'Base64 SHA-256 digest of the complete image bytes' }) @IsString() @Matches(/^[A-Za-z0-9+/]{43}=$/) checksumSha256!: string;
+}
+
+export class SellerProductMediaCompleteDto {}
 export class SellerProductOptionValueMediaRefDto {
   @ApiProperty({ required: false }) @IsOptional() @IsUUID() assetId?: string;
   @ApiProperty({ required: false }) @IsOptional() @IsUUID() imageId?: string;

@@ -8,6 +8,7 @@ import {
   type SellerProductUpsertRequest,
   type SellerProductCategory,
   type SellerProductMediaStageResponse,
+  type SellerProductMediaUploadIntentResponse,
 } from '@shopee-clone/contracts';
 import { RoleApiError, type AuthenticatedFetcher } from './role-api';
 
@@ -166,25 +167,45 @@ function isMediaStageResponse(value: unknown): value is SellerProductMediaStageR
   );
 }
 
+function isUploadIntentResponse(value: unknown): value is SellerProductMediaUploadIntentResponse {
+  if (!value || typeof value !== 'object') return false;
+  const item = value as Record<string, unknown>;
+  const upload = item.upload;
+  if (!upload || typeof upload !== 'object') return false;
+  const details = upload as Record<string, unknown>;
+  const headers = details.headers;
+  return typeof item.mediaId === 'string' && typeof details.url === 'string' && details.method === 'PUT' && typeof details.expiresAt === 'string' && !!headers && typeof headers === 'object' && typeof (headers as Record<string, unknown>)['Content-Type'] === 'string' && typeof (headers as Record<string, unknown>)['x-amz-checksum-sha256'] === 'string';
+}
+
+async function sha256Base64(file: File): Promise<string> {
+  const bytes = typeof file.arrayBuffer === 'function' ? await file.arrayBuffer() : await new Response(file).arrayBuffer();
+  const digest = await globalThis.crypto.subtle.digest('SHA-256', new Uint8Array(bytes));
+  let binary = '';
+  for (const byte of new Uint8Array(digest)) binary += String.fromCharCode(byte);
+  return globalThis.btoa(binary);
+}
+
 export async function stageSellerProductMedia(
   fetcher: AuthenticatedFetcher,
   file: File,
 ): Promise<SellerProductMediaStageResponse> {
-  const body = new FormData();
-  body.append('file', file);
-  const response = await fetcher(endpoint('/api/v1/seller/products/media'), {
+  const checksumSha256 = await sha256Base64(file);
+  const intentResult = await json(fetcher, endpoint('/api/v1/seller/products/media/upload-intents'), {
     method: 'POST',
-    body,
-    cache: 'no-store',
-    headers: { Accept: 'application/json, application/problem+json' },
+    body: JSON.stringify({ mimeType: file.type, byteSize: file.size, checksumSha256 }),
   });
-  if (!response.ok) throw new RoleApiError('status', response.status);
-  let value: unknown;
-  try {
-    value = await response.json();
-  } catch {
-    throw new RoleApiError('contract', response.status);
-  }
-  if (!isMediaStageResponse(value)) throw new RoleApiError('contract', response.status);
-  return value;
+  if (!isUploadIntentResponse(intentResult.body)) throw new RoleApiError('contract', intentResult.status);
+  const uploadResponse = await fetch(intentResult.body.upload.url, {
+    method: 'PUT',
+    body: file,
+    cache: 'no-store',
+    headers: intentResult.body.upload.headers,
+  });
+  if (!uploadResponse.ok) throw new RoleApiError('status', uploadResponse.status);
+  const completeResult = await json(fetcher, endpoint(`/api/v1/seller/products/media/${intentResult.body.mediaId}/complete`), {
+    method: 'POST',
+    body: JSON.stringify({}),
+  });
+  if (!isMediaStageResponse(completeResult.body)) throw new RoleApiError('contract', completeResult.status);
+  return completeResult.body;
 }

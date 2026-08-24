@@ -28,6 +28,7 @@ import { OrderLifecycleService } from './order-lifecycle.service';
 import { SellerOrderCompensationService } from '../seller-orders/seller-order-compensation.service';
 import { orderNotificationEvent } from '../notifications/notification-events';
 import { NotificationService } from '../notifications/notification.service';
+import { publicSellerProductMediaUrl } from '../seller-products/seller-product-media.storage';
 
 @Injectable()
 export class OrderHistoryService {
@@ -161,10 +162,32 @@ export class OrderHistoryService {
           id: true,
           payableTotalMinor: true,
           shop: { select: { ownerId: true } },
-          lines: { take: 1, select: { productImageUrl: true } },
+          lines: {
+            take: 1,
+            select: {
+              productImageUrl: true,
+              product: {
+                select: {
+                  images: {
+                    where: { variantId: null },
+                    orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }],
+                    take: 1,
+                    select: {
+                      url: true,
+                      sellerProductMediaAsset: { select: { storageKey: true } },
+                    },
+                  },
+                },
+              },
+            },
+          },
         },
       });
       if (!order) return;
+      const image = order.lines[0]?.product.images[0];
+      const cdnUrl = image?.sellerProductMediaAsset?.storageKey
+        ? publicSellerProductMediaUrl(image.sellerProductMediaAsset.storageKey)
+        : null;
       await this.notifications.notify(
         orderNotificationEvent({
           type: 'ORDER_CANCELLED',
@@ -172,7 +195,7 @@ export class OrderHistoryService {
           buyerId,
           sellerOwnerId: order.shop.ownerId,
           amountMinor: Number(order.payableTotalMinor),
-          thumbnailUrl: order.lines[0]?.productImageUrl ?? null,
+          thumbnailUrl: cdnUrl ?? order.lines[0]?.productImageUrl ?? image?.url ?? null,
         }),
       );
     } catch (error) {

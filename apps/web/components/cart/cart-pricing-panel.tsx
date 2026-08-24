@@ -1,9 +1,10 @@
 'use client';
 
 import { SHIPPING_SERVICES, type CartResponse, type ShippingAddress } from '@shopee-clone/contracts';
-import Link from 'next/link';
+import { useState } from 'react';
 
 import type { CartPricingState } from './use-cart-pricing';
+import { AddressCreationDialog } from '../address-creation-dialog';
 
 function money(value: number): string {
   return `${new Intl.NumberFormat('vi-VN').format(value)}₫`;
@@ -39,6 +40,8 @@ export function CartPricingPanel({
   cart: CartResponse;
   pricing: CartPricingState;
 }) {
+  const [addressDialogOpen, setAddressDialogOpen] = useState(false);
+
   if (pricing.status === 'loading-addresses') {
     return (
       <section className="cart-pricing" aria-busy="true">
@@ -48,16 +51,25 @@ export function CartPricingPanel({
   }
   if (pricing.status === 'missing-address') {
     return (
-      <section
-        className="cart-pricing cart-pricing--required"
-        aria-labelledby="pricing-address-required"
-      >
-        <div>
+      <>
+        <section
+          className="cart-pricing cart-pricing--required"
+          aria-labelledby="pricing-address-required"
+        >
+          <div>
           <h2 id="pricing-address-required">Cần địa chỉ nhận hàng</h2>
           <p>{pricing.message}</p>
-        </div>
-        <Link href="/account/addresses">Quản lý địa chỉ</Link>
-      </section>
+          </div>
+          <button type="button" onClick={() => setAddressDialogOpen(true)}>
+            Thêm địa chỉ nhận hàng
+          </button>
+        </section>
+        <AddressCreationDialog
+          open={addressDialogOpen}
+          onOpenChange={setAddressDialogOpen}
+          onCreated={() => pricing.retry()}
+        />
+      </>
     );
   }
 

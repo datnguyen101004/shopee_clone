@@ -16,7 +16,7 @@ import { InventoryAdjustmentReason, ProductModerationStatus, ProductStatus, Shop
 import { PrismaService } from '../prisma/prisma.service';
 import { InventoryService } from '../inventory/inventory.service';
 import { SellerProductConflictError, SellerProductInputError, SellerProductMediaError, SellerProductNotFoundError, SellerProductUnavailableError } from './seller-products.errors';
-import { SellerProductMediaStorage } from './seller-product-media.storage';
+import { SellerProductMediaStorage, stableProductMediaUrl } from './seller-product-media.storage';
 
 const detailInclude = {
   category: true,
@@ -176,18 +176,67 @@ export class SellerProductsService {
     return this.prisma.sellerProductMediaAsset.create({ data: { uploaderId: userId, shopId: shop.id, storageKey: input.storageKey, mimeType: input.mimeType, byteSize: input.byteSize, width: input.width, height: input.height, expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000) } });
   }
 
+  async createMediaUploadIntent(userId: string, input: { mimeType: string; byteSize: number; checksumSha256: string }) {
+    if (process.env.AWS_SELLER_PRODUCT_MEDIA_UPLOAD_ENABLED === 'false') throw new SellerProductMediaError('seller-product-media-upload-disabled');
+    const shop = await this.requireShop(userId);
+    const extension = input.mimeType === 'image/jpeg' ? 'jpg' : input.mimeType === 'image/png' ? 'png' : input.mimeType === 'image/webp' ? 'webp' : null;
+    if (!extension || !Number.isSafeInteger(input.byteSize) || input.byteSize < 1 || input.byteSize > 5 * 1024 * 1024 || !/^[A-Za-z0-9+/]{43}=$/.test(input.checksumSha256)) throw new SellerProductMediaError('invalid-seller-product-upload-intent');
+    const mediaId = randomUUID();
+    const storageKey = `${process.env.AWS_S3_PREFIX?.trim() || 'seller-product-media'}/${mediaId}.${extension}`;
+    const pending = await this.prisma.sellerProductMediaAsset.create({ data: { id: mediaId, uploaderId: userId, shopId: shop.id, storageKey, mimeType: input.mimeType, byteSize: input.byteSize, checksumSha256: input.checksumSha256, uploadExpiresAt: new Date(Date.now() + 300_000), state: 'PENDING_UPLOAD' } });
+    try {
+      const signed = await this.mediaStorage.createUploadUrl(storageKey, input.mimeType, input.checksumSha256);
+      const updated = await this.prisma.sellerProductMediaAsset.update({ where: { id: pending.id }, data: { uploadExpiresAt: signed.expiresAt } });
+      return { mediaId: updated.id, upload: { url: signed.url, method: 'PUT' as const, headers: { 'Content-Type': input.mimeType, 'x-amz-checksum-sha256': input.checksumSha256 }, expiresAt: signed.expiresAt.toISOString() } };
+    } catch (error) {
+      await this.prisma.sellerProductMediaAsset.deleteMany({ where: { id: pending.id, state: 'PENDING_UPLOAD' } });
+      throw error;
+    }
+  }
+
+  async completeMediaUpload(userId: string, mediaId: string) {
+    const media = await this.prisma.sellerProductMediaAsset.findFirst({ where: { id: mediaId, uploaderId: userId, state: { in: ['PENDING_UPLOAD', 'STAGED'] } } });
+    if (!media) throw new SellerProductMediaError('seller-product-media-unavailable');
+    if (media.state === 'STAGED' && media.width !== null && media.height !== null && media.expiresAt) return this.mediaCompletionResponse(media);
+    if (!media.checksumSha256) throw new SellerProductMediaError('seller-product-media-unavailable');
+    const verified = await this.mediaStorage.verifyUploadedObject(media.storageKey, { mimeType: media.mimeType, byteSize: media.byteSize, checksumSha256: media.checksumSha256 });
+    if (!verified) throw new SellerProductMediaError('seller-product-media-upload-invalid');
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    const updated = await this.prisma.sellerProductMediaAsset.updateMany({ where: { id: media.id, uploaderId: userId, state: 'PENDING_UPLOAD' }, data: { state: 'STAGED', width: verified.width, height: verified.height, expiresAt, uploadExpiresAt: null } });
+    if (updated.count === 0) {
+      const existing = await this.prisma.sellerProductMediaAsset.findFirst({ where: { id: media.id, uploaderId: userId, state: 'STAGED' } });
+      if (existing && existing.width !== null && existing.height !== null && existing.expiresAt) return this.mediaCompletionResponse(existing);
+      throw new SellerProductMediaError('seller-product-media-unavailable');
+    }
+    const complete = await this.prisma.sellerProductMediaAsset.findUnique({ where: { id: media.id } });
+    if (!complete) throw new SellerProductMediaError('seller-product-media-unavailable');
+    return this.mediaCompletionResponse(complete);
+  }
+
+  private mediaCompletionResponse(media: { id: string; mimeType: string; byteSize: number; width: number | null; height: number | null; expiresAt: Date | null }) {
+    if (media.width === null || media.height === null || !media.expiresAt) throw new SellerProductMediaError('seller-product-media-unavailable');
+    return { id: media.id, mimeType: media.mimeType, byteSize: media.byteSize, width: media.width, height: media.height, previewUrl: `/api/v1/seller/products/media/${media.id}/preview`, expiresAt: media.expiresAt.toISOString() };
+  }
+
   async stagedMedia(userId: string, mediaId: string) {
     return this.prisma.sellerProductMediaAsset.findFirst({ where: { id: mediaId, uploaderId: userId, state: 'STAGED', expiresAt: { gt: new Date() } } });
   }
 
   async attachedMedia(mediaId: string) {
-    return this.prisma.sellerProductMediaAsset.findFirst({ where: { id: mediaId, state: 'ATTACHED', product: { deletedAt: null } }, select: { storageKey: true, mimeType: true } });
+    return this.prisma.sellerProductMediaAsset.findFirst({ where: { id: mediaId, state: 'ATTACHED', product: { deletedAt: null } }, select: { id: true, storageKey: true, mimeType: true } });
   }
 
   async cleanupExpiredMedia(storage: { remove(key: string): Promise<void> }): Promise<number> {
     const expired = await this.prisma.sellerProductMediaAsset.findMany({ where: { state: 'STAGED', expiresAt: { lt: new Date() } }, select: { id: true, storageKey: true } });
     for (const item of expired) await storage.remove(item.storageKey);
     if (expired.length) await this.prisma.sellerProductMediaAsset.deleteMany({ where: { id: { in: expired.map((item) => item.id) }, state: 'STAGED' } });
+    return expired.length;
+  }
+
+  async cleanupExpiredPendingMedia(storage: { remove(key: string): Promise<void> }): Promise<number> {
+    const expired = await this.prisma.sellerProductMediaAsset.findMany({ where: { state: 'PENDING_UPLOAD', uploadExpiresAt: { lt: new Date() } }, select: { id: true, storageKey: true } });
+    for (const item of expired) await storage.remove(item.storageKey);
+    if (expired.length) await this.prisma.sellerProductMediaAsset.deleteMany({ where: { id: { in: expired.map((item) => item.id) }, state: 'PENDING_UPLOAD' } });
     return expired.length;
   }
 
@@ -219,7 +268,11 @@ export class SellerProductsService {
     return this.prisma.$transaction(async (transaction) => {
       const current = await this.requireProduct(userId, productId, transaction);
       if (current.status === ProductStatus.ARCHIVED) throw new SellerProductConflictError(['lifecycle']);
-      const protectedVariants = await transaction.productVariant.findMany({ where: { productId, OR: [{ orderLines: { some: {} } }, { cartLines: { some: {} } }] }, select: { id: true, sku: true, combinationKey: true } });
+      // Reuse every existing variant by combination. Deleting an apparently
+      // unprotected variant is unsafe because inventory adjustments retain a
+      // RESTRICT foreign-key history; replaceVariants marks removed variants
+      // inactive instead.
+      const protectedVariants = await transaction.productVariant.findMany({ where: { productId }, select: { id: true, sku: true, combinationKey: true } });
       await this.validateCategoryInput(transaction, input);
       const reuseMedia = this.existingMediaUnchanged(current.images, input.media);
       const resolvedMedia = reuseMedia ? null : await this.resolveMedia(transaction, userId, current.shopId, productId, input);
@@ -229,7 +282,6 @@ export class SellerProductsService {
           ? this.imageAliasesFromCurrent(current.images)
           : await this.replaceProductMedia(transaction, productId, resolvedMedia!);
         await this.applyOptionValueMedia(transaction, productId, input, mediaMap);
-        await transaction.productVariant.deleteMany({ where: { productId, ...(protectedVariants.length ? { id: { notIn: protectedVariants.map((variant) => variant.id) } } : {}) } });
         await this.replaceVariants(transaction, productId, current.slug, current.shopId, input, protectedVariants, userId);
         return mapDetail(await this.findDetail(transaction, productId));
       } catch (error) {
@@ -314,7 +366,7 @@ export class SellerProductsService {
   }
 
   private existingMediaUnchanged(
-    current: Array<{ id: string; altText: string | null; sortOrder: number }>,
+    current: Array<{ id: string; url: string; altText: string | null; sortOrder: number }>,
     media: SellerProductUpsertRequest['media'],
   ): boolean {
     if (current.length !== media.length) return false;
@@ -322,6 +374,7 @@ export class SellerProductsService {
       const image = current[index];
       return Boolean(
         image &&
+          !image.url.startsWith('/api/v1/product-media/') &&
           item.imageId === image.id &&
           (item.altText?.trim() || null) === image.altText &&
           item.sortOrder === image.sortOrder,
@@ -354,16 +407,16 @@ export class SellerProductsService {
         const image = currentById.get(media.imageId);
         if (!image) throw new SellerProductMediaError('seller-product-media-not-owned');
         const assetId = image.sellerProductMediaAsset?.id ?? null;
-        const storedUrl = image.sellerProductMediaAsset
+        const cdnUrl = image.sellerProductMediaAsset
           ? this.mediaStorage.publicUrl(image.sellerProductMediaAsset.storageKey)
           : null;
-        resolved.push({ url: storedUrl ?? (assetId ? `/api/v1/product-media/${assetId}` : image.url), altText, sortOrder: media.sortOrder, aliases: [`image:${media.imageId}`, ...(assetId ? [`asset:${assetId}`] : [])], assetId });
+        resolved.push({ url: cdnUrl ?? (assetId ? stableProductMediaUrl(assetId) : image.url), altText, sortOrder: media.sortOrder, aliases: [`image:${media.imageId}`, ...(assetId ? [`asset:${assetId}`] : [])], assetId });
         continue;
       }
       if (!media.assetId) throw new SellerProductMediaError('seller-product-media-unavailable');
       const asset = await client.sellerProductMediaAsset.findFirst({ where: { id: media.assetId, uploaderId: userId, shopId, state: 'STAGED', expiresAt: { gt: new Date() } } });
       if (!asset) throw new SellerProductMediaError('seller-product-media-unavailable');
-      resolved.push({ url: this.mediaStorage.publicUrl(asset.storageKey) ?? `/api/v1/product-media/${asset.id}`, altText, sortOrder: media.sortOrder, aliases: [`asset:${asset.id}`], assetId: asset.id });
+      resolved.push({ url: this.mediaStorage.publicUrl(asset.storageKey) ?? stableProductMediaUrl(asset.id), altText, sortOrder: media.sortOrder, aliases: [`asset:${asset.id}`], assetId: asset.id });
     }
     return resolved;
   }

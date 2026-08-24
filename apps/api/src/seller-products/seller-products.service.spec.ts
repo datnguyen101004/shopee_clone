@@ -38,11 +38,30 @@ describe('SellerProductsService authoring rules', () => {
     expect(prisma.sellerProductMediaAsset.deleteMany).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ state: 'STAGED' }) }));
   });
 
+  it('creates a pending upload intent before signing and returns only ephemeral transport data', async () => {
+    const pending = { id: 'media-id', storageKey: 'seller-product-media/media-id.png' };
+    const prisma = {
+      shop: { findFirst: jest.fn().mockResolvedValue({ id: shopId }) },
+      sellerProductMediaAsset: {
+        create: jest.fn().mockResolvedValue(pending),
+        update: jest.fn().mockResolvedValue({ id: pending.id }),
+        deleteMany: jest.fn().mockResolvedValue({ count: 1 }),
+      },
+    };
+    const storage = { createUploadUrl: jest.fn().mockResolvedValue({ url: 'https://s3.example.test/signed', expiresAt: new Date('2026-08-24T10:05:00.000Z') }) };
+    const service = new SellerProductsService(prisma as never, undefined, storage as never);
+    await expect(service.createMediaUploadIntent(userId, { mimeType: 'image/png', byteSize: 24, checksumSha256: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=' })).resolves.toEqual({
+      mediaId: 'media-id',
+      upload: { url: 'https://s3.example.test/signed', method: 'PUT', headers: { 'Content-Type': 'image/png', 'x-amz-checksum-sha256': 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=' }, expiresAt: '2026-08-24T10:05:00.000Z' },
+    });
+    expect(prisma.sellerProductMediaAsset.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ state: 'PENDING_UPLOAD', uploaderId: userId, shopId, checksumSha256: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=' }) }));
+  });
+
   it('reuses existing product images when the seller did not change media', () => {
     const service = new SellerProductsService({} as never);
     const current = [
-      { id: 'image-1', altText: null, sortOrder: 0, url: '/api/v1/product-media/a' },
-      { id: 'image-2', altText: 'Cover', sortOrder: 1, url: '/api/v1/product-media/b' },
+      { id: 'image-1', altText: null, sortOrder: 0, url: 'https://cdn.videod.me/seller-product-media/a.png' },
+      { id: 'image-2', altText: 'Cover', sortOrder: 1, url: 'https://cdn.videod.me/seller-product-media/b.png' },
     ];
     const unchanged = [
       { imageId: 'image-1', altText: null, sortOrder: 0 },

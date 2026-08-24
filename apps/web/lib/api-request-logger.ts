@@ -9,7 +9,7 @@ type ApiRequestDetails = {
   url: string;
 };
 
-const sensitiveQueryParameter = /^(?:access_?)?token$|secret|password|authorization|code/i;
+const sensitiveQueryParameter = /^(?:access_?)?token$|secret|password|authorization|code|^expires$|^signature$|^key-pair-id$|^x-amz-/i;
 
 function requestUrl(input: RequestInfo | URL): URL | null {
   const rawUrl =
@@ -24,9 +24,17 @@ function requestUrl(input: RequestInfo | URL): URL | null {
   }
 }
 
+function isDiagnosticsUrl(url: URL) {
+  return (
+    url.pathname.startsWith('/api/') ||
+    url.hostname === 'cdn.videod.me' ||
+    url.hostname.endsWith('.s3.ap-southeast-1.amazonaws.com')
+  );
+}
+
 function getApiRequestDetails(input: RequestInfo | URL, init?: RequestInit): ApiRequestDetails | null {
   const url = requestUrl(input);
-  if (!url || !url.pathname.startsWith('/api/')) return null;
+  if (!url || !isDiagnosticsUrl(url)) return null;
 
   for (const key of url.searchParams.keys()) {
     if (sensitiveQueryParameter.test(key)) url.searchParams.set(key, '[redacted]');

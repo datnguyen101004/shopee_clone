@@ -9,6 +9,7 @@ import { useRef, useState } from 'react';
 import { CheckoutApiError, confirmCodCheckout } from '../../lib/checkout-api';
 import { clearCheckoutDraft } from '../../lib/checkout-draft';
 import { CheckoutSubmitIntent } from '../../lib/checkout-intent';
+import { AddressCreationDialog } from '../address-creation-dialog';
 import { useAuthSession } from '../auth-session-provider';
 import { useCart } from '../cart/cart-provider';
 import { useCheckoutPreview } from './use-checkout-preview';
@@ -33,6 +34,7 @@ export function CheckoutScreen() {
   const submitLock = useRef(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitMessage, setSubmitMessage] = useState('');
+  const [addressDialogOpen, setAddressDialogOpen] = useState(false);
 
   if (auth.state.status === 'guest' || cart.state.status === 'unauthenticated') {
     return (
@@ -165,10 +167,19 @@ export function CheckoutScreen() {
             ) : null}
           </>
         ) : (
-          <div className="checkout-required">
-            <p>Bạn chưa có địa chỉ nhận hàng.</p>
-            <Link href="/account/addresses">Thêm địa chỉ</Link>
-          </div>
+          <>
+            <div className="checkout-required">
+              <p>Bạn chưa có địa chỉ nhận hàng.</p>
+              <button type="button" onClick={() => setAddressDialogOpen(true)}>
+                Thêm địa chỉ nhận hàng
+              </button>
+            </div>
+            <AddressCreationDialog
+              open={addressDialogOpen}
+              onOpenChange={setAddressDialogOpen}
+              onCreated={() => checkout.retry()}
+            />
+          </>
         )}
       </section>
 

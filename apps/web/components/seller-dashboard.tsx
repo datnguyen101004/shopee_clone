@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { fetchSellerDashboard } from '../lib/seller-analytics-api';
 import { RoleApiError } from '../lib/role-api';
+import { marketplaceMediaUrl } from '../lib/marketplace-media-url';
 import { DateTimeLocalPicker } from './datetime-local-picker';
 import { useAuthSession } from './auth-session-provider';
 
@@ -22,7 +23,7 @@ function defaultRange(): { from: string; to: string } {
 function SellerDashboardImage({ src, alt }: { src: string | null; alt: string }) {
   const [failed, setFailed] = useState(false);
   if (!src || failed) return <span className="seller-dashboard-image seller-dashboard-image--fallback">Ảnh</span>;
-  return <img className="seller-dashboard-image" src={src} alt={alt} onError={() => setFailed(true)} />;
+  return <img className="seller-dashboard-image" src={marketplaceMediaUrl(src)} alt={alt} onError={() => setFailed(true)} />;
 }
 
 export function SellerDashboard() {

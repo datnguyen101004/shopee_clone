@@ -23,7 +23,24 @@ export const sellerOrderInclude = {
     },
   },
   purchase: { select: { id: true, addressSnapshot: true } },
-  lines: { orderBy: [{ sourceCartLineId: 'asc' as const }, { id: 'asc' as const }] },
+  lines: {
+    orderBy: [{ sourceCartLineId: 'asc' as const }, { id: 'asc' as const }],
+    include: {
+      product: {
+        select: {
+          images: {
+            where: { variantId: null },
+            orderBy: [{ sortOrder: 'asc' as const }, { id: 'asc' as const }],
+            take: 1,
+            select: {
+              url: true,
+              sellerProductMediaAsset: { select: { storageKey: true } },
+            },
+          },
+        },
+      },
+    },
+  },
   timelineEvents: { orderBy: [{ orderVersion: 'asc' as const }, { id: 'asc' as const }] },
   fulfillment: {
     include: {

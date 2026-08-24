@@ -4,6 +4,7 @@ import type { InventoryAdjustment, InventoryAdjustmentReason, InventoryBalance }
 import { useCallback, useEffect, useState } from 'react';
 import { adjustSellerInventory, fetchSellerInventory, fetchSellerInventoryHistory } from '../lib/inventory-api';
 import { RoleApiError } from '../lib/role-api';
+import { marketplaceMediaUrl } from '../lib/marketplace-media-url';
 import { useAuthSession } from './auth-session-provider';
 
 const money = (value: number) => new Intl.NumberFormat('vi-VN').format(value);
@@ -11,7 +12,7 @@ const money = (value: number) => new Intl.NumberFormat('vi-VN').format(value);
 function InventoryProductImage({ item }: { item: InventoryBalance }) {
   const [failed, setFailed] = useState(false);
   if (!item.productImageUrl || failed) return <span className="seller-inventory-product-image seller-inventory-product-image--fallback" aria-label={`Chưa có ảnh cho ${item.productName}`}>Ảnh</span>;
-  return <img className="seller-inventory-product-image" src={item.productImageUrl} alt={`Ảnh ${item.productName}`} onError={() => setFailed(true)} />;
+  return <img className="seller-inventory-product-image" src={marketplaceMediaUrl(item.productImageUrl)} alt={`Ảnh ${item.productName}`} onError={() => setFailed(true)} />;
 }
 
 export function SellerInventoryManagement() {

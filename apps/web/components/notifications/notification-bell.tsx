@@ -9,6 +9,7 @@ import {
   listNotificationPopover,
   markNotificationRead,
 } from '../../lib/notifications-api';
+import { marketplaceMediaUrl } from '../../lib/marketplace-media-url';
 import { useAuthSession } from '../auth-session-provider';
 
 const POLL_INTERVAL_MS = 30_000;
@@ -198,7 +199,12 @@ export function NotificationBell() {
                     onClick={() => void handleItemClick(item)}
                   >
                     {item.metadata.thumbnailUrl ? (
-                      <img src={item.metadata.thumbnailUrl} alt="" width={40} height={40} />
+                      <img
+                        src={marketplaceMediaUrl(item.metadata.thumbnailUrl)}
+                        alt=""
+                        width={40}
+                        height={40}
+                      />
                     ) : (
                       <span className="market-notification__thumb" aria-hidden="true">
                         🔔

@@ -42,7 +42,7 @@ import {
 import { LegacyAdministrativeDivisionFields } from './legacy-administrative-division-fields';
 
 type AddressField = keyof Omit<CreateShippingAddressRequest, 'isDefault'>;
-type AddressErrors = Partial<Record<AddressField, string>>;
+export type AddressErrors = Partial<Record<AddressField, string>>;
 
 function normalizeField(
   form: FormData,
@@ -57,7 +57,7 @@ function normalizeField(
   return normalized ?? value.trim();
 }
 
-function addressPayload(form: FormData): {
+export function addressPayload(form: FormData): {
   value: CreateShippingAddressRequest;
   errors: AddressErrors;
 } {
@@ -113,7 +113,7 @@ function addressPayload(form: FormData): {
   };
 }
 
-function AddressForm({
+export function AddressForm({
   initial,
   pending,
   errors,

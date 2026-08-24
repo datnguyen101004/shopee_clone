@@ -1,4 +1,4 @@
-import { Controller, Get, HttpCode, HttpStatus, Inject, Param, Post, Req, Res, UploadedFile, UseFilters, UseGuards, UseInterceptors } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, HttpStatus, Inject, Param, Post, Req, Res, UploadedFile, UseFilters, UseGuards, UseInterceptors } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiBearerAuth, ApiConsumes, ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { Response } from 'express';
@@ -10,6 +10,8 @@ import { SellerProductMediaError } from './seller-products.errors';
 import { SellerProductMediaStorage, imageDimensions } from './seller-product-media.storage';
 import { SellerProductsExceptionFilter } from './seller-products-exception.filter';
 import { SellerProductsService } from './seller-products.service';
+// eslint-disable-next-line @typescript-eslint/consistent-type-imports
+import { SellerProductMediaCompleteDto, SellerProductMediaUploadIntentDto } from './seller-products.dto';
 
 const allowedMimeTypes = ['image/jpeg', 'image/png', 'image/webp'] as const;
 
@@ -22,6 +24,27 @@ export class SellerProductMediaController {
     @Inject(SellerProductsService) private readonly products: SellerProductsService,
     @Inject(SellerProductMediaStorage) private readonly storage: SellerProductMediaStorage,
   ) {}
+
+  @Post('seller/products/media/upload-intents')
+  @HttpCode(HttpStatus.CREATED)
+  @UseGuards(AuthGuard, RolesGuard)
+  @RequireRoles('seller')
+  @ApiOperation({ summary: 'Create a five-minute direct-to-private-S3 product image upload intent' })
+  async createUploadIntent(@Req() request: AuthenticatedRequest, @Body() input: SellerProductMediaUploadIntentDto) {
+    if (!request.authUser) throw new AuthenticationFailedError();
+    return this.products.createMediaUploadIntent(request.authUser.id, input);
+  }
+
+  @Post('seller/products/media/:mediaId/complete')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(AuthGuard, RolesGuard)
+  @RequireRoles('seller')
+  @ApiOperation({ summary: 'Verify a private S3 upload and stage it for product attachment' })
+  async completeUpload(@Req() request: AuthenticatedRequest, @Param('mediaId') mediaId: string, @Body() _input: SellerProductMediaCompleteDto) {
+    if (!request.authUser) throw new AuthenticationFailedError();
+    void _input;
+    return this.products.completeMediaUpload(request.authUser.id, mediaId);
+  }
 
   @Post('seller/products/media')
   @HttpCode(HttpStatus.CREATED)
@@ -53,10 +76,14 @@ export class SellerProductMediaController {
     if (!request.authUser) throw new AuthenticationFailedError();
     const media = await this.products.stagedMedia(request.authUser.id, mediaId);
     if (!media) { response.status(404).end(); return; }
-    const data = await this.storage.read(media.storageKey);
-    if (!data) { response.status(404).end(); return; }
-    response.setHeader('Cache-Control', 'private, no-store');
-    response.type(media.mimeType).send(data);
+    const target = await this.storage.readTarget(media.storageKey);
+    if (!target) { response.status(404).end(); return; }
+    this.setPrivateMediaHeaders(response);
+    if (target.kind === 'cloudfront') {
+      response.status(HttpStatus.TEMPORARY_REDIRECT).setHeader('Location', target.url).end();
+      return;
+    }
+    response.type(media.mimeType).send(target.data);
   }
 
   @Get('product-media/:mediaId')
@@ -64,9 +91,19 @@ export class SellerProductMediaController {
   async attached(@Param('mediaId') mediaId: string, @Res() response: Response): Promise<void> {
     const media = await this.products.attachedMedia(mediaId);
     if (!media) { response.status(404).end(); return; }
-    const data = await this.storage.read(media.storageKey);
-    if (!data) { response.status(404).end(); return; }
-    response.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
-    response.type(media.mimeType).send(data);
+    const target = await this.storage.readTarget(media.storageKey, { allowPublic: true });
+    if (!target) { response.status(404).end(); return; }
+    this.setPrivateMediaHeaders(response);
+    if (target.kind === 'cloudfront') {
+      response.status(HttpStatus.TEMPORARY_REDIRECT).setHeader('Location', target.url).end();
+      return;
+    }
+    response.type(media.mimeType).send(target.data);
+  }
+
+  private setPrivateMediaHeaders(response: Response): void {
+    response.setHeader('Cache-Control', 'private, no-store');
+    response.setHeader('Pragma', 'no-cache');
+    response.setHeader('Referrer-Policy', 'no-referrer');
   }
 }

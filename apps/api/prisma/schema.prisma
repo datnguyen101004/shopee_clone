@@ -326,6 +326,7 @@ enum ReviewMediaState {
 }
 
 enum SellerProductMediaState {
+  PENDING_UPLOAD @map("pending_upload")
   STAGED   @map("staged")
   ATTACHED @map("attached")
 
@@ -1700,8 +1701,10 @@ model SellerProductMediaAsset {
   storageKey     String                  @unique @map("storage_key") @db.VarChar(255)
   mimeType       String                  @map("mime_type") @db.VarChar(32)
   byteSize       Int                     @map("byte_size")
-  width          Int
-  height         Int
+  width          Int?
+  height         Int?
+  checksumSha256 String?                 @map("checksum_sha256") @db.VarChar(64)
+  uploadExpiresAt DateTime?              @map("upload_expires_at") @db.Timestamptz(3)
   state          SellerProductMediaState @default(STAGED)
   expiresAt      DateTime?               @map("expires_at") @db.Timestamptz(3)
   createdAt      DateTime                @default(now()) @map("created_at") @db.Timestamptz(3)

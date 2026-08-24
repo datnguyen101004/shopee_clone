@@ -16,7 +16,7 @@ import { loadCanonicalDataset } from './loader';
 import type { CanonicalDatasetPlan, DatasetImportSummary } from './types';
 
 const NORMALIZED_AT = new Date('2026-08-13T00:00:00.000Z');
-const TRANSACTION_TIMEOUT_MS = 120_000;
+const TRANSACTION_TIMEOUT_MS = 900_000;
 const PRODUCT_BATCH_SIZE = 50;
 const PRODUCT_MODULE_KEYS = ['flash-sale', 'top-selling', 'mall', 'daily'] as const;
 const LEGACY_PRODUCT_IDS = Array.from(
@@ -173,6 +173,8 @@ async function importSource(
   for (let offset = 0; offset < source.products.length; offset += PRODUCT_BATCH_SIZE) {
     const batch = source.products.slice(offset, offset + PRODUCT_BATCH_SIZE);
     for (const product of batch) {
+      // Nested product→variant→inventory creates can insert inventory first (Prisma 7
+      // interpreter), violating inventory_variant_id_fkey. Persist in FK order instead.
       await transaction.product.upsert({
         where: { id: product.id },
         create: {
@@ -183,52 +185,10 @@ async function importSource(
           name: product.name,
           description: product.description,
           status: ProductStatus.ACTIVE,
-          // Ratings are exclusively derived from visible verified reviews (T21).
           ratingAverageBasisPoints: 0,
           ratingCount: 0,
           soldCount: product.soldCount,
           createdAt: product.createdAt,
-          variants: {
-            create: {
-              id: product.variant.id,
-              sku: product.variant.sku,
-              name: product.variant.name,
-              priceMinor: product.variant.priceMinor,
-              compareAtPriceMinor: product.variant.compareAtPriceMinor,
-              weightGrams: product.variant.weightGrams,
-              status: VariantStatus.ACTIVE,
-              inventory: {
-                create: {
-                  quantityOnHand: product.variant.quantityOnHand,
-                  quantityReserved: product.variant.quantityReserved,
-                },
-              },
-            },
-          },
-          images: {
-            create: {
-              id: product.image.id,
-              url: product.image.url,
-              altText: product.image.altText,
-              sortOrder: 0,
-            },
-          },
-          datasetRecord: {
-            create: {
-              id: product.sourceRecordId,
-              sourceId: source.id,
-              stableRecordKey: product.stableRecordKey,
-              sourceIdentity: product.sourceIdentity,
-              sourceIndex: product.sourceIndex,
-              sourceProductUrl: product.sourceProductUrl,
-              sourcePageUrl: product.sourcePageUrl,
-              rawNotes: product.rawNotes,
-              rawPayload: asPrismaJson(product.rawPayload),
-              generatedFields: asPrismaJson(product.generatedFields),
-              isActive: true,
-              normalizedAt: NORMALIZED_AT,
-            },
-          },
         },
         update: {
           shopId: product.shopId,
@@ -237,99 +197,92 @@ async function importSource(
           name: product.name,
           description: product.description,
           status: ProductStatus.ACTIVE,
-          // Dataset re-import must never overwrite review-derived projections.
           soldCount: product.soldCount,
           createdAt: product.createdAt,
           deletedAt: null,
-          variants: {
-            upsert: {
-              where: { id: product.variant.id },
-              create: {
-                id: product.variant.id,
-                sku: product.variant.sku,
-                name: product.variant.name,
-                priceMinor: product.variant.priceMinor,
-                compareAtPriceMinor: product.variant.compareAtPriceMinor,
-                weightGrams: product.variant.weightGrams,
-                status: VariantStatus.ACTIVE,
-                inventory: {
-                  create: {
-                    quantityOnHand: product.variant.quantityOnHand,
-                    quantityReserved: product.variant.quantityReserved,
-                  },
-                },
-              },
-              update: {
-                sku: product.variant.sku,
-                name: product.variant.name,
-                priceMinor: product.variant.priceMinor,
-                compareAtPriceMinor: product.variant.compareAtPriceMinor,
-                weightGrams: product.variant.weightGrams,
-                status: VariantStatus.ACTIVE,
-                deletedAt: null,
-                inventory: {
-                  upsert: {
-                    create: {
-                      quantityOnHand: product.variant.quantityOnHand,
-                      quantityReserved: product.variant.quantityReserved,
-                    },
-                    update: {
-                      quantityOnHand: product.variant.quantityOnHand,
-                      quantityReserved: product.variant.quantityReserved,
-                    },
-                  },
-                },
-              },
-            },
-          },
-          images: {
-            upsert: {
-              where: { id: product.image.id },
-              create: {
-                id: product.image.id,
-                url: product.image.url,
-                altText: product.image.altText,
-                sortOrder: 0,
-              },
-              update: {
-                variantId: null,
-                url: product.image.url,
-                altText: product.image.altText,
-                sortOrder: 0,
-              },
-            },
-          },
-          datasetRecord: {
-            upsert: {
-              create: {
-                id: product.sourceRecordId,
-                sourceId: source.id,
-                stableRecordKey: product.stableRecordKey,
-                sourceIdentity: product.sourceIdentity,
-                sourceIndex: product.sourceIndex,
-                sourceProductUrl: product.sourceProductUrl,
-                sourcePageUrl: product.sourcePageUrl,
-                rawNotes: product.rawNotes,
-                rawPayload: asPrismaJson(product.rawPayload),
-                generatedFields: asPrismaJson(product.generatedFields),
-                isActive: true,
-                normalizedAt: NORMALIZED_AT,
-              },
-              update: {
-                sourceId: source.id,
-                stableRecordKey: product.stableRecordKey,
-                sourceIdentity: product.sourceIdentity,
-                sourceIndex: product.sourceIndex,
-                sourceProductUrl: product.sourceProductUrl,
-                sourcePageUrl: product.sourcePageUrl,
-                rawNotes: product.rawNotes,
-                rawPayload: asPrismaJson(product.rawPayload),
-                generatedFields: asPrismaJson(product.generatedFields),
-                isActive: true,
-                normalizedAt: NORMALIZED_AT,
-              },
-            },
-          },
+        },
+      });
+      await transaction.productVariant.upsert({
+        where: { id: product.variant.id },
+        create: {
+          id: product.variant.id,
+          productId: product.id,
+          sku: product.variant.sku,
+          name: product.variant.name,
+          priceMinor: product.variant.priceMinor,
+          compareAtPriceMinor: product.variant.compareAtPriceMinor,
+          weightGrams: product.variant.weightGrams,
+          status: VariantStatus.ACTIVE,
+        },
+        update: {
+          productId: product.id,
+          sku: product.variant.sku,
+          name: product.variant.name,
+          priceMinor: product.variant.priceMinor,
+          compareAtPriceMinor: product.variant.compareAtPriceMinor,
+          weightGrams: product.variant.weightGrams,
+          status: VariantStatus.ACTIVE,
+          deletedAt: null,
+        },
+      });
+      await transaction.inventory.upsert({
+        where: { variantId: product.variant.id },
+        create: {
+          variantId: product.variant.id,
+          quantityOnHand: product.variant.quantityOnHand,
+          quantityReserved: product.variant.quantityReserved,
+        },
+        update: {
+          quantityOnHand: product.variant.quantityOnHand,
+          quantityReserved: product.variant.quantityReserved,
+        },
+      });
+      await transaction.productImage.upsert({
+        where: { id: product.image.id },
+        create: {
+          id: product.image.id,
+          productId: product.id,
+          url: product.image.url,
+          altText: product.image.altText,
+          sortOrder: 0,
+        },
+        update: {
+          variantId: null,
+          url: product.image.url,
+          altText: product.image.altText,
+          sortOrder: 0,
+        },
+      });
+      await transaction.datasetProductRecord.upsert({
+        where: { id: product.sourceRecordId },
+        create: {
+          id: product.sourceRecordId,
+          sourceId: source.id,
+          productId: product.id,
+          stableRecordKey: product.stableRecordKey,
+          sourceIdentity: product.sourceIdentity,
+          sourceIndex: product.sourceIndex,
+          sourceProductUrl: product.sourceProductUrl,
+          sourcePageUrl: product.sourcePageUrl,
+          rawNotes: product.rawNotes,
+          rawPayload: asPrismaJson(product.rawPayload),
+          generatedFields: asPrismaJson(product.generatedFields),
+          isActive: true,
+          normalizedAt: NORMALIZED_AT,
+        },
+        update: {
+          sourceId: source.id,
+          productId: product.id,
+          stableRecordKey: product.stableRecordKey,
+          sourceIdentity: product.sourceIdentity,
+          sourceIndex: product.sourceIndex,
+          sourceProductUrl: product.sourceProductUrl,
+          sourcePageUrl: product.sourcePageUrl,
+          rawNotes: product.rawNotes,
+          rawPayload: asPrismaJson(product.rawPayload),
+          generatedFields: asPrismaJson(product.generatedFields),
+          isActive: true,
+          normalizedAt: NORMALIZED_AT,
         },
       });
     }
@@ -418,20 +371,25 @@ export async function importCanonicalDataset(
   );
   const importedAt = options?.importedAt ?? new Date();
 
-  await prisma.$transaction(
-    async (transaction) => {
-      await transaction.homepageModuleProduct.deleteMany({
-        where: { productId: { in: LEGACY_PRODUCT_IDS } },
-      });
-      await transaction.product.updateMany({
-        where: { id: { in: LEGACY_PRODUCT_IDS }, datasetRecord: null },
-        data: { status: ProductStatus.ARCHIVED, deletedAt: importedAt },
-      });
-      for (const source of plan.sources) await importSource(transaction, source, importedAt);
-      await rebuildHomepage(transaction, plan);
-    },
-    { maxWait: 10_000, timeout: TRANSACTION_TIMEOUT_MS },
-  );
+  const txOptions = { maxWait: 10_000, timeout: TRANSACTION_TIMEOUT_MS };
+  await prisma.$transaction(async (transaction) => {
+    await transaction.homepageModuleProduct.deleteMany({
+      where: { productId: { in: LEGACY_PRODUCT_IDS } },
+    });
+    await transaction.product.updateMany({
+      where: { id: { in: LEGACY_PRODUCT_IDS }, datasetRecord: null },
+      data: { status: ProductStatus.ARCHIVED, deletedAt: importedAt },
+    });
+  }, txOptions);
+  // One transaction per source so a slow SSM/EC2 seed can commit progress
+  // instead of aborting the entire catalog after 120s.
+  for (const source of plan.sources) {
+    await prisma.$transaction(
+      async (transaction) => importSource(transaction, source, importedAt),
+      txOptions,
+    );
+  }
+  await prisma.$transaction(async (transaction) => rebuildHomepage(transaction, plan), txOptions);
 
   return summarizeDatasetPlan(plan);
 }

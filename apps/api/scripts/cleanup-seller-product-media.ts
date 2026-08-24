@@ -9,8 +9,11 @@ async function main() {
   const prisma = new PrismaService();
   await prisma.$connect();
   try {
-    const removed = await new SellerProductsService(prisma).cleanupExpiredMedia(new SellerProductMediaStorage());
-    process.stdout.write(`${JSON.stringify({ removed })}\n`);
+    const service = new SellerProductsService(prisma);
+    const storage = new SellerProductMediaStorage();
+    const removedStaged = await service.cleanupExpiredMedia(storage);
+    const removedPending = await service.cleanupExpiredPendingMedia(storage);
+    process.stdout.write(`${JSON.stringify({ removed: removedStaged + removedPending, removedStaged, removedPending })}\n`);
   } finally {
     await prisma.$disconnect();
   }

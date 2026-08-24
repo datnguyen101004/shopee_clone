@@ -20,6 +20,7 @@ import {
   fetchSellerOrders,
 } from '../lib/seller-orders-api';
 import { RoleApiError } from '../lib/role-api';
+import { marketplaceMediaUrl } from '../lib/marketplace-media-url';
 import { useAuthSession } from './auth-session-provider';
 
 const money = (value: number) => `${new Intl.NumberFormat('vi-VN').format(value)}₫`;
@@ -79,7 +80,7 @@ function OrderCard({ item }: { item: SellerOrderSummary }) {
           {item.lines.slice(0, 3).map((line) => (
             <div className="seller-order-line" key={line.lineId}>
               {line.productImageUrl ? (
-                <img src={line.productImageUrl} alt="" />
+                <img src={marketplaceMediaUrl(line.productImageUrl)} alt="" />
               ) : (
                 <span className="seller-order-line__fallback">Ảnh</span>
               )}
@@ -461,7 +462,7 @@ export function SellerOrderDetailScreen({
             {order.summary.lines.map((line) => (
               <div className="seller-order-detail-line" key={line.lineId}>
                 {line.productImageUrl ? (
-                  <img src={line.productImageUrl} alt="" />
+                  <img src={marketplaceMediaUrl(line.productImageUrl)} alt="" />
                 ) : (
                   <span className="seller-order-line__fallback">Ảnh</span>
                 )}

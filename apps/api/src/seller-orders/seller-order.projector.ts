@@ -17,6 +17,7 @@ import { checkedMoneyFromBigInt } from '../pricing/money';
 import { availableSellerActions } from './seller-order-fulfillment';
 import type { SellerOrderGraph } from './seller-order.repository';
 import { SellerOrderUnavailableError } from './seller-order.errors';
+import { publicSellerProductMediaUrl } from '../seller-products/seller-product-media.storage';
 
 function jsonObject<T>(value: Prisma.JsonValue): T {
   if (typeof value !== 'object' || value === null || Array.isArray(value))
@@ -102,6 +103,14 @@ function projectOrderTimeline(graph: SellerOrderGraph): SellerOrderOrderTimeline
   }));
 }
 
+function currentProductImageUrl(line: SellerOrderGraph['lines'][number]): string | null {
+  const image = line.product.images[0];
+  const cdnUrl = image?.sellerProductMediaAsset?.storageKey
+    ? publicSellerProductMediaUrl(image.sellerProductMediaAsset.storageKey)
+    : null;
+  return cdnUrl ?? line.productImageUrl ?? image?.url ?? null;
+}
+
 function projectSummary(graph: SellerOrderGraph, now: Date): SellerOrderSummary {
   const fulfillment = graph.fulfillment;
   const fulfillmentState = fulfillment?.state ?? 'PENDING_CONFIRMATION';
@@ -115,7 +124,7 @@ function projectSummary(graph: SellerOrderGraph, now: Date): SellerOrderSummary 
     productId: line.productId,
     variantId: line.variantId,
     productName: line.productName,
-    productImageUrl: line.productImageUrl,
+    productImageUrl: currentProductImageUrl(line),
     variantName: line.variantName,
     variantSku: line.variantSku,
     quantity: line.quantity,

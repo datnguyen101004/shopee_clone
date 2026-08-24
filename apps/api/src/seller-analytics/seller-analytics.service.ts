@@ -12,6 +12,7 @@ import {
 } from '@shopee-clone/contracts';
 import { SellerAnalyticsNotFoundError, SellerAnalyticsUnavailableError, SellerAnalyticsValidationError } from './seller-analytics.errors';
 import { SellerShopScopeNotFoundError, SellerShopScopeService } from '../seller-scope/seller-shop-scope.service';
+import { publicSellerProductMediaUrl } from '../seller-products/seller-product-media.storage';
 
 const ELIGIBLE_STATUSES = ['awaiting_pickup', 'shipping', 'delivered'] as const;
 const LOW_STOCK_THRESHOLD = 10;
@@ -144,6 +145,21 @@ export class SellerAnalyticsService {
         WHERE p."shop_id" = ${shop.id}::uuid AND p."status" = 'active' AND p."deleted_at" IS NULL AND pv."status" = 'active' AND pv."deleted_at" IS NULL AND (i."quantity_on_hand" - i."quantity_reserved") <= ${LOW_STOCK_THRESHOLD}
         ORDER BY (i."quantity_on_hand" - i."quantity_reserved"), pv."id" LIMIT 10`),
     ]);
+    const imageProductIds = [...new Set([...bestRows.map((row) => row.productId), ...lowRows.map((row) => row.productId)])];
+    const currentImages = imageProductIds.length
+      ? await tx.productImage.findMany({
+          where: { productId: { in: imageProductIds }, variantId: null },
+          orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }],
+          select: { productId: true, url: true, sellerProductMediaAsset: { select: { storageKey: true } } },
+        })
+      : [];
+    const currentImageByProduct = new Map<string, (typeof currentImages)[number]>();
+    for (const image of currentImages) if (!currentImageByProduct.has(image.productId)) currentImageByProduct.set(image.productId, image);
+    const currentImageUrl = (productId: string, snapshotUrl: string | null): string | null => {
+      const image = currentImageByProduct.get(productId);
+      const cdnUrl = image?.sellerProductMediaAsset?.storageKey ? publicSellerProductMediaUrl(image.sellerProductMediaAsset.storageKey) : null;
+      return cdnUrl ?? snapshotUrl ?? image?.url ?? null;
+    };
     const kpi = kpiRows[0] ?? { eligibleOrderCount: 0n, unitsSold: 0n, merchandiseRevenueMinor: 0n };
     const actual = new Map(seriesRows.map((row) => [row.bucket, row]));
     const series: SellerDashboardResponse['timeSeries'] = [];
@@ -160,8 +176,8 @@ export class SellerAnalyticsService {
       generatedAt: generatedAt.toISOString(),
       kpis: { eligibleOrderCount: toSafe(kpi.eligibleOrderCount), unitsSold: toSafe(kpi.unitsSold), merchandiseRevenueMinor: toSafe(kpi.merchandiseRevenueMinor) },
       timeSeries: series,
-      bestSellers: bestRows.map((row) => ({ productId: row.productId, productName: row.productName, productImageUrl: row.productImageUrl, unitsSold: toSafe(row.unitsSold), merchandiseRevenueMinor: toSafe(row.merchandiseRevenueMinor), currentProductAvailable: row.currentProductAvailable })),
-      lowStock: { threshold: LOW_STOCK_THRESHOLD, items: lowRows },
+      bestSellers: bestRows.map((row) => ({ productId: row.productId, productName: row.productName, productImageUrl: currentImageUrl(row.productId, row.productImageUrl), unitsSold: toSafe(row.unitsSold), merchandiseRevenueMinor: toSafe(row.merchandiseRevenueMinor), currentProductAvailable: row.currentProductAvailable })),
+      lowStock: { threshold: LOW_STOCK_THRESHOLD, items: lowRows.map((row) => ({ ...row, productImageUrl: currentImageUrl(row.productId, row.productImageUrl) })) },
       conversion: { status: 'NOT_AVAILABLE', rateBasisPoints: null, visits: null },
     };
   }
@@ -181,7 +197,21 @@ export class SellerAnalyticsService {
     const rows = await tx.$queryRaw<Array<{ productId: string; productName: string; productImageUrl: string | null; unitsSold: bigint; merchandiseRevenueMinor: bigint; currentProductAvailable: boolean }>>(Prisma.sql`
       WITH eligible AS (SELECT ol."id", ol."product_id", ol."product_name", ol."product_image_url", ol."quantity", ol."payable_merchandise_minor", ol."created_at" FROM "order_lines" ol INNER JOIN "shop_orders" so ON so."id" = ol."order_id" WHERE so."shop_id" = ${shop.id}::uuid AND so."status" IN (${statusList}) AND so."created_at" >= ${range.from} AND so."created_at" < ${range.to}), aggregated AS (SELECT "product_id", SUM("quantity")::bigint AS "unitsSold", SUM("payable_merchandise_minor")::bigint AS "merchandiseRevenueMinor" FROM eligible GROUP BY "product_id"), snapshots AS (SELECT DISTINCT ON ("product_id") "product_id", "product_name", "product_image_url" FROM eligible ORDER BY "product_id", "created_at" DESC, "id" DESC), ranked AS (SELECT a."product_id" AS "productId", s."product_name" AS "productName", s."product_image_url" AS "productImageUrl", a."unitsSold", a."merchandiseRevenueMinor", EXISTS (SELECT 1 FROM "products" p WHERE p."id" = a."product_id" AND p."shop_id" = ${shop.id}::uuid AND p."status" = 'active' AND p."deleted_at" IS NULL) AS "currentProductAvailable" FROM aggregated a INNER JOIN snapshots s ON s."product_id" = a."product_id")
       SELECT * FROM ranked r ${cursorFilter} ORDER BY r."unitsSold" DESC, r."merchandiseRevenueMinor" DESC, r."productId" ASC LIMIT ${query.limit + 1}`);
-    const items = rows.slice(0, query.limit).map((row) => ({ productId: row.productId, productName: row.productName, productImageUrl: row.productImageUrl, unitsSold: toSafe(row.unitsSold), merchandiseRevenueMinor: toSafe(row.merchandiseRevenueMinor), currentProductAvailable: row.currentProductAvailable }));
+    const productIds = [...new Set(rows.map((row) => row.productId))];
+    const currentImages = productIds.length
+      ? await tx.productImage.findMany({
+          where: { productId: { in: productIds }, variantId: null },
+          orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }],
+          select: { productId: true, url: true, sellerProductMediaAsset: { select: { storageKey: true } } },
+        })
+      : [];
+    const currentImageByProduct = new Map<string, (typeof currentImages)[number]>();
+    for (const image of currentImages) if (!currentImageByProduct.has(image.productId)) currentImageByProduct.set(image.productId, image);
+    const items = rows.slice(0, query.limit).map((row) => {
+      const image = currentImageByProduct.get(row.productId);
+      const cdnUrl = image?.sellerProductMediaAsset?.storageKey ? publicSellerProductMediaUrl(image.sellerProductMediaAsset.storageKey) : null;
+      return { productId: row.productId, productName: row.productName, productImageUrl: cdnUrl ?? row.productImageUrl ?? image?.url ?? null, unitsSold: toSafe(row.unitsSold), merchandiseRevenueMinor: toSafe(row.merchandiseRevenueMinor), currentProductAvailable: row.currentProductAvailable };
+    });
     const last = items.at(-1);
     return { sellerAnalyticsVersion: 'seller-analytics-v1', currency: 'VND', range: { from: query.from, to: query.to, timeZone: shop.timeZone, fromUtc: range.from.toISOString(), toUtcExclusive: range.to.toISOString() }, items, nextCursor: rows.length > query.limit && last ? encodeCursor(query, last) : null };
   }

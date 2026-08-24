@@ -14,6 +14,27 @@ describe('fetchHomepage', () => {
     );
   });
 
+  it('uses the public API origin when the server-only origin is not configured', async () => {
+    const originalHomepageBaseUrl = process.env.HOMEPAGE_API_BASE_URL;
+    const originalPublicBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
+    delete process.env.HOMEPAGE_API_BASE_URL;
+    process.env.NEXT_PUBLIC_API_BASE_URL = 'https://api.videod.me';
+    const fetcher = vi.fn().mockResolvedValue(new Response(JSON.stringify(valid), { status: 200 }));
+
+    try {
+      await expect(fetchHomepage(fetcher)).resolves.toEqual(valid);
+      expect(fetcher).toHaveBeenCalledWith(
+        'https://api.videod.me/api/v1/homepage',
+        expect.objectContaining({ cache: 'no-store' }),
+      );
+    } finally {
+      if (originalHomepageBaseUrl === undefined) delete process.env.HOMEPAGE_API_BASE_URL;
+      else process.env.HOMEPAGE_API_BASE_URL = originalHomepageBaseUrl;
+      if (originalPublicBaseUrl === undefined) delete process.env.NEXT_PUBLIC_API_BASE_URL;
+      else process.env.NEXT_PUBLIC_API_BASE_URL = originalPublicBaseUrl;
+    }
+  });
+
   it.each([
     ['status', vi.fn().mockResolvedValue(new Response('{}', { status: 503 }))],
     ['contract', vi.fn().mockResolvedValue(new Response('{}', { status: 200 }))],

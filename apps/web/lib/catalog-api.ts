@@ -24,6 +24,7 @@ export async function fetchCatalogProducts(
   const baseUrl =
     process.env.CATALOG_API_BASE_URL ??
     process.env.HOMEPAGE_API_BASE_URL ??
+    process.env.NEXT_PUBLIC_API_BASE_URL ??
     'http://127.0.0.1:3001';
   const url = new URL('/api/v1/catalog/products', baseUrl);
   url.search = serializeCatalogQuery(query);

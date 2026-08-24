@@ -27,6 +27,7 @@ export async function fetchProductDetail(
     process.env.PRODUCT_DETAIL_API_BASE_URL ??
     process.env.CATALOG_API_BASE_URL ??
     process.env.HOMEPAGE_API_BASE_URL ??
+    process.env.NEXT_PUBLIC_API_BASE_URL ??
     'http://127.0.0.1:3001';
   const url = new URL(`/api/v1/catalog/products/${encodeURIComponent(productId)}`, baseUrl);
   console.info('[storefront-api]', url.href);

@@ -21,14 +21,15 @@ describe('installApiRequestLogger', () => {
     await fetch('https://api.example.test/api/v1/homepage?code=private-value');
 
     expect(fetcher).toHaveBeenCalledOnce();
-    expect(info).toHaveBeenNthCalledWith(1, '[api-debug] request', {
-      method: 'GET',
-      url: 'https://api.example.test/api/v1/homepage?code=%5Bredacted%5D',
-    });
+    expect(info).toHaveBeenNthCalledWith(
+      1,
+      '[api-debug] request',
+      '{"method":"GET","url":"https://api.example.test/api/v1/homepage?code=%5Bredacted%5D"}',
+    );
     expect(info).toHaveBeenNthCalledWith(
       2,
       '[api-debug] response',
-      expect.objectContaining({ method: 'GET', status: 204 }),
+      expect.stringContaining('"status":204'),
     );
   });
 

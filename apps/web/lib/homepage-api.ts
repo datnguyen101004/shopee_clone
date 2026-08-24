@@ -13,7 +13,11 @@ export async function fetchHomepage(
   fetcher: typeof fetch = fetch,
   timeoutMs = 20_000,
 ): Promise<HomepageResponse> {
-  const url = `${process.env.HOMEPAGE_API_BASE_URL ?? 'http://127.0.0.1:3001'}/api/v1/homepage`;
+  const baseUrl =
+    process.env.HOMEPAGE_API_BASE_URL ??
+    process.env.NEXT_PUBLIC_API_BASE_URL ??
+    'http://127.0.0.1:3001';
+  const url = new URL('/api/v1/homepage', baseUrl).toString();
   console.info('[storefront-api]', url);
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);

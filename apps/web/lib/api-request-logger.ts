@@ -57,24 +57,30 @@ export function installApiRequestLogger() {
     if (!request) return originalFetch(input, init);
 
     const startedAt = performance.now();
-    console.info('[api-debug] request', request);
+    console.info('[api-debug] request', JSON.stringify(request));
 
     try {
       const response = await originalFetch(input, init);
       const log = response.ok ? console.info : console.error;
-      log('[api-debug] response', {
-        ...request,
-        status: response.status,
-        statusText: response.statusText,
-        durationMs: durationMs(startedAt),
-      });
+      log(
+        '[api-debug] response',
+        JSON.stringify({
+          ...request,
+          status: response.status,
+          statusText: response.statusText,
+          durationMs: durationMs(startedAt),
+        }),
+      );
       return response;
     } catch (error) {
-      console.error('[api-debug] transport error', {
-        ...request,
-        durationMs: durationMs(startedAt),
-        error,
-      });
+      console.error(
+        '[api-debug] transport error',
+        JSON.stringify({
+          ...request,
+          durationMs: durationMs(startedAt),
+          error: error instanceof Error ? { name: error.name, message: error.message } : error,
+        }),
+      );
       throw error;
     }
   };

@@ -20,7 +20,7 @@ describe('installApiRequestLogger', () => {
     installApiRequestLogger();
     await fetch('https://api.example.test/api/v1/homepage?code=private-value');
 
-    expect(fetcher).toHaveBeenCalledOnce();
+    expect(fetcher).toHaveBeenCalledTimes(1);
     expect(info).toHaveBeenNthCalledWith(
       1,
       '[api-debug] request',
@@ -41,7 +41,7 @@ describe('installApiRequestLogger', () => {
     installApiRequestLogger();
     await fetch('https://videod.me/_next/static/chunk.js');
 
-    expect(fetcher).toHaveBeenCalledOnce();
+    expect(fetcher).toHaveBeenCalledTimes(1);
     expect(info).not.toHaveBeenCalled();
   });
 

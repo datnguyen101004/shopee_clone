@@ -1376,7 +1376,7 @@ export function SellerProductEditor({ productId }: { productId?: string }) {
           </div>
         </fieldset>
       </div>
-      <div className="seller-product-actions">
+      <div className="seller-product-actions seller-product-form-actions">
         {product ? (
           <>
             <button

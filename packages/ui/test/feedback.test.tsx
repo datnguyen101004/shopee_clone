@@ -89,7 +89,7 @@ describe('feedback components', () => {
       </>,
     );
     await userEvent.click(screen.getByRole('button', { name: 'Thử lại' }));
-    expect(retry).toHaveBeenCalledOnce();
+    expect(retry).toHaveBeenCalledTimes(1);
     const results = await axe(container, { rules: { 'color-contrast': { enabled: false } } });
     expect(results.violations).toEqual([]);
   });

@@ -32,7 +32,7 @@ describe('UI primitives', () => {
       </>,
     );
     await user.click(screen.getByRole('button', { name: 'Tìm kiếm' }));
-    expect(onClick).toHaveBeenCalledOnce();
+    expect(onClick).toHaveBeenCalledTimes(1);
     expect(screen.getByTestId('search')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Đang lưu/ })).toBeDisabled();
     expect(screen.getByRole('link', { name: 'Giỏ hàng' })).toHaveAttribute('aria-disabled', 'true');

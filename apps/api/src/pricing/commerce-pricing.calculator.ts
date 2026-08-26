@@ -32,6 +32,7 @@ export interface AuthoritativePricingLine {
   compareAtUnitPriceMinor: bigint | null;
   shop: {
     id: string;
+    ownerUserId: string;
     slug: string;
     name: string;
     location: string;
@@ -123,7 +124,12 @@ export class CommercePricingCalculator {
           service: serviceByShop.get(first.shop.id) ?? 'STANDARD',
         });
         return {
-          shop: { id: first.shop.id, slug: first.shop.slug, name: first.shop.name },
+          shop: {
+            id: first.shop.id,
+            ownerUserId: first.shop.ownerUserId,
+            slug: first.shop.slug,
+            name: first.shop.name,
+          },
           lines,
           shipping,
           listSubtotalMinor,

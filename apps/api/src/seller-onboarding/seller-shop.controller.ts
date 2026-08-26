@@ -11,7 +11,7 @@ import {
   UseFilters,
   UseGuards,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 
 import { AuthGuard, type AuthenticatedRequest } from '../auth/auth.guard';
 import { RequireRoles, RolesGuard } from '../auth/role-authorization.guard';
@@ -42,6 +42,7 @@ export class SellerShopController {
   @RequireRoles('buyer')
   @Header('Cache-Control', 'no-store')
   @ApiOperation({ summary: 'Create the authenticated seller shop application' })
+  @ApiResponse({ status: 409, description: 'The account already owns its single shop slot.' })
   create(
     @Req() request: AuthenticatedRequest,
     @Body() input: CreateSellerShopDto,
@@ -64,6 +65,7 @@ export class SellerShopController {
   @RequireRoles('buyer')
   @Header('Cache-Control', 'no-store')
   @ApiOperation({ summary: 'Update or resubmit the authenticated buyer shop registration' })
+  @ApiResponse({ status: 409, description: 'The existing single shop is in a finalized state.' })
   updateRegistration(
     @Req() request: AuthenticatedRequest,
     @Body() input: UpdateSellerShopDto,

@@ -9,7 +9,7 @@ import {
   UserStatus,
 } from '../generated/prisma/enums';
 import { PrismaService } from '../prisma/prisma.service';
-import { GoogleAccountMethodRequiredError, GoogleSignInFailedError } from './auth.errors';
+import { AccountSuspendedError, GoogleAccountMethodRequiredError, GoogleSignInFailedError } from './auth.errors';
 
 const safeUserSelect = {
   id: true,
@@ -180,9 +180,10 @@ export class AuthRepository {
       });
       let user;
       if (identity) {
-        if (identity.user.status !== UserStatus.ACTIVE || identity.user.deletedAt !== null) {
+        if (identity.user.deletedAt !== null) {
           throw new GoogleSignInFailedError();
         }
+        if (identity.user.status !== UserStatus.ACTIVE) throw new AccountSuspendedError();
         user = identity.user;
         await transaction.externalIdentity.update({
           where: { id: identity.id },

@@ -33,7 +33,12 @@ export class GoogleAuthCallbackController {
   @Header('Referrer-Policy', 'no-referrer')
   @ApiOperation({ summary: 'Consume the exact registered Google OAuth callback' })
   async callback(@Req() request: Request, @Res() response: Response): Promise<void> {
-    let outcome: 'success' | 'cancelled' | 'failed' | 'account-method-required' = 'failed';
+    let outcome:
+      | 'success'
+      | 'cancelled'
+      | 'failed'
+      | 'account-method-required'
+      | 'account-and-shop-disabled' = 'failed';
     let returnTo = '/';
     try {
       const completion = await this.googleAuth.complete({

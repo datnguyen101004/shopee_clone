@@ -132,7 +132,7 @@ describe('multi-shop cart screen', () => {
         },
         shops: [
           {
-            shop: { id: shopId, slug: 'sample-shop', name: 'Sample Shop' },
+            shop: { id: shopId, ownerUserId: '00000000-0000-4000-8000-000000000101', slug: 'sample-shop', name: 'Sample Shop' },
             lines: [
               {
                 lineId,

@@ -15,6 +15,7 @@ import { AUTH_CONFIG, type AuthConfig } from './auth.config';
 import { AuthClock } from './auth-clock';
 import {
   AuthenticationFailedError,
+  AccountSuspendedError,
   PasswordResetFailedError,
   RecoveryDeliveryFailedError,
   RefreshSessionFailedError,
@@ -136,15 +137,10 @@ export class AuthService {
     );
     const user = await this.repository.findCredentialUser(input.email);
     const verified = await this.password.verify(input.password, user?.passwordHash ?? null);
-    if (
-      !user ||
-      !verified ||
-      user.status !== UserStatus.ACTIVE ||
-      user.deletedAt !== null ||
-      user.passwordHash === null
-    ) {
+    if (!user || !verified || user.deletedAt !== null || user.passwordHash === null) {
       throw new AuthenticationFailedError();
     }
+    if (user.status !== UserStatus.ACTIVE) throw new AccountSuspendedError();
     this.limiter.clear(identityKey);
     if (this.password.needsRehash(user.passwordHash)) {
       const upgradedHash = await this.password.hash(input.password);

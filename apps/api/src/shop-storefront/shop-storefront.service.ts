@@ -63,6 +63,7 @@ export class ShopStorefrontService {
     safeRatingAggregate(shop.ratingAverageBasisPoints, shop.ratingCount);
     return {
       id: shop.id,
+      ownerUserId: shop.ownerId,
       slug: shop.slug,
       name: shop.name,
       location: shop.location,

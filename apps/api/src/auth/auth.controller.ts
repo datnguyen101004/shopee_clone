@@ -106,6 +106,7 @@ export class AuthController {
   @Header('Cache-Control', 'no-store')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Authenticate email credentials' })
+  @ApiResponse({ status: 403, description: 'Verified credentials belong to a suspended seller account and shop.' })
   async login(
     @Body() input: LoginDto,
     @Req() request: Request,

@@ -40,6 +40,7 @@ const response = {
   initialVariantId: variantId,
   shop: {
     id: '00000000-0000-4000-8000-000000000101',
+    ownerUserId: '00000000-0000-4000-8000-000000000102',
     slug: 'tech-store',
     name: 'Tech Store',
     location: 'Hồ Chí Minh',

@@ -36,6 +36,7 @@ export const NOTIFICATION_TYPES = [
   'PRODUCT_APPROVED',
   'PRODUCT_REJECTED',
   'VOUCHER_ASSIGNED',
+  'CHAT_MESSAGE',
   'SYSTEM_NOTICE',
 ] as const;
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
@@ -68,6 +69,7 @@ export const NOTIFICATION_CATEGORY_BY_TYPE: Record<NotificationType, Notificatio
   PRODUCT_APPROVED: 'SYSTEM',
   PRODUCT_REJECTED: 'SYSTEM',
   VOUCHER_ASSIGNED: 'PROMOTIONS',
+  CHAT_MESSAGE: 'ACCOUNT',
   SYSTEM_NOTICE: 'SYSTEM',
 };
 

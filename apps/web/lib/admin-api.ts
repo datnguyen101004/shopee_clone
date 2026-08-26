@@ -28,8 +28,6 @@ import type {
   UpdateAdminHomepageModuleSettingsRequest,
 } from '@shopee-clone/contracts';
 
-
-
 const fallbackBaseUrl = 'http://localhost:3001';
 
 export type AuthenticatedFetcher = (
@@ -46,6 +44,23 @@ export class AdminApiError extends Error {
     super(`Admin API ${kind} error (${status}): ${problem?.detail || problem?.title || 'Unknown'}`);
     this.name = 'AdminApiError';
   }
+}
+
+export function adminErrorMessage(error: unknown, fallback: string): string {
+  if (error instanceof AdminApiError) {
+    return error.problem?.detail ?? error.problem?.title ?? error.message;
+  }
+  return error instanceof Error ? error.message : fallback;
+}
+
+function parseAdminProblem(value: unknown): AdminApiError['problem'] | undefined {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
+  const record = value as Record<string, unknown>;
+  return {
+    ...(typeof record.title === 'string' ? { title: record.title } : {}),
+    ...(typeof record.detail === 'string' ? { detail: record.detail } : {}),
+    ...(typeof record.code === 'string' ? { code: record.code } : {}),
+  };
 }
 
 function endpoint(path: string): URL {
@@ -68,9 +83,9 @@ async function requestJson<T>(
   });
 
   if (!response.ok) {
-    let problem: any;
+    let problem: AdminApiError['problem'];
     try {
-      problem = await response.json();
+      problem = parseAdminProblem(await response.json());
     } catch {
       // problem fallback
     }
@@ -88,7 +103,9 @@ async function requestJson<T>(
   }
 }
 
-export function fetchAdminDashboard(fetcher: AuthenticatedFetcher): Promise<AdminDashboardResponse> {
+export function fetchAdminDashboard(
+  fetcher: AuthenticatedFetcher,
+): Promise<AdminDashboardResponse> {
   return requestJson(endpoint('/api/v1/admin/dashboard'), fetcher);
 }
 
@@ -292,4 +309,3 @@ export function applyAdminProductAction(
     body: JSON.stringify(input),
   });
 }
-

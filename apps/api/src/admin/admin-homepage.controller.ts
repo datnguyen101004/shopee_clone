@@ -25,6 +25,8 @@ import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { AuthGuard, type AuthenticatedRequest } from '../auth/auth.guard';
 import { RequireRoles, RolesGuard } from '../auth/role-authorization.guard';
 import { AdminExceptionFilter } from './admin-exception.filter';
+// DTO classes must remain runtime values for Nest validation metadata.
+// eslint-disable-next-line @typescript-eslint/consistent-type-imports
 import {
   CreateAdminBannerDto,
   ReorderAdminBannersDto,

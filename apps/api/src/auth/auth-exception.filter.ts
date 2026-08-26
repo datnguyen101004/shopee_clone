@@ -9,6 +9,7 @@ import type { Request } from 'express';
 
 import {
   AuthenticationFailedError,
+  AccountSuspendedError,
   AuthorizationDeniedError,
   AuthInputError,
   AuthOriginDeniedError,
@@ -91,6 +92,16 @@ export class AuthExceptionFilter implements ExceptionFilter {
         'authentication-failed',
         'Authentication failed',
         'The credentials or session could not be verified.',
+      );
+      return;
+    }
+    if (exception instanceof AccountSuspendedError) {
+      this.problem(
+        response,
+        403,
+        'account-and-shop-disabled',
+        'Account and shop disabled',
+        'The account and its shop have been disabled. Please contact support if you need assistance.',
       );
       return;
     }

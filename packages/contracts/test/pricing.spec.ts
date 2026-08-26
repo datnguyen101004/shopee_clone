@@ -27,7 +27,7 @@ const quote: PricingQuoteResponse = {
   address: { id: addressId, province: 'Thành phố Hồ Chí Minh', district: 'Quận 1' },
   shops: [
     {
-      shop: { id: shopA, slug: 'shop-a', name: 'Shop A' },
+      shop: { id: shopA, ownerUserId: '00000000-0000-4000-8000-000000000601', slug: 'shop-a', name: 'Shop A' },
       lines: [
         {
           lineId: lineA,
@@ -75,7 +75,7 @@ const quote: PricingQuoteResponse = {
       payableTotalMinor: 178_714,
     },
     {
-      shop: { id: shopB, slug: 'shop-b', name: 'Shop B' },
+      shop: { id: shopB, ownerUserId: '00000000-0000-4000-8000-000000000602', slug: 'shop-b', name: 'Shop B' },
       lines: [
         {
           lineId: lineB,

@@ -70,6 +70,13 @@ export class SellerOnboardingRepository {
     });
   }
 
+  findOwnedShop(userId: string, transaction: SellerOnboardingTransaction = this.prisma) {
+    return transaction.shop.findFirst({
+      where: { ownerId: userId },
+      select: sellerShopSelect,
+    });
+  }
+
   findDefaultShippingAddress(
     userId: string,
     transaction: SellerOnboardingTransaction = this.prisma,

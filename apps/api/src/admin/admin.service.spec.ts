@@ -165,6 +165,60 @@ describe('AdminService', () => {
 
       expect(result.status).toBe('ACTIVE');
     });
+
+    it('routes seller user and shop actions through the same lifecycle adapter', async () => {
+      const lifecycle = {
+        suspendUserInTransaction: jest.fn().mockResolvedValue(undefined),
+        restoreUserInTransaction: jest.fn().mockResolvedValue(undefined),
+        suspendShopInTransaction: jest.fn().mockResolvedValue(undefined),
+        restoreShopInTransaction: jest.fn().mockResolvedValue(undefined),
+      };
+      const lifecycleService = new AdminService(repository, lifecycle as never);
+      const sellerUser = {
+        id: targetUserId,
+        email: 'seller@example.com',
+        displayName: 'Seller',
+        phoneNumber: null,
+        status: 'ACTIVE' as const,
+        roles: ['buyer', 'seller'] as Array<'buyer' | 'seller' | 'admin'>,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      repository.findUserById.mockResolvedValue(sellerUser);
+      repository.findShopById.mockResolvedValue({
+        id: targetShopId,
+        ownerUserId: targetUserId,
+        slug: 'seller-shop',
+        name: 'Seller Shop',
+        status: 'ACTIVE',
+        onboardingStatus: 'APPROVED',
+        onboardingReason: 'Approved seller request',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+
+      await lifecycleService.executeUserAction(adminUserId, targetUserId, {
+        action: 'SUSPEND',
+        reason: 'Seller suspension requires review',
+      });
+      await lifecycleService.executeShopAction(adminUserId, targetShopId, {
+        action: 'RESTORE',
+        reason: 'Seller shop suspension resolved',
+      });
+
+      expect(lifecycle.suspendUserInTransaction).toHaveBeenCalledWith(
+        expect.anything(),
+        adminUserId,
+        targetUserId,
+        'Seller suspension requires review',
+      );
+      expect(lifecycle.restoreShopInTransaction).toHaveBeenCalledWith(
+        expect.anything(),
+        adminUserId,
+        targetShopId,
+        'Seller shop suspension resolved',
+      );
+    });
   });
 
   describe('Category Hierarchy and Integrity', () => {

@@ -1,5 +1,7 @@
 :root {
-  --sc-font-sans: var(--font-be-vietnam-pro), 'Be Vietnam Pro', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --sc-font-sans:
+    var(--font-be-vietnam-pro), 'Be Vietnam Pro', -apple-system, BlinkMacSystemFont, 'Segoe UI',
+    Roboto, 'Helvetica Neue', Arial, sans-serif;
 }
 
 html,
@@ -1341,7 +1343,9 @@ textarea {
   background: #fff;
   color: #111827;
   font: inherit;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
 }
 
 .return-workflow input:focus,
@@ -1408,7 +1412,9 @@ textarea {
   padding: 1rem 1.15rem;
   color: inherit;
   text-decoration: none;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
 }
 
 .return-card:hover {
@@ -1693,7 +1699,9 @@ textarea {
   width: fit-content;
   max-width: 100%;
   box-sizing: border-box;
-  transition: background 0.15s ease, border-color 0.15s ease;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease;
   user-select: none;
 }
 
@@ -2690,6 +2698,9 @@ textarea {
   text-decoration: none;
   font-weight: 700;
 }
+.market-topline__seller-registration {
+  color: #fff;
+}
 .market-topline__meta {
   margin-left: auto;
 }
@@ -3288,7 +3299,9 @@ textarea {
   text-decoration: none;
   border-radius: 0.85rem;
   overflow: hidden;
-  box-shadow: 0 10px 28px -5px rgba(238, 77, 45, 0.25), 0 4px 10px -2px rgba(0, 0, 0, 0.06);
+  box-shadow:
+    0 10px 28px -5px rgba(238, 77, 45, 0.25),
+    0 4px 10px -2px rgba(0, 0, 0, 0.06);
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   background: #fff;
   border: 1px solid rgba(238, 77, 45, 0.15);
@@ -3297,7 +3310,9 @@ textarea {
 
 .hero-banner-link:hover {
   transform: translateY(-3px) scale(1.005);
-  box-shadow: 0 18px 38px -6px rgba(238, 77, 45, 0.36), 0 6px 16px -3px rgba(0, 0, 0, 0.08);
+  box-shadow:
+    0 18px 38px -6px rgba(238, 77, 45, 0.36),
+    0 6px 16px -3px rgba(0, 0, 0, 0.08);
   border-color: rgba(238, 77, 45, 0.45);
 }
 
@@ -3312,7 +3327,6 @@ textarea {
   background: linear-gradient(135deg, #fff1ed 0%, #ffe3da 100%);
 }
 
-
 .hero-banner-img {
   width: 100%;
   height: 100%;
@@ -3321,10 +3335,6 @@ textarea {
   object-position: center;
   transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
 }
-
-
-
-
 
 .hero-banner-link:hover .hero-banner-img {
   transform: scale(1.015);
@@ -3518,7 +3528,9 @@ textarea {
 .category-card:hover {
   transform: translateY(-5px);
   border-color: rgba(238, 77, 45, 0.25);
-  box-shadow: 0 10px 24px -4px rgba(238, 77, 45, 0.15), 0 4px 8px -2px rgba(0, 0, 0, 0.04);
+  box-shadow:
+    0 10px 24px -4px rgba(238, 77, 45, 0.15),
+    0 4px 8px -2px rgba(0, 0, 0, 0.04);
 }
 .category-card span {
   display: grid;
@@ -3576,7 +3588,9 @@ textarea {
 .product-card:hover {
   transform: translateY(-5px);
   border-color: #ee4d2d;
-  box-shadow: 0 12px 28px -4px rgba(0, 0, 0, 0.12), 0 6px 12px -2px rgba(238, 77, 45, 0.08);
+  box-shadow:
+    0 12px 28px -4px rgba(0, 0, 0, 0.12),
+    0 6px 12px -2px rgba(238, 77, 45, 0.08);
 }
 .product-card__link {
   display: block;
@@ -3603,7 +3617,6 @@ textarea {
   color: #ee4d2d;
 }
 .product-card__image--fallback::before,
-
 .product-card__image--fallback::after {
   content: '';
   position: absolute;
@@ -3965,9 +3978,9 @@ textarea {
   display: grid;
   grid-template-columns: 220px minmax(0, 1fr);
   grid-template-areas:
-    "sidebar summary"
-    "sidebar active-filters"
-    "sidebar main";
+    'sidebar summary'
+    'sidebar active-filters'
+    'sidebar main';
   gap: 0.75rem 1.5rem;
   align-items: start;
 }
@@ -4048,7 +4061,9 @@ textarea {
   background: #fff;
   color: #1e293b;
   font-size: 0.86rem;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
 }
 
 .shopee-form-input:focus,
@@ -4145,7 +4160,10 @@ textarea {
   text-transform: uppercase;
   cursor: pointer;
   box-shadow: 0 2px 6px rgb(238 77 45 / 25%);
-  transition: transform 0.12s ease, box-shadow 0.12s ease, opacity 0.12s ease;
+  transition:
+    transform 0.12s ease,
+    box-shadow 0.12s ease,
+    opacity 0.12s ease;
 }
 
 .shopee-btn-apply:hover {
@@ -4169,7 +4187,10 @@ textarea {
   text-decoration: none;
   text-transform: uppercase;
   letter-spacing: 0.02em;
-  transition: border-color 0.15s ease, color 0.15s ease, background-color 0.15s ease;
+  transition:
+    border-color 0.15s ease,
+    color 0.15s ease,
+    background-color 0.15s ease;
 }
 
 .shopee-btn-clear:hover {
@@ -4243,7 +4264,9 @@ textarea {
   font-size: 0.8rem;
   font-weight: 600;
   text-decoration: none;
-  transition: background-color 0.15s ease, border-color 0.15s ease;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease;
 }
 
 .shopee-active-filter-tag:hover {
@@ -4293,7 +4316,10 @@ textarea {
   border-radius: 0.35rem;
   background: #fff;
   box-shadow: 0 1px 3px rgb(0 0 0 / 5%);
-  transition: transform 0.18s cubic-bezier(0.2, 0, 0, 1), box-shadow 0.18s cubic-bezier(0.2, 0, 0, 1), border-color 0.18s ease;
+  transition:
+    transform 0.18s cubic-bezier(0.2, 0, 0, 1),
+    box-shadow 0.18s cubic-bezier(0.2, 0, 0, 1),
+    border-color 0.18s ease;
 }
 
 .catalog-card:hover {
@@ -4614,13 +4640,14 @@ textarea {
   width: min(540px, 100%);
   height: auto;
   border-radius: 1rem;
-  box-shadow: 0 20px 40px -10px rgba(238, 77, 45, 0.36), 0 8px 16px -4px rgba(0, 0, 0, 0.08);
+  box-shadow:
+    0 20px 40px -10px rgba(238, 77, 45, 0.36),
+    0 8px 16px -4px rgba(0, 0, 0, 0.08);
   transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
 }
 .hero:hover .hero__art img {
   transform: translateY(-4px) scale(1.02);
 }
-
 
 .homepage-primary-action {
   display: inline-flex;
@@ -5229,6 +5256,54 @@ textarea {
 
 .seller-shop-panel {
   max-width: 920px;
+}
+
+.buyer-shop-registration-panel {
+  max-width: none;
+  margin-inline: 0;
+  box-shadow: none;
+}
+
+.buyer-shop-registration-steps {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem;
+  margin: 1.25rem 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: registration-step;
+}
+
+.buyer-shop-registration-steps li {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  color: var(--sc-color-text-muted);
+  font-size: 0.85rem;
+  font-weight: 800;
+}
+
+.buyer-shop-registration-steps li::before {
+  counter-increment: registration-step;
+  content: counter(registration-step);
+  display: grid;
+  width: 1.75rem;
+  height: 1.75rem;
+  flex: 0 0 1.75rem;
+  place-items: center;
+  border: 1px solid var(--sc-color-border);
+  border-radius: 999px;
+  background: white;
+}
+
+.buyer-shop-registration-steps li.is-current {
+  color: var(--sc-color-brand-700);
+}
+
+.buyer-shop-registration-steps li.is-current::before {
+  border-color: var(--sc-color-brand-600);
+  background: var(--sc-color-brand-600);
+  color: white;
 }
 
 .seller-products-heading,
@@ -5932,12 +6007,13 @@ textarea {
 .return-workflow button,
 .return-workflow a.button,
 main[aria-labelledby='seller-notice-title'] button {
-  transition: transform 0.15s cubic-bezier(0.2, 0, 0, 1),
-              box-shadow 0.15s cubic-bezier(0.2, 0, 0, 1),
-              background-color 0.15s ease,
-              border-color 0.15s ease,
-              color 0.15s ease,
-              opacity 0.15s ease;
+  transition:
+    transform 0.15s cubic-bezier(0.2, 0, 0, 1),
+    box-shadow 0.15s cubic-bezier(0.2, 0, 0, 1),
+    background-color 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease,
+    opacity 0.15s ease;
 }
 
 .seller-center-shell button:hover:not(:disabled),
@@ -6090,7 +6166,9 @@ main[aria-labelledby='seller-notice-title'] button:focus-visible {
   font-weight: 600;
   font-size: 0.88rem;
   text-decoration: none;
-  transition: background 0.15s ease, color 0.15s ease;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease;
 }
 .seller-center-nav a:hover,
 .seller-center-nav a.is-active,
@@ -7646,10 +7724,11 @@ main[aria-labelledby='seller-notice-title'] button:focus-visible {
   text-decoration: none;
   cursor: pointer;
   box-shadow: 0 2px 6px rgb(238 77 45 / 25%);
-  transition: transform 0.15s cubic-bezier(0.2, 0, 0, 1),
-              box-shadow 0.15s cubic-bezier(0.2, 0, 0, 1),
-              background-color 0.15s ease,
-              border-color 0.15s ease;
+  transition:
+    transform 0.15s cubic-bezier(0.2, 0, 0, 1),
+    box-shadow 0.15s cubic-bezier(0.2, 0, 0, 1),
+    background-color 0.15s ease,
+    border-color 0.15s ease;
 }
 
 .seller-product-primary:hover:not(:disabled),
@@ -7694,11 +7773,12 @@ main[aria-labelledby='seller-notice-title'] button:focus-visible {
   font-size: 0.84rem;
   text-decoration: none;
   cursor: pointer;
-  transition: transform 0.15s cubic-bezier(0.2, 0, 0, 1),
-              box-shadow 0.15s cubic-bezier(0.2, 0, 0, 1),
-              background-color 0.15s ease,
-              border-color 0.15s ease,
-              color 0.15s ease;
+  transition:
+    transform 0.15s cubic-bezier(0.2, 0, 0, 1),
+    box-shadow 0.15s cubic-bezier(0.2, 0, 0, 1),
+    background-color 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease;
 }
 
 .seller-product-row-action:hover,
@@ -7809,11 +7889,12 @@ main[aria-labelledby='seller-notice-title'] button:focus-visible {
   background: #fffbeb;
   color: #d97706;
   cursor: pointer;
-  transition: transform 0.15s cubic-bezier(0.2, 0, 0, 1),
-              box-shadow 0.15s cubic-bezier(0.2, 0, 0, 1),
-              background-color 0.15s ease,
-              border-color 0.15s ease,
-              color 0.15s ease;
+  transition:
+    transform 0.15s cubic-bezier(0.2, 0, 0, 1),
+    box-shadow 0.15s cubic-bezier(0.2, 0, 0, 1),
+    background-color 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease;
 }
 
 .seller-product-row-hide svg {
@@ -7847,11 +7928,12 @@ main[aria-labelledby='seller-notice-title'] button:focus-visible {
   background: #fef2f2;
   color: #ef4444;
   cursor: pointer;
-  transition: transform 0.15s cubic-bezier(0.2, 0, 0, 1),
-              box-shadow 0.15s cubic-bezier(0.2, 0, 0, 1),
-              background-color 0.15s ease,
-              border-color 0.15s ease,
-              color 0.15s ease;
+  transition:
+    transform 0.15s cubic-bezier(0.2, 0, 0, 1),
+    box-shadow 0.15s cubic-bezier(0.2, 0, 0, 1),
+    background-color 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease;
 }
 
 .seller-product-row-delete svg {
@@ -8317,6 +8399,10 @@ main[aria-labelledby='seller-notice-title'] button:focus-visible {
 }
 
 @media (max-width: 720px) {
+  .buyer-shop-registration-steps {
+    grid-template-columns: 1fr;
+  }
+
   .seller-shop-form,
   .seller-shop-form fieldset {
     grid-template-columns: 1fr;
@@ -8583,7 +8669,9 @@ main[aria-labelledby='seller-notice-title'] button:focus-visible {
   border-radius: 3px;
   font-size: 0.88rem;
   color: #1f2937;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
 }
 
 .shopee-form-row__value .sc-input-field input:focus {
@@ -8748,7 +8836,9 @@ main[aria-labelledby='seller-notice-title'] button:focus-visible {
   font-size: 0.86rem;
   box-shadow: 0 1px 1px 0 rgba(0, 0, 0, 0.03);
   cursor: pointer;
-  transition: background 0.15s ease, border-color 0.15s ease;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease;
 }
 
 .shopee-btn-avatar:hover {
@@ -10291,7 +10381,9 @@ main[aria-labelledby='seller-notice-title'] button:focus-visible {
 
 .admin-card-hover:hover {
   transform: translateY(-4px);
-  box-shadow: 0 10px 25px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -2px rgba(0, 0, 0, 0.04) !important;
+  box-shadow:
+    0 10px 25px -3px rgba(0, 0, 0, 0.08),
+    0 4px 6px -2px rgba(0, 0, 0, 0.04) !important;
   border-color: #fca5a5 !important;
 }
 
@@ -10306,7 +10398,9 @@ main[aria-labelledby='seller-notice-title'] button:focus-visible {
 .catalog-card:hover {
   transform: translateY(-5px);
   border-color: #ee4d2d;
-  box-shadow: 0 12px 28px -4px rgba(0, 0, 0, 0.12), 0 6px 12px -2px rgba(238, 77, 45, 0.08);
+  box-shadow:
+    0 12px 28px -4px rgba(0, 0, 0, 0.12),
+    0 6px 12px -2px rgba(238, 77, 45, 0.08);
 }
 
 .catalog-card .catalog-card__media img {
@@ -10445,7 +10539,9 @@ main[aria-labelledby='seller-notice-title'] button:focus-visible {
   max-width: 520px;
   background: #ffffff;
   border-radius: 1rem;
-  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.15), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+  box-shadow:
+    0 20px 25px -5px rgba(0, 0, 0, 0.15),
+    0 8px 10px -6px rgba(0, 0, 0, 0.1);
   padding: 1.5rem;
   color: #18181b;
   border: 1px solid #f4f4f5;
@@ -10555,7 +10651,9 @@ main[aria-labelledby='seller-notice-title'] button:focus-visible {
   color: #18181b;
   box-sizing: border-box;
   font-family: inherit;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
 }
 
 .report-dialog-field select:focus,
@@ -10923,7 +11021,9 @@ main[aria-labelledby='seller-notice-title'] button:focus-visible {
 .admin-case-card--selected {
   border-color: #ee4d2d !important;
   background: #fffaf9 !important;
-  box-shadow: 0 0 0 1.5px #ee4d2d, 0 3px 8px rgba(238, 77, 45, 0.12) !important;
+  box-shadow:
+    0 0 0 1.5px #ee4d2d,
+    0 3px 8px rgba(238, 77, 45, 0.12) !important;
 }
 
 .admin-case-card__select:focus-visible,
@@ -11661,7 +11761,9 @@ main[aria-labelledby='seller-notice-title'] button:focus-visible {
   justify-content: space-between;
   gap: 1.5rem;
   padding: 1.15rem 1.25rem;
-  transition: border-color 150ms ease, box-shadow 150ms ease;
+  transition:
+    border-color 150ms ease,
+    box-shadow 150ms ease;
 }
 
 .seller-review-card:hover {

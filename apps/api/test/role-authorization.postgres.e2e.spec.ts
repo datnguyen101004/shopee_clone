@@ -13,6 +13,8 @@ import {
   MarketplaceRole,
   RoleAuditAction,
   RoleAuditSource,
+  ShopOnboardingStatus,
+  ShopStatus,
   UserStatus,
 } from '../src/generated/prisma/enums';
 import { PrismaService } from '../src/prisma/prisma.service';
@@ -99,6 +101,17 @@ databaseTest('Role authorization with isolated PostgreSQL', () => {
         }),
       ),
     });
+    await prisma.shop.create({
+      data: {
+        id: '00000000-0000-4000-8000-000000008102',
+        ownerId: targetId,
+        slug: 't12-role-target-shop',
+        name: 'T12 Role Target Shop',
+        status: ShopStatus.ACTIVE,
+        onboardingStatus: ShopOnboardingStatus.APPROVED,
+        onboardingReason: 'Approved shop for role invariant test',
+      },
+    });
   });
 
   afterAll(async () => app?.close());
@@ -147,6 +160,9 @@ databaseTest('Role authorization with isolated PostgreSQL', () => {
         ownerId: sessionUserId,
         slug: 't12-current-role-shop',
         name: 'T12 Current Role Shop',
+        status: ShopStatus.ACTIVE,
+        onboardingStatus: ShopOnboardingStatus.APPROVED,
+        onboardingReason: 'Approved shop for current-role test',
       },
     });
     await roles.grantRole(
@@ -160,12 +176,14 @@ databaseTest('Role authorization with isolated PostgreSQL', () => {
       .get('/api/v1/seller/shop')
       .set('Authorization', authorization)
       .expect(200);
-    await roles.revokeRole(
-      currentAdminId,
-      sessionUserId,
-      'seller',
-      'Seller permission revoked during active session',
-    );
+    await expect(
+      roles.revokeRole(
+        currentAdminId,
+        sessionUserId,
+        'seller',
+        'Seller permission revoked during active session',
+      ),
+    ).rejects.toBeInstanceOf(RoleConflictError);
     const denied = await request(app.getHttpServer())
       .get('/api/v1/seller/shop')
       .set('Authorization', authorization)
@@ -196,15 +214,12 @@ databaseTest('Role authorization with isolated PostgreSQL', () => {
     });
     expect(grantAudit.actorUserId).toBe(currentAdminId);
 
-    await roles.revokeRole(currentAdminId, targetId, 'seller', 'Seller access no longer needed');
-    await roles.revokeRole(currentAdminId, targetId, 'seller', 'Seller access no longer needed');
+    await expect(
+      roles.revokeRole(currentAdminId, targetId, 'seller', 'Seller access no longer needed'),
+    ).rejects.toBeInstanceOf(RoleConflictError);
     expect(
-      await prisma.roleAuditEvent.count({
-        where: {
-          targetUserId: targetId,
-          role: MarketplaceRole.SELLER,
-          action: RoleAuditAction.REVOKE,
-        },
+      await prisma.userRoleAssignment.count({
+        where: { userId: targetId, role: MarketplaceRole.SELLER },
       }),
     ).toBe(1);
 

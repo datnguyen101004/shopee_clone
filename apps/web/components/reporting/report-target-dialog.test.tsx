@@ -6,7 +6,7 @@ import { ReportTargetDialog } from './report-target-dialog';
 import { submitReport } from '../../lib/reporting-api';
 
 vi.mock('../../lib/reporting-api', async () => {
-  const actual = await vi.importActual<typeof import('../../lib/reporting-api')>('../../lib/reporting-api');
+  const actual = (await vi.importActual('../../lib/reporting-api')) as Record<string, unknown>;
   return { ...actual, submitReport: vi.fn() };
 });
 

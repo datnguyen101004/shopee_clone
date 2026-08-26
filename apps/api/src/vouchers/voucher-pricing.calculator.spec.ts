@@ -39,7 +39,7 @@ const snapshot: AuthoritativePricingSnapshot = {
       unitWeightGrams: 300,
       sellingUnitPriceMinor: 100_000n,
       compareAtUnitPriceMinor: 120_000n,
-      shop: { id: shopA, slug: 'shop-a', name: 'Shop A', location: 'TP. Hồ Chí Minh' },
+      shop: { id: shopA, ownerUserId: '00000000-0000-4000-8000-000000000501', slug: 'shop-a', name: 'Shop A', location: 'TP. Hồ Chí Minh' },
     },
     {
       lineId: lineB,
@@ -49,7 +49,7 @@ const snapshot: AuthoritativePricingSnapshot = {
       unitWeightGrams: 1_200,
       sellingUnitPriceMinor: 50_000n,
       compareAtUnitPriceMinor: null,
-      shop: { id: shopB, slug: 'shop-b', name: 'Shop B', location: 'Hà Nội' },
+      shop: { id: shopB, ownerUserId: '00000000-0000-4000-8000-000000000502', slug: 'shop-b', name: 'Shop B', location: 'Hà Nội' },
     },
   ],
   exclusions: [],

@@ -29,6 +29,8 @@ import {
 } from '@nestjs/swagger';
 import { AuthGuard, type AuthenticatedRequest } from '../auth/auth.guard';
 import { RequireRoles, RolesGuard } from '../auth/role-authorization.guard';
+// DTO classes must remain runtime values for Nest validation metadata.
+// eslint-disable-next-line @typescript-eslint/consistent-type-imports
 import {
   AddModerationCaseNoteDto,
   AssignModerationCaseDto,

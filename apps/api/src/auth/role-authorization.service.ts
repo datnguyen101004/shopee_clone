@@ -14,6 +14,7 @@ import {
   MarketplaceRole,
   RoleAuditAction,
   RoleAuditSource,
+  ShopOnboardingStatus,
   UserStatus,
 } from '../generated/prisma/enums';
 import { PrismaService } from '../prisma/prisma.service';
@@ -95,6 +96,19 @@ export class RoleAuthorizationService {
         );
         await this.assertCurrentAdmin(transaction, actorUserId);
         await this.assertEligibleTarget(transaction, targetUserId);
+        if (persistedRole === MarketplaceRole.SELLER) {
+          const approvedShop = await transaction.shop.findFirst({
+            where: {
+              ownerId: targetUserId,
+              deletedAt: null,
+              onboardingStatus: ShopOnboardingStatus.APPROVED,
+            },
+            select: { id: true },
+          });
+          if (!approvedShop) {
+            throw new RoleConflictError('Seller role requires one approved shop owned by the target account');
+          }
+        }
         const existing = await transaction.userRoleAssignment.findUnique({
           where: { userId_role: { userId: targetUserId, role: persistedRole } },
           select: { userId: true },
@@ -175,6 +189,11 @@ export class RoleAuthorizationService {
     reason: string,
   ): Promise<RoleAssignmentResult> {
     const persistedRole = toPersistedRole(role);
+    if (persistedRole === MarketplaceRole.SELLER) {
+      return Promise.reject(
+        new RoleConflictError('Seller role follows the approved shop lifecycle and cannot be revoked directly'),
+      );
+    }
     return this.prisma.$transaction(async (transaction) => {
       await transaction.$queryRawUnsafe(
         'SELECT 1::int AS locked FROM pg_advisory_xact_lock(hashtext($1))',

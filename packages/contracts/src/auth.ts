@@ -103,9 +103,13 @@ export const googleSignInOutcomeValues = [
   'cancelled',
   'failed',
   'account-method-required',
+  'account-and-shop-disabled',
 ] as const;
 
 export type GoogleSignInOutcome = (typeof googleSignInOutcomeValues)[number];
+
+export const authProblemTypeValues = ['account-and-shop-disabled'] as const;
+export type AuthProblemType = (typeof authProblemTypeValues)[number];
 
 export interface GoogleSignInCompletion {
   outcome: GoogleSignInOutcome;
@@ -418,4 +422,14 @@ export function isAuthorizationProblemDetails(value: unknown): value is AuthProb
 
 export function parseAuthProblemDetails(value: unknown): AuthProblemDetails | null {
   return isAuthProblemDetails(value) ? value : null;
+}
+
+export function isAccountAndShopDisabledProblemDetails(
+  value: unknown,
+): value is AuthProblemDetails {
+  return (
+    isAuthProblemDetails(value) &&
+    value.type === 'https://shopee-clone.local/problems/account-and-shop-disabled' &&
+    value.status === 403
+  );
 }

@@ -57,6 +57,7 @@ describe('ShopStorefrontService', () => {
     });
     await expect(service.profile('demo-shop')).resolves.toMatchObject({
       id: shopId,
+      ownerUserId: otherShopId,
       activeProductCount: 2,
       ratingAverageBasisPoints: 425,
       ratingCount: 4,

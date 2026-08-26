@@ -11,7 +11,12 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 
-import { googleSignInStartUrl, requestPasswordReset, resetAccountPassword } from '../lib/auth-api';
+import {
+  AuthApiError,
+  googleSignInStartUrl,
+  requestPasswordReset,
+  resetAccountPassword,
+} from '../lib/auth-api';
 import type { ProductLoginIntent } from '../lib/login-intent';
 import { useAuthSession } from './auth-session-provider';
 
@@ -67,8 +72,16 @@ export function LoginForm({
     try {
       await login({ email, password });
       router.replace(intent?.returnTo ?? returnTo);
-    } catch {
-      setError('Không thể đăng nhập. Vui lòng kiểm tra thông tin và thử lại.');
+    } catch (caught: unknown) {
+      if (
+        caught instanceof AuthApiError &&
+        caught.problem?.type ===
+          'https://shopee-clone.local/problems/account-and-shop-disabled'
+      ) {
+        setError('Tài khoản và shop của bạn đã bị vô hiệu hóa. Vui lòng liên hệ hỗ trợ.');
+      } else {
+        setError('Không thể đăng nhập. Vui lòng kiểm tra thông tin và thử lại.');
+      }
       setPassword('');
     } finally {
       setPending(false);

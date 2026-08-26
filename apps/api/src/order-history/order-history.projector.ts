@@ -40,7 +40,10 @@ function projectSummary(order: BuyerOrderSummaryGraph | BuyerOrderDetailGraph): 
     version: order.version,
     createdAt: order.createdAt.toISOString(),
     updatedAt: order.updatedAt.toISOString(),
-    shop: jsonObject<{ id: string; slug: string; name: string }>(order.shopSnapshot),
+    shop: (() => {
+      const snapshot = jsonObject<{ id: string; slug: string; name: string }>(order.shopSnapshot);
+      return { id: snapshot.id, slug: snapshot.slug, name: snapshot.name };
+    })(),
     note: order.note,
     lines: order.lines.map((line) => ({
       lineId: line.sourceCartLineId,

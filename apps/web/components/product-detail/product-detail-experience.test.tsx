@@ -103,6 +103,7 @@ const product: ProductDetailResponse = {
   initialVariantId: '00000000-0000-4000-8000-000000000401',
   shop: {
     id: '00000000-0000-4000-8000-000000000101',
+    ownerUserId: '00000000-0000-4000-8000-000000000201',
     slug: 'store',
     name: 'Store',
     location: 'Hà Nội',

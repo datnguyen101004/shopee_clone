@@ -122,6 +122,7 @@ export class CatalogProductDetailService {
       initialVariantId,
       shop: {
         id: product.shop.id,
+        ownerUserId: product.shop.ownerId,
         slug: product.shop.slug,
         name: product.shop.name,
         location: product.shop.location,

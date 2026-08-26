@@ -129,6 +129,28 @@ describe('notifications API boundary', () => {
     });
   });
 
+  it('accepts chat notifications persisted for account inboxes', async () => {
+    const chatResponse = {
+      ...listResponse,
+      items: [
+        {
+          ...sampleItem,
+          category: 'ACCOUNT' as const,
+          type: 'CHAT_MESSAGE' as const,
+          metadata: {
+            ...sampleItem.metadata,
+            targetUrl: '/account/chat?conversation=00000000-0000-4000-8000-000000000401',
+          },
+        },
+      ],
+    };
+    const authenticatedFetch = vi
+      .fn()
+      .mockResolvedValue(new Response(JSON.stringify(chatResponse), { status: 200 }));
+
+    await expect(listNotificationPopover(authenticatedFetch)).resolves.toEqual(chatResponse);
+  });
+
   it('surfaces transport and status errors with problem details when present', async () => {
     const authenticatedFetch = vi
       .fn()

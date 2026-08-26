@@ -40,6 +40,7 @@ describe('notification contracts', () => {
     expect(NOTIFICATION_CATEGORY_BY_TYPE.ORDER_CONFIRMED).toBe('ORDERS');
     expect(NOTIFICATION_CATEGORY_BY_TYPE.VOUCHER_ASSIGNED).toBe('PROMOTIONS');
     expect(NOTIFICATION_CATEGORY_BY_TYPE.PRODUCT_REJECTED).toBe('SYSTEM');
+    expect(NOTIFICATION_CATEGORY_BY_TYPE.CHAT_MESSAGE).toBe('ACCOUNT');
     expect(isMandatoryNotificationType('REFUNDED')).toBe(true);
     expect(isMandatoryNotificationType('VOUCHER_ASSIGNED')).toBe(false);
     expect(MANDATORY_NOTIFICATION_TYPES).toContain('DISPUTE_ESCALATED');
@@ -82,6 +83,24 @@ describe('notification contracts', () => {
         unreadCount: 0,
       }),
     ).toBe(false);
+    expect(
+      isNotificationListResponse({
+        notificationVersion: NOTIFICATION_VERSION,
+        items: [
+          {
+            ...item,
+            category: 'ACCOUNT',
+            type: 'CHAT_MESSAGE',
+            metadata: {
+              ...item.metadata,
+              targetUrl: '/account/chat?conversation=00000000-0000-4000-8000-000000000401',
+            },
+          },
+        ],
+        nextCursor: null,
+        unreadCount: 1,
+      }),
+    ).toBe(true);
   });
 
   it('validates preference payloads', () => {

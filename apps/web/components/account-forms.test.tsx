@@ -1,7 +1,7 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
-import { requestPasswordReset } from '../lib/auth-api';
+import { AuthApiError, requestPasswordReset } from '../lib/auth-api';
 import { LoginForm, ForgotPasswordForm, RegisterForm } from './account-forms';
 import { useAuthSession } from './auth-session-provider';
 
@@ -9,6 +9,15 @@ const replace = vi.fn();
 
 vi.mock('next/navigation', () => ({ useRouter: () => ({ replace }) }));
 vi.mock('../lib/auth-api', () => ({
+  AuthApiError: class AuthApiError extends Error {
+    constructor(
+      public readonly kind: 'transport' | 'status' | 'contract',
+      public readonly status = 0,
+      public readonly problem: { type: string } | null = null,
+    ) {
+      super('Authentication API error');
+    }
+  },
   googleSignInStartUrl: vi.fn(
     (returnTo?: string) =>
       `http://localhost:3001/api/v1/auth/google/start?returnTo=${encodeURIComponent(returnTo ?? '/')}`,
@@ -58,6 +67,23 @@ describe('account forms', () => {
     expect(password).toHaveValue('');
     expect(login).toHaveBeenCalledWith({ email: 'buyer@example.com', password: 'wrong password' });
     expect(document.body).not.toHaveTextContent('internal secret');
+  });
+
+  it('shows the paired account and shop feedback for a verified suspended login', async () => {
+    login.mockRejectedValue(
+      new AuthApiError('status', 403, {
+        type: 'https://shopee-clone.local/problems/account-and-shop-disabled',
+        title: 'Account and shop disabled',
+        status: 403,
+        detail: 'The account and its shop have been disabled.',
+      }),
+    );
+    const user = userEvent.setup();
+    render(<LoginForm intent={null} />);
+    await user.type(screen.getByRole('textbox', { name: 'Email' }), 'seller@example.com');
+    await user.type(screen.getByLabelText('Mật khẩu'), 'correct passphrase');
+    await user.click(screen.getByRole('button', { name: 'Đăng nhập' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Tài khoản và shop của bạn đã bị vô hiệu hóa');
   });
 
   it('prevents duplicate login submission and returns only to an allowlisted product path', async () => {

@@ -4,6 +4,8 @@ import type { ModerationCaseDetail, ModerationDecisionResult } from '@shopee-clo
 import { AdminInvalidInputError } from './admin.errors';
 import { AdminModerationRepository } from './admin-moderation.repository';
 import { AdminModerationService } from './admin-moderation.service';
+import { PrismaService } from '../prisma/prisma.service';
+import { NotificationService } from '../notifications/notification.service';
 
 describe('AdminModerationService', () => {
   let service: AdminModerationService;
@@ -21,11 +23,15 @@ describe('AdminModerationService', () => {
       addNote: jest.fn(),
       makeDecision: jest.fn(),
     };
+    const mockPrisma = { moderationCase: { findUnique: jest.fn() } };
+    const mockNotifications = { notify: jest.fn() };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         AdminModerationService,
         { provide: AdminModerationRepository, useValue: mockRepo },
+        { provide: PrismaService, useValue: mockPrisma },
+        { provide: NotificationService, useValue: mockNotifications },
       ],
     }).compile();
 
@@ -37,7 +43,12 @@ describe('AdminModerationService', () => {
     await expect(service.getCaseDetail('invalid-uuid')).rejects.toThrow(AdminInvalidInputError);
 
     await expect(
-      service.assignCase(adminId, 'invalid-uuid', { assignedAdminId: null, expectedVersion: 0 }, idempotencyKey),
+      service.assignCase(
+        adminId,
+        'invalid-uuid',
+        { assignedAdminId: null, expectedVersion: 0 },
+        idempotencyKey,
+      ),
     ).rejects.toThrow(AdminInvalidInputError);
 
     await expect(
@@ -59,7 +70,9 @@ describe('AdminModerationService', () => {
   it('delegates assignCase, addNote, and makeDecision to repository with computed digests', async () => {
     repository.assignCase.mockResolvedValue({ caseDetail: {} as unknown as ModerationCaseDetail });
     repository.addNote.mockResolvedValue({ caseDetail: {} as unknown as ModerationCaseDetail });
-    repository.makeDecision.mockResolvedValue({ decisionId: validUuid } as unknown as ModerationDecisionResult);
+    repository.makeDecision.mockResolvedValue({
+      decisionId: validUuid,
+    } as unknown as ModerationDecisionResult);
 
     await service.assignCase(
       adminId,
@@ -94,7 +107,11 @@ describe('AdminModerationService', () => {
     await service.makeDecision(
       adminId,
       validUuid,
-      { outcome: 'SUSPEND_TARGET', publicReason: 'Suspension for verified counterfeits.', expectedVersion: 2 },
+      {
+        outcome: 'SUSPEND_TARGET',
+        publicReason: 'Suspension for verified counterfeits.',
+        expectedVersion: 2,
+      },
       idempotencyKey,
     );
     expect(repository.makeDecision).toHaveBeenCalledWith(

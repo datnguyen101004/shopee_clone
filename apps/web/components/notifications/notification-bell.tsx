@@ -87,12 +87,14 @@ export function NotificationBell() {
 
   useEffect(() => {
     if (!authenticated) {
-      setUnreadCount(0);
-      setItems([]);
-      setOpen(false);
-      return;
+      const timer = window.setTimeout(() => {
+        setUnreadCount(0);
+        setItems([]);
+        setOpen(false);
+      }, 0);
+      return () => window.clearTimeout(timer);
     }
-    void refreshUnread();
+    const initialRefresh = window.setTimeout(() => void refreshUnread(), 0);
     const timer = window.setInterval(() => {
       void refreshUnread();
     }, POLL_INTERVAL_MS);
@@ -101,6 +103,7 @@ export function NotificationBell() {
     };
     window.addEventListener('focus', onFocus);
     return () => {
+      window.clearTimeout(initialRefresh);
       window.clearInterval(timer);
       window.removeEventListener('focus', onFocus);
     };
@@ -108,7 +111,7 @@ export function NotificationBell() {
 
   useEffect(() => {
     if (!open) return;
-    void loadPreview();
+    const previewTimer = window.setTimeout(() => void loadPreview(), 0);
     const onPointerDown = (event: MouseEvent) => {
       if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
     };
@@ -118,6 +121,7 @@ export function NotificationBell() {
     window.addEventListener('mousedown', onPointerDown);
     window.addEventListener('keydown', onKeyDown);
     return () => {
+      window.clearTimeout(previewTimer);
       window.removeEventListener('mousedown', onPointerDown);
       window.removeEventListener('keydown', onKeyDown);
     };
@@ -156,9 +160,7 @@ export function NotificationBell() {
       <button
         type="button"
         className="market-notification__trigger"
-        aria-label={
-          unreadCount > 0 ? `Thông báo, ${unreadCount} chưa đọc` : 'Thông báo'
-        }
+        aria-label={unreadCount > 0 ? `Thông báo, ${unreadCount} chưa đọc` : 'Thông báo'}
         aria-haspopup="dialog"
         aria-expanded={open}
         aria-controls={popoverId}

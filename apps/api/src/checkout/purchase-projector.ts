@@ -16,6 +16,7 @@ export const purchaseInclude = {
     orderBy: [{ shopId: 'asc' as const }, { id: 'asc' as const }],
     include: {
       lines: { orderBy: [{ sourceCartLineId: 'asc' as const }, { id: 'asc' as const }] },
+      shop: { select: { ownerId: true } },
     },
   },
   vouchers: {
@@ -46,7 +47,13 @@ function jsonObject<T>(value: Prisma.JsonValue): T {
 export class PurchaseProjector {
   project(purchase: PurchaseGraph): PurchaseResult {
     const orders = purchase.orders.map((order) => {
-      const shop = jsonObject<{ id: string; slug: string; name: string }>(order.shopSnapshot);
+      const shopSnapshot = jsonObject<{ id: string; slug: string; name: string; ownerUserId?: string }>(order.shopSnapshot);
+      const shop = {
+        id: shopSnapshot.id,
+        ownerUserId: shopSnapshot.ownerUserId ?? order.shop.ownerId,
+        slug: shopSnapshot.slug,
+        name: shopSnapshot.name,
+      };
       const shipping = jsonObject<MockShippingBreakdown>(order.shippingSnapshot);
       return {
         orderReference: order.id,

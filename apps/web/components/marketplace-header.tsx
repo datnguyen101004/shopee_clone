@@ -54,7 +54,6 @@ export function MarketplaceHeader({
     setSearchError('');
   }
 
-
   return (
     <Container className="market-header">
       <div className="market-topline">
@@ -63,6 +62,14 @@ export function MarketplaceHeader({
         ) : null}
         {account.status === 'authenticated' && hasMarketplaceRole(account.user, 'admin') ? (
           <Link href="/admin">Quản trị</Link>
+        ) : null}
+        {account.status === 'authenticated' &&
+        hasMarketplaceRole(account.user, 'buyer') &&
+        !hasMarketplaceRole(account.user, 'seller') &&
+        !hasMarketplaceRole(account.user, 'admin') ? (
+          <Link className="market-topline__seller-registration" href="/account/shop-registration">
+            Đăng ký thành shop
+          </Link>
         ) : null}
         <span className="market-topline__meta">Kết nối · Hỗ trợ</span>
       </div>

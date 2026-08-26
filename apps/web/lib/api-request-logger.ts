@@ -9,16 +9,15 @@ type ApiRequestDetails = {
   url: string;
 };
 
-const sensitiveQueryParameter = /^(?:access_?)?token$|secret|password|authorization|code|^expires$|^signature$|^key-pair-id$|^x-amz-/i;
+const sensitiveQueryParameter =
+  /^(?:access_?)?token$|secret|password|authorization|code|^expires$|^signature$|^key-pair-id$|^x-amz-/i;
 
 function requestUrl(input: RequestInfo | URL): URL | null {
   const rawUrl =
     typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
 
   try {
-    return typeof window === 'undefined'
-      ? new URL(rawUrl)
-      : new URL(rawUrl, window.location.href);
+    return typeof window === 'undefined' ? new URL(rawUrl) : new URL(rawUrl, window.location.href);
   } catch {
     return null;
   }
@@ -32,7 +31,10 @@ function isDiagnosticsUrl(url: URL) {
   );
 }
 
-function getApiRequestDetails(input: RequestInfo | URL, init?: RequestInit): ApiRequestDetails | null {
+function getApiRequestDetails(
+  input: RequestInfo | URL,
+  init?: RequestInit,
+): ApiRequestDetails | null {
   const url = requestUrl(input);
   if (!url || !isDiagnosticsUrl(url)) return null;
 
@@ -81,6 +83,12 @@ export function installApiRequestLogger() {
       );
       return response;
     } catch (error) {
+      // Aborts are expected when a component unmounts or a newer request supersedes
+      // the current one. They are not transport failures and should not pollute the
+      // browser console as errors.
+      if (init?.signal?.aborted || (error instanceof DOMException && error.name === 'AbortError')) {
+        throw error;
+      }
       console.error(
         '[api-debug] transport error',
         JSON.stringify({

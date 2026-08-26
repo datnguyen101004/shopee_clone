@@ -72,6 +72,7 @@ const quoteCartSelect = {
               shop: {
                 select: {
                   id: true,
+                  ownerId: true,
                   slug: true,
                   name: true,
                   location: true,
@@ -392,7 +393,13 @@ export class PricingQuoteService {
         unitWeightGrams: variant.weightGrams,
         sellingUnitPriceMinor: variant.priceMinor,
         compareAtUnitPriceMinor: variant.compareAtPriceMinor,
-        shop: { id: shop.id, slug: shop.slug, name: shop.name, location: shop.location },
+        shop: {
+          id: shop.id,
+          ownerUserId: shop.ownerId,
+          slug: shop.slug,
+          name: shop.name,
+          location: shop.location,
+        },
       });
       snapshots.push({
         lineId: row.id,

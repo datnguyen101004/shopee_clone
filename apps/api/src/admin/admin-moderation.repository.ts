@@ -12,7 +12,7 @@ import {
   type ModerationDecisionResult,
   type ReportReasonCode as ContractReportReasonCode,
 } from '@shopee-clone/contracts';
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Optional } from '@nestjs/common';
 import type { Prisma } from '../generated/prisma/client';
 import type { ReportReasonCode as PrismaReportReasonCode } from '../generated/prisma/enums';
 import {
@@ -36,6 +36,7 @@ import {
   AdminNotFoundError,
 } from './admin.errors';
 import { recordPrivilegedAudit } from './privileged-audit.helper';
+import { SellerIdentityLifecycleService } from '../seller-identity/seller-identity-lifecycle.service';
 
 export class ModerationConflictError extends Error {
   constructor(message: string = 'The moderation case has been modified by another operation.') {
@@ -53,7 +54,11 @@ export class ModerationIdempotencyConflictError extends Error {
 
 @Injectable()
 export class AdminModerationRepository {
-  constructor(@Inject(PrismaService) private readonly prisma: PrismaService) {}
+  constructor(
+    @Inject(PrismaService) private readonly prisma: PrismaService,
+    @Optional() @Inject(SellerIdentityLifecycleService)
+    private readonly sellerLifecycle?: SellerIdentityLifecycleService,
+  ) {}
 
   async listCases(query: ModerationCaseListQuery): Promise<ModerationCaseListResponse> {
     const limit = Math.min(query.limit ?? MODERATION_DEFAULT_LIMIT, MODERATION_MAX_LIMIT);
@@ -577,20 +582,40 @@ export class AdminModerationRepository {
         if (input.outcome === ModerationCaseOutcome.SUSPEND_TARGET) {
           nextTargetStatus = ShopStatus.SUSPENDED;
           privilegedAction = PrivilegedAction.SUSPEND;
-          await tx.shop.update({
-            where: { id: shop.id },
-            data: { status: ShopStatus.SUSPENDED },
-          });
+          if (this.sellerLifecycle) {
+            const result = await this.sellerLifecycle.suspendShopInTransaction(
+              tx,
+              actorAdminId,
+              shop.id,
+              input.publicReason.trim(),
+            );
+            nextTargetStatus = result.shopStatus ?? ShopStatus.SUSPENDED;
+          } else {
+            await tx.shop.update({
+              where: { id: shop.id },
+              data: { status: ShopStatus.SUSPENDED },
+            });
+          }
         } else if (input.outcome === ModerationCaseOutcome.RESTORE_TARGET) {
           if (shop.onboardingStatus !== ShopOnboardingStatus.APPROVED) {
             throw new AdminInvalidInputError('Cannot restore shop that is not approved');
           }
           nextTargetStatus = ShopStatus.ACTIVE;
           privilegedAction = PrivilegedAction.RESTORE;
-          await tx.shop.update({
-            where: { id: shop.id },
-            data: { status: ShopStatus.ACTIVE },
-          });
+          if (this.sellerLifecycle) {
+            const result = await this.sellerLifecycle.restoreShopInTransaction(
+              tx,
+              actorAdminId,
+              shop.id,
+              input.publicReason.trim(),
+            );
+            nextTargetStatus = result.shopStatus ?? ShopStatus.ACTIVE;
+          } else {
+            await tx.shop.update({
+              where: { id: shop.id },
+              data: { status: ShopStatus.ACTIVE },
+            });
+          }
         } else {
           nextTargetStatus = previousTargetStatus;
           privilegedAction = PrivilegedAction.NO_ACTION;

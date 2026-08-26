@@ -1,15 +1,13 @@
 'use client';
 
-import type {
-  AdminBannerSummary,
-  AdminHomepageModuleSummary,
-} from '@shopee-clone/contracts';
-import { useEffect, useState } from 'react';
+import type { AdminBannerSummary, AdminHomepageModuleSummary } from '@shopee-clone/contracts';
+import { useCallback, useEffect, useState } from 'react';
 
 import { useAuthSession } from '../../../../components/auth-session-provider';
 import {
   createAdminBanner,
   deleteAdminBanner,
+  adminErrorMessage,
   fetchAdminBanners,
   fetchAdminHomepageModules,
   updateAdminBanner,
@@ -50,7 +48,7 @@ export default function AdminHomepageConfigPage() {
   const [moduleSubmitting, setModuleSubmitting] = useState(false);
   const [moduleError, setModuleError] = useState<string | null>(null);
 
-  const loadData = () => {
+  const loadData = useCallback(() => {
     setLoading(true);
     setError(null);
     Promise.all([
@@ -66,11 +64,12 @@ export default function AdminHomepageConfigPage() {
         setError(err.message || 'Không thể tải dữ liệu cấu hình trang chủ');
         setLoading(false);
       });
-  };
+  }, [authenticatedFetch]);
 
   useEffect(() => {
-    loadData();
-  }, []);
+    const timer = window.setTimeout(() => void loadData(), 0);
+    return () => window.clearTimeout(timer);
+  }, [loadData]);
 
   const openCreateBannerModal = () => {
     setBannerModalMode('CREATE');
@@ -101,7 +100,9 @@ export default function AdminHomepageConfigPage() {
   const handleBannerSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!bannerHref.startsWith('/') || bannerHref.startsWith('//') || bannerHref.includes('://')) {
-      setBannerError('Đường dẫn phải là relative path hợp lệ (bắt đầu bằng / và không chứa domain ngoài)');
+      setBannerError(
+        'Đường dẫn phải là relative path hợp lệ (bắt đầu bằng / và không chứa domain ngoài)',
+      );
       return;
     }
 
@@ -132,8 +133,8 @@ export default function AdminHomepageConfigPage() {
       }
       setBannerModalMode(null);
       loadData();
-    } catch (err: any) {
-      setBannerError(err.problem?.detail || err.message || 'Lỗi lưu banner');
+    } catch (error: unknown) {
+      setBannerError(adminErrorMessage(error, 'Lỗi lưu banner'));
       setBannerSubmitting(false);
     }
   };
@@ -143,8 +144,8 @@ export default function AdminHomepageConfigPage() {
     try {
       await deleteAdminBanner(authenticatedFetch, b.id);
       loadData();
-    } catch (err: any) {
-      alert(`Không thể xóa: ${err.message}`);
+    } catch (error: unknown) {
+      alert(`Không thể xóa: ${adminErrorMessage(error, 'Không thể xóa banner')}`);
     }
   };
 
@@ -177,8 +178,8 @@ export default function AdminHomepageConfigPage() {
       });
       setEditingModule(null);
       loadData();
-    } catch (err: any) {
-      setModuleError(err.problem?.detail || err.message || 'Lỗi cập nhật module');
+    } catch (error: unknown) {
+      setModuleError(adminErrorMessage(error, 'Lỗi cập nhật module'));
       setModuleSubmitting(false);
     }
   };
@@ -186,9 +187,12 @@ export default function AdminHomepageConfigPage() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
       <div>
-        <h1 style={{ fontSize: '24px', fontWeight: 700, color: '#111827' }}>Cấu hình Trang chủ & Banner</h1>
+        <h1 style={{ fontSize: '24px', fontWeight: 700, color: '#111827' }}>
+          Cấu hình Trang chủ & Banner
+        </h1>
         <p style={{ color: '#6b7280', fontSize: '14px', marginTop: '4px' }}>
-          Quản lý banner chiến dịch và bật/tắt, sắp xếp các module hiển thị trên trang chủ Marketplace.
+          Quản lý banner chiến dịch và bật/tắt, sắp xếp các module hiển thị trên trang chủ
+          Marketplace.
         </p>
       </div>
 
@@ -227,20 +231,18 @@ export default function AdminHomepageConfigPage() {
       </div>
 
       {loading ? (
-        <div style={{ padding: '32px', textAlign: 'center', color: '#6b7280' }}>Đang tải dữ liệu cấu hình...</div>
+        <div style={{ padding: '32px', textAlign: 'center', color: '#6b7280' }}>
+          Đang tải dữ liệu cấu hình...
+        </div>
       ) : error ? (
         <div style={{ padding: '24px', color: '#ef4444' }}>{error}</div>
       ) : activeTab === 'BANNERS' ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-            <button
-              onClick={openCreateBannerModal}
-              className="admin-btn admin-btn-primary"
-            >
+            <button onClick={openCreateBannerModal} className="admin-btn admin-btn-primary">
               + Thêm Banner mới
             </button>
           </div>
-
 
           <div
             style={{
@@ -252,11 +254,27 @@ export default function AdminHomepageConfigPage() {
             }}
           >
             {banners.length === 0 ? (
-              <div style={{ padding: '32px', textAlign: 'center', color: '#6b7280' }}>Chưa có banner nào.</div>
+              <div style={{ padding: '32px', textAlign: 'center', color: '#6b7280' }}>
+                Chưa có banner nào.
+              </div>
             ) : (
-              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '14px' }}>
+              <table
+                style={{
+                  width: '100%',
+                  borderCollapse: 'collapse',
+                  textAlign: 'left',
+                  fontSize: '14px',
+                }}
+              >
                 <thead>
-                  <tr style={{ background: '#f9fafb', borderBottom: '1px solid #e5e7eb', color: '#4b5563', fontSize: '13px' }}>
+                  <tr
+                    style={{
+                      background: '#f9fafb',
+                      borderBottom: '1px solid #e5e7eb',
+                      color: '#4b5563',
+                      fontSize: '13px',
+                    }}
+                  >
                     <th style={{ padding: '12px 16px' }}>Tiêu đề & Nhãn</th>
                     <th style={{ padding: '12px 16px' }}>Đích đến (Href)</th>
                     <th style={{ padding: '12px 16px' }}>Giao diện (Theme)</th>
@@ -269,11 +287,15 @@ export default function AdminHomepageConfigPage() {
                     <tr key={b.id} style={{ borderBottom: '1px solid #f3f4f6' }}>
                       <td style={{ padding: '14px 16px' }}>
                         <div style={{ fontWeight: 600, color: '#111827' }}>{b.title}</div>
-                        {b.eyebrow && <div style={{ fontSize: '12px', color: '#ee4d2d' }}>{b.eyebrow}</div>}
+                        {b.eyebrow && (
+                          <div style={{ fontSize: '12px', color: '#ee4d2d' }}>{b.eyebrow}</div>
+                        )}
                       </td>
                       <td style={{ padding: '14px 16px', color: '#4b5563' }}>{b.href}</td>
                       <td style={{ padding: '14px 16px', color: '#6b7280' }}>{b.theme}</td>
-                      <td style={{ padding: '14px 16px', color: '#111827', fontWeight: 600 }}>{b.sortOrder}</td>
+                      <td style={{ padding: '14px 16px', color: '#111827', fontWeight: 600 }}>
+                        {b.sortOrder}
+                      </td>
                       <td style={{ padding: '14px 16px', textAlign: 'right' }}>
                         <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
                           <button
@@ -323,9 +345,23 @@ export default function AdminHomepageConfigPage() {
             border: '1px solid #f3f4f6',
           }}
         >
-          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '14px' }}>
+          <table
+            style={{
+              width: '100%',
+              borderCollapse: 'collapse',
+              textAlign: 'left',
+              fontSize: '14px',
+            }}
+          >
             <thead>
-              <tr style={{ background: '#f9fafb', borderBottom: '1px solid #e5e7eb', color: '#4b5563', fontSize: '13px' }}>
+              <tr
+                style={{
+                  background: '#f9fafb',
+                  borderBottom: '1px solid #e5e7eb',
+                  color: '#4b5563',
+                  fontSize: '13px',
+                }}
+              >
                 <th style={{ padding: '12px 16px' }}>Module Key & Loại</th>
                 <th style={{ padding: '12px 16px' }}>Tiêu đề hiển thị</th>
                 <th style={{ padding: '12px 16px' }}>Trạng thái</th>
@@ -342,7 +378,9 @@ export default function AdminHomepageConfigPage() {
                   </td>
                   <td style={{ padding: '14px 16px' }}>
                     <div style={{ color: '#111827' }}>{m.title}</div>
-                    {m.subtitle && <div style={{ fontSize: '12px', color: '#6b7280' }}>{m.subtitle}</div>}
+                    {m.subtitle && (
+                      <div style={{ fontSize: '12px', color: '#6b7280' }}>{m.subtitle}</div>
+                    )}
                   </td>
                   <td style={{ padding: '14px 16px' }}>
                     <span
@@ -407,13 +445,28 @@ export default function AdminHomepageConfigPage() {
               boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)',
             }}
           >
-            <h2 style={{ fontSize: '18px', fontWeight: 700, color: '#111827', marginBottom: '16px' }}>
-              {bannerModalMode === 'CREATE' ? 'Tạo banner mới' : `Chỉnh sửa banner: ${editingBanner?.title}`}
+            <h2
+              style={{ fontSize: '18px', fontWeight: 700, color: '#111827', marginBottom: '16px' }}
+            >
+              {bannerModalMode === 'CREATE'
+                ? 'Tạo banner mới'
+                : `Chỉnh sửa banner: ${editingBanner?.title}`}
             </h2>
 
-            <form onSubmit={handleBannerSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+            <form
+              onSubmit={handleBannerSubmit}
+              style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}
+            >
               <div>
-                <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#374151', marginBottom: '4px' }}>
+                <label
+                  style={{
+                    display: 'block',
+                    fontSize: '13px',
+                    fontWeight: 600,
+                    color: '#374151',
+                    marginBottom: '4px',
+                  }}
+                >
                   Tiêu đề banner:
                 </label>
                 <input
@@ -421,13 +474,27 @@ export default function AdminHomepageConfigPage() {
                   value={bannerTitle}
                   onChange={(e) => setBannerTitle(e.target.value)}
                   placeholder="Siêu Sale Hè 2026"
-                  style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #d1d5db', fontSize: '14px' }}
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    borderRadius: '6px',
+                    border: '1px solid #d1d5db',
+                    fontSize: '14px',
+                  }}
                   required
                 />
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#374151', marginBottom: '4px' }}>
+                <label
+                  style={{
+                    display: 'block',
+                    fontSize: '13px',
+                    fontWeight: 600,
+                    color: '#374151',
+                    marginBottom: '4px',
+                  }}
+                >
                   Đích đến (Relative URL bắt đầu bằng /):
                 </label>
                 <input
@@ -435,13 +502,27 @@ export default function AdminHomepageConfigPage() {
                   value={bannerHref}
                   onChange={(e) => setBannerHref(e.target.value)}
                   placeholder="/search?q=sale"
-                  style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #d1d5db', fontSize: '14px' }}
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    borderRadius: '6px',
+                    border: '1px solid #d1d5db',
+                    fontSize: '14px',
+                  }}
                   required
                 />
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#374151', marginBottom: '4px' }}>
+                <label
+                  style={{
+                    display: 'block',
+                    fontSize: '13px',
+                    fontWeight: 600,
+                    color: '#374151',
+                    marginBottom: '4px',
+                  }}
+                >
                   URL Ảnh (Media relative hoặc S3):
                 </label>
                 <input
@@ -449,42 +530,91 @@ export default function AdminHomepageConfigPage() {
                   value={bannerImageUrl}
                   onChange={(e) => setBannerImageUrl(e.target.value)}
                   placeholder="/media/banners/banner1.png"
-                  style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #d1d5db', fontSize: '14px' }}
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    borderRadius: '6px',
+                    border: '1px solid #d1d5db',
+                    fontSize: '14px',
+                  }}
                 />
               </div>
 
               <div style={{ display: 'flex', gap: '16px' }}>
                 <div style={{ flex: 1 }}>
-                  <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#374151', marginBottom: '4px' }}>
+                  <label
+                    style={{
+                      display: 'block',
+                      fontSize: '13px',
+                      fontWeight: 600,
+                      color: '#374151',
+                      marginBottom: '4px',
+                    }}
+                  >
                     Giao diện (Theme):
                   </label>
                   <input
                     type="text"
                     value={bannerTheme}
                     onChange={(e) => setBannerTheme(e.target.value)}
-                    style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #d1d5db', fontSize: '14px' }}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      borderRadius: '6px',
+                      border: '1px solid #d1d5db',
+                      fontSize: '14px',
+                    }}
                   />
                 </div>
                 <div style={{ width: '100px' }}>
-                  <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#374151', marginBottom: '4px' }}>
+                  <label
+                    style={{
+                      display: 'block',
+                      fontSize: '13px',
+                      fontWeight: 600,
+                      color: '#374151',
+                      marginBottom: '4px',
+                    }}
+                  >
                     Thứ tự:
                   </label>
                   <input
                     type="number"
                     value={bannerSortOrder}
                     onChange={(e) => setBannerSortOrder(Number(e.target.value))}
-                    style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #d1d5db', fontSize: '14px' }}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      borderRadius: '6px',
+                      border: '1px solid #d1d5db',
+                      fontSize: '14px',
+                    }}
                   />
                 </div>
               </div>
 
               {bannerError && (
-                <div style={{ padding: '8px 12px', background: '#fee2e2', color: '#dc2626', borderRadius: '6px', fontSize: '13px' }}>
+                <div
+                  style={{
+                    padding: '8px 12px',
+                    background: '#fee2e2',
+                    color: '#dc2626',
+                    borderRadius: '6px',
+                    fontSize: '13px',
+                  }}
+                >
                   {bannerError}
                 </div>
               )}
 
-              <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', marginTop: '12px' }}>
+              <div
+                style={{
+                  display: 'flex',
+                  gap: '12px',
+                  justifyContent: 'flex-end',
+                  marginTop: '12px',
+                }}
+              >
                 <button
                   type="button"
                   onClick={() => setBannerModalMode(null)}
@@ -547,69 +677,141 @@ export default function AdminHomepageConfigPage() {
               boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)',
             }}
           >
-            <h2 style={{ fontSize: '18px', fontWeight: 700, color: '#111827', marginBottom: '16px' }}>
+            <h2
+              style={{ fontSize: '18px', fontWeight: 700, color: '#111827', marginBottom: '16px' }}
+            >
               Cài đặt Module: {editingModule.key}
             </h2>
 
-            <form onSubmit={handleModuleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+            <form
+              onSubmit={handleModuleSubmit}
+              style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}
+            >
               <div>
-                <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#374151', marginBottom: '4px' }}>
+                <label
+                  style={{
+                    display: 'block',
+                    fontSize: '13px',
+                    fontWeight: 600,
+                    color: '#374151',
+                    marginBottom: '4px',
+                  }}
+                >
                   Tiêu đề module:
                 </label>
                 <input
                   type="text"
                   value={moduleTitle}
                   onChange={(e) => setModuleTitle(e.target.value)}
-                  style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #d1d5db', fontSize: '14px' }}
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    borderRadius: '6px',
+                    border: '1px solid #d1d5db',
+                    fontSize: '14px',
+                  }}
                   required
                 />
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#374151', marginBottom: '4px' }}>
+                <label
+                  style={{
+                    display: 'block',
+                    fontSize: '13px',
+                    fontWeight: 600,
+                    color: '#374151',
+                    marginBottom: '4px',
+                  }}
+                >
                   Phụ đề (Subtitle):
                 </label>
                 <input
                   type="text"
                   value={moduleSubtitle}
                   onChange={(e) => setModuleSubtitle(e.target.value)}
-                  style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #d1d5db', fontSize: '14px' }}
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    borderRadius: '6px',
+                    border: '1px solid #d1d5db',
+                    fontSize: '14px',
+                  }}
                 />
               </div>
 
               <div style={{ display: 'flex', gap: '16px' }}>
                 <div style={{ flex: 1 }}>
-                  <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#374151', marginBottom: '4px' }}>
+                  <label
+                    style={{
+                      display: 'block',
+                      fontSize: '13px',
+                      fontWeight: 600,
+                      color: '#374151',
+                      marginBottom: '4px',
+                    }}
+                  >
                     Thứ tự hiển thị:
                   </label>
                   <input
                     type="number"
                     value={moduleSortOrder}
                     onChange={(e) => setModuleSortOrder(Number(e.target.value))}
-                    style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #d1d5db', fontSize: '14px' }}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      borderRadius: '6px',
+                      border: '1px solid #d1d5db',
+                      fontSize: '14px',
+                    }}
                   />
                 </div>
 
-                <div style={{ display: 'flex', alignItems: 'center', marginTop: '20px', gap: '8px' }}>
+                <div
+                  style={{ display: 'flex', alignItems: 'center', marginTop: '20px', gap: '8px' }}
+                >
                   <input
                     type="checkbox"
                     id="moduleEnabledCheck"
                     checked={moduleEnabled}
                     onChange={(e) => setModuleEnabled(e.target.checked)}
                   />
-                  <label htmlFor="moduleEnabledCheck" style={{ fontSize: '13px', fontWeight: 600, color: '#374151', cursor: 'pointer' }}>
+                  <label
+                    htmlFor="moduleEnabledCheck"
+                    style={{
+                      fontSize: '13px',
+                      fontWeight: 600,
+                      color: '#374151',
+                      cursor: 'pointer',
+                    }}
+                  >
                     Kích hoạt module
                   </label>
                 </div>
               </div>
 
               {moduleError && (
-                <div style={{ padding: '8px 12px', background: '#fee2e2', color: '#dc2626', borderRadius: '6px', fontSize: '13px' }}>
+                <div
+                  style={{
+                    padding: '8px 12px',
+                    background: '#fee2e2',
+                    color: '#dc2626',
+                    borderRadius: '6px',
+                    fontSize: '13px',
+                  }}
+                >
                   {moduleError}
                 </div>
               )}
 
-              <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', marginTop: '12px' }}>
+              <div
+                style={{
+                  display: 'flex',
+                  gap: '12px',
+                  justifyContent: 'flex-end',
+                  marginTop: '12px',
+                }}
+              >
                 <button
                   type="button"
                   onClick={() => setEditingModule(null)}

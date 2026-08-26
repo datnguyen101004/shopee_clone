@@ -43,6 +43,7 @@ const product = {
 
 const profile = {
   id: shopId,
+  ownerUserId: secondShopId,
   slug: 'shop-mau',
   name: 'Shop mẫu',
   location: 'TP. Hồ Chí Minh',

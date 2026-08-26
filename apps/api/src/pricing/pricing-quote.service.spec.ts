@@ -52,6 +52,7 @@ function fixtureCart() {
             images: [{ url: '/media/products/fixture.webp' }],
             shop: {
               id: shopId,
+              ownerId: '00000000-0000-4000-8000-000000000008',
               slug: 'fixture-shop',
               name: 'Fixture Shop',
               location: 'Hà Nội',

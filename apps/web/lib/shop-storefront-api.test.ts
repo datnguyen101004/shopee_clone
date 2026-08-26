@@ -9,6 +9,7 @@ import {
 const shopId = '00000000-0000-4000-8000-000000000101';
 const profile = {
   id: shopId,
+  ownerUserId: '00000000-0000-4000-8000-000000000201',
   slug: 'demo-shop',
   name: 'Demo Shop',
   location: 'Hà Nội',

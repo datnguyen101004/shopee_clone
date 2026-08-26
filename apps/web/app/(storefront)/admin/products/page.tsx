@@ -7,7 +7,11 @@ import { useState } from 'react';
 
 import { ProductIcon, ShopIcon } from '../../../../components/admin/admin-icons';
 import { useAuthSession } from '../../../../components/auth-session-provider';
-import { applyAdminProductAction, lookupAdminProduct } from '../../../../lib/admin-api';
+import {
+  adminErrorMessage,
+  applyAdminProductAction,
+  lookupAdminProduct,
+} from '../../../../lib/admin-api';
 
 function formatVnd(amount: number): string {
   return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount);
@@ -40,8 +44,8 @@ export default function AdminProductsPage() {
     try {
       const res = await lookupAdminProduct(authenticatedFetch, { slug: term, id: term });
       setProduct(res.product);
-    } catch (err: any) {
-      setErrorMessage(err.problem?.detail || err.message || 'Lỗi khi tra cứu sản phẩm');
+    } catch (error: unknown) {
+      setErrorMessage(adminErrorMessage(error, 'Lỗi khi tra cứu sản phẩm'));
       setProduct(null);
     } finally {
       setLoading(false);
@@ -67,8 +71,8 @@ export default function AdminProductsPage() {
       setProduct((prev) => (prev ? { ...prev, moderationStatus: result.moderationStatus } : null));
       setModalAction(null);
       setReason('');
-    } catch (err: any) {
-      setActionError(err.problem?.detail || err.message || 'Lỗi thực hiện hành động');
+    } catch (error: unknown) {
+      setActionError(adminErrorMessage(error, 'Lỗi thực hiện hành động'));
     } finally {
       setSubmitting(false);
     }
@@ -79,7 +83,8 @@ export default function AdminProductsPage() {
       <div>
         <h1 style={{ fontSize: '24px', fontWeight: 700, color: '#111827' }}>Kiểm soát Sản phẩm</h1>
         <p style={{ color: '#6b7280', fontSize: '14px', marginTop: '4px' }}>
-          Tra cứu nhanh chi tiết sản phẩm theo Slug hoặc UUID để kiểm duyệt, khóa hoặc mở khóa sản phẩm vi phạm.
+          Tra cứu nhanh chi tiết sản phẩm theo Slug hoặc UUID để kiểm duyệt, khóa hoặc mở khóa sản
+          phẩm vi phạm.
         </p>
       </div>
 
@@ -132,7 +137,16 @@ export default function AdminProductsPage() {
           </button>
         </form>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: '#6b7280', flexWrap: 'wrap' }}>
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            fontSize: '13px',
+            color: '#6b7280',
+            flexWrap: 'wrap',
+          }}
+        >
           <span>Gợi ý thử nhanh:</span>
           {['ao-thun-nam', 'tai-nghe-bluetooth', 'kem-chong-nang'].map((sample) => (
             <button
@@ -149,7 +163,6 @@ export default function AdminProductsPage() {
           ))}
         </div>
       </div>
-
 
       {/* Error Message */}
       {errorMessage && (
@@ -184,7 +197,8 @@ export default function AdminProductsPage() {
             Không tìm thấy sản phẩm nào
           </div>
           <p style={{ fontSize: '14px', marginTop: '4px' }}>
-            Không có sản phẩm nào khớp với từ khóa &ldquo;<strong>{searchedQuery}</strong>&rdquo;. Vui lòng kiểm tra lại slug hoặc ID.
+            Không có sản phẩm nào khớp với từ khóa &ldquo;<strong>{searchedQuery}</strong>&rdquo;.
+            Vui lòng kiểm tra lại slug hoặc ID.
           </p>
         </div>
       )}
@@ -231,14 +245,15 @@ export default function AdminProductsPage() {
                     unoptimized
                   />
                 ) : (
-
                   <ProductIcon size={40} color="#9ca3af" />
                 )}
               </div>
 
               {/* Basic Info */}
               <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                <div
+                  style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}
+                >
                   <span
                     style={{
                       padding: '2px 8px',
@@ -249,7 +264,8 @@ export default function AdminProductsPage() {
                       color: product.moderationStatus === 'ACTIVE' ? '#166534' : '#991b1b',
                     }}
                   >
-                    Kiểm duyệt: {product.moderationStatus === 'ACTIVE' ? 'Đang hoạt động' : 'ĐÃ BỊ KHÓA'}
+                    Kiểm duyệt:{' '}
+                    {product.moderationStatus === 'ACTIVE' ? 'Đang hoạt động' : 'ĐÃ BỊ KHÓA'}
                   </span>
 
                   <span
@@ -278,25 +294,60 @@ export default function AdminProductsPage() {
                   </span>
                 </div>
 
-                <h2 style={{ fontSize: '18px', fontWeight: 700, color: '#111827', margin: '4px 0 0 0' }}>
+                <h2
+                  style={{
+                    fontSize: '18px',
+                    fontWeight: 700,
+                    color: '#111827',
+                    margin: '4px 0 0 0',
+                  }}
+                >
                   {product.name}
                 </h2>
 
-                <div style={{ fontSize: '13px', color: '#6b7280', display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
+                <div
+                  style={{
+                    fontSize: '13px',
+                    color: '#6b7280',
+                    display: 'flex',
+                    gap: '16px',
+                    flexWrap: 'wrap',
+                  }}
+                >
                   <span>
                     Slug: <code>{product.slug}</code>
                   </span>
                   <span>UUID: {product.id}</span>
                 </div>
 
-                <div style={{ fontSize: '13px', color: '#374151', display: 'flex', gap: '20px', marginTop: '4px' }}>
-                  <span>⭐ {(product.ratingAverageBasisPoints / 100).toFixed(1)} / 5.0 ({product.ratingCount} đánh giá)</span>
-                  <span>Đã bán: <strong>{product.soldCount}</strong></span>
+                <div
+                  style={{
+                    fontSize: '13px',
+                    color: '#374151',
+                    display: 'flex',
+                    gap: '20px',
+                    marginTop: '4px',
+                  }}
+                >
+                  <span>
+                    ⭐ {(product.ratingAverageBasisPoints / 100).toFixed(1)} / 5.0 (
+                    {product.ratingCount} đánh giá)
+                  </span>
+                  <span>
+                    Đã bán: <strong>{product.soldCount}</strong>
+                  </span>
                 </div>
               </div>
 
               {/* Action Buttons */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'flex-end' }}>
+              <div
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '8px',
+                  alignItems: 'flex-end',
+                }}
+              >
                 <Link
                   href={`/products/${product.slug}`}
                   target="_blank"
@@ -343,7 +394,6 @@ export default function AdminProductsPage() {
                 )}
               </div>
             </div>
-
 
             {/* Shop Info Subsection */}
             <div
@@ -403,9 +453,17 @@ export default function AdminProductsPage() {
             <div style={{ overflowX: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
                 <thead>
-                  <tr style={{ background: '#f9fafb', borderBottom: '1px solid #e5e7eb', textAlign: 'left' }}>
+                  <tr
+                    style={{
+                      background: '#f9fafb',
+                      borderBottom: '1px solid #e5e7eb',
+                      textAlign: 'left',
+                    }}
+                  >
                     <th style={{ padding: '10px 12px', color: '#4b5563' }}>SKU</th>
-                    <th style={{ padding: '10px 12px', color: '#4b5563' }}>Phân loại / Thuộc tính</th>
+                    <th style={{ padding: '10px 12px', color: '#4b5563' }}>
+                      Phân loại / Thuộc tính
+                    </th>
                     <th style={{ padding: '10px 12px', color: '#4b5563' }}>Giá niêm yết</th>
                     <th style={{ padding: '10px 12px', color: '#4b5563' }}>Tồn kho</th>
                     <th style={{ padding: '10px 12px', color: '#4b5563' }}>Trạng thái</th>
@@ -419,7 +477,9 @@ export default function AdminProductsPage() {
 
                     return (
                       <tr key={variant.id} style={{ borderBottom: '1px solid #f3f4f6' }}>
-                        <td style={{ padding: '10px 12px', fontFamily: 'monospace' }}>{variant.sku}</td>
+                        <td style={{ padding: '10px 12px', fontFamily: 'monospace' }}>
+                          {variant.sku}
+                        </td>
                         <td style={{ padding: '10px 12px', color: '#111827' }}>
                           {attrText || 'Mặc định (Default)'}
                         </td>
@@ -483,8 +543,8 @@ export default function AdminProductsPage() {
 
             <p style={{ fontSize: '14px', color: '#4b5563', margin: 0 }}>
               Bạn đang thực hiện {modalAction === 'SUSPEND' ? 'khóa' : 'mở khóa'} sản phẩm{' '}
-              <strong>{product.name}</strong> (<code>{product.slug}</code>). Hành động này sẽ được ghi vết vào
-              Nhật ký kiểm toán đặc quyền.
+              <strong>{product.name}</strong> (<code>{product.slug}</code>). Hành động này sẽ được
+              ghi vết vào Nhật ký kiểm toán đặc quyền.
             </p>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
@@ -511,12 +571,27 @@ export default function AdminProductsPage() {
             </div>
 
             {actionError && (
-              <div style={{ fontSize: '13px', color: '#dc2626', background: '#fef2f2', padding: '8px 12px', borderRadius: '6px' }}>
+              <div
+                style={{
+                  fontSize: '13px',
+                  color: '#dc2626',
+                  background: '#fef2f2',
+                  padding: '8px 12px',
+                  borderRadius: '6px',
+                }}
+              >
                 {actionError}
               </div>
             )}
 
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '12px' }}>
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'flex-end',
+                gap: '10px',
+                marginTop: '12px',
+              }}
+            >
               <button
                 type="button"
                 onClick={() => setModalAction(null)}
@@ -542,7 +617,6 @@ export default function AdminProductsPage() {
                 {submitting ? 'Đang xử lý...' : 'Xác nhận'}
               </button>
             </div>
-
           </div>
         </div>
       )}

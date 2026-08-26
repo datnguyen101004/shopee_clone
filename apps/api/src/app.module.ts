@@ -27,6 +27,7 @@ import { ReportingModule } from './reporting/reporting.module';
 import { SellerModerationNoticesModule } from './seller-moderation-notices/seller-moderation-notices.module';
 import { ReturnsModule } from './returns/returns.module';
 import { NotificationsModule } from './notifications/notifications.module';
+import { SellerIdentityModule } from './seller-identity/seller-identity.module';
 
 @Module({
   imports: [
@@ -57,6 +58,7 @@ import { NotificationsModule } from './notifications/notifications.module';
     SellerModerationNoticesModule,
     ReturnsModule,
     NotificationsModule,
+    SellerIdentityModule,
   ],
 })
 export class AppModule {}

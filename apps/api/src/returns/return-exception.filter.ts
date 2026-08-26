@@ -18,7 +18,6 @@ import {
   ReturnIdempotencyConflictError,
   ReturnNotFoundError,
   ReturnStaleError,
-  ReturnUnavailableError,
   ReturnValidationError,
 } from './return-errors';
 

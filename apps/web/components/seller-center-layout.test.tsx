@@ -5,11 +5,13 @@ import { SellerCenterLayout } from './seller-center-layout';
 vi.mock('next/navigation', () => ({ usePathname: () => '/seller/products/new' }));
 vi.mock('../lib/seller-shop-api', () => ({ fetchSellerShopWorkspace: vi.fn() }));
 const authenticatedFetch = vi.fn();
-vi.mock('./auth-session-provider', () => ({ useAuthSession: () => ({ state: { status: 'authenticated', user: { roles: ['buyer', 'seller'] } }, authenticatedFetch }) }));
+let accountRoles = ['buyer', 'seller'];
+vi.mock('./auth-session-provider', () => ({ useAuthSession: () => ({ state: { status: 'authenticated', user: { roles: accountRoles } }, authenticatedFetch }) }));
 
 describe('SellerCenterLayout', () => {
   beforeEach(() => {
     vi.mocked(fetchSellerShopWorkspace).mockReset();
+    accountRoles = ['buyer', 'seller'];
   });
 
   it('shows the active seller destination and live management links', async () => {
@@ -26,6 +28,20 @@ describe('SellerCenterLayout', () => {
     render(<SellerCenterLayout><p>Editor</p></SellerCenterLayout>);
     await waitFor(() => expect(screen.getByRole('heading', { name: /Chưa có shop/ })).toBeInTheDocument());
     expect(screen.queryByText('Editor')).not.toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /Mở hồ sơ shop/ })).toHaveAttribute('href', '/seller/shop');
+    expect(screen.getByRole('link', { name: /Xem hồ sơ đăng ký/ })).toHaveAttribute(
+      'href',
+      '/account/shop-registration',
+    );
+  });
+  it('keeps buyer-only accounts outside the Seller Center shell', () => {
+    accountRoles = ['buyer'];
+    render(<SellerCenterLayout><p>Editor</p></SellerCenterLayout>);
+    expect(screen.getByRole('heading', { name: 'Bạn chưa phải người bán' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Đăng ký thành shop' })).toHaveAttribute(
+      'href',
+      '/account/shop-registration',
+    );
+    expect(screen.queryByText('Editor')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Quản lý shop')).not.toBeInTheDocument();
   });
 });

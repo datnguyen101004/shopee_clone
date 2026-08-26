@@ -27,6 +27,7 @@ const valid = {
   initialVariantId: '00000000-0000-4000-8000-000000000401',
   shop: {
     id: '00000000-0000-4000-8000-000000000101',
+    ownerUserId: '00000000-0000-4000-8000-000000000201',
     slug: 'store',
     name: 'Store',
     location: 'Hà Nội',
@@ -54,7 +55,24 @@ describe('fetchProductDetail', () => {
     ['invalid-id', 'INVALID_ID!@#', vi.fn()],
 
     ['not-found', productId, vi.fn().mockResolvedValue(new Response('{}', { status: 404 }))],
-    ['deleted', productId, vi.fn().mockResolvedValue(new Response(JSON.stringify({ type: 'https://shopee-clone.local/problems/product-deleted', title: 'Product deleted', status: 410, detail: 'Deleted', code: 'PRODUCT_DELETED' }), { status: 410 }))],
+    [
+      'deleted',
+      productId,
+      vi
+        .fn()
+        .mockResolvedValue(
+          new Response(
+            JSON.stringify({
+              type: 'https://shopee-clone.local/problems/product-deleted',
+              title: 'Product deleted',
+              status: 410,
+              detail: 'Deleted',
+              code: 'PRODUCT_DELETED',
+            }),
+            { status: 410 },
+          ),
+        ),
+    ],
     ['status', productId, vi.fn().mockResolvedValue(new Response('{}', { status: 503 }))],
     ['contract', productId, vi.fn().mockResolvedValue(new Response('{}', { status: 200 }))],
     ['transport', productId, vi.fn().mockRejectedValue(new TypeError('offline'))],

@@ -21,7 +21,13 @@ import {
   OrderHistoryApiError,
 } from '../../lib/order-history-api';
 import { useAuthSession } from '../auth-session-provider';
-import { createProductReview, getAuthorProductReview, stageReviewMedia, updateProductReview, ReviewsApiError } from '../../lib/reviews-api';
+import {
+  createProductReview,
+  getAuthorProductReview,
+  stageReviewMedia,
+  updateProductReview,
+  ReviewsApiError,
+} from '../../lib/reviews-api';
 import {
   AccountLoadFailure,
   AccountWorkspace,
@@ -83,13 +89,24 @@ function OrderCard({ order }: { order: BuyerOrderSummary }) {
       <div className="buyer-order-card__lines">
         {order.lines.map((line) => (
           <article key={line.lineId}>
-            <Link className="buyer-order-product-link" href={`/products/${line.productId}`} aria-label={`${line.productName}${line.productAvailable ? '' : ' (sản phẩm đã bị xóa)'}`}>
-              {line.productImageUrl ? <img src={line.productImageUrl} alt="" /> : <span aria-hidden="true">SP</span>}
+            <Link
+              className="buyer-order-product-link"
+              href={`/products/${line.productId}`}
+              aria-label={`${line.productName}${line.productAvailable ? '' : ' (sản phẩm đã bị xóa)'}`}
+            >
+              {line.productImageUrl ? (
+                <img src={line.productImageUrl} alt="" />
+              ) : (
+                <span aria-hidden="true">SP</span>
+              )}
             </Link>
             <div>
-              <strong><Link href={`/products/${line.productId}`}>{line.productName}</Link></strong>
+              <strong>
+                <Link href={`/products/${line.productId}`}>{line.productName}</Link>
+              </strong>
               <small>
-                {line.variantName} · x{line.quantity}{line.productAvailable ? '' : ' · Sản phẩm đã bị xóa'}
+                {line.variantName} · x{line.quantity}
+                {line.productAvailable ? '' : ' · Sản phẩm đã bị xóa'}
               </small>
             </div>
             <b>{money(line.payableMerchandiseMinor)}</b>
@@ -108,13 +125,21 @@ function OrderCard({ order }: { order: BuyerOrderSummary }) {
   );
 }
 
-function ReviewAction({ orderReference, line }: { orderReference: string; line: BuyerOrderSummary['lines'][number] }) {
+function ReviewAction({
+  orderReference,
+  line,
+}: {
+  orderReference: string;
+  line: BuyerOrderSummary['lines'][number];
+}) {
   const auth = useAuthSession();
   const [open, setOpen] = useState(false);
   const [rating, setRating] = useState(5);
   const [text, setText] = useState('');
   const [message, setMessage] = useState('');
-  const [existing, setExisting] = useState<{ id: string; etag: string; mediaIds: string[] } | null>(null);
+  const [existing, setExisting] = useState<{ id: string; etag: string; mediaIds: string[] } | null>(
+    null,
+  );
   const [files, setFiles] = useState<File[]>([]);
   const [pending, setPending] = useState(false);
   const key = useRef<string | null>(null);
@@ -124,54 +149,237 @@ function ReviewAction({ orderReference, line }: { orderReference: string; line: 
     setPending(true);
     setMessage('');
     try {
-      const stagedMediaIds = await Promise.all(files.map((file) => stageReviewMedia(file, auth.authenticatedFetch)));
+      const stagedMediaIds = await Promise.all(
+        files.map((file) => stageReviewMedia(file, auth.authenticatedFetch)),
+      );
       const mediaIds = existing ? [...existing.mediaIds, ...stagedMediaIds] : stagedMediaIds;
       if (existing) {
-        await updateProductReview(existing.id, { rating: rating as 1 | 2 | 3 | 4 | 5, ...(text.trim() ? { text } : {}), ...(mediaIds.length ? { mediaIds } : {}) }, existing.etag, auth.authenticatedFetch);
-        setMessage('Đánh giá đã được cập nhật.'); setOpen(false);
+        await updateProductReview(
+          existing.id,
+          {
+            rating: rating as 1 | 2 | 3 | 4 | 5,
+            ...(text.trim() ? { text } : {}),
+            ...(mediaIds.length ? { mediaIds } : {}),
+          },
+          existing.etag,
+          auth.authenticatedFetch,
+        );
+        setMessage('Đánh giá đã được cập nhật.');
+        setOpen(false);
         return;
       }
       key.current ??= crypto.randomUUID();
-      await createProductReview(orderReference, line.lineId, { rating: rating as 1 | 2 | 3 | 4 | 5, ...(text.trim() ? { text } : {}), ...(mediaIds.length ? { mediaIds } : {}) }, key.current, auth.authenticatedFetch);
-      key.current = null; setMessage('Đánh giá đã được lưu. Tải lại chi tiết đơn để xem trạng thái mới.'); setOpen(false);
+      await createProductReview(
+        orderReference,
+        line.lineId,
+        {
+          rating: rating as 1 | 2 | 3 | 4 | 5,
+          ...(text.trim() ? { text } : {}),
+          ...(mediaIds.length ? { mediaIds } : {}),
+        },
+        key.current,
+        auth.authenticatedFetch,
+      );
+      key.current = null;
+      setMessage('Đánh giá đã được lưu. Tải lại chi tiết đơn để xem trạng thái mới.');
+      setOpen(false);
     } catch (error) {
       if (error instanceof ReviewsApiError && error.status === 409 && existing) {
         try {
           const latest = await getAuthorProductReview(existing.id, auth.authenticatedFetch);
-          setExisting({ id: latest.review.id, etag: latest.etag, mediaIds: latest.review.media.map((media) => media.id) });
-          setMessage('Đánh giá đã thay đổi ở phiên khác. Đã tải phiên bản mới; nội dung bạn nhập vẫn được giữ để gửi lại.');
-        } catch { setMessage('Đánh giá đã thay đổi. Vui lòng tải lại trang trước khi thử lại.'); }
-      } else setMessage(error instanceof ReviewsApiError && error.status === 409 ? 'Đánh giá đã tồn tại. Tải lại chi tiết đơn.' : 'Chưa thể lưu đánh giá. Nội dung của bạn vẫn được giữ để thử lại.');
-    } finally { setPending(false); }
+          setExisting({
+            id: latest.review.id,
+            etag: latest.etag,
+            mediaIds: latest.review.media.map((media) => media.id),
+          });
+          setMessage(
+            'Đánh giá đã thay đổi ở phiên khác. Đã tải phiên bản mới; nội dung bạn nhập vẫn được giữ để gửi lại.',
+          );
+        } catch {
+          setMessage('Đánh giá đã thay đổi. Vui lòng tải lại trang trước khi thử lại.');
+        }
+      } else
+        setMessage(
+          error instanceof ReviewsApiError && error.status === 409
+            ? 'Đánh giá đã tồn tại. Tải lại chi tiết đơn.'
+            : 'Chưa thể lưu đánh giá. Nội dung của bạn vẫn được giữ để thử lại.',
+        );
+    } finally {
+      setPending(false);
+    }
   }
   async function openEdit() {
     if (!line.review?.reviewId) return;
     try {
       const result = await getAuthorProductReview(line.review.reviewId, auth.authenticatedFetch);
-      setExisting({ id: result.review.id, etag: result.etag, mediaIds: result.review.media.map((media) => media.id) }); setRating(result.review.rating); setText(result.review.text ?? ''); setOpen(true); setMessage(result.review.visibility === 'HIDDEN' ? 'Đánh giá này hiện đang bị ẩn với người xem công khai.' : '');
-    } catch { setMessage('Không thể tải đánh giá hiện tại. Vui lòng thử lại.'); }
+      setExisting({
+        id: result.review.id,
+        etag: result.etag,
+        mediaIds: result.review.media.map((media) => media.id),
+      });
+      setRating(result.review.rating);
+      setText(result.review.text ?? '');
+      setOpen(true);
+      setMessage(
+        result.review.visibility === 'HIDDEN'
+          ? 'Đánh giá này hiện đang bị ẩn với người xem công khai.'
+          : '',
+      );
+    } catch {
+      setMessage('Không thể tải đánh giá hiện tại. Vui lòng thử lại.');
+    }
   }
-  const close = () => { if (!pending) setOpen(false); };
-  return <div className="buyer-review-action">
-    {line.review.state === 'REVIEWED' ? <button type="button" onClick={() => void openEdit()}>Sửa đánh giá</button> : <button type="button" onClick={() => setOpen(true)}>Đánh giá</button>}
-    {open ? <div className="review-dialog-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) close(); }}>
-      <section className="review-dialog" role="dialog" aria-modal="true" aria-labelledby={`review-title-${line.lineId}`}>
-        <header className="review-dialog__header"><h2 id={`review-title-${line.lineId}`}>Đánh giá sản phẩm</h2><button type="button" aria-label="Đóng đánh giá" disabled={pending} onClick={close}>×</button></header>
-        <div className="review-dialog__product">
-          {line.productImageUrl ? <img src={line.productImageUrl} alt="" /> : <span aria-hidden="true">SP</span>}
-          <div><strong>{line.productName}</strong><small>Phân loại: {line.variantName}</small></div>
+  const close = () => {
+    if (!pending) setOpen(false);
+  };
+  return (
+    <div className="buyer-review-action">
+      {line.review.state === 'REVIEWED' ? (
+        <button type="button" onClick={() => void openEdit()}>
+          Sửa đánh giá
+        </button>
+      ) : (
+        <button type="button" onClick={() => setOpen(true)}>
+          Đánh giá
+        </button>
+      )}
+      {open ? (
+        <div
+          className="review-dialog-backdrop"
+          role="presentation"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) close();
+          }}
+        >
+          <section
+            className="review-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby={`review-title-${line.lineId}`}
+          >
+            <header className="review-dialog__header">
+              <h2 id={`review-title-${line.lineId}`}>Đánh giá sản phẩm</h2>
+              <button type="button" aria-label="Đóng đánh giá" disabled={pending} onClick={close}>
+                ×
+              </button>
+            </header>
+            <div className="review-dialog__product">
+              {line.productImageUrl ? (
+                <img src={line.productImageUrl} alt="" />
+              ) : (
+                <span aria-hidden="true">SP</span>
+              )}
+              <div>
+                <strong>{line.productName}</strong>
+                <small>Phân loại: {line.variantName}</small>
+              </div>
+            </div>
+            <form
+              onSubmit={(event) => {
+                event.preventDefault();
+                void submit();
+              }}
+            >
+              <fieldset className="review-dialog__rating">
+                <legend>Chất lượng sản phẩm</legend>
+                <div>
+                  {[1, 2, 3, 4, 5].map((value) => (
+                    <label
+                      className={value <= rating ? 'is-active' : undefined}
+                      key={value}
+                      title={`${value} sao`}
+                    >
+                      <input
+                        disabled={pending}
+                        type="radio"
+                        name={`rating-${line.lineId}`}
+                        checked={rating === value}
+                        onChange={() => setRating(value)}
+                      />
+                      <span aria-hidden="true">★</span>
+                      <span className="sr-only">{value} sao</span>
+                    </label>
+                  ))}
+                </div>
+                <strong>
+                  {rating === 5
+                    ? 'Tuyệt vời'
+                    : rating === 4
+                      ? 'Hài lòng'
+                      : rating === 3
+                        ? 'Bình thường'
+                        : rating === 2
+                          ? 'Không hài lòng'
+                          : 'Tệ'}
+                </strong>
+              </fieldset>
+              <div className="review-dialog__comment">
+                <label htmlFor={`review-text-${line.lineId}`}>Đúng với mô tả:</label>
+                <textarea
+                  id={`review-text-${line.lineId}`}
+                  disabled={pending}
+                  maxLength={1000}
+                  placeholder="Hãy chia sẻ những điều bạn thích về sản phẩm này với những người mua khác nhé."
+                  value={text}
+                  onChange={(event) => setText(event.target.value)}
+                />
+                <small>{text.length}/1000</small>
+              </div>
+              <div className="review-dialog__media">
+                <span>Thêm hình ảnh</span>
+                <label className="review-dialog__upload">
+                  <input
+                    aria-label="Ảnh đánh giá"
+                    disabled={pending || files.length >= 6}
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    multiple
+                    onChange={(event) =>
+                      setFiles((current) =>
+                        [...current, ...Array.from(event.target.files ?? [])].slice(
+                          0,
+                          Math.max(0, 6 - (existing?.mediaIds.length ?? 0)),
+                        ),
+                      )
+                    }
+                  />
+                  <span aria-hidden="true">＋</span>
+                  <strong>Thêm hình ảnh</strong>
+                  <small>{files.length}/6</small>
+                </label>
+                {files.map((file, index) => (
+                  <div className="review-dialog__file" key={`${file.name}-${index}`}>
+                    <span>{file.name}</span>
+                    <button
+                      type="button"
+                      aria-label={`Xóa ${file.name}`}
+                      onClick={() =>
+                        setFiles((current) => current.filter((_, itemIndex) => itemIndex !== index))
+                      }
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+              </div>
+              <p className="review-dialog__notice">
+                Đánh giá của bạn sẽ được hiển thị công khai với nhãn “Đã mua hàng”.
+              </p>
+              <footer>
+                <button type="button" disabled={pending} onClick={close}>
+                  Trở lại
+                </button>
+                <button className="review-dialog__submit" disabled={pending} type="submit">
+                  {pending ? 'Đang gửi…' : 'Hoàn thành'}
+                </button>
+              </footer>
+            </form>
+          </section>
         </div>
-        <form onSubmit={(event) => { event.preventDefault(); void submit(); }}>
-          <fieldset className="review-dialog__rating"><legend>Chất lượng sản phẩm</legend><div>{[1, 2, 3, 4, 5].map((value) => <label className={value <= rating ? 'is-active' : undefined} key={value} title={`${value} sao`}><input disabled={pending} type="radio" name={`rating-${line.lineId}`} checked={rating === value} onChange={() => setRating(value)} /><span aria-hidden="true">★</span><span className="sr-only">{value} sao</span></label>)}</div><strong>{rating === 5 ? 'Tuyệt vời' : rating === 4 ? 'Hài lòng' : rating === 3 ? 'Bình thường' : rating === 2 ? 'Không hài lòng' : 'Tệ'}</strong></fieldset>
-          <div className="review-dialog__comment"><label htmlFor={`review-text-${line.lineId}`}>Đúng với mô tả:</label><textarea id={`review-text-${line.lineId}`} disabled={pending} maxLength={1000} placeholder="Hãy chia sẻ những điều bạn thích về sản phẩm này với những người mua khác nhé." value={text} onChange={(event) => setText(event.target.value)} /><small>{text.length}/1000</small></div>
-          <div className="review-dialog__media"><span>Thêm hình ảnh</span><label className="review-dialog__upload"><input aria-label="Ảnh đánh giá" disabled={pending || files.length >= 6} type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={(event) => setFiles((current) => [...current, ...Array.from(event.target.files ?? [])].slice(0, Math.max(0, 6 - (existing?.mediaIds.length ?? 0))))} /><span aria-hidden="true">＋</span><strong>Thêm hình ảnh</strong><small>{files.length}/6</small></label>{files.map((file, index) => <div className="review-dialog__file" key={`${file.name}-${index}`}><span>{file.name}</span><button type="button" aria-label={`Xóa ${file.name}`} onClick={() => setFiles((current) => current.filter((_, itemIndex) => itemIndex !== index))}>×</button></div>)}</div>
-          <p className="review-dialog__notice">Đánh giá của bạn sẽ được hiển thị công khai với nhãn “Đã mua hàng”.</p>
-          <footer><button type="button" disabled={pending} onClick={close}>Trở lại</button><button className="review-dialog__submit" disabled={pending} type="submit">{pending ? 'Đang gửi…' : 'Hoàn thành'}</button></footer>
-        </form>
-      </section>
-    </div> : null}
-    {message ? <p role="status">{message}</p> : null}
-  </div>;
+      ) : null}
+      {message ? <p role="status">{message}</p> : null}
+    </div>
+  );
 }
 
 export function BuyerOrderListScreen({ filter }: { filter: BuyerOrderListFilter | null }) {
@@ -204,7 +412,9 @@ export function BuyerOrderListScreen({ filter }: { filter: BuyerOrderListFilter 
   useEffect(() => {
     if (!userId || !filter) return;
     const controller = new AbortController();
-    queueMicrotask(() => void load(null, false, controller.signal));
+    queueMicrotask(() => {
+      if (!controller.signal.aborted) void load(null, false, controller.signal);
+    });
     return () => controller.abort();
   }, [filter, load, userId]);
 
@@ -374,7 +584,9 @@ export function BuyerOrderDetailScreen({ orderReference }: { orderReference: str
   useEffect(() => {
     if (!userId) return;
     const controller = new AbortController();
-    queueMicrotask(() => void load(controller.signal));
+    queueMicrotask(() => {
+      if (!controller.signal.aborted) void load(controller.signal);
+    });
     return () => controller.abort();
   }, [load, userId]);
 
@@ -461,13 +673,24 @@ export function BuyerOrderDetailScreen({ orderReference }: { orderReference: str
               <h2>{detail.order.shop.name}</h2>
               {detail.order.lines.map((line) => (
                 <article className="buyer-order-detail__line" key={line.lineId}>
-                  <Link className="buyer-order-product-link" href={`/products/${line.productId}`} aria-label={`${line.productName}${line.productAvailable ? '' : ' (sản phẩm đã bị xóa)'}`}>
-                    {line.productImageUrl ? <img src={line.productImageUrl} alt="" /> : <span aria-hidden="true">SP</span>}
+                  <Link
+                    className="buyer-order-product-link"
+                    href={`/products/${line.productId}`}
+                    aria-label={`${line.productName}${line.productAvailable ? '' : ' (sản phẩm đã bị xóa)'}`}
+                  >
+                    {line.productImageUrl ? (
+                      <img src={line.productImageUrl} alt="" />
+                    ) : (
+                      <span aria-hidden="true">SP</span>
+                    )}
                   </Link>
                   <div>
-                    <strong><Link href={`/products/${line.productId}`}>{line.productName}</Link></strong>
+                    <strong>
+                      <Link href={`/products/${line.productId}`}>{line.productName}</Link>
+                    </strong>
                     <small>
-                      {line.variantName} · x{line.quantity}{line.productAvailable ? '' : ' · Sản phẩm đã bị xóa'}
+                      {line.variantName} · x{line.quantity}
+                      {line.productAvailable ? '' : ' · Sản phẩm đã bị xóa'}
                     </small>
                   </div>
                   <b>{money(line.payableMerchandiseMinor)}</b>
@@ -517,7 +740,9 @@ export function BuyerOrderDetailScreen({ orderReference }: { orderReference: str
                 </Link>
               </p>
             ) : null}
-            {detail.order.returnCapability?.allowed ? <BuyerReturnForm order={detail.order} /> : null}
+            {detail.order.returnCapability?.allowed ? (
+              <BuyerReturnForm order={detail.order} />
+            ) : null}
             <div className="buyer-order-detail__actions">
               <Link href="/account/orders">Về đơn mua</Link>
               {detail.order.cancellation.allowed ? (

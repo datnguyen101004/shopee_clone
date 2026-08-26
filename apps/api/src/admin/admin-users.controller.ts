@@ -12,11 +12,13 @@ import {
   UseFilters,
   UseGuards,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 
 import { AuthGuard, type AuthenticatedRequest } from '../auth/auth.guard';
 import { RequireRoles, RolesGuard } from '../auth/role-authorization.guard';
 import { AdminExceptionFilter } from './admin-exception.filter';
+// DTO classes must remain runtime values for Nest validation metadata.
+// eslint-disable-next-line @typescript-eslint/consistent-type-imports
 import { AdminUserActionDto, AdminUserListQueryDto } from './admin.dto';
 import { AdminService } from './admin.service';
 
@@ -46,6 +48,7 @@ export class AdminUsersController {
   @Post(':userId/actions')
   @Header('Cache-Control', 'private, no-store')
   @ApiOperation({ summary: 'Perform status mutation action (SUSPEND / RESTORE) on user' })
+  @ApiResponse({ status: 409, description: 'A seller account action must transition its paired shop.' })
   executeAction(
     @Param('userId') userId: string,
     @Body() input: AdminUserActionDto,

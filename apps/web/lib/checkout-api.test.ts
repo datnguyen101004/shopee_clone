@@ -34,7 +34,7 @@ const line = {
   variantSku: 'SKU',
 };
 const shop = {
-  shop: { id: shopId, slug: 'shop-a', name: 'Shop A' },
+  shop: { id: shopId, ownerUserId: '00000000-0000-4000-8000-000000000101', slug: 'shop-a', name: 'Shop A' },
   note: '',
   lines: [line],
   shipping: {

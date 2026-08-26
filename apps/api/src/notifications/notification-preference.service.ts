@@ -41,7 +41,7 @@ export class NotificationPreferenceService {
       const preferences: NotificationChannelPreference[] = [];
       for (const category of NOTIFICATION_CATEGORIES) {
         for (const channel of NOTIFICATION_CHANNELS) {
-          const mandatory = this.isMandatoryPair(category, channel);
+          const mandatory = this.isMandatoryPair(category);
           preferences.push({
             category,
             channel,
@@ -66,7 +66,7 @@ export class NotificationPreferenceService {
     if (!NOTIFICATION_CHANNELS.includes(input.channel)) {
       throw new NotificationValidationError(['channel']);
     }
-    if (!input.enabled && this.isMandatoryPair(input.category, input.channel)) {
+    if (!input.enabled && this.isMandatoryPair(input.category)) {
       throw new NotificationPreferenceForbiddenError(['enabled']);
     }
     try {
@@ -104,10 +104,12 @@ export class NotificationPreferenceService {
     channel: NotificationChannel,
     type: NotificationType,
   ): Promise<boolean> {
-    if (MANDATORY_NOTIFICATION_TYPES.includes(type as (typeof MANDATORY_NOTIFICATION_TYPES)[number])) {
+    if (
+      MANDATORY_NOTIFICATION_TYPES.includes(type as (typeof MANDATORY_NOTIFICATION_TYPES)[number])
+    ) {
       return true;
     }
-    if (this.isMandatoryPair(category, channel)) return true;
+    if (this.isMandatoryPair(category)) return true;
     const row = await this.prisma.notificationPreference.findUnique({
       where: {
         userId_category_channel: { userId, category, channel },
@@ -116,7 +118,7 @@ export class NotificationPreferenceService {
     return row?.enabled ?? true;
   }
 
-  private isMandatoryPair(category: NotificationCategory, _channel: NotificationChannel): boolean {
+  private isMandatoryPair(category: NotificationCategory): boolean {
     return MANDATORY_CATEGORIES.has(category) && category === 'ORDERS';
   }
 }

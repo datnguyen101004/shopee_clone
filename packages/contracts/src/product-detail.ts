@@ -32,6 +32,7 @@ export interface ProductDetailVariant {
 
 export interface ProductDetailShop {
   id: string;
+  ownerUserId: string;
   slug: string;
   name: string;
   location: string;
@@ -195,6 +196,7 @@ export function isProductDetailResponse(value: unknown): value is ProductDetailR
     !(value.initialVariantId === null || isUuid(value.initialVariantId)) ||
     !isRecord(value.shop) ||
     !isUuid(value.shop.id) ||
+    !isUuid(value.shop.ownerUserId) ||
     !isString(value.shop.slug) ||
     !isString(value.shop.name) ||
     !isString(value.shop.location) ||
@@ -284,4 +286,3 @@ export function isCanonicalProductSlug(value: string): boolean {
 export function isCanonicalProductId(value: string): boolean {
   return canonicalUuid.test(value) || isCanonicalProductSlug(value);
 }
-

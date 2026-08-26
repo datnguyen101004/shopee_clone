@@ -99,7 +99,7 @@ export interface MockShippingBreakdown {
 }
 
 export interface PricingQuoteShop {
-  shop: { id: string; slug: string; name: string };
+  shop: { id: string; ownerUserId: string; slug: string; name: string };
   lines: PricingQuoteLine[];
   shipping: MockShippingBreakdown;
   listSubtotalMinor: number;
@@ -492,8 +492,9 @@ function isShop(value: unknown): value is PricingQuoteShop {
       'payableTotalMinor',
     ]) ||
     !isRecord(value.shop) ||
-    !hasExactKeys(value.shop, ['id', 'slug', 'name']) ||
+    !hasExactKeys(value.shop, ['id', 'ownerUserId', 'slug', 'name']) ||
     !isUuid(value.shop.id) ||
+    !isUuid(value.shop.ownerUserId) ||
     typeof value.shop.slug !== 'string' ||
     !canonicalSlug.test(value.shop.slug) ||
     !isText(value.shop.name) ||

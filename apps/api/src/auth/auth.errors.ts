@@ -6,6 +6,11 @@ export class AuthInputError extends Error {
 
 export class RegistrationUnavailableError extends Error {}
 export class AuthenticationFailedError extends Error {}
+export class AccountSuspendedError extends Error {
+  constructor() {
+    super('The account and its shop have been disabled.');
+  }
+}
 export class RefreshSessionFailedError extends Error {
   constructor(public readonly clearCookie = true) {
     super('Refresh session failed');

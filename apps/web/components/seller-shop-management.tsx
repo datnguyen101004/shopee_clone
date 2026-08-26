@@ -6,6 +6,7 @@ import {
   type SellerShopProfile,
   type ShopServiceAddress,
 } from '@shopee-clone/contracts';
+import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
 import { useAuthSession } from './auth-session-provider';
@@ -100,8 +101,12 @@ function incompleteProfileMessage(input: CreateSellerShopRequest): string | null
   return missing.length > 0 ? `Hãy điền đầy đủ: ${missing.join(', ')}.` : null;
 }
 
-export function SellerShopManagement() {
+type SellerShopSurface = 'buyer-registration' | 'seller-management';
+
+export function SellerShopManagement({ surface }: { surface: SellerShopSurface }) {
   const { authenticatedFetch, state: authState } = useAuthSession();
+  const isBuyerRegistration = surface === 'buyer-registration';
+  const isSeller = authState.status === 'authenticated' && authState.user.roles.includes('seller');
   const [shop, setShop] = useState<SellerShopProfile | null>(null);
   const [workspaceDefaultAddress, setWorkspaceDefaultAddress] = useState<ShopServiceAddress | null>(null);
   const [form, setForm] = useState(emptyForm);
@@ -112,6 +117,7 @@ export function SellerShopManagement() {
 
   useEffect(() => {
     if (authState.status !== 'authenticated') return;
+    if (!isBuyerRegistration && !isSeller) return;
     let active = true;
     void fetchSellerShopWorkspace(authenticatedFetch)
       .then((workspace) => {
@@ -132,7 +138,7 @@ export function SellerShopManagement() {
     return () => {
       active = false;
     };
-  }, [authState.status, authenticatedFetch]);
+  }, [authState.status, authenticatedFetch, isBuyerRegistration, isSeller]);
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
@@ -196,6 +202,15 @@ export function SellerShopManagement() {
   if (!authState.user.roles.includes('buyer')) {
     return <section className="operational-panel" role="status"><h1>Không có quyền truy cập</h1></section>;
   }
+  if (!isBuyerRegistration && !isSeller) {
+    return (
+      <section className="operational-panel" role="status">
+        <h1>Bạn chưa phải người bán</h1>
+        <p>Hồ sơ đăng ký shop được quản lý trong khu vực tài khoản người mua.</p>
+        <Link href="/account/shop-registration">Mở hồ sơ đăng ký</Link>
+      </section>
+    );
+  }
   if (status === 'loading') {
     return (
       <section className="operational-panel" aria-busy="true">
@@ -214,11 +229,22 @@ export function SellerShopManagement() {
 
   return (
     <section
-      className="operational-panel seller-shop-panel"
+      className={`operational-panel seller-shop-panel${isBuyerRegistration ? ' buyer-shop-registration-panel' : ''}`}
       aria-labelledby="seller-shop-title"
     >
-      <span className="operational-eyebrow">Hồ sơ gian hàng</span>
-      <h1 id="seller-shop-title">{shop ? shop.name : 'Đăng ký gian hàng'}</h1>
+      <span className="operational-eyebrow">
+        {isBuyerRegistration ? 'Đăng ký người bán' : 'Hồ sơ gian hàng'}
+      </span>
+      <h1 id="seller-shop-title">
+        {shop ? shop.name : isBuyerRegistration ? 'Thông tin đăng ký shop' : 'Hồ sơ gian hàng'}
+      </h1>
+      {isBuyerRegistration ? (
+        <ol className="buyer-shop-registration-steps" aria-label="Các bước đăng ký shop">
+          <li className={!shop ? 'is-current' : undefined}>Điền hồ sơ</li>
+          <li className={shop && !shop.canSell ? 'is-current' : undefined}>Chờ xét duyệt</li>
+          <li className={shop?.canSell ? 'is-current' : undefined}>Mở Seller Center</li>
+        </ol>
+      ) : null}
       {shop ? (
         <p>
           Trạng thái duyệt: {onboardingLabel(shop.onboardingStatus)}. Vận hành:{' '}
@@ -236,18 +262,24 @@ export function SellerShopManagement() {
       {shop && mode === 'view' ? (
         <div className="seller-shop-profile-view" data-testid="seller-shop-profile-view">
           <div className="seller-shop-profile-actions">
-            <button
-              className="seller-shop-submit"
-              type="button"
-              onClick={() => {
-                setForm(fromWorkspaceShop(shop, workspaceDefaultAddress));
-                setMessage(null);
-                setMode('editing');
-              }}
-            >
-              Cập nhật hồ sơ
-            </button>
-            {shop.onboardingStatus === 'approved' ? (
+            {!isBuyerRegistration || shop.onboardingStatus !== 'approved' ? (
+              <button
+                className="seller-shop-submit"
+                type="button"
+                onClick={() => {
+                  setForm(fromWorkspaceShop(shop, workspaceDefaultAddress));
+                  setMessage(null);
+                  setMode('editing');
+                }}
+              >
+                Cập nhật hồ sơ
+              </button>
+            ) : (
+              <Link className="seller-shop-submit" href="/seller">
+                Mở Seller Center
+              </Link>
+            )}
+            {!isBuyerRegistration && shop.onboardingStatus === 'approved' ? (
               <button
                 className="seller-shop-status-action"
                 type="button"
@@ -477,7 +509,7 @@ export function SellerShopManagement() {
             />
           </label>
         </fieldset>
-        {shop?.onboardingStatus === 'approved' && mode === 'editing' ? (
+        {!isBuyerRegistration && shop?.onboardingStatus === 'approved' && mode === 'editing' ? (
           <fieldset className="seller-shop-form-wide">
             <legend>Trạng thái bán</legend>
             <button
@@ -496,9 +528,9 @@ export function SellerShopManagement() {
               {shop.status === 'active' ? 'Tạm ngừng bán' : 'Mở bán'}
             </button>
           </fieldset>
-        ) : (
+        ) : shop?.onboardingStatus !== 'approved' ? (
           <p>Chỉ shop đã duyệt mới có thể tự kích hoạt bán.</p>
-        )}
+        ) : null}
         <div className="seller-shop-form-actions">
         {shop && mode === 'editing' ? (
           <button

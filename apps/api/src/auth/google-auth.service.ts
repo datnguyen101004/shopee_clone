@@ -2,7 +2,11 @@ import { isSafeAuthReturnTo } from '@shopee-clone/contracts';
 import { Inject, Injectable } from '@nestjs/common';
 
 import { AUTH_CONFIG, type AuthConfig } from './auth.config';
-import { GoogleAccountMethodRequiredError, GoogleSignInFailedError } from './auth.errors';
+import {
+  AccountSuspendedError,
+  GoogleAccountMethodRequiredError,
+  GoogleSignInFailedError,
+} from './auth.errors';
 import { AuthClock } from './auth-clock';
 import { AuthLimiterService } from './auth-limiter.service';
 import { AuthRepository } from './auth.repository';
@@ -17,7 +21,10 @@ export interface GoogleAuthStartResult {
 
 export type GoogleAuthCompletion =
   | { outcome: 'success'; returnTo: string; session: AuthSessionResult }
-  | { outcome: 'cancelled' | 'failed' | 'account-method-required'; returnTo: string };
+  | {
+      outcome: 'cancelled' | 'failed' | 'account-method-required' | 'account-and-shop-disabled';
+      returnTo: string;
+    };
 
 function containsControlCharacter(value: string): boolean {
   return [...value].some((character) => {
@@ -121,6 +128,9 @@ export class GoogleAuthService {
     } catch (error) {
       if (error instanceof GoogleAccountMethodRequiredError) {
         return { outcome: 'account-method-required', returnTo: attempt.returnTo };
+      }
+      if (error instanceof AccountSuspendedError) {
+        return { outcome: 'account-and-shop-disabled', returnTo: attempt.returnTo };
       }
       throw error;
     }

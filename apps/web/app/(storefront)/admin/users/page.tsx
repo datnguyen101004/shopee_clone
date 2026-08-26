@@ -1,11 +1,14 @@
 'use client';
 
 import type { AdminUserSummary } from '@shopee-clone/contracts';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
 import { useAuthSession } from '../../../../components/auth-session-provider';
-import { executeAdminUserAction, fetchAdminUsers } from '../../../../lib/admin-api';
-import { grantRole, revokeRole } from '../../../../lib/role-api';
+import {
+  adminErrorMessage,
+  executeAdminUserAction,
+  fetchAdminUsers,
+} from '../../../../lib/admin-api';
 
 export default function AdminUsersPage() {
   const { authenticatedFetch } = useAuthSession();
@@ -20,13 +23,12 @@ export default function AdminUsersPage() {
 
   // Action Modal State
   const [selectedUser, setSelectedUser] = useState<AdminUserSummary | null>(null);
-  const [actionType, setActionType] = useState<'SUSPEND' | 'RESTORE' | 'GRANT_ROLE' | 'REVOKE_ROLE' | null>(null);
-  const [targetRole, setTargetRole] = useState<'seller' | 'admin'>('seller');
+  const [actionType, setActionType] = useState<'SUSPEND' | 'RESTORE' | null>(null);
   const [reason, setReason] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
 
-  const loadUsers = () => {
+  const loadUsers = useCallback(() => {
     setLoading(true);
     setError(null);
     fetchAdminUsers(authenticatedFetch, {
@@ -42,11 +44,12 @@ export default function AdminUsersPage() {
         setError(err.message || 'Không thể tải danh sách người dùng');
         setLoading(false);
       });
-  };
+  }, [authenticatedFetch, roleFilter, search, statusFilter]);
 
   useEffect(() => {
-    loadUsers();
-  }, [statusFilter, roleFilter]);
+    const timer = window.setTimeout(() => void loadUsers(), 0);
+    return () => window.clearTimeout(timer);
+  }, [loadUsers]);
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -71,21 +74,17 @@ export default function AdminUsersPage() {
           reason: reason.trim(),
         });
         setUsers((prev) => prev.map((u) => (u.id === updated.id ? updated : u)));
-      } else if (actionType === 'GRANT_ROLE') {
-        await grantRole(authenticatedFetch, selectedUser.id, targetRole, reason.trim());
-        loadUsers();
-      } else if (actionType === 'REVOKE_ROLE') {
-        await revokeRole(authenticatedFetch, selectedUser.id, targetRole, reason.trim());
+        // Refetch the authoritative list so paired shop/account state is not left stale.
         loadUsers();
       }
       closeModal();
-    } catch (err: any) {
-      setActionError(err.problem?.detail || err.message || 'Thao tác thất bại');
+    } catch (error: unknown) {
+      setActionError(adminErrorMessage(error, 'Thao tác thất bại'));
       setSubmitting(false);
     }
   };
 
-  const openModal = (user: AdminUserSummary, type: 'SUSPEND' | 'RESTORE' | 'GRANT_ROLE' | 'REVOKE_ROLE') => {
+  const openModal = (user: AdminUserSummary, type: 'SUSPEND' | 'RESTORE') => {
     setSelectedUser(user);
     setActionType(type);
     setReason('');
@@ -106,7 +105,7 @@ export default function AdminUsersPage() {
       <div>
         <h1 style={{ fontSize: '24px', fontWeight: 700, color: '#111827' }}>Quản lý Người dùng</h1>
         <p style={{ color: '#6b7280', fontSize: '14px', marginTop: '4px' }}>
-          Tra cứu thông tin tài khoản, thay đổi trạng thái khóa/mở và phân quyền vai trò.
+          Tra cứu thông tin tài khoản và thay đổi trạng thái khóa/mở.
         </p>
       </div>
 
@@ -124,7 +123,10 @@ export default function AdminUsersPage() {
           justifyContent: 'space-between',
         }}
       >
-        <form onSubmit={handleSearchSubmit} style={{ display: 'flex', gap: '10px', flex: 1, minWidth: '280px' }}>
+        <form
+          onSubmit={handleSearchSubmit}
+          style={{ display: 'flex', gap: '10px', flex: 1, minWidth: '280px' }}
+        >
           <input
             type="text"
             placeholder="Tìm theo email hoặc tên..."
@@ -150,14 +152,20 @@ export default function AdminUsersPage() {
           </button>
         </form>
 
-
         <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
           <div>
-            <label style={{ fontSize: '13px', color: '#4b5563', marginRight: '6px' }}>Trạng thái:</label>
+            <label style={{ fontSize: '13px', color: '#4b5563', marginRight: '6px' }}>
+              Trạng thái:
+            </label>
             <select
               value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value as any)}
-              style={{ padding: '6px 10px', borderRadius: '6px', border: '1px solid #d1d5db', fontSize: '13px' }}
+              onChange={(e) => setStatusFilter(e.target.value as 'ALL' | 'ACTIVE' | 'SUSPENDED')}
+              style={{
+                padding: '6px 10px',
+                borderRadius: '6px',
+                border: '1px solid #d1d5db',
+                fontSize: '13px',
+              }}
             >
               <option value="ALL">Tất cả</option>
               <option value="ACTIVE">Đang hoạt động</option>
@@ -166,11 +174,20 @@ export default function AdminUsersPage() {
           </div>
 
           <div>
-            <label style={{ fontSize: '13px', color: '#4b5563', marginRight: '6px' }}>Vai trò:</label>
+            <label style={{ fontSize: '13px', color: '#4b5563', marginRight: '6px' }}>
+              Vai trò:
+            </label>
             <select
               value={roleFilter}
-              onChange={(e) => setRoleFilter(e.target.value as any)}
-              style={{ padding: '6px 10px', borderRadius: '6px', border: '1px solid #d1d5db', fontSize: '13px' }}
+              onChange={(e) =>
+                setRoleFilter(e.target.value as 'ALL' | 'buyer' | 'seller' | 'admin')
+              }
+              style={{
+                padding: '6px 10px',
+                borderRadius: '6px',
+                border: '1px solid #d1d5db',
+                fontSize: '13px',
+              }}
             >
               <option value="ALL">Tất cả vai trò</option>
               <option value="buyer">Người mua (Buyer)</option>
@@ -192,15 +209,33 @@ export default function AdminUsersPage() {
         }}
       >
         {loading ? (
-          <div style={{ padding: '32px', textAlign: 'center', color: '#6b7280' }}>Đang tải danh sách người dùng...</div>
+          <div style={{ padding: '32px', textAlign: 'center', color: '#6b7280' }}>
+            Đang tải danh sách người dùng...
+          </div>
         ) : error ? (
           <div style={{ padding: '24px', color: '#ef4444' }}>{error}</div>
         ) : users.length === 0 ? (
-          <div style={{ padding: '32px', textAlign: 'center', color: '#6b7280' }}>Không tìm thấy người dùng nào phù hợp.</div>
+          <div style={{ padding: '32px', textAlign: 'center', color: '#6b7280' }}>
+            Không tìm thấy người dùng nào phù hợp.
+          </div>
         ) : (
-          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '14px' }}>
+          <table
+            style={{
+              width: '100%',
+              borderCollapse: 'collapse',
+              textAlign: 'left',
+              fontSize: '14px',
+            }}
+          >
             <thead>
-              <tr style={{ background: '#f9fafb', borderBottom: '1px solid #e5e7eb', color: '#4b5563', fontSize: '13px' }}>
+              <tr
+                style={{
+                  background: '#f9fafb',
+                  borderBottom: '1px solid #e5e7eb',
+                  color: '#4b5563',
+                  fontSize: '13px',
+                }}
+              >
                 <th style={{ padding: '12px 16px' }}>Họ tên & Email</th>
                 <th style={{ padding: '12px 16px' }}>Số điện thoại</th>
                 <th style={{ padding: '12px 16px' }}>Vai trò</th>
@@ -227,8 +262,10 @@ export default function AdminUsersPage() {
                             fontWeight: 600,
                             padding: '2px 8px',
                             borderRadius: '12px',
-                            background: r === 'admin' ? '#fef3c7' : r === 'seller' ? '#e0e7ff' : '#f3f4f6',
-                            color: r === 'admin' ? '#92400e' : r === 'seller' ? '#3730a3' : '#4b5563',
+                            background:
+                              r === 'admin' ? '#fef3c7' : r === 'seller' ? '#e0e7ff' : '#f3f4f6',
+                            color:
+                              r === 'admin' ? '#92400e' : r === 'seller' ? '#3730a3' : '#4b5563',
                           }}
                         >
                           {r}
@@ -281,21 +318,6 @@ export default function AdminUsersPage() {
                           Mở khóa
                         </button>
                       )}
-
-                      {!u.roles.includes('admin') && (
-                        <button
-                          onClick={() => openModal(u, 'GRANT_ROLE')}
-                          className="admin-btn admin-btn-secondary"
-                          style={{
-                            padding: '5px 12px',
-                            fontSize: '12px',
-                            fontWeight: 500,
-                          }}
-                        >
-                          Phân quyền
-                        </button>
-                      )}
-
                     </div>
                   </td>
                 </tr>
@@ -328,41 +350,38 @@ export default function AdminUsersPage() {
               boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)',
             }}
           >
-            <h2 style={{ fontSize: '18px', fontWeight: 700, color: '#111827', marginBottom: '8px' }}>
+            <h2
+              style={{ fontSize: '18px', fontWeight: 700, color: '#111827', marginBottom: '8px' }}
+            >
               {actionType === 'SUSPEND'
                 ? `Tạm khóa tài khoản: ${selectedUser.displayName}`
-                : actionType === 'RESTORE'
-                  ? `Mở khóa tài khoản: ${selectedUser.displayName}`
-                  : `Cấp vai trò cho: ${selectedUser.displayName}`}
+                : `Mở khóa tài khoản: ${selectedUser.displayName}`}
             </h2>
 
             <p style={{ fontSize: '13px', color: '#4b5563', marginBottom: '16px' }}>
               {actionType === 'SUSPEND'
                 ? 'Khi khóa, toàn bộ các phiên đăng nhập đang hoạt động của người dùng sẽ bị thu hồi ngay lập tức.'
-                : actionType === 'RESTORE'
-                  ? 'Khôi phục trạng thái hoạt động bình thường cho tài khoản này.'
-                  : 'Chỉ cấp quyền khi có sự phê duyệt hợp lệ.'}
+                : 'Khôi phục trạng thái hoạt động bình thường cho tài khoản này.'}
             </p>
 
-            {actionType === 'GRANT_ROLE' && (
-              <div style={{ marginBottom: '16px' }}>
-                <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#374151', marginBottom: '4px' }}>
-                  Vai trò cần cấp:
-                </label>
-                <select
-                  value={targetRole}
-                  onChange={(e) => setTargetRole(e.target.value as any)}
-                  style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #d1d5db', fontSize: '14px' }}
-                >
-                  <option value="seller">Người bán (Seller)</option>
-                  <option value="admin">Quản trị viên (Admin)</option>
-                </select>
-              </div>
-            )}
+            {selectedUser.roles.includes('seller') ? (
+              <p role="note" style={{ fontSize: '13px', color: '#b45309', marginBottom: '16px' }}>
+                Thao tác này áp dụng đồng thời cho tài khoản seller và shop duy nhất của tài khoản;
+                các phiên đăng nhập hiện tại sẽ bị thu hồi khi khóa.
+              </p>
+            ) : null}
 
             <form onSubmit={handleActionSubmit}>
               <div style={{ marginBottom: '16px' }}>
-                <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#374151', marginBottom: '4px' }}>
+                <label
+                  style={{
+                    display: 'block',
+                    fontSize: '13px',
+                    fontWeight: 600,
+                    color: '#374151',
+                    marginBottom: '4px',
+                  }}
+                >
                   Lý do thao tác (Bắt buộc, 8 - 240 ký tự):
                 </label>
                 <textarea
@@ -382,7 +401,18 @@ export default function AdminUsersPage() {
               </div>
 
               {actionError && (
-                <div style={{ padding: '8px 12px', background: '#fee2e2', color: '#dc2626', borderRadius: '6px', fontSize: '13px', marginBottom: '16px' }}>
+                <div
+                  role="alert"
+                  aria-live="assertive"
+                  style={{
+                    padding: '8px 12px',
+                    background: '#fee2e2',
+                    color: '#dc2626',
+                    borderRadius: '6px',
+                    fontSize: '13px',
+                    marginBottom: '16px',
+                  }}
+                >
                   {actionError}
                 </div>
               )}

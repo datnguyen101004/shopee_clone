@@ -201,7 +201,7 @@ export class SellerOnboardingService {
   async workspace(userId: string): Promise<SellerShopWorkspace> {
     try {
       const [shop, address] = await Promise.all([
-        this.repository.findOwnedLiveShop(userId),
+        this.repository.findOwnedShop(userId),
         this.repository.findDefaultShippingAddress(userId),
       ]);
       return {
@@ -249,7 +249,7 @@ export class SellerOnboardingService {
       if (!(await this.repository.lockOwner(transaction, userId))) {
         throw new AuthorizationDeniedError();
       }
-      const existing = await this.repository.findOwnedLiveShop(userId, transaction);
+      const existing = await this.repository.findOwnedShop(userId, transaction);
       if (existing) throw new SellerShopConflictError(['shop']);
       try {
         return profile(await this.repository.createShop(transaction, payload));
@@ -419,7 +419,16 @@ export class SellerOnboardingService {
         shop.onboardingStatus === ShopOnboardingStatus.REJECTED &&
         shop.status === ShopStatus.INACTIVE &&
         shop.onboardingReason === input.reason;
-      if (alreadyApproved || alreadyRejected) return profile(shop);
+      if (alreadyRejected) return profile(shop);
+      if (alreadyApproved) {
+        await this.roles.grantSellerForShopApproval(
+          transaction,
+          actorUserId,
+          shop.ownerId,
+          input.reason,
+        );
+        return profile(shop);
+      }
       if (
         shop.onboardingStatus === ShopOnboardingStatus.APPROVED ||
         shop.onboardingStatus === ShopOnboardingStatus.REJECTED
@@ -465,4 +474,3 @@ export class SellerOnboardingService {
     });
   }
 }
-

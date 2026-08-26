@@ -118,12 +118,14 @@ export {
   ROLE_REASON_MAX_LENGTH,
   ROLE_REASON_MIN_LENGTH,
   authorizationProblemTypeValues,
+  authProblemTypeValues,
   elevatedMarketplaceRoleValues,
   googleSignInOutcomeValues,
   hasMarketplaceRole,
   isAcceptedAuthPassword,
   isAcceptedRoleReason,
   isAuthProblemDetails,
+  isAccountAndShopDisabledProblemDetails,
   isAuthorizationProblemDetails,
   isAuthSessionResponse,
   isAuthUser,
@@ -154,6 +156,7 @@ export {
 } from './auth';
 export type {
   AuthProblemDetails,
+  AuthProblemType,
   AuthorizationProblemType,
   AuthSessionResponse,
   AuthUser,

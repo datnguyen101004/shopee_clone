@@ -3,6 +3,7 @@ import { loadAuthConfig } from './auth.config';
 import type { AuthClock } from './auth-clock';
 import {
   AuthenticationFailedError,
+  AccountSuspendedError,
   RecoveryDeliveryFailedError,
   RefreshSessionFailedError,
 } from './auth.errors';
@@ -112,6 +113,15 @@ describe('AuthService', () => {
     expect(password.verify).toHaveBeenCalledWith('wrong', null);
   });
 
+  it('returns the locked account outcome only after the submitted password is verified', async () => {
+    repository.findCredentialUser.mockResolvedValue({ ...user, status: UserStatus.SUSPENDED });
+    password.verify.mockResolvedValue(true);
+    await expect(
+      service.login({ email: user.email, password: 'correct passphrase' }, '127.0.0.1'),
+    ).rejects.toBeInstanceOf(AccountSuspendedError);
+    expect(repository.createSession).not.toHaveBeenCalled();
+  });
+
   it('converts a verified Google subject into the existing local session shape', async () => {
     repository.createGoogleIdentitySession.mockResolvedValue(user);
     await expect(
@@ -148,6 +158,23 @@ describe('AuthService', () => {
       '00000000-0000-4000-8000-000000000003',
       now,
     );
+  });
+
+  it('rejects refresh and access authentication as soon as the seller account is suspended', async () => {
+    repository.findSessionByHash.mockResolvedValue({
+      id: '00000000-0000-4000-8000-000000000004',
+      userId: user.id,
+      familyId: '00000000-0000-4000-8000-000000000005',
+      rotatedAt: null,
+      revokedAt: null,
+      expiresAt: new Date(now.getTime() + 60_000),
+      user: { ...user, status: UserStatus.SUSPENDED },
+    } as never);
+    await expect(service.refresh('a'.repeat(43))).rejects.toBeInstanceOf(RefreshSessionFailedError);
+    repository.findAuthenticatedSession.mockResolvedValue(null);
+    await expect(
+      service.authenticateAccess({ sub: user.id, sid: '00000000-0000-4000-8000-000000000004', iat: 1, exp: 2 } as never),
+    ).rejects.toBeInstanceOf(AuthenticationFailedError);
   });
 
   it('returns generic recovery behavior without sending for an unknown account', async () => {

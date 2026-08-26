@@ -18,6 +18,7 @@ function candidate(overrides: Record<string, unknown> = {}): DetailCandidate {
     soldCount: 20,
     shop: {
       id: '00000000-0000-4000-8000-000000000101',
+      ownerId: '00000000-0000-4000-8000-000000000102',
       slug: 'tech-store',
       name: 'Tech Store',
       location: 'Hà Nội',
@@ -89,7 +90,7 @@ describe('CatalogProductDetailService', () => {
     expect(response).toMatchObject({
       purchasable: true,
       initialVariantId: variantId,
-      shop: { activeProductCount: 4 },
+      shop: { activeProductCount: 4, ownerUserId: '00000000-0000-4000-8000-000000000102' },
     });
     expect(response.gallery).toEqual(
       expect.arrayContaining([

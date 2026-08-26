@@ -12,6 +12,7 @@ const outcomeMessage = {
   failed: 'Không thể xác minh đăng nhập Google. Vui lòng thử lại.',
   'account-method-required':
     'Email này đã có tài khoản. Vui lòng đăng nhập bằng phương thức đã sử dụng trước đó.',
+  'account-and-shop-disabled': 'Tài khoản và shop đã bị vô hiệu hóa. Vui lòng liên hệ hỗ trợ.',
 } as const;
 
 export function GoogleSignInCompletionView({ completion }: { completion: GoogleSignInCompletion }) {

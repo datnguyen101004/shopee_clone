@@ -12,7 +12,7 @@ import type {
 } from '@shopee-clone/contracts';
 import { Inject, Injectable } from '@nestjs/common';
 
-import { Prisma } from '../generated/prisma/client';
+import type { Prisma } from '../generated/prisma/client';
 import type {
   Prisma as PrismaTypes,
   ReturnActorType,

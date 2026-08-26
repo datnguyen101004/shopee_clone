@@ -1,7 +1,6 @@
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
-
 import { StorefrontShell } from './storefront-shell';
 import { MarketplaceHeader } from './marketplace-header';
 import { marketplaceCategories } from './marketplace-navigation';
@@ -78,8 +77,6 @@ describe('StorefrontShell', () => {
     }
   });
 
-
-
   it('opens mobile categories and restores trigger focus after Escape', async () => {
     const user = userEvent.setup();
     renderShell();
@@ -125,11 +122,17 @@ describe('StorefrontShell', () => {
     const accountTrigger = screen.getByLabelText('Tài khoản Buyer Example');
     expect(accountTrigger).toBeInTheDocument();
     expect(accountTrigger.tagName).toBe('BUTTON');
+    expect(screen.getByRole('link', { name: 'Đăng ký thành shop' })).toHaveAttribute(
+      'href',
+      '/account/shop-registration',
+    );
     expect(screen.queryByRole('link', { name: 'Địa chỉ' })).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Yêu thích' })).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Shop đang theo dõi' })).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Đơn mua' })).not.toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Giỏ hàng, 0 sản phẩm' })).not.toHaveTextContent('Giỏ hàng');
+    expect(screen.getByRole('link', { name: 'Giỏ hàng, 0 sản phẩm' })).not.toHaveTextContent(
+      'Giỏ hàng',
+    );
     await user.hover(accountTrigger);
     expect(screen.getByRole('menuitem', { name: 'Tài khoản của tôi' })).toHaveAttribute(
       'href',
@@ -160,7 +163,11 @@ describe('StorefrontShell', () => {
       />,
     );
     expect(screen.getByRole('link', { name: 'Kênh người bán' })).toHaveAttribute('href', '/seller');
-    expect(screen.getByRole('menuitem', { name: 'Kênh người bán' })).toHaveAttribute('href', '/seller');
+    expect(screen.getByRole('menuitem', { name: 'Kênh người bán' })).toHaveAttribute(
+      'href',
+      '/seller',
+    );
+    expect(screen.queryByRole('link', { name: 'Đăng ký thành shop' })).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Quản trị' })).not.toBeInTheDocument();
     expect(screen.queryByRole('menuitem', { name: 'Quản trị' })).not.toBeInTheDocument();
 
@@ -177,6 +184,7 @@ describe('StorefrontShell', () => {
     );
     expect(screen.queryByRole('link', { name: 'Kênh người bán' })).not.toBeInTheDocument();
     expect(screen.queryByRole('menuitem', { name: 'Kênh người bán' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Đăng ký thành shop' })).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Quản trị' })).toHaveAttribute('href', '/admin');
     expect(screen.getByRole('menuitem', { name: 'Quản trị' })).toHaveAttribute('href', '/admin');
   });

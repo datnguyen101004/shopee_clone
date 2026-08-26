@@ -99,7 +99,7 @@ function SellerShopRequired({ state }: { state: Exclude<ShopGateState, 'loading'
       <span className="operational-eyebrow">Seller Center</span>
       <h1>{title}</h1>
       <p>{message}</p>
-      <Link href="/seller/shop">Mở hồ sơ shop</Link>
+      <Link href="/account/shop-registration">Xem hồ sơ đăng ký</Link>
     </section>
   );
 }
@@ -132,8 +132,42 @@ export function SellerCenterLayout({ children }: { children: ReactNode }) {
     };
   }, [authenticatedFetch, currentPath, isSeller, isShopProfile]);
 
-  const canRenderOperationalPage = !isSeller || isShopProfile || (shopGate.path === currentPath && shopGate.state === 'ready');
+  const canRenderOperationalPage = isShopProfile || (shopGate.path === currentPath && shopGate.state === 'ready');
   const showShopGateLoading = isSeller && !isShopProfile && (shopGate.path !== currentPath || shopGate.state === 'loading');
+
+  if (state.status === 'loading') {
+    return (
+      <main className="operational-page">
+        <section className="operational-state" aria-busy="true">
+          <h1>Đang kiểm tra quyền người bán</h1>
+        </section>
+      </main>
+    );
+  }
+
+  if (state.status === 'guest') {
+    return (
+      <main className="operational-page">
+        <section className="operational-state">
+          <h1>Cần đăng nhập</h1>
+          <p>Đăng nhập để truy cập Kênh Người Bán.</p>
+          <Link href="/login?returnTo=/seller">Đăng nhập</Link>
+        </section>
+      </main>
+    );
+  }
+
+  if (!isSeller) {
+    return (
+      <main className="operational-page">
+        <section className="operational-state" role="status">
+          <h1>Bạn chưa phải người bán</h1>
+          <p>Hãy hoàn tất hồ sơ đăng ký shop trong khu vực tài khoản người mua.</p>
+          <Link href="/account/shop-registration">Đăng ký thành shop</Link>
+        </section>
+      </main>
+    );
+  }
 
   return (
     <div className="seller-center-shell">

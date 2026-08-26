@@ -16,16 +16,12 @@ import {
   UseFilters,
   UseGuards,
 } from '@nestjs/common';
-import {
-  ApiBearerAuth,
-  ApiOperation,
-  ApiParam,
-  ApiResponse,
-  ApiTags,
-} from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
 
 import { AuthGuard, type AuthenticatedRequest } from '../auth/auth.guard';
 import { RequireRoles, RolesGuard } from '../auth/role-authorization.guard';
+// DTO classes must remain runtime values for Nest validation metadata.
+// eslint-disable-next-line @typescript-eslint/consistent-type-imports
 import { SellerModerationNoticesQueryDto } from './seller-moderation-notices.dto';
 import { SellerModerationNoticesExceptionFilter } from './seller-moderation-notices-exception.filter';
 import { SellerModerationNoticesService } from './seller-moderation-notices.service';
@@ -46,7 +42,9 @@ export class SellerModerationNoticesController {
 
   @Get()
   @Header('Cache-Control', 'private, no-store')
-  @ApiOperation({ summary: 'List seller moderation notices with cursor pagination and unread filtering' })
+  @ApiOperation({
+    summary: 'List seller moderation notices with cursor pagination and unread filtering',
+  })
   @ApiResponse({ status: 200, description: 'Seller moderation notices list and unread count' })
   async listNotices(
     @Req() req: AuthenticatedRequest,

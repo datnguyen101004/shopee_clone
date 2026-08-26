@@ -216,19 +216,19 @@ enum NotificationChannel {
 }
 
 enum NotificationType {
-  ORDER_CONFIRMED    @map("order_confirmed")
-  ORDER_SHIPPING     @map("order_shipping")
-  ORDER_DELIVERED    @map("order_delivered")
-  ORDER_CANCELLED    @map("order_cancelled")
-  RETURN_REQUESTED   @map("return_requested")
-  RETURN_ACCEPTED    @map("return_accepted")
-  DISPUTE_ESCALATED  @map("dispute_escalated")
-  REFUNDED           @map("refunded")
-  PRODUCT_APPROVED   @map("product_approved")
-  PRODUCT_REJECTED   @map("product_rejected")
-  VOUCHER_ASSIGNED   @map("voucher_assigned")
-  CHAT_MESSAGE       @map("chat_message")
-  SYSTEM_NOTICE      @map("system_notice")
+  ORDER_CONFIRMED   @map("order_confirmed")
+  ORDER_SHIPPING    @map("order_shipping")
+  ORDER_DELIVERED   @map("order_delivered")
+  ORDER_CANCELLED   @map("order_cancelled")
+  RETURN_REQUESTED  @map("return_requested")
+  RETURN_ACCEPTED   @map("return_accepted")
+  DISPUTE_ESCALATED @map("dispute_escalated")
+  REFUNDED          @map("refunded")
+  PRODUCT_APPROVED  @map("product_approved")
+  PRODUCT_REJECTED  @map("product_rejected")
+  VOUCHER_ASSIGNED  @map("voucher_assigned")
+  CHAT_MESSAGE      @map("chat_message")
+  SYSTEM_NOTICE     @map("system_notice")
 
   @@map("notification_type")
 }
@@ -328,8 +328,8 @@ enum ReviewMediaState {
 
 enum SellerProductMediaState {
   PENDING_UPLOAD @map("pending_upload")
-  STAGED   @map("staged")
-  ATTACHED @map("attached")
+  STAGED         @map("staged")
+  ATTACHED       @map("attached")
 
   @@map("seller_product_media_state")
 }
@@ -451,7 +451,7 @@ model User {
   createdAt                DateTime                           @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt                DateTime                           @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
   deletedAt                DateTime?                          @map("deleted_at") @db.Timestamptz(3)
-  shops                    Shop[]
+  shop                     Shop?
   authSessions             AuthSession[]
   passwordResetTokens      PasswordResetToken[]
   externalIdentities       ExternalIdentity[]
@@ -652,7 +652,7 @@ model PasswordResetToken {
 
 model Shop {
   id                       String                    @id @default(uuid()) @db.Uuid
-  ownerId                  String                    @map("owner_id") @db.Uuid
+  ownerId                  String                    @unique @map("owner_id") @db.Uuid
   slug                     String                    @unique @db.VarChar(120)
   name                     String                    @db.VarChar(160)
   description              String                    @default("") @db.VarChar(2000)
@@ -700,7 +700,6 @@ model Shop {
   returnRequests           ReturnRequest[]
   refundLedgerEntries      RefundLedgerEntry[]
 
-  @@index([ownerId])
   @@index([status])
   @@index([onboardingStatus])
   @@index([deletedAt])
@@ -1694,26 +1693,26 @@ model ProductImage {
 }
 
 model SellerProductMediaAsset {
-  id             String                  @id @default(uuid()) @db.Uuid
-  uploaderId     String                  @map("uploader_id") @db.Uuid
-  shopId         String                  @map("shop_id") @db.Uuid
-  productId      String?                 @map("product_id") @db.Uuid
-  productImageId String?                 @unique @map("product_image_id") @db.Uuid
-  storageKey     String                  @unique @map("storage_key") @db.VarChar(255)
-  mimeType       String                  @map("mime_type") @db.VarChar(32)
-  byteSize       Int                     @map("byte_size")
-  width          Int?
-  height         Int?
-  checksumSha256 String?                 @map("checksum_sha256") @db.VarChar(64)
-  uploadExpiresAt DateTime?              @map("upload_expires_at") @db.Timestamptz(3)
-  state          SellerProductMediaState @default(STAGED)
-  expiresAt      DateTime?               @map("expires_at") @db.Timestamptz(3)
-  createdAt      DateTime                @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt      DateTime                @updatedAt @map("updated_at") @db.Timestamptz(3)
-  uploader       User                    @relation("SellerProductMediaUploader", fields: [uploaderId], references: [id], onDelete: Restrict)
-  shop           Shop                    @relation(fields: [shopId], references: [id], onDelete: Restrict)
-  product        Product?                @relation(fields: [productId], references: [id], onDelete: SetNull)
-  productImage   ProductImage?           @relation("SellerProductMediaAssetProductImage", fields: [productImageId], references: [id], onDelete: SetNull)
+  id              String                  @id @default(uuid()) @db.Uuid
+  uploaderId      String                  @map("uploader_id") @db.Uuid
+  shopId          String                  @map("shop_id") @db.Uuid
+  productId       String?                 @map("product_id") @db.Uuid
+  productImageId  String?                 @unique @map("product_image_id") @db.Uuid
+  storageKey      String                  @unique @map("storage_key") @db.VarChar(255)
+  mimeType        String                  @map("mime_type") @db.VarChar(32)
+  byteSize        Int                     @map("byte_size")
+  width           Int?
+  height          Int?
+  checksumSha256  String?                 @map("checksum_sha256") @db.VarChar(64)
+  uploadExpiresAt DateTime?               @map("upload_expires_at") @db.Timestamptz(3)
+  state           SellerProductMediaState @default(STAGED)
+  expiresAt       DateTime?               @map("expires_at") @db.Timestamptz(3)
+  createdAt       DateTime                @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt       DateTime                @updatedAt @map("updated_at") @db.Timestamptz(3)
+  uploader        User                    @relation("SellerProductMediaUploader", fields: [uploaderId], references: [id], onDelete: Restrict)
+  shop            Shop                    @relation(fields: [shopId], references: [id], onDelete: Restrict)
+  product         Product?                @relation(fields: [productId], references: [id], onDelete: SetNull)
+  productImage    ProductImage?           @relation("SellerProductMediaAssetProductImage", fields: [productImageId], references: [id], onDelete: SetNull)
 
   @@index([uploaderId, state, expiresAt])
   @@index([shopId, productId, state])
@@ -2041,19 +2040,19 @@ model SellerModerationNotice {
 }
 
 model Notification {
-  id               String                         @id @default(uuid()) @db.Uuid
-  recipientId      String                         @map("recipient_id") @db.Uuid
+  id               String                        @id @default(uuid()) @db.Uuid
+  recipientId      String                        @map("recipient_id") @db.Uuid
   category         NotificationCategory
   type             NotificationType
-  title            String                         @db.VarChar(160)
-  body             String                         @db.VarChar(500)
+  title            String                        @db.VarChar(160)
+  body             String                        @db.VarChar(500)
   metadata         Json
-  deduplicationKey String                         @unique @map("deduplication_key") @db.VarChar(240)
-  isRead           Boolean                        @default(false) @map("is_read")
-  readAt           DateTime?                      @map("read_at") @db.Timestamptz(3)
-  isArchived       Boolean                        @default(false) @map("is_archived")
-  createdAt        DateTime                       @default(now()) @map("created_at") @db.Timestamptz(3)
-  recipient        User                           @relation("NotificationRecipient", fields: [recipientId], references: [id], onDelete: Cascade)
+  deduplicationKey String                        @unique @map("deduplication_key") @db.VarChar(240)
+  isRead           Boolean                       @default(false) @map("is_read")
+  readAt           DateTime?                     @map("read_at") @db.Timestamptz(3)
+  isArchived       Boolean                       @default(false) @map("is_archived")
+  createdAt        DateTime                      @default(now()) @map("created_at") @db.Timestamptz(3)
+  recipient        User                          @relation("NotificationRecipient", fields: [recipientId], references: [id], onDelete: Cascade)
   deliveryAttempts NotificationDeliveryAttempt[]
 
   @@index([recipientId, isArchived, createdAt(sort: Desc), id])
@@ -2063,14 +2062,14 @@ model Notification {
 }
 
 model NotificationPreference {
-  id        String              @id @default(uuid()) @db.Uuid
-  userId    String              @map("user_id") @db.Uuid
+  id        String               @id @default(uuid()) @db.Uuid
+  userId    String               @map("user_id") @db.Uuid
   category  NotificationCategory
   channel   NotificationChannel
-  enabled   Boolean             @default(true)
-  updatedAt DateTime            @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
-  createdAt DateTime            @default(now()) @map("created_at") @db.Timestamptz(3)
-  user      User                @relation("NotificationPreferenceOwner", fields: [userId], references: [id], onDelete: Cascade)
+  enabled   Boolean              @default(true)
+  updatedAt DateTime             @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  createdAt DateTime             @default(now()) @map("created_at") @db.Timestamptz(3)
+  user      User                 @relation("NotificationPreferenceOwner", fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, category, channel])
   @@index([userId])

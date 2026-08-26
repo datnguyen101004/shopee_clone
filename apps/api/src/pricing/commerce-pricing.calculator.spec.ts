@@ -27,6 +27,7 @@ const snapshot: AuthoritativePricingSnapshot = {
       compareAtUnitPriceMinor: 120_000n,
       shop: {
         id: '00000000-0000-4000-8000-000000000401',
+        ownerUserId: '00000000-0000-4000-8000-000000000501',
         slug: 'shop-south',
         name: 'Shop South',
         location: 'TP. Hồ Chí Minh',
@@ -42,6 +43,7 @@ const snapshot: AuthoritativePricingSnapshot = {
       compareAtUnitPriceMinor: 40_000n,
       shop: {
         id: '00000000-0000-4000-8000-000000000402',
+        ownerUserId: '00000000-0000-4000-8000-000000000502',
         slug: 'shop-north',
         name: 'Shop North',
         location: 'Hà Nội',
@@ -62,6 +64,10 @@ describe('commerce pricing calculator', () => {
   it('itemizes markdowns, defaults missing service, and reconciles multi-shop totals', () => {
     const quote = calculator.calculate(snapshot);
     expect(isPricingQuoteResponse(quote)).toBe(true);
+    expect(quote.shops.map(({ shop }) => shop.ownerUserId)).toEqual([
+      '00000000-0000-4000-8000-000000000501',
+      '00000000-0000-4000-8000-000000000502',
+    ]);
     expect(quote.shops.map(({ shop }) => shop.slug)).toEqual(['shop-south', 'shop-north']);
     const discounted = quote.shops[0]!.lines[0]!;
     expect(discounted).toMatchObject({

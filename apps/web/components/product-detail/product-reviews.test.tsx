@@ -9,7 +9,7 @@ const product = {
   id: '00000000-0000-4000-8000-000000000301', name: 'Phone', description: 'Detail',
   category: { slug: 'phones', name: 'Phones' }, ratingAverageBasisPoints: 0, ratingCount: 0, soldCount: 0,
   gallery: [], variants: [], purchasable: false, initialVariantId: null,
-  shop: { id: '00000000-0000-4000-8000-000000000101', slug: 'store', name: 'Store', location: 'Hà Nội', activeProductCount: 1 },
+  shop: { id: '00000000-0000-4000-8000-000000000101', ownerUserId: '00000000-0000-4000-8000-000000000201', slug: 'store', name: 'Store', location: 'Hà Nội', activeProductCount: 1 },
   shippingPreview: { origin: 'Hà Nội', destinationLabel: 'Toàn quốc', feeMinor: null, deliveryTimeLabel: null, message: 'Xác nhận sau.' }, relatedProducts: [],
 } satisfies ProductDetailResponse;
 

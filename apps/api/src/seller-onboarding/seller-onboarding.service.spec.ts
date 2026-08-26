@@ -1,7 +1,7 @@
 import { AuthorizationDeniedError } from '../auth/auth.errors';
 import type { RoleAuthorizationService } from '../auth/role-authorization.service';
 import { ShopOnboardingStatus, ShopStatus } from '../generated/prisma/enums';
-import { SellerShopConflictError } from './seller-onboarding.errors';
+import { SellerOnboardingInputError, SellerShopConflictError } from './seller-onboarding.errors';
 import { SellerOnboardingService } from './seller-onboarding.service';
 import type { SellerOnboardingRepository } from './seller-onboarding.repository';
 
@@ -63,6 +63,7 @@ function row(overrides: Record<string, unknown> = {}) {
 
 describe('SellerOnboardingService', () => {
   const findOwnedLiveShop = jest.fn();
+  const findOwnedShop = jest.fn();
   const findDefaultShippingAddress = jest.fn();
   const findShopById = jest.fn();
   const lockOwner = jest.fn();
@@ -70,6 +71,7 @@ describe('SellerOnboardingService', () => {
   const updateShop = jest.fn();
   const repository = {
     findOwnedLiveShop,
+    findOwnedShop,
     findDefaultShippingAddress,
     findShopById,
     lockOwner,
@@ -87,17 +89,18 @@ describe('SellerOnboardingService', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     lockOwner.mockResolvedValue(true);
+    findOwnedShop.mockImplementation(findOwnedLiveShop);
   });
 
   it('returns the account default address with a null workspace without creating a shop', async () => {
-    findOwnedLiveShop.mockResolvedValue(null);
+    findOwnedShop.mockResolvedValue(null);
     findDefaultShippingAddress.mockResolvedValue(address);
     await expect(service.workspace('owner-id')).resolves.toEqual({ shop: null, defaultAddress: address });
     expect(createShop).not.toHaveBeenCalled();
   });
 
   it('returns a null address candidate when the account has no default address', async () => {
-    findOwnedLiveShop.mockResolvedValue(null);
+    findOwnedShop.mockResolvedValue(null);
     findDefaultShippingAddress.mockResolvedValue(null);
 
     await expect(service.workspace('owner-id')).resolves.toEqual({
@@ -107,12 +110,21 @@ describe('SellerOnboardingService', () => {
   });
 
   it('keeps a complete shop address while still exposing the account default candidate', async () => {
-    findOwnedLiveShop.mockResolvedValue(row());
+    findOwnedShop.mockResolvedValue(row());
     findDefaultShippingAddress.mockResolvedValue({ ...address, addressLine: '88 Lê Lợi' });
 
     await expect(service.workspace('owner-id')).resolves.toMatchObject({
       shop: { pickupAddress: address, returnAddress: address },
       defaultAddress: { ...address, addressLine: '88 Lê Lợi' },
+    });
+  });
+
+  it('keeps a soft-deleted ownership slot visible to the workspace instead of allowing replacement', async () => {
+    findOwnedShop.mockResolvedValue(row({ deletedAt: new Date('2026-08-16T01:00:00.000Z') }));
+    findDefaultShippingAddress.mockResolvedValue(null);
+
+    await expect(service.workspace('owner-id')).resolves.toMatchObject({
+      shop: { id: row().id },
     });
   });
 
@@ -131,6 +143,14 @@ describe('SellerOnboardingService', () => {
         onboardingStatus: ShopOnboardingStatus.PENDING_APPROVAL,
       }),
     );
+  });
+
+  it('rejects an incomplete shop profile before opening a transaction', async () => {
+    expect(() =>
+      service.create('owner-id', { ...createInput, pickupAddress: { ...address, ward: '' } }),
+    ).toThrow(SellerOnboardingInputError);
+    expect(createShop).not.toHaveBeenCalled();
+    expect(lockOwner).not.toHaveBeenCalled();
   });
 
   it('rejects a second live shop and seller activation before approval', async () => {
@@ -174,6 +194,26 @@ describe('SellerOnboardingService', () => {
       reason: 'Shop identity looks complete',
     }, 'admin-id');
     expect(approved.canSell).toBe(true);
+    expect(approved).toMatchObject({
+      slug: 'an-tech-shop',
+      name: 'An Tech Shop',
+      description: createInput.description,
+      location: createInput.location,
+      contactPhone: '0912345678',
+      contactEmail: 'shop@example.test',
+      pickupAddress: address,
+      returnAddress: address,
+      logoUrl: null,
+      bannerUrl: null,
+    });
+    expect(updateShop).toHaveBeenCalledWith(
+      {},
+      row().id,
+      expect.objectContaining({
+        onboardingStatus: ShopOnboardingStatus.APPROVED,
+        status: ShopStatus.ACTIVE,
+      }),
+    );
     findShopById.mockResolvedValue(
       row({
         status: ShopStatus.ACTIVE,

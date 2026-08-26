@@ -1,7 +1,4 @@
-import type {
-  ReporterReportDetail,
-  ReporterReportListResponse,
-} from '@shopee-clone/contracts';
+import type { ReporterReportDetail, ReporterReportListResponse } from '@shopee-clone/contracts';
 import {
   Controller,
   Get,
@@ -13,16 +10,12 @@ import {
   UseFilters,
   UseGuards,
 } from '@nestjs/common';
-import {
-  ApiBearerAuth,
-  ApiOperation,
-  ApiParam,
-  ApiResponse,
-  ApiTags,
-} from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
 
 import { AuthGuard, type AuthenticatedRequest } from '../auth/auth.guard';
 import { RequireRoles, RolesGuard } from '../auth/role-authorization.guard';
+// DTO classes must remain runtime values for Nest validation metadata.
+// eslint-disable-next-line @typescript-eslint/consistent-type-imports
 import { ReporterReportQueryDto } from './reporting.dto';
 import { ReportingExceptionFilter } from './reporting-exception.filter';
 import { ReportingService } from './reporting.service';

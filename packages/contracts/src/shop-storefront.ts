@@ -34,6 +34,7 @@ export interface PublicShopCategoryFacet {
 
 export interface PublicShopProfile {
   id: string;
+  ownerUserId: string;
   slug: string;
   name: string;
   location: string;
@@ -208,6 +209,7 @@ export function isPublicShopProfile(value: unknown): value is PublicShopProfile 
     !isRecord(value) ||
     !hasExactKeys(value, [
       'id',
+      'ownerUserId',
       'slug',
       'name',
       'location',
@@ -221,6 +223,7 @@ export function isPublicShopProfile(value: unknown): value is PublicShopProfile 
       'categories',
     ]) ||
     !isCanonicalShopId(value.id) ||
+    !isCanonicalShopId(value.ownerUserId) ||
     !isCanonicalShopSlug(value.slug) ||
     !isString(value.name) ||
     !isString(value.location) ||

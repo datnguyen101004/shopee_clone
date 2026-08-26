@@ -14,13 +14,7 @@ import {
   UseFilters,
   UseGuards,
 } from '@nestjs/common';
-import {
-  ApiBearerAuth,
-  ApiOperation,
-  ApiParam,
-  ApiResponse,
-  ApiTags,
-} from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
 import type {
   ArchiveNotificationResponse,
   MarkAllNotificationsReadResponse,
@@ -35,10 +29,9 @@ import { AuthGuard, type AuthenticatedRequest } from '../auth/auth.guard';
 import { NotificationExceptionFilter } from './notification-exception.filter';
 import { NotificationValidationError } from './notification.errors';
 import { NotificationService } from './notification.service';
-import {
-  NotificationListQueryDto,
-  UpdateNotificationPreferenceDto,
-} from './notifications.dto';
+// These DTO classes are runtime values used by Nest's ValidationPipe metadata.
+// eslint-disable-next-line @typescript-eslint/consistent-type-imports
+import { NotificationListQueryDto, UpdateNotificationPreferenceDto } from './notifications.dto';
 
 @ApiTags('notifications')
 @ApiBearerAuth()

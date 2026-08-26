@@ -37,7 +37,7 @@ import {
   type UpdateAdminHomepageModuleSettingsRequest,
 } from '@shopee-clone/contracts';
 
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Optional } from '@nestjs/common';
 import {
   PrivilegedAction,
   PrivilegedTargetType,
@@ -55,10 +55,15 @@ import {
 } from './admin.errors';
 import { AdminRepository } from './admin.repository';
 import { recordPrivilegedAudit } from './privileged-audit.helper';
+import { SellerIdentityLifecycleService } from '../seller-identity/seller-identity-lifecycle.service';
 
 @Injectable()
 export class AdminService {
-  constructor(@Inject(AdminRepository) private readonly repository: AdminRepository) {}
+  constructor(
+    @Inject(AdminRepository) private readonly repository: AdminRepository,
+    @Optional() @Inject(SellerIdentityLifecycleService)
+    private readonly sellerLifecycle?: SellerIdentityLifecycleService,
+  ) {}
 
   async dashboard(): Promise<AdminDashboardResponse> {
     const counts = await this.repository.countDashboardMetrics();
@@ -118,6 +123,26 @@ export class AdminService {
     return this.repository.transaction(async (tx) => {
       const user = await this.repository.findUserById(targetUserId, tx);
       if (!user) throw new AdminNotFoundError('User');
+
+      if (this.sellerLifecycle) {
+        if (input.action === 'SUSPEND') {
+          await this.sellerLifecycle.suspendUserInTransaction(tx, actorUserId, targetUserId, input.reason);
+        } else {
+          await this.sellerLifecycle.restoreUserInTransaction(tx, actorUserId, targetUserId, input.reason);
+        }
+        const updated = await this.repository.findUserById(targetUserId, tx);
+        if (!updated) throw new AdminNotFoundError('User');
+        return {
+          id: updated.id,
+          email: updated.email,
+          displayName: updated.displayName,
+          phoneNumber: updated.phoneNumber,
+          status: updated.status,
+          roles: updated.roles,
+          createdAt: updated.createdAt.toISOString(),
+          updatedAt: updated.updatedAt.toISOString(),
+        };
+      }
 
       if (input.action === 'SUSPEND') {
         if (user.status === 'SUSPENDED') {
@@ -269,6 +294,27 @@ export class AdminService {
     return this.repository.transaction(async (tx) => {
       const shop = await this.repository.findShopById(targetShopId, tx);
       if (!shop) throw new AdminNotFoundError('Shop');
+
+      if (this.sellerLifecycle) {
+        if (input.action === 'SUSPEND') {
+          await this.sellerLifecycle.suspendShopInTransaction(tx, actorUserId, targetShopId, input.reason);
+        } else {
+          await this.sellerLifecycle.restoreShopInTransaction(tx, actorUserId, targetShopId, input.reason);
+        }
+        const updated = await this.repository.findShopById(targetShopId, tx);
+        if (!updated) throw new AdminNotFoundError('Shop');
+        return {
+          id: updated.id,
+          ownerUserId: updated.ownerUserId,
+          slug: updated.slug,
+          name: updated.name,
+          status: updated.status,
+          onboardingStatus: updated.onboardingStatus,
+          onboardingReason: updated.onboardingReason,
+          createdAt: updated.createdAt.toISOString(),
+          updatedAt: updated.updatedAt.toISOString(),
+        };
+      }
 
       if (input.action === 'SUSPEND') {
         if (shop.status === 'SUSPENDED') {
@@ -1107,4 +1153,3 @@ export class AdminService {
     });
   }
 }
-

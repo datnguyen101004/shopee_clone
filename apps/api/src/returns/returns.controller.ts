@@ -41,6 +41,8 @@ import { ReturnEvidenceStorage } from './return-evidence.storage';
 import { ReturnExceptionFilter } from './return-exception.filter';
 import { ReturnValidationError } from './return-errors';
 import { ReturnService } from './return.service';
+// DTO classes must remain runtime values for Nest validation metadata.
+// eslint-disable-next-line @typescript-eslint/consistent-type-imports
 import {
   AdminReturnDecisionDto,
   BuyerReturnActionDto,

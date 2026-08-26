@@ -1,10 +1,14 @@
 'use client';
 
 import type { AdminShopSummary } from '@shopee-clone/contracts';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
 import { useAuthSession } from '../../../../components/auth-session-provider';
-import { executeAdminShopAction, fetchAdminShops } from '../../../../lib/admin-api';
+import {
+  adminErrorMessage,
+  executeAdminShopAction,
+  fetchAdminShops,
+} from '../../../../lib/admin-api';
 import { approveSellerShop } from '../../../../lib/seller-shop-api';
 
 export default function AdminShopsPage() {
@@ -15,17 +19,23 @@ export default function AdminShopsPage() {
 
   // Filters
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'ALL' | 'ACTIVE' | 'INACTIVE' | 'SUSPENDED'>('ALL');
-  const [onboardingFilter, setOnboardingFilter] = useState<'ALL' | 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED'>('ALL');
+  const [statusFilter, setStatusFilter] = useState<'ALL' | 'ACTIVE' | 'INACTIVE' | 'SUSPENDED'>(
+    'ALL',
+  );
+  const [onboardingFilter, setOnboardingFilter] = useState<
+    'ALL' | 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED'
+  >('ALL');
 
   // Modal State
   const [selectedShop, setSelectedShop] = useState<AdminShopSummary | null>(null);
-  const [actionType, setActionType] = useState<'SUSPEND' | 'RESTORE' | 'APPROVE' | 'REJECT' | null>(null);
+  const [actionType, setActionType] = useState<'SUSPEND' | 'RESTORE' | 'APPROVE' | 'REJECT' | null>(
+    null,
+  );
   const [reason, setReason] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
 
-  const loadShops = () => {
+  const loadShops = useCallback(() => {
     setLoading(true);
     setError(null);
     fetchAdminShops(authenticatedFetch, {
@@ -41,11 +51,12 @@ export default function AdminShopsPage() {
         setError(err.message || 'Không thể tải danh sách cửa hàng');
         setLoading(false);
       });
-  };
+  }, [authenticatedFetch, onboardingFilter, search, statusFilter]);
 
   useEffect(() => {
-    loadShops();
-  }, [statusFilter, onboardingFilter]);
+    const timer = window.setTimeout(() => void loadShops(), 0);
+    return () => window.clearTimeout(timer);
+  }, [loadShops]);
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -70,26 +81,27 @@ export default function AdminShopsPage() {
           reason: reason.trim(),
         });
         setShops((prev) => prev.map((s) => (s.id === updated.id ? updated : s)));
+        // Refetch the authoritative list after the paired account transition commits.
+        loadShops();
       } else if (actionType === 'APPROVE' || actionType === 'REJECT') {
-        await approveSellerShop(
-          authenticatedFetch,
-          selectedShop.id,
-          {
-            decision: actionType === 'APPROVE' ? 'approve' : 'reject',
-            reason: reason.trim(),
-          },
-        );
+        await approveSellerShop(authenticatedFetch, selectedShop.id, {
+          decision: actionType === 'APPROVE' ? 'approve' : 'reject',
+          reason: reason.trim(),
+        });
         loadShops();
       }
 
       closeModal();
-    } catch (err: any) {
-      setActionError(err.problem?.detail || err.message || 'Thao tác thất bại');
+    } catch (error: unknown) {
+      setActionError(adminErrorMessage(error, 'Thao tác thất bại'));
       setSubmitting(false);
     }
   };
 
-  const openModal = (shop: AdminShopSummary, type: 'SUSPEND' | 'RESTORE' | 'APPROVE' | 'REJECT') => {
+  const openModal = (
+    shop: AdminShopSummary,
+    type: 'SUSPEND' | 'RESTORE' | 'APPROVE' | 'REJECT',
+  ) => {
     setSelectedShop(shop);
     setActionType(type);
     setReason('');
@@ -108,7 +120,9 @@ export default function AdminShopsPage() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
       <div>
-        <h1 style={{ fontSize: '24px', fontWeight: 700, color: '#111827' }}>Quản lý Cửa hàng (Shops)</h1>
+        <h1 style={{ fontSize: '24px', fontWeight: 700, color: '#111827' }}>
+          Quản lý Cửa hàng (Shops)
+        </h1>
         <p style={{ color: '#6b7280', fontSize: '14px', marginTop: '4px' }}>
           Xét duyệt hồ sơ đăng ký mở shop, quản lý trạng thái hoạt động và tạm khóa vi phạm.
         </p>
@@ -128,7 +142,10 @@ export default function AdminShopsPage() {
           justifyContent: 'space-between',
         }}
       >
-        <form onSubmit={handleSearchSubmit} style={{ display: 'flex', gap: '10px', flex: 1, minWidth: '280px' }}>
+        <form
+          onSubmit={handleSearchSubmit}
+          style={{ display: 'flex', gap: '10px', flex: 1, minWidth: '280px' }}
+        >
           <input
             type="text"
             placeholder="Tìm theo tên shop hoặc slug..."
@@ -154,14 +171,22 @@ export default function AdminShopsPage() {
           </button>
         </form>
 
-
         <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
           <div>
-            <label style={{ fontSize: '13px', color: '#4b5563', marginRight: '6px' }}>Trạng thái bán:</label>
+            <label style={{ fontSize: '13px', color: '#4b5563', marginRight: '6px' }}>
+              Trạng thái bán:
+            </label>
             <select
               value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value as any)}
-              style={{ padding: '6px 10px', borderRadius: '6px', border: '1px solid #d1d5db', fontSize: '13px' }}
+              onChange={(e) =>
+                setStatusFilter(e.target.value as 'ALL' | 'ACTIVE' | 'INACTIVE' | 'SUSPENDED')
+              }
+              style={{
+                padding: '6px 10px',
+                borderRadius: '6px',
+                border: '1px solid #d1d5db',
+                fontSize: '13px',
+              }}
             >
               <option value="ALL">Tất cả</option>
               <option value="ACTIVE">Đang hoạt động</option>
@@ -171,11 +196,22 @@ export default function AdminShopsPage() {
           </div>
 
           <div>
-            <label style={{ fontSize: '13px', color: '#4b5563', marginRight: '6px' }}>Xét duyệt:</label>
+            <label style={{ fontSize: '13px', color: '#4b5563', marginRight: '6px' }}>
+              Xét duyệt:
+            </label>
             <select
               value={onboardingFilter}
-              onChange={(e) => setOnboardingFilter(e.target.value as any)}
-              style={{ padding: '6px 10px', borderRadius: '6px', border: '1px solid #d1d5db', fontSize: '13px' }}
+              onChange={(e) =>
+                setOnboardingFilter(
+                  e.target.value as 'ALL' | 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED',
+                )
+              }
+              style={{
+                padding: '6px 10px',
+                borderRadius: '6px',
+                border: '1px solid #d1d5db',
+                fontSize: '13px',
+              }}
             >
               <option value="ALL">Tất cả</option>
               <option value="PENDING_APPROVAL">Chờ duyệt</option>
@@ -197,15 +233,33 @@ export default function AdminShopsPage() {
         }}
       >
         {loading ? (
-          <div style={{ padding: '32px', textAlign: 'center', color: '#6b7280' }}>Đang tải danh sách shop...</div>
+          <div style={{ padding: '32px', textAlign: 'center', color: '#6b7280' }}>
+            Đang tải danh sách shop...
+          </div>
         ) : error ? (
           <div style={{ padding: '24px', color: '#ef4444' }}>{error}</div>
         ) : shops.length === 0 ? (
-          <div style={{ padding: '32px', textAlign: 'center', color: '#6b7280' }}>Không tìm thấy cửa hàng nào phù hợp.</div>
+          <div style={{ padding: '32px', textAlign: 'center', color: '#6b7280' }}>
+            Không tìm thấy cửa hàng nào phù hợp.
+          </div>
         ) : (
-          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '14px' }}>
+          <table
+            style={{
+              width: '100%',
+              borderCollapse: 'collapse',
+              textAlign: 'left',
+              fontSize: '14px',
+            }}
+          >
             <thead>
-              <tr style={{ background: '#f9fafb', borderBottom: '1px solid #e5e7eb', color: '#4b5563', fontSize: '13px' }}>
+              <tr
+                style={{
+                  background: '#f9fafb',
+                  borderBottom: '1px solid #e5e7eb',
+                  color: '#4b5563',
+                  fontSize: '13px',
+                }}
+              >
                 <th style={{ padding: '12px 16px' }}>Tên shop & Slug</th>
                 <th style={{ padding: '12px 16px' }}>Trạng thái bán</th>
                 <th style={{ padding: '12px 16px' }}>Xét duyệt Onboarding</th>
@@ -230,12 +284,24 @@ export default function AdminShopsPage() {
                         fontSize: '12px',
                         fontWeight: 600,
                         background:
-                          s.status === 'ACTIVE' ? '#d1fae5' : s.status === 'SUSPENDED' ? '#fee2e2' : '#f3f4f6',
+                          s.status === 'ACTIVE'
+                            ? '#d1fae5'
+                            : s.status === 'SUSPENDED'
+                              ? '#fee2e2'
+                              : '#f3f4f6',
                         color:
-                          s.status === 'ACTIVE' ? '#065f46' : s.status === 'SUSPENDED' ? '#991b1b' : '#4b5563',
+                          s.status === 'ACTIVE'
+                            ? '#065f46'
+                            : s.status === 'SUSPENDED'
+                              ? '#991b1b'
+                              : '#4b5563',
                       }}
                     >
-                      {s.status === 'ACTIVE' ? 'Hoạt động' : s.status === 'SUSPENDED' ? 'Tạm khóa' : 'Tạm ngừng'}
+                      {s.status === 'ACTIVE'
+                        ? 'Hoạt động'
+                        : s.status === 'SUSPENDED'
+                          ? 'Tạm khóa'
+                          : 'Tạm ngừng'}
                     </span>
                   </td>
                   <td style={{ padding: '14px 16px' }}>
@@ -267,7 +333,14 @@ export default function AdminShopsPage() {
                           : 'Chờ duyệt'}
                     </span>
                   </td>
-                  <td style={{ padding: '14px 16px', color: '#6b7280', fontSize: '13px', maxWidth: '200px' }}>
+                  <td
+                    style={{
+                      padding: '14px 16px',
+                      color: '#6b7280',
+                      fontSize: '13px',
+                      maxWidth: '200px',
+                    }}
+                  >
                     {s.onboardingReason || '—'}
                   </td>
                   <td style={{ padding: '14px 16px', color: '#6b7280', fontSize: '13px' }}>
@@ -331,7 +404,6 @@ export default function AdminShopsPage() {
                           )}
                         </>
                       )}
-
                     </div>
                   </td>
                 </tr>
@@ -364,7 +436,9 @@ export default function AdminShopsPage() {
               boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)',
             }}
           >
-            <h2 style={{ fontSize: '18px', fontWeight: 700, color: '#111827', marginBottom: '8px' }}>
+            <h2
+              style={{ fontSize: '18px', fontWeight: 700, color: '#111827', marginBottom: '8px' }}
+            >
               {actionType === 'SUSPEND'
                 ? `Tạm khóa shop: ${selectedShop.name}`
                 : actionType === 'RESTORE'
@@ -384,9 +458,24 @@ export default function AdminShopsPage() {
                     : 'Từ chối đơn đăng ký mở shop này.'}
             </p>
 
+            {actionType === 'SUSPEND' || actionType === 'RESTORE' ? (
+              <p role="note" style={{ fontSize: '13px', color: '#b45309', marginBottom: '16px' }}>
+                Với shop seller đã duyệt, thao tác này cập nhật đồng thời tài khoản sở hữu và shop;
+                khôi phục không tự mở lại các phiên đã bị thu hồi.
+              </p>
+            ) : null}
+
             <form onSubmit={handleActionSubmit}>
               <div style={{ marginBottom: '16px' }}>
-                <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#374151', marginBottom: '4px' }}>
+                <label
+                  style={{
+                    display: 'block',
+                    fontSize: '13px',
+                    fontWeight: 600,
+                    color: '#374151',
+                    marginBottom: '4px',
+                  }}
+                >
                   Lý do quyết định (Bắt buộc, 8 - 240 ký tự):
                 </label>
                 <textarea
@@ -406,7 +495,18 @@ export default function AdminShopsPage() {
               </div>
 
               {actionError && (
-                <div style={{ padding: '8px 12px', background: '#fee2e2', color: '#dc2626', borderRadius: '6px', fontSize: '13px', marginBottom: '16px' }}>
+                <div
+                  role="alert"
+                  aria-live="assertive"
+                  style={{
+                    padding: '8px 12px',
+                    background: '#fee2e2',
+                    color: '#dc2626',
+                    borderRadius: '6px',
+                    fontSize: '13px',
+                    marginBottom: '16px',
+                  }}
+                >
                   {actionError}
                 </div>
               )}
@@ -434,7 +534,8 @@ export default function AdminShopsPage() {
                   disabled={submitting}
                   style={{
                     padding: '8px 16px',
-                    background: actionType === 'SUSPEND' || actionType === 'REJECT' ? '#dc2626' : '#ee4d2d',
+                    background:
+                      actionType === 'SUSPEND' || actionType === 'REJECT' ? '#dc2626' : '#ee4d2d',
                     color: '#ffffff',
                     border: 'none',
                     borderRadius: '8px',

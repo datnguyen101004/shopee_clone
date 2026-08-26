@@ -1,6 +1,10 @@
 import { loadAuthConfig } from './auth.config';
 import type { AuthClock } from './auth-clock';
-import { GoogleAccountMethodRequiredError, GoogleSignInFailedError } from './auth.errors';
+import {
+  AccountSuspendedError,
+  GoogleAccountMethodRequiredError,
+  GoogleSignInFailedError,
+} from './auth.errors';
 import type { AuthLimiterService } from './auth-limiter.service';
 import { AuthRandom } from './auth-random';
 import type { AuthRepository } from './auth.repository';
@@ -131,5 +135,19 @@ describe('GoogleAuthService', () => {
         requestSource: '127.0.0.1',
       }),
     ).resolves.toEqual({ outcome: 'account-method-required', returnTo: '/' });
+  });
+
+  it('returns a stable locked account outcome after provider identity proof', async () => {
+    const started = await service.start('/', '127.0.0.1');
+    auth.loginWithGoogle.mockRejectedValueOnce(new AccountSuspendedError());
+    await expect(
+      service.complete({
+        state: new URL(started.authorizationUrl).searchParams.get('state')!,
+        code: 'one-time-code',
+        providerError: undefined,
+        browserBinding: started.browserBinding,
+        requestSource: '127.0.0.1',
+      }),
+    ).resolves.toEqual({ outcome: 'account-and-shop-disabled', returnTo: '/' });
   });
 });

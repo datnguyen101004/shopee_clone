@@ -5,6 +5,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AdminCenterLayout } from './admin/admin-center-layout';
 import { useAuthSession } from './auth-session-provider';
 
+type AuthSessionValue = ReturnType<typeof useAuthSession>;
+
 vi.mock('./auth-session-provider', () => ({ useAuthSession: vi.fn() }));
 vi.mock('next/navigation', () => ({
   usePathname: () => '/admin',
@@ -35,7 +37,7 @@ describe('AdminCenterLayout and Admin Console Gating', () => {
     vi.mocked(useAuthSession).mockReturnValue({
       state: { status: 'guest', user: null },
       authenticatedFetch: vi.fn(),
-    } as any);
+    } as unknown as AuthSessionValue);
 
     render(
       <AdminCenterLayout>
@@ -51,7 +53,7 @@ describe('AdminCenterLayout and Admin Console Gating', () => {
     vi.mocked(useAuthSession).mockReturnValue({
       state: { status: 'authenticated', user: buyerUser },
       authenticatedFetch: vi.fn(),
-    } as any);
+    } as unknown as AuthSessionValue);
 
     render(
       <AdminCenterLayout>
@@ -67,7 +69,7 @@ describe('AdminCenterLayout and Admin Console Gating', () => {
     vi.mocked(useAuthSession).mockReturnValue({
       state: { status: 'authenticated', user: adminUser },
       authenticatedFetch: vi.fn(),
-    } as any);
+    } as unknown as AuthSessionValue);
 
     render(
       <AdminCenterLayout>

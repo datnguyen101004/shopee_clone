@@ -6,6 +6,8 @@ import type { ReactNode } from 'react';
 
 import { useAuthSession } from './auth-session-provider';
 import { useCart } from './cart/cart-provider';
+import { ChatProvider } from './chat/chat-provider';
+import { FloatingChat } from './chat/floating-chat';
 import {
   MarketplaceCategoryNavigation,
   MarketplaceHeader,
@@ -27,7 +29,7 @@ export function StorefrontShell({ children }: { children: ReactNode }) {
   const auth = useAuthSession();
   const cart = useCart();
   return (
-    <PageShell
+    <ChatProvider><PageShell
       header={
         <MarketplaceHeader
           categoriesOpen={navigation.categoriesOpen}
@@ -51,6 +53,6 @@ export function StorefrontShell({ children }: { children: ReactNode }) {
       footer={<StorefrontFooter />}
     >
       {children}
-    </PageShell>
+    </PageShell><FloatingChat /></ChatProvider>
   );
 }

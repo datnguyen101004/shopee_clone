@@ -15,6 +15,7 @@ import { useState } from 'react';
 
 import { writeCheckoutDraft } from '../../lib/checkout-draft';
 import { useAuthSession } from '../auth-session-provider';
+import { ChatNowButton } from '../chat/chat-now-button';
 import { CartPricingPanel } from './cart-pricing-panel';
 import { useCart } from './cart-provider';
 import { useCartPricing } from './use-cart-pricing';
@@ -254,6 +255,7 @@ function ShopGroup({
         ) : (
           <strong id={`cart-shop-${group.shop.id}`}>{group.shop.name}</strong>
         )}
+        <ChatNowButton shopId={group.shop.id} ownerUserId={quotedShop?.shop.ownerUserId} />
       </header>
       <div className="cart-shop__labels" aria-hidden="true">
         <span>Sản phẩm</span>

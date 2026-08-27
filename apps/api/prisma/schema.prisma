@@ -435,6 +435,15 @@ enum ReturnEvidenceState {
   @@map("return_evidence_state")
 }
 
+enum ChatOutboxStatus {
+  PENDING    @map("pending")
+  PROCESSING @map("processing")
+  SENT       @map("sent")
+  FAILED     @map("failed")
+
+  @@map("chat_user_outbox_status")
+}
+
 enum RefundLedgerKind {
   MOCK_CREDIT @map("mock_credit")
 
@@ -493,6 +502,11 @@ model User {
   refundLedgerEntries      RefundLedgerEntry[]                @relation("RefundLedgerBuyer")
   notifications            Notification[]                     @relation("NotificationRecipient")
   notificationPreferences  NotificationPreference[]           @relation("NotificationPreferenceOwner")
+  chatConversationsLow     ChatConversation[]                 @relation("ChatConversationLowParticipant")
+  chatConversationsHigh    ChatConversation[]                 @relation("ChatConversationHighParticipant")
+  chatMemberships          ChatMembership[]                   @relation("ChatMembershipUser")
+  chatMessagesSent         ChatMessage[]                      @relation("ChatMessageSender")
+  chatOutboxRecipients     ChatOutbox[]                       @relation("ChatOutboxRecipient")
 
   @@index([status])
   @@index([deletedAt])
@@ -2037,6 +2051,87 @@ model SellerModerationNotice {
   @@index([productId])
   @@index([shopId])
   @@map("seller_moderation_notices")
+}
+
+model ChatConversation {
+  id                    String          @id @default(uuid()) @db.Uuid
+  participantLowUserId  String          @map("participant_low_user_id") @db.Uuid
+  participantHighUserId String          @map("participant_high_user_id") @db.Uuid
+  nextSequence          Int             @default(1) @map("next_sequence")
+  lastMessageSequence   Int             @default(0) @map("last_message_sequence")
+  lastMessagePreview    String?         @map("last_message_preview") @db.VarChar(2000)
+  lastMessageAt         DateTime?       @map("last_message_at") @db.Timestamptz(3)
+  createdAt              DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt              DateTime        @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  participantLow        User            @relation("ChatConversationLowParticipant", fields: [participantLowUserId], references: [id], onDelete: Restrict)
+  participantHigh       User            @relation("ChatConversationHighParticipant", fields: [participantHighUserId], references: [id], onDelete: Restrict)
+  memberships           ChatMembership[]
+  messages              ChatMessage[]
+  outbox                ChatOutbox[]
+
+  @@unique([participantLowUserId, participantHighUserId])
+  @@index([participantLowUserId, lastMessageAt(sort: Desc), id(sort: Desc)])
+  @@index([participantHighUserId, lastMessageAt(sort: Desc), id(sort: Desc)])
+  @@map("chat_user_conversations")
+}
+
+model ChatMembership {
+  id                String          @id @default(uuid()) @db.Uuid
+  conversationId    String          @map("conversation_id") @db.Uuid
+  userId            String          @map("user_id") @db.Uuid
+  lastReadSequence  Int             @default(0) @map("last_read_sequence")
+  unreadCount       Int             @default(0) @map("unread_count")
+  lastReadAt        DateTime?       @map("last_read_at") @db.Timestamptz(3)
+  createdAt         DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt         DateTime        @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  conversation      ChatConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  user              User            @relation("ChatMembershipUser", fields: [userId], references: [id], onDelete: Restrict)
+
+  @@unique([conversationId, userId])
+  @@index([userId, updatedAt(sort: Desc), conversationId])
+  @@map("chat_user_memberships")
+}
+
+model ChatMessage {
+  id              String          @id @default(uuid()) @db.Uuid
+  conversationId  String          @map("conversation_id") @db.Uuid
+  sequence        Int
+  senderUserId    String          @map("sender_user_id") @db.Uuid
+  clientMessageId String          @map("client_message_id") @db.Uuid
+  requestDigest   String          @map("request_digest") @db.Char(64)
+  content         String          @db.VarChar(2000)
+  createdAt       DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
+  conversation    ChatConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender          User            @relation("ChatMessageSender", fields: [senderUserId], references: [id], onDelete: Restrict)
+
+  @@unique([conversationId, sequence])
+  @@unique([conversationId, senderUserId, clientMessageId])
+  @@index([conversationId, sequence(sort: Desc)])
+  @@index([senderUserId, createdAt(sort: Desc)])
+  @@map("chat_user_messages")
+}
+
+model ChatOutbox {
+  id                 String          @id @default(uuid()) @db.Uuid
+  conversationId     String          @map("conversation_id") @db.Uuid
+  messageId          String?         @map("message_id") @db.Uuid
+  recipientUserId    String          @map("recipient_user_id") @db.Uuid
+  eventType          String          @map("event_type") @db.VarChar(80)
+  payload            Json            @db.JsonB
+  deduplicationKey   String          @unique @map("deduplication_key") @db.VarChar(240)
+  status             ChatOutboxStatus @default(PENDING)
+  attemptCount      Int             @default(0) @map("attempt_count")
+  nextAttemptAt     DateTime?       @map("next_attempt_at") @db.Timestamptz(3)
+  lockedUntil       DateTime?       @map("locked_until") @db.Timestamptz(3)
+  lastError         String?         @map("last_error") @db.VarChar(500)
+  createdAt         DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt         DateTime        @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  conversation      ChatConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  recipient         User            @relation("ChatOutboxRecipient", fields: [recipientUserId], references: [id], onDelete: Restrict)
+
+  @@index([status, nextAttemptAt, createdAt])
+  @@index([recipientUserId, createdAt])
+  @@map("chat_user_outbox")
 }
 
 model Notification {

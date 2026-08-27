@@ -22,6 +22,7 @@
     "db:import:dataset": "tsx prisma/import-dataset.ts",
     "db:reset": "prisma migrate reset",
     "db:verify": "tsx prisma/verify.ts",
+    "chat:preflight": "tsx prisma/preflight-chat-foundation.ts",
     "seller-identity:preflight": "tsx prisma/preflight-single-shop-seller-account.ts",
     "seller-identity:backfill": "tsx prisma/backfill-single-shop-seller-account.ts",
     "seller-orders:migration:verify": "tsx prisma/verify-seller-order-migration.ts",
@@ -43,8 +44,10 @@
     "@nestjs/core": "11.1.29",
     "@nestjs/jwt": "11.0.2",
     "@nestjs/platform-express": "11.1.29",
+    "@nestjs/platform-socket.io": "11.1.29",
     "@nestjs/schedule": "6.0.1",
     "@nestjs/swagger": "11.4.6",
+    "@nestjs/websockets": "11.1.29",
     "@prisma/adapter-pg": "7.9.1",
     "@prisma/client": "7.9.1",
     "@shopee-clone/contracts": "workspace:*",
@@ -56,7 +59,8 @@
     "pg": "8.23.0",
     "pg-boss": "12.26.1",
     "reflect-metadata": "0.2.2",
-    "rxjs": "7.8.2"
+    "rxjs": "7.8.2",
+    "socket.io": "4.8.1"
   },
   "devDependencies": {
     "@nestjs/cli": "11.0.24",

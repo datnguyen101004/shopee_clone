@@ -28,6 +28,7 @@ import { SellerModerationNoticesModule } from './seller-moderation-notices/selle
 import { ReturnsModule } from './returns/returns.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { SellerIdentityModule } from './seller-identity/seller-identity.module';
+import { ChatModule } from './chat/chat.module';
 
 @Module({
   imports: [
@@ -59,6 +60,7 @@ import { SellerIdentityModule } from './seller-identity/seller-identity.module';
     ReturnsModule,
     NotificationsModule,
     SellerIdentityModule,
+    ChatModule,
   ],
 })
 export class AppModule {}

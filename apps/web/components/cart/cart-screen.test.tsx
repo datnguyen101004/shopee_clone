@@ -216,6 +216,7 @@ describe('multi-shop cart screen', () => {
       'href',
       '/shops/sample-shop',
     );
+    expect(screen.getAllByRole('button', { name: 'Chat ngay' })).toHaveLength(cart.groups.length);
     expect(screen.getByText('200.000₫')).toBeVisible();
     expect(screen.getByText('222.000₫')).toBeVisible();
     expect(screen.getByText(/Giảm 40.000₫/)).toBeVisible();

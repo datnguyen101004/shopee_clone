@@ -7,6 +7,7 @@ import { notFound } from 'next/navigation';
 import { ShopCatalog } from '../../../../components/shop-storefront/shop-catalog';
 import { ShopFollowControl } from '../../../../components/shop-storefront/shop-follow-control';
 import { ReportButton } from '../../../../components/reporting/report-button';
+import { ChatNowButton } from '../../../../components/chat/chat-now-button';
 import {
   fetchPublicShopCatalog,
   fetchPublicShopProfile,
@@ -120,6 +121,7 @@ export default async function ShopStorefrontPage({ params, searchParams }: ShopP
               targetName={shop.name}
               label="Tố cáo Shop"
             />
+            <ChatNowButton shopId={shop.id} ownerUserId={shop.ownerUserId} />
           </div>
         </div>
         <dl className="shop-profile__metrics">

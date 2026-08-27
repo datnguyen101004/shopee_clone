@@ -24,7 +24,7 @@ describe('order lifecycle persistence', () => {
       expect(schema).toContain(state);
     }
     expect(schema).toContain('model OrderTimelineEvent {');
-    expect(schema).toContain('version                         Int');
+    expect(schema).toMatch(/orderVersion\s+Int/);
     expect(migration).toContain('CREATE TYPE "order_timeline_actor"');
   });
 

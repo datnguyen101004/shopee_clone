@@ -225,6 +225,7 @@ describe('checkout screens', () => {
     );
     render(<CheckoutScreen />);
     expect(screen.getAllByText('122.000₫')).toHaveLength(2);
+    expect(screen.getAllByRole('button', { name: 'Chat ngay' })).toHaveLength(preview.shops.length);
     const button = screen.getByRole('button', { name: 'Đặt hàng' });
     await user.dblClick(button);
     expect(confirmCodCheckout).toHaveBeenCalledTimes(1);

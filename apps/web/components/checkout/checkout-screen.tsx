@@ -13,6 +13,7 @@ import { AddressCreationDialog } from '../address-creation-dialog';
 import { useAuthSession } from '../auth-session-provider';
 import { useCart } from '../cart/cart-provider';
 import { useCheckoutPreview } from './use-checkout-preview';
+import { ChatNowButton } from '../chat/chat-now-button';
 
 const serviceLabels = {
   ECONOMY: 'Tiết kiệm',
@@ -189,6 +190,7 @@ export function CheckoutScreen() {
             <header>
               <span>Shop</span>
               <strong>{shop.shop.name}</strong>
+              <ChatNowButton shopId={shop.shop.id} ownerUserId={shop.shop.ownerUserId} />
             </header>
             <div className="checkout-lines">
               {shop.lines.map((line) => (

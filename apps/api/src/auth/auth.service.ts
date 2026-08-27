@@ -254,6 +254,11 @@ export class AuthService {
     return safeUser(session.user);
   }
 
+  async isSessionActive(userId: string, sessionId: string): Promise<boolean> {
+    const session = await this.repository.findAuthenticatedSession(userId, sessionId, this.clock.now());
+    return session !== null;
+  }
+
   async forgotPassword(email: string, requestSource: string): Promise<void> {
     const now = this.clock.now();
     this.limiter.consume(

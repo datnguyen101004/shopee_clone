@@ -16,7 +16,20 @@ function formatMessageTime(value: string): string {
   return Number.isNaN(date.getTime()) ? '' : messageTimeFormatter.format(date);
 }
 
-function conversationLabel(conversation: { shopName?: string | null; participant: { displayName: string } }): string {
+const messageDateFormatter = new Intl.DateTimeFormat('vi-VN', {
+  dateStyle: 'medium',
+  timeZone: 'Asia/Ho_Chi_Minh',
+});
+
+function formatMessageDate(value: string): string {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? '' : messageDateFormatter.format(date);
+}
+
+function conversationLabel(conversation: {
+  shopName?: string | null;
+  participant: { displayName: string };
+}): string {
   return conversation.shopName?.trim() || conversation.participant.displayName;
 }
 
@@ -36,18 +49,18 @@ export function FloatingChat() {
   const shouldAutoScroll = useRef(true);
   const [search, setSearch] = useState('');
   const [expandedMessageId, setExpandedMessageId] = useState<string | null>(null);
-  const [pendingConversation, setPendingConversation] = useState<Parameters<typeof chat.selectConversation>[0] | null>(null);
+  const [pendingConversation, setPendingConversation] = useState<
+    Parameters<typeof chat.selectConversation>[0] | null
+  >(null);
   const [hasNewMessages, setHasNewMessages] = useState(false);
+  const pointerEngaged = useRef(false);
   const conversations = useMemo(
     () =>
       chat.conversations.filter((conversation) => {
         const query = search.trim().toLocaleLowerCase('vi');
-        return (
-          conversationLabel(conversation).toLocaleLowerCase('vi').includes(query) ||
-          conversation.participant.displayName.toLocaleLowerCase('vi').includes(query)
-        );
+        return conversationLabel(conversation).toLocaleLowerCase('vi').includes(query);
       }),
-    [chat.conversations, search]
+    [chat.conversations, search],
   );
   const lastOwnMessageId = useMemo(() => {
     for (let index = chat.messages.length - 1; index >= 0; index -= 1) {
@@ -59,6 +72,7 @@ export function FloatingChat() {
     return null;
   }, [authenticatedUserId, chat.messages]);
   const latestMessageId = chat.messages.at(-1)?.id ?? null;
+  const loadOlderInFlight = useRef(false);
 
   useEffect(() => {
     if (open && !wasOpen.current) {
@@ -94,7 +108,11 @@ export function FloatingChat() {
       shouldAutoScroll.current = true;
       setHasNewMessages(false);
     }
-    if (previousLatestMessageId.current && previousLatestMessageId.current !== latestMessageId && !shouldAutoScroll.current) {
+    if (
+      previousLatestMessageId.current &&
+      previousLatestMessageId.current !== latestMessageId &&
+      !shouldAutoScroll.current
+    ) {
       setHasNewMessages(true);
     }
     previousLatestMessageId.current = latestMessageId;
@@ -107,12 +125,31 @@ export function FloatingChat() {
     return () => cancelAnimationFrame(frame);
   }, [chat.selectedConversation, latestMessageId, open]);
 
+  const loadOlder = async () => {
+    const pane = messagesPaneRef.current;
+    if (!pane || loadOlderInFlight.current || !chat.hasMoreBefore) return;
+    loadOlderInFlight.current = true;
+    const previousHeight = pane.scrollHeight;
+    const previousTop = pane.scrollTop;
+    try {
+      await chat.loadOlderMessages();
+      requestAnimationFrame(() => {
+        const nextPane = messagesPaneRef.current;
+        if (nextPane) nextPane.scrollTop = previousTop + (nextPane.scrollHeight - previousHeight);
+      });
+    } finally {
+      loadOlderInFlight.current = false;
+    }
+  };
+
   const select = (conversation: Parameters<typeof chat.selectConversation>[0]) => {
     if (chat.selectedConversation?.id.startsWith('new:') && chat.draft.trim()) {
       setPendingConversation(conversation);
       return;
     }
-    void chat.selectConversation(conversation);
+    void Promise.resolve(chat.selectConversation(conversation)).then(() =>
+      chat.markSelectedConversationRead(),
+    );
   };
 
   return (
@@ -150,11 +187,21 @@ export function FloatingChat() {
           aria-label="Trò chuyện"
           tabIndex={-1}
         >
-          <header
-            className={`floating-chat__header ${chat.unreadCount > 0 ? 'has-unread' : ''}`}
-          >
+          <header className={`floating-chat__header ${chat.unreadCount > 0 ? 'has-unread' : ''}`}>
             <div className="floating-chat__header-info">
-              <div className="floating-chat__header-avatar">
+              <div
+                className="floating-chat__header-avatar"
+                role="button"
+                tabIndex={0}
+                aria-label="Đánh dấu cuộc trò chuyện đã xem"
+                onClick={() => void chat.markSelectedConversationRead()}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    void chat.markSelectedConversationRead();
+                  }
+                }}
+              >
                 {chat.selectedConversation?.participant.avatarUrl ? (
                   <img
                     src={chat.selectedConversation.participant.avatarUrl}
@@ -241,10 +288,25 @@ export function FloatingChat() {
 
               <div className="floating-chat__contacts-list">
                 {chat.loading && !chat.conversations.length ? (
-                  <p className="floating-chat__list-notice">Đang tải…</p>
+                  <div className="floating-chat__skeleton-list" aria-label="Đang tải liên hệ">
+                    {Array.from({ length: 4 }, (_, index) => (
+                      <span className="floating-chat__skeleton-contact" key={index} />
+                    ))}
+                    <span className="floating-chat__loading-label">Đang tải…</span>
+                  </div>
                 ) : null}
-                {!chat.loading && !conversations.length ? (
-                  <p className="floating-chat__list-notice">Chưa có cuộc trò chuyện.</p>
+                {chat.listError && chat.conversations.length ? (
+                  <p className="floating-chat__list-error" role="alert">
+                    <span>{chat.listError}</span>
+                    <button type="button" onClick={() => void chat.retry()}>
+                      Thử lại
+                    </button>
+                  </p>
+                ) : null}
+                {!chat.loading && !chat.listError && !conversations.length ? (
+                  <p className="floating-chat__list-notice">
+                    {search.trim() ? 'Không tìm thấy liên hệ.' : 'Chưa có cuộc trò chuyện.'}
+                  </p>
                 ) : null}
                 {conversations.map((conversation) => (
                   <button
@@ -296,21 +358,137 @@ export function FloatingChat() {
               </div>
             </aside>
 
-            <main onClick={() => void chat.markSelectedConversationRead()}>
+            <main
+              tabIndex={0}
+              aria-label="Nội dung cuộc trò chuyện"
+              onPointerDown={() => {
+                pointerEngaged.current = true;
+              }}
+              onClick={() => {
+                pointerEngaged.current = false;
+                void chat.markSelectedConversationRead();
+              }}
+              onFocus={() => {
+                if (!pointerEngaged.current) void chat.markSelectedConversationRead();
+                pointerEngaged.current = false;
+              }}
+            >
               {chat.selectedConversation ? (
                 <>
-                  <div
-                    ref={messagesPaneRef}
-                    className="floating-chat__messages"
-                    aria-live="polite"
-                    onScroll={() => {
-                      const pane = messagesPaneRef.current;
-                      if (!pane) return;
-                      const atBottom = pane.scrollHeight - pane.scrollTop - pane.clientHeight <= 64;
-                      shouldAutoScroll.current = atBottom;
-                      if (atBottom) setHasNewMessages(false);
-                    }}
-                  >
+                  {chat.historyLoading ? (
+                    <div className="floating-chat__history-skeleton" aria-label="Đang tải tin nhắn">
+                      <span className="floating-chat__skeleton-bubble is-theirs" />
+                      <span className="floating-chat__skeleton-bubble is-mine" />
+                      <span className="floating-chat__skeleton-bubble is-theirs" />
+                    </div>
+                  ) : null}
+                  {chat.historyError ? (
+                    <div className="floating-chat__history-error" role="alert">
+                      <span>{chat.historyError}</span>
+                      <button
+                        type="button"
+                        onClick={() => void chat.selectConversation(chat.selectedConversation!)}
+                      >
+                        Thử lại
+                      </button>
+                    </div>
+                  ) : null}
+                  <div className="floating-chat__messages-shell">
+                    <div
+                      ref={messagesPaneRef}
+                      className="floating-chat__messages"
+                      aria-live="polite"
+                      onScroll={() => {
+                        const pane = messagesPaneRef.current;
+                        if (!pane) return;
+                        const atBottom = pane.scrollHeight - pane.scrollTop - pane.clientHeight <= 64;
+                        shouldAutoScroll.current = atBottom;
+                        if (atBottom) setHasNewMessages(false);
+                        if (pane.scrollTop <= 48 && chat.hasMoreBefore && !chat.olderLoading)
+                          void loadOlder();
+                      }}
+                    >
+                    {!chat.hasMoreBefore && chat.messages.length > 0 ? (
+                      <div className="floating-chat__beginning" role="status">
+                        Bắt đầu cuộc trò chuyện
+                      </div>
+                    ) : null}
+                    {chat.olderLoading ? (
+                      <p className="floating-chat__older-loading" role="status">
+                        Đang tải tin cũ…
+                      </p>
+                    ) : null}
+                    {chat.olderError ? (
+                      <p className="floating-chat__older-error" role="alert">
+                        <span>{chat.olderError}</span>
+                        <button type="button" onClick={() => void loadOlder()}>
+                          Thử lại
+                        </button>
+                      </p>
+                    ) : null}
+                    {chat.messages.map((message, index) => {
+                      const isOwnMessage =
+                        authenticatedUserId !== null &&
+                        message.senderUserId === authenticatedUserId;
+                      const showReadState =
+                        isOwnMessage &&
+                        (message.id === lastOwnMessageId || expandedMessageId === message.id);
+                      const showTime = message.id === latestMessageId;
+                      const previous = chat.messages[index - 1];
+                      const showDateBoundary =
+                        !previous ||
+                        formatMessageDate(previous.createdAt) !==
+                          formatMessageDate(message.createdAt);
+                      return (
+                        <div
+                          key={`message-group-${message.id}`}
+                          className="floating-chat__message-group"
+                        >
+                          {showDateBoundary ? (
+                            <div className="floating-chat__date-boundary">
+                              {formatMessageDate(message.createdAt)}
+                            </div>
+                          ) : null}
+                          <p
+                            key={message.id}
+                            className={[
+                              isOwnMessage ? 'is-mine' : 'is-theirs',
+                              message.deliveryState === 'FAILED' ? 'is-failed' : '',
+                            ]
+                              .filter(Boolean)
+                              .join(' ')}
+                            onClick={() =>
+                              setExpandedMessageId((current) =>
+                                current === message.id ? null : message.id,
+                              )
+                            }
+                          >
+                            <span className="floating-chat__message-bubble">{message.content}</span>
+                            <span className="floating-chat__message-footer">
+                              {showTime ? (
+                                <small className="floating-chat__message-time">
+                                  <time dateTime={message.createdAt}>
+                                    {formatMessageTime(message.createdAt)}
+                                  </time>
+                                </small>
+                              ) : null}
+                              {showReadState ? (
+                                <small className="floating-chat__message-state">
+                                  {message.deliveryState === 'PENDING'
+                                    ? 'Đang gửi…'
+                                    : message.deliveryState === 'FAILED'
+                                      ? 'Gửi thất bại'
+                                      : message.isRead
+                                        ? 'Đã xem'
+                                        : 'Đã gửi'}
+                                </small>
+                              ) : null}
+                            </span>
+                          </p>
+                        </div>
+                      );
+                    })}
+                    </div>
                     {hasNewMessages ? (
                       <button
                         type="button"
@@ -325,107 +503,56 @@ export function FloatingChat() {
                         Tin nhắn mới
                       </button>
                     ) : null}
-                    {chat.messages.map((message) => {
-                      const isOwnMessage =
-                        authenticatedUserId !== null && message.senderUserId === authenticatedUserId;
-                      const showReadState =
-                        isOwnMessage &&
-                        (message.id === lastOwnMessageId || expandedMessageId === message.id);
-                      const showTime = message.id === latestMessageId;
-                      return (
-                        <p
-                          key={message.id}
-                          className={[
-                            isOwnMessage ? 'is-mine' : 'is-theirs',
-                            message.deliveryState === 'FAILED' ? 'is-failed' : '',
-                          ]
-                            .filter(Boolean)
-                            .join(' ')}
-                          onClick={() =>
-                            setExpandedMessageId((current) =>
-                              current === message.id ? null : message.id
-                            )
-                          }
-                        >
-                          <span className="floating-chat__message-bubble">{message.content}</span>
-                          <span className="floating-chat__message-footer">
-                            {showTime ? (
-                              <small className="floating-chat__message-time">
-                                <time dateTime={message.createdAt}>
-                                  {formatMessageTime(message.createdAt)}
-                                </time>
-                              </small>
-                            ) : null}
-                            {showReadState ? (
-                              <small className="floating-chat__message-state">
-                                {message.deliveryState === 'PENDING'
-                                  ? 'Đang gửi…'
-                                  : message.deliveryState === 'FAILED'
-                                    ? 'Gửi thất bại'
-                                    : message.isRead
-                                      ? 'Đã xem'
-                                      : 'Đã gửi'}
-                              </small>
-                            ) : null}
-                          </span>
-                          {message.deliveryState === 'FAILED' ? (
-                            <button
-                              type="button"
-                              className="floating-chat__retry-button"
-                              onClick={() => {
-                                chat.setDraft(message.content);
-                              }}
-                            >
-                              Gửi lại
-                            </button>
-                          ) : null}
-                        </p>
-                      );
-                    })}
                   </div>
 
-                  <form
-                    className="floating-chat__form"
-                    onSubmit={(event) => {
-                      event.preventDefault();
-                      void chat.sendDraft();
-                    }}
-                  >
-                    <textarea
-                      aria-label="Nội dung tin nhắn"
-                      value={chat.draft}
-                      onChange={(event) => chat.setDraft(event.target.value)}
-                      onKeyDown={(event) => {
-                        if (event.key === 'Enter' && !event.shiftKey) {
-                          event.preventDefault();
-                          void chat.sendDraft();
-                        }
+                  {chat.selectedConversation.canMessage === false ? (
+                    <div className="floating-chat__forbidden" role="status">
+                      Bạn không thể tiếp tục cuộc trò chuyện này
+                    </div>
+                  ) : (
+                    <form
+                      className="floating-chat__form"
+                      onSubmit={(event) => {
+                        event.preventDefault();
+                        void chat.sendDraft();
                       }}
-                      placeholder="Nhập tin nhắn…"
-                      rows={1}
-                    />
-                    <button
-                      type="submit"
-                      disabled={chat.sending || !chat.draft.trim()}
-                      className="floating-chat__send-button"
                     >
-                      <span>Gửi</span>
-                      <svg
-                        width="15"
-                        height="15"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2.5"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        aria-hidden="true"
+                      <textarea
+                        aria-label="Nội dung tin nhắn"
+                        value={chat.draft}
+                        onChange={(event) => chat.setDraft(event.target.value)}
+                        onKeyDown={(event) => {
+                          if (event.key === 'Enter' && !event.shiftKey) {
+                            event.preventDefault();
+                            void chat.sendDraft();
+                          }
+                        }}
+                        placeholder="Nhập tin nhắn…"
+                        rows={1}
+                      />
+                      <button
+                        type="submit"
+                        disabled={chat.sending || !chat.draft.trim()}
+                        className="floating-chat__send-button"
                       >
-                        <line x1="22" y1="2" x2="11" y2="13" />
-                        <polygon points="22 2 15 22 11 13 2 9 22 2" />
-                      </svg>
-                    </button>
-                  </form>
+                        <span>Gửi</span>
+                        <svg
+                          width="15"
+                          height="15"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2.5"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          aria-hidden="true"
+                        >
+                          <line x1="22" y1="2" x2="11" y2="13" />
+                          <polygon points="22 2 15 22 11 13 2 9 22 2" />
+                        </svg>
+                      </button>
+                    </form>
+                  )}
                 </>
               ) : (
                 <div className="floating-chat__empty">
@@ -472,7 +599,9 @@ export function FloatingChat() {
                     className="floating-chat__discard-confirm"
                     onClick={() => {
                       chat.setDraft('');
-                      void chat.selectConversation(pendingConversation);
+                      void Promise.resolve(chat.selectConversation(pendingConversation)).then(() =>
+                        chat.markSelectedConversationRead(),
+                      );
                       setPendingConversation(null);
                     }}
                   >

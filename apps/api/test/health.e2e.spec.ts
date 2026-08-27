@@ -1,10 +1,11 @@
 import type { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
-import { isHealthResponse } from '@shopee-clone/contracts';
+import { isHealthResponse, parseChatOutboxHealthResponse } from '@shopee-clone/contracts';
 import request from 'supertest';
 
 import { AppModule } from '../src/app.module';
 import { PrismaService } from '../src/prisma/prisma.service';
+import { ChatOutboxDispatcher } from '../src/chat/chat.realtime';
 
 describe('Health endpoint', () => {
   let app: INestApplication;
@@ -15,6 +16,24 @@ describe('Health endpoint', () => {
       .useValue({
         onModuleInit: jest.fn(),
         onModuleDestroy: jest.fn(),
+      })
+      .overrideProvider(ChatOutboxDispatcher)
+      .useValue({
+        onModuleInit: jest.fn(),
+        onModuleDestroy: jest.fn(),
+        readiness: jest.fn().mockResolvedValue({
+          ready: true,
+          pending: 0,
+          processing: 0,
+          failed: 0,
+          oldestPendingAgeSeconds: null,
+          claimed: 2,
+          sent: 2,
+          failedAttempts: 0,
+          polls: 2,
+          lastPollAt: '2026-08-27T00:00:00.000Z',
+          lastErrorAt: null,
+        }),
       })
       .compile();
 
@@ -32,5 +51,24 @@ describe('Health endpoint', () => {
 
     expect(isHealthResponse(response.body)).toBe(true);
     expect(response.body).toMatchObject({ status: 'ok', service: 'api' });
+  });
+
+  it('GET /api/v1/health/chat-outbox returns only the privacy-safe aggregate contract', async () => {
+    const response = await request(app.getHttpServer())
+      .get('/api/v1/health/chat-outbox')
+      .expect(200);
+
+    expect(parseChatOutboxHealthResponse(response.body)).toEqual(response.body);
+    expect(response.body).toEqual(expect.objectContaining({ ready: true, pending: 0, failed: 0 }));
+    expect(Object.keys(response.body)).not.toEqual(
+      expect.arrayContaining([
+        'content',
+        'conversationId',
+        'userId',
+        'ticket',
+        'sessionId',
+        'rawError',
+      ]),
+    );
   });
 });

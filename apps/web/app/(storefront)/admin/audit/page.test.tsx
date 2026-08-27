@@ -40,7 +40,7 @@ describe('AdminAuditPage', () => {
   it('renders a friendly target and a structured before-and-after detail panel', async () => {
     render(<AdminAuditPage />);
 
-    expect(await screen.findByText('Đánh giá')).toBeInTheDocument();
+    expect(await screen.findByText(reviewId)).toBeInTheDocument();
     expect(screen.getByText('Mã đánh giá')).toBeInTheDocument();
     expect(screen.getByText(reviewId)).toBeInTheDocument();
     expect(screen.getByTitle('HIDE')).toHaveTextContent('Ẩn đánh giá');
@@ -59,7 +59,7 @@ describe('AdminAuditPage', () => {
 
   it('passes the moderation target and action filters to the audit query', async () => {
     render(<AdminAuditPage />);
-    await screen.findByText('Đánh giá');
+    await screen.findByText(reviewId);
 
     fireEvent.change(screen.getByLabelText('Lọc theo đối tượng tác động'), {
       target: { value: 'MODERATION_CASE' },

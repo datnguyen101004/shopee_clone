@@ -583,6 +583,7 @@ export {
   isChatProblemDetails,
   isSendChatMessageRequest,
   parseChatConversationListResponse,
+  parseChatOutboxHealthResponse,
   parseChatMessagePage,
   parseChatUnreadCountResponse,
   parseChatProblemDetails,
@@ -596,6 +597,7 @@ export {
 } from './chat';
 export type {
   ChatConversationListResponse,
+  ChatOutboxHealthResponse,
   ChatConversationSummary,
   ChatEventType,
   ChatMessage,

@@ -6,13 +6,22 @@ import { useChat } from './chat-provider';
 import { FloatingChat } from './floating-chat';
 
 vi.mock('./chat-provider', () => ({ useChat: vi.fn() }));
-vi.mock('../auth-session-provider', () => ({ useAuthSession: vi.fn(() => ({ state: { status: 'authenticated', user: { id: '00000000-0000-4000-8000-000000000001' } } })) }));
+vi.mock('../auth-session-provider', () => ({
+  useAuthSession: vi.fn(() => ({
+    state: { status: 'authenticated', user: { id: '00000000-0000-4000-8000-000000000001' } },
+  })),
+}));
 
 const ownerId = '00000000-0000-4000-8000-000000000001';
 const secondOwnerId = '00000000-0000-4000-8000-000000000002';
 const conversation = {
   id: '00000000-0000-4000-8000-000000000003',
-  participant: { userId: ownerId, displayName: 'Shop Owner', avatarUrl: null, presence: 'ACTIVE' as const },
+  participant: {
+    userId: ownerId,
+    displayName: 'Shop Owner',
+    avatarUrl: null,
+    presence: 'ACTIVE' as const,
+  },
   lastMessagePreview: 'Xin chào',
   lastMessageAt: '2026-08-27T00:00:00.000Z',
   unreadCount: 2,
@@ -24,7 +33,30 @@ describe('FloatingChat', () => {
   let chat: Record<string, unknown>;
   beforeEach(() => {
     vi.clearAllMocks();
-    chat = { open: false, selectedShop: null, selectedConversation: null, conversations: [conversation], messages: [], loading: false, error: '', unreadCount: 120, draft: '', sending: false, openForShop: vi.fn(), openWidget: vi.fn(() => { chat.open = true; }), closeWidget: vi.fn(() => { chat.open = false; }), selectConversation: vi.fn(), markSelectedConversationRead: vi.fn(), setDraft: vi.fn(), sendDraft: vi.fn(), retry: vi.fn() };
+    chat = {
+      open: false,
+      selectedShop: null,
+      selectedConversation: null,
+      conversations: [conversation],
+      messages: [],
+      loading: false,
+      error: '',
+      unreadCount: 120,
+      draft: '',
+      sending: false,
+      openForShop: vi.fn(),
+      openWidget: vi.fn(() => {
+        chat.open = true;
+      }),
+      closeWidget: vi.fn(() => {
+        chat.open = false;
+      }),
+      selectConversation: vi.fn(),
+      markSelectedConversationRead: vi.fn(),
+      setDraft: vi.fn(),
+      sendDraft: vi.fn(),
+      retry: vi.fn(),
+    };
     vi.mocked(useChat).mockImplementation(() => chat as never);
   });
 
@@ -51,6 +83,41 @@ describe('FloatingChat', () => {
     expect(screen.queryByText('Shop Owner')).toBeNull();
   });
 
+  it('searches only the visible shop label instead of a hidden owner account name', async () => {
+    const user = userEvent.setup();
+    chat.open = true;
+    chat.conversations = [
+      {
+        ...conversation,
+        shopName: 'SpaceT',
+        participant: { ...conversation.participant, displayName: 'SpaceT Dataset Owner' },
+      },
+      {
+        ...conversation,
+        id: '00000000-0000-4000-8000-000000000004',
+        shopName: 'Điện Thoại Hay',
+        participant: {
+          ...conversation.participant,
+          userId: secondOwnerId,
+          displayName: 'Điện Thoại Hay Dataset Owner',
+        },
+      },
+    ];
+
+    render(<FloatingChat />);
+    const search = screen.getByLabelText('Tìm liên hệ');
+
+    await user.type(search, 'dat');
+    expect(screen.getByText('Không tìm thấy liên hệ.')).toBeVisible();
+    expect(screen.queryByRole('button', { name: /SpaceT/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /Điện Thoại Hay/ })).toBeNull();
+
+    await user.clear(search);
+    await user.type(search, 'spaceT');
+    expect(screen.getByRole('button', { name: /SpaceT/ })).toBeVisible();
+    expect(screen.queryByRole('button', { name: /Điện Thoại Hay/ })).toBeNull();
+  });
+
   it('uses the orange header only while unread messages exist', () => {
     chat.open = true;
     chat.unreadCount = 0;
@@ -65,8 +132,21 @@ describe('FloatingChat', () => {
 
   it('announces presence and protects an unsent temporary draft before switching', async () => {
     const user = userEvent.setup();
-    const temporary = { ...conversation, id: `new:${ownerId}`, participant: { ...conversation.participant, userId: ownerId }, unreadCount: 0 };
-    const other = { ...conversation, id: '00000000-0000-4000-8000-000000000004', participant: { ...conversation.participant, userId: secondOwnerId, displayName: 'Other Shop' } };
+    const temporary = {
+      ...conversation,
+      id: `new:${ownerId}`,
+      participant: { ...conversation.participant, userId: ownerId },
+      unreadCount: 0,
+    };
+    const other = {
+      ...conversation,
+      id: '00000000-0000-4000-8000-000000000004',
+      participant: {
+        ...conversation.participant,
+        userId: secondOwnerId,
+        displayName: 'Other Shop',
+      },
+    };
     chat.open = true;
     chat.selectedConversation = temporary;
     chat.conversations = [other];
@@ -87,8 +167,28 @@ describe('FloatingChat', () => {
     chat.open = true;
     chat.selectedConversation = conversation;
     chat.messages = [
-      { id: '00000000-0000-4000-8000-000000000005', conversationId: conversation.id, sequence: 1, senderUserId: ownerId, clientMessageId: '00000000-0000-4000-8000-000000000005', content: 'Tin của tôi', createdAt: '2026-08-27T00:00:00.000Z', deliveryState: 'SENT', isRead: false },
-      { id: '00000000-0000-4000-8000-000000000006', conversationId: conversation.id, sequence: 2, senderUserId: secondOwnerId, clientMessageId: '00000000-0000-4000-8000-000000000006', content: 'Tin của shop', createdAt: '2026-08-27T00:00:01.000Z', deliveryState: 'SENT', isRead: true },
+      {
+        id: '00000000-0000-4000-8000-000000000005',
+        conversationId: conversation.id,
+        sequence: 1,
+        senderUserId: ownerId,
+        clientMessageId: '00000000-0000-4000-8000-000000000005',
+        content: 'Tin của tôi',
+        createdAt: '2026-08-27T00:00:00.000Z',
+        deliveryState: 'SENT',
+        isRead: false,
+      },
+      {
+        id: '00000000-0000-4000-8000-000000000006',
+        conversationId: conversation.id,
+        sequence: 2,
+        senderUserId: secondOwnerId,
+        clientMessageId: '00000000-0000-4000-8000-000000000006',
+        content: 'Tin của shop',
+        createdAt: '2026-08-27T00:00:01.000Z',
+        deliveryState: 'SENT',
+        isRead: true,
+      },
     ];
     render(<FloatingChat />);
     const own = screen.getByText('Tin của tôi').closest('p');
@@ -104,8 +204,28 @@ describe('FloatingChat', () => {
     chat.open = true;
     chat.selectedConversation = conversation;
     chat.messages = [
-      { id: '00000000-0000-4000-8000-000000000008', conversationId: conversation.id, sequence: 1, senderUserId: ownerId, clientMessageId: '00000000-0000-4000-8000-000000000008', content: 'Tin cũ của tôi', createdAt: '2026-08-27T00:00:00.000Z', deliveryState: 'SENT', isRead: true },
-      { id: '00000000-0000-4000-8000-000000000009', conversationId: conversation.id, sequence: 2, senderUserId: ownerId, clientMessageId: '00000000-0000-4000-8000-000000000009', content: 'Tin cuối của tôi', createdAt: '2026-08-27T00:01:00.000Z', deliveryState: 'SENT', isRead: true },
+      {
+        id: '00000000-0000-4000-8000-000000000008',
+        conversationId: conversation.id,
+        sequence: 1,
+        senderUserId: ownerId,
+        clientMessageId: '00000000-0000-4000-8000-000000000008',
+        content: 'Tin cũ của tôi',
+        createdAt: '2026-08-27T00:00:00.000Z',
+        deliveryState: 'SENT',
+        isRead: true,
+      },
+      {
+        id: '00000000-0000-4000-8000-000000000009',
+        conversationId: conversation.id,
+        sequence: 2,
+        senderUserId: ownerId,
+        clientMessageId: '00000000-0000-4000-8000-000000000009',
+        content: 'Tin cuối của tôi',
+        createdAt: '2026-08-27T00:01:00.000Z',
+        deliveryState: 'SENT',
+        isRead: true,
+      },
     ];
     render(<FloatingChat />);
     const older = screen.getByText('Tin cũ của tôi').closest('p');
@@ -123,7 +243,17 @@ describe('FloatingChat', () => {
     chat.open = true;
     chat.selectedConversation = conversation;
     chat.messages = [
-      { id: '00000000-0000-4000-8000-000000000010', conversationId: conversation.id, sequence: 1, senderUserId: secondOwnerId, clientMessageId: '00000000-0000-4000-8000-000000000010', content: 'Tin đầu', createdAt: '2026-08-27T00:00:00.000Z', deliveryState: 'SENT', isRead: false },
+      {
+        id: '00000000-0000-4000-8000-000000000010',
+        conversationId: conversation.id,
+        sequence: 1,
+        senderUserId: secondOwnerId,
+        clientMessageId: '00000000-0000-4000-8000-000000000010',
+        content: 'Tin đầu',
+        createdAt: '2026-08-27T00:00:00.000Z',
+        deliveryState: 'SENT',
+        isRead: false,
+      },
     ];
     view.rerender(<FloatingChat />);
     const pane = screen.getByText('Tin đầu').closest('.floating-chat__messages');
@@ -133,7 +263,17 @@ describe('FloatingChat', () => {
 
     chat.messages = [
       ...(chat.messages as unknown[]),
-      { id: '00000000-0000-4000-8000-000000000011', conversationId: conversation.id, sequence: 2, senderUserId: secondOwnerId, clientMessageId: '00000000-0000-4000-8000-000000000011', content: 'Tin mới nhất', createdAt: '2026-08-27T00:01:00.000Z', deliveryState: 'SENT', isRead: false },
+      {
+        id: '00000000-0000-4000-8000-000000000011',
+        conversationId: conversation.id,
+        sequence: 2,
+        senderUserId: secondOwnerId,
+        clientMessageId: '00000000-0000-4000-8000-000000000011',
+        content: 'Tin mới nhất',
+        createdAt: '2026-08-27T00:01:00.000Z',
+        deliveryState: 'SENT',
+        isRead: false,
+      },
     ];
     view.rerender(<FloatingChat />);
     Object.defineProperty(pane, 'scrollHeight', { configurable: true, value: 960 });
@@ -143,7 +283,19 @@ describe('FloatingChat', () => {
   it('does not move a user reading older history and offers a new-message jump', async () => {
     chat.open = true;
     chat.selectedConversation = conversation;
-    chat.messages = [{ id: '00000000-0000-0000-0000-000000000030', conversationId: conversation.id, sequence: 1, senderUserId: secondOwnerId, clientMessageId: '00000000-0000-0000-0000-000000000030', content: 'Tin đầu', createdAt: '2026-08-27T00:00:00.000Z', deliveryState: 'SENT', isRead: false }];
+    chat.messages = [
+      {
+        id: '00000000-0000-0000-0000-000000000030',
+        conversationId: conversation.id,
+        sequence: 1,
+        senderUserId: secondOwnerId,
+        clientMessageId: '00000000-0000-0000-0000-000000000030',
+        content: 'Tin đầu',
+        createdAt: '2026-08-27T00:00:00.000Z',
+        deliveryState: 'SENT',
+        isRead: false,
+      },
+    ];
     const view = render(<FloatingChat />);
     const pane = screen.getByText('Tin đầu').closest('.floating-chat__messages')!;
     Object.defineProperty(pane, 'scrollHeight', { configurable: true, value: 800 });
@@ -151,12 +303,28 @@ describe('FloatingChat', () => {
     await waitFor(() => expect(pane.scrollTop).toBe(800));
     pane.scrollTop = 100;
     fireEvent.scroll(pane);
-    chat.messages = [...(chat.messages as unknown[]), { id: '00000000-0000-0000-0000-000000000031', conversationId: conversation.id, sequence: 2, senderUserId: secondOwnerId, clientMessageId: '00000000-0000-0000-0000-000000000031', content: 'Tin mới', createdAt: '2026-08-27T00:01:00.000Z', deliveryState: 'SENT', isRead: false }];
+    chat.messages = [
+      ...(chat.messages as unknown[]),
+      {
+        id: '00000000-0000-0000-0000-000000000031',
+        conversationId: conversation.id,
+        sequence: 2,
+        senderUserId: secondOwnerId,
+        clientMessageId: '00000000-0000-0000-0000-000000000031',
+        content: 'Tin mới',
+        createdAt: '2026-08-27T00:01:00.000Z',
+        deliveryState: 'SENT',
+        isRead: false,
+      },
+    ];
     Object.defineProperty(pane, 'scrollHeight', { configurable: true, value: 900 });
     view.rerender(<FloatingChat />);
     expect(pane.scrollTop).toBe(100);
-    expect(screen.getByRole('button', { name: 'Tin nhắn mới' })).toBeVisible();
-    await userEvent.setup().click(screen.getByRole('button', { name: 'Tin nhắn mới' }));
+    const newMessageButton = screen.getByRole('button', { name: 'Tin nhắn mới' });
+    expect(newMessageButton).toBeVisible();
+    expect(newMessageButton.parentElement).toHaveClass('floating-chat__messages-shell');
+    expect(newMessageButton.previousElementSibling).toBe(pane);
+    await userEvent.setup().click(newMessageButton);
     expect(pane.scrollTop).toBe(900);
   });
 
@@ -165,11 +333,63 @@ describe('FloatingChat', () => {
     chat.open = true;
     chat.selectedConversation = conversation;
     chat.messages = [
-      { id: '00000000-0000-4000-8000-000000000007', conversationId: conversation.id, sequence: 2, senderUserId: secondOwnerId, clientMessageId: '00000000-0000-4000-8000-000000000007', content: 'Tin mới', createdAt: '2026-08-27T00:00:00.000Z', deliveryState: 'SENT', isRead: false },
+      {
+        id: '00000000-0000-4000-8000-000000000007',
+        conversationId: conversation.id,
+        sequence: 2,
+        senderUserId: secondOwnerId,
+        clientMessageId: '00000000-0000-4000-8000-000000000007',
+        content: 'Tin mới',
+        createdAt: '2026-08-27T00:00:00.000Z',
+        deliveryState: 'SENT',
+        isRead: false,
+      },
     ];
     render(<FloatingChat />);
     await user.click(screen.getByText('Tin mới'));
     expect(chat.markSelectedConversationRead).toHaveBeenCalledTimes(1);
+  });
+
+  it('marks a selected conversation read after an explicit contact click', async () => {
+    const user = userEvent.setup();
+    chat.open = true;
+    chat.selectedConversation = conversation;
+    render(<FloatingChat />);
+    await user.click(screen.getByRole('button', { name: /Shop Owner/ }));
+    await waitFor(() => expect(chat.markSelectedConversationRead).toHaveBeenCalledTimes(1));
+  });
+
+  it('shows date boundaries while keeping timestamps scoped to the newest message', () => {
+    chat.open = true;
+    chat.selectedConversation = conversation;
+    chat.messages = [
+      {
+        id: '00000000-0000-0000-0000-000000000040',
+        conversationId: conversation.id,
+        sequence: 1,
+        senderUserId: ownerId,
+        clientMessageId: '00000000-0000-0000-0000-000000000040',
+        content: 'Hôm qua',
+        createdAt: '2026-08-26T12:00:00.000Z',
+        deliveryState: 'SENT',
+        isRead: true,
+      },
+      {
+        id: '00000000-0000-0000-0000-000000000041',
+        conversationId: conversation.id,
+        sequence: 2,
+        senderUserId: secondOwnerId,
+        clientMessageId: '00000000-0000-0000-0000-000000000041',
+        content: 'Hôm nay',
+        createdAt: '2026-08-27T01:00:00.000Z',
+        deliveryState: 'SENT',
+        isRead: false,
+      },
+    ];
+    render(<FloatingChat />);
+    expect(document.querySelectorAll('.floating-chat__date-boundary')).toHaveLength(2);
+    expect(screen.getByText('Hôm qua').closest('p')).not.toHaveTextContent('19:00');
+    expect(screen.getByText('Hôm nay').closest('p')).toHaveTextContent('08:00');
   });
 
   it('renders recoverable loading and error states with retry', async () => {
@@ -188,13 +408,24 @@ describe('FloatingChat', () => {
   });
 
   it('keeps failed content visible and restores it to the composer on retry', async () => {
-    const user = userEvent.setup();
     chat.open = true;
     chat.selectedConversation = conversation;
-    chat.messages = [{ id: '00000000-0000-4000-8000-000000000020', conversationId: conversation.id, sequence: 0, senderUserId: '00000000-0000-4000-8000-000000000001', clientMessageId: '00000000-0000-4000-8000-000000000020', content: 'Nội dung lỗi', createdAt: '2026-08-27T00:00:00.000Z', deliveryState: 'FAILED', isRead: false }];
+    chat.messages = [
+      {
+        id: '00000000-0000-4000-8000-000000000020',
+        conversationId: conversation.id,
+        sequence: 0,
+        senderUserId: '00000000-0000-4000-8000-000000000001',
+        clientMessageId: '00000000-0000-4000-8000-000000000020',
+        content: 'Nội dung lỗi',
+        createdAt: '2026-08-27T00:00:00.000Z',
+        deliveryState: 'FAILED',
+        isRead: false,
+      },
+    ];
     render(<FloatingChat />);
     expect(screen.getByText('Gửi thất bại')).toBeVisible();
-    await user.click(screen.getByRole('button', { name: 'Gửi lại' }));
-    expect(chat.setDraft).toHaveBeenCalledWith('Nội dung lỗi');
+    expect(screen.queryByRole('button', { name: 'Gửi lại' })).toBeNull();
+    expect(screen.getByText('Nội dung lỗi')).toBeVisible();
   });
 });

@@ -19,6 +19,7 @@ import {
   normalizeAuthEmail,
   parseGoogleSignInCompletion,
   parseAuthSessionResponse,
+  isSafeAuthReturnTo,
 } from '../src';
 
 const user = {
@@ -192,5 +193,7 @@ describe('authentication contracts', () => {
       isGoogleSignInCompletion({ outcome: 'success', returnTo: 'https://attacker.example' }),
     ).toBe(false);
     expect(isGoogleSignInCompletion({ ...completion, code: 'secret' })).toBe(false);
+    expect(isSafeAuthReturnTo('/shops/dien-thoai-hay')).toBe(true);
+    expect(isSafeAuthReturnTo('/shops/shop--invalid')).toBe(false);
   });
 });

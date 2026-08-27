@@ -353,7 +353,8 @@ export function isSafeAuthReturnTo(value: unknown): value is string {
     value === '/account/profile' ||
     value === '/account/addresses' ||
     (typeof value === 'string' &&
-      /^\/products\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(value))
+      (/^\/products\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(value) ||
+        (/^\/shops\/(.+)$/.test(value) && isCanonicalShopSlug(value.slice('/shops/'.length)))))
   );
 }
 
@@ -433,3 +434,4 @@ export function isAccountAndShopDisabledProblemDetails(
     value.status === 403
   );
 }
+import { isCanonicalShopSlug } from './shop-storefront';

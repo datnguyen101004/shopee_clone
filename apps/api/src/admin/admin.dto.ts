@@ -56,8 +56,8 @@ export class AdminUserListQueryDto {
   status?: AdminUserStatus;
 
   @IsOptional()
-  @IsIn(['buyer', 'seller', 'admin'])
-  role?: 'buyer' | 'seller' | 'admin';
+  @IsIn(['buyer', 'seller', 'admin', 'carrier_operator'])
+  role?: 'buyer' | 'seller' | 'admin' | 'carrier_operator';
 
   @IsOptional()
   @IsString()

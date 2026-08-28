@@ -2,6 +2,7 @@ import {
   archiveNotification,
   getNotificationPreferences,
   getNotificationUnreadCount,
+  isNotificationAtOrBefore,
   listNotificationPopover,
   listNotifications,
   markAllNotificationsRead,
@@ -39,6 +40,34 @@ const listResponse = {
 };
 
 describe('notifications API boundary', () => {
+  it('identifies the selected notification and all older entries as read-through targets', () => {
+    const selected = { ...sampleItem, activityAt: '2026-08-22T04:00:02.000Z' };
+    expect(
+      isNotificationAtOrBefore(
+        { ...sampleItem, id: '00000000-0000-4000-8000-000000000200', activityAt: selected.activityAt },
+        selected,
+      ),
+    ).toBe(true);
+    expect(
+      isNotificationAtOrBefore(
+        { ...sampleItem, id: '00000000-0000-4000-8000-000000000202', activityAt: selected.activityAt },
+        selected,
+      ),
+    ).toBe(false);
+    expect(
+      isNotificationAtOrBefore(
+        { ...sampleItem, activityAt: '2026-08-22T04:00:01.000Z' },
+        selected,
+      ),
+    ).toBe(true);
+    expect(
+      isNotificationAtOrBefore(
+        { ...sampleItem, activityAt: '2026-08-22T04:00:03.000Z' },
+        selected,
+      ),
+    ).toBe(false);
+  });
+
   it('uses authenticatedFetch for list, unread, and mutation paths', async () => {
     const authenticatedFetch = vi
       .fn()
@@ -47,7 +76,7 @@ describe('notifications API boundary', () => {
       .mockResolvedValueOnce(new Response(JSON.stringify({ unreadCount: 3 }), { status: 200 }))
       .mockResolvedValueOnce(
         new Response(
-          JSON.stringify({ id: notificationId, isRead: true, readAt: timestamp }),
+          JSON.stringify({ id: notificationId, isRead: true, readAt: timestamp, updatedCount: 1 }),
           { status: 200 },
         ),
       )

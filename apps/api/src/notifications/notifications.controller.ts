@@ -92,7 +92,7 @@ export class NotificationsController {
   @Post(':notificationId/read')
   @HttpCode(HttpStatus.OK)
   @Header('Cache-Control', 'private, no-store')
-  @ApiOperation({ summary: 'Mark a single notification as read' })
+  @ApiOperation({ summary: 'Mark the selected notification and all older notifications as read' })
   @ApiParam({ name: 'notificationId', format: 'uuid' })
   @ApiResponse({ status: 404, description: 'Notification not found' })
   markRead(

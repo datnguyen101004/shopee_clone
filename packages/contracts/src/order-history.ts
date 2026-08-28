@@ -7,7 +7,7 @@ import {
   type ShopOrderStatus,
   type InventoryHoldStatus,
 } from './checkout';
-import type { MockShippingBreakdown } from './pricing';
+import { isShippingBreakdown, type ShippingBreakdown, type ShippingServiceCode } from './pricing';
 import type { ReviewEligibility } from './reviews';
 
 export const ORDER_HISTORY_VERSION = 'order-history-v1' as const;
@@ -83,6 +83,30 @@ export interface BuyerOrderVoucherSnapshot {
   allocations: BuyerOrderVoucherAllocation[];
 }
 
+export interface BuyerOrderShipmentEvent {
+  status: string;
+  previousStatus: string | null;
+  shipmentVersion: number;
+  externalEventId: string | null;
+  publicReason: string | null;
+  carrierOccurredAt: string | null;
+  occurredAt: string;
+}
+
+export interface BuyerOrderShipment {
+  provider: 'MOCK' | 'DEMO_CARRIER';
+  version: string | null;
+  trackingCode: string;
+  status: string;
+  service: ShippingServiceCode;
+  handedOffAt: string;
+  registeredAt: string | null;
+  deliveredAt: string | null;
+  returnedAt: string | null;
+  lastUpdatedAt: string | null;
+  events: BuyerOrderShipmentEvent[];
+}
+
 export interface BuyerOrderTimelineEvent {
   id: string;
   previousStatus: ShopOrderStatus | null;
@@ -106,7 +130,8 @@ export interface BuyerOrderSummary {
   shop: { id: string; slug: string; name: string };
   note: string;
   lines: BuyerOrderLine[];
-  shipping: MockShippingBreakdown;
+  shipping: ShippingBreakdown;
+  shipment?: BuyerOrderShipment | null;
   listSubtotalMinor: number;
   productDiscountMinor: number;
   merchandiseSubtotalMinor: number;
@@ -334,48 +359,6 @@ function isLine(value: unknown): value is BuyerOrderLine {
   );
 }
 
-function isShipping(value: unknown): value is MockShippingBreakdown {
-  if (
-    !isRecord(value) ||
-    !exact(value, [
-      'provider',
-      'version',
-      'shopId',
-      'originProvince',
-      'destinationProvince',
-      'zone',
-      'shipmentWeightGrams',
-      'service',
-      'estimatedDaysMin',
-      'estimatedDaysMax',
-      'baseFeeMinor',
-      'zoneSurchargeMinor',
-      'weightSurchargeMinor',
-      'shippingFeeMinor',
-    ])
-  )
-    return false;
-  return (
-    value.provider === 'MOCK' &&
-    value.version === 'mock-v1' &&
-    isUuid(value.shopId) &&
-    isText(value.originProvince, 100) &&
-    isText(value.destinationProvince, 100) &&
-    ['SAME_PROVINCE', 'SAME_REGION', 'CROSS_REGION', 'UNKNOWN'].includes(String(value.zone)) &&
-    isPositive(value.shipmentWeightGrams) &&
-    ['ECONOMY', 'STANDARD', 'EXPRESS'].includes(String(value.service)) &&
-    isPositive(value.estimatedDaysMin) &&
-    isPositive(value.estimatedDaysMax) &&
-    value.estimatedDaysMin <= value.estimatedDaysMax &&
-    isMoney(value.baseFeeMinor) &&
-    isMoney(value.zoneSurchargeMinor) &&
-    isMoney(value.weightSurchargeMinor) &&
-    isMoney(value.shippingFeeMinor) &&
-    value.shippingFeeMinor ===
-      value.baseFeeMinor + value.zoneSurchargeMinor + value.weightSurchargeMinor
-  );
-}
-
 function isCancellation(value: unknown): value is BuyerOrderCancellationCapability {
   if (
     !isRecord(value) ||
@@ -414,6 +397,65 @@ function isInventoryHold(value: unknown): value is BuyerOrderInventoryHold {
   );
 }
 
+// Historical order snapshots intentionally keep the original mock quote
+// numbers, even when they predate the current tariff table. New demo quotes
+// still use the shared strict validator.
+function isOrderHistoryShipping(value: unknown): value is ShippingBreakdown {
+  if (!isRecord(value)) return false;
+  if (value.provider !== 'MOCK') return isShippingBreakdown(value);
+  if (
+    !exact(value, [
+      'provider', 'version', 'shopId', 'originProvince', 'destinationProvince', 'zone',
+      'shipmentWeightGrams', 'service', 'estimatedDaysMin', 'estimatedDaysMax',
+      'baseFeeMinor', 'zoneSurchargeMinor', 'weightSurchargeMinor', 'shippingFeeMinor',
+    ]) ||
+    value.version !== 'mock-v1' ||
+    !isUuid(value.shopId) ||
+    !isText(value.originProvince, 100) ||
+    !isText(value.destinationProvince, 100) ||
+    !['SAME_PROVINCE', 'SAME_REGION', 'CROSS_REGION', 'UNKNOWN'].includes(String(value.zone)) ||
+    !isPositive(value.shipmentWeightGrams) ||
+    !['ECONOMY', 'STANDARD', 'EXPRESS'].includes(String(value.service)) ||
+    !isPositive(value.estimatedDaysMin) ||
+    !isPositive(value.estimatedDaysMax) ||
+    value.estimatedDaysMin > value.estimatedDaysMax ||
+    !isMoney(value.baseFeeMinor) ||
+    !isMoney(value.zoneSurchargeMinor) ||
+    !isMoney(value.weightSurchargeMinor) ||
+    !isMoney(value.shippingFeeMinor)
+  ) return false;
+  return value.shippingFeeMinor === value.baseFeeMinor + value.zoneSurchargeMinor + value.weightSurchargeMinor;
+}
+
+function isShipment(value: unknown): value is BuyerOrderShipment {
+  if (
+    !isRecord(value) ||
+    !exact(value, ['provider', 'version', 'trackingCode', 'status', 'service', 'handedOffAt', 'registeredAt', 'deliveredAt', 'returnedAt', 'lastUpdatedAt', 'events']) ||
+    !['MOCK', 'DEMO_CARRIER'].includes(String(value.provider)) ||
+    !(value.version === null || isText(value.version, 80)) ||
+    !isText(value.trackingCode, 120) ||
+    !isText(value.status, 60) ||
+    !['ECONOMY', 'STANDARD', 'EXPRESS'].includes(String(value.service)) ||
+    !isInstant(value.handedOffAt) ||
+    !(value.registeredAt === null || isInstant(value.registeredAt)) ||
+    !(value.deliveredAt === null || isInstant(value.deliveredAt)) ||
+    !(value.returnedAt === null || isInstant(value.returnedAt)) ||
+    !(value.lastUpdatedAt === null || isInstant(value.lastUpdatedAt)) ||
+    !Array.isArray(value.events)
+  ) return false;
+  return value.events.every((event) =>
+    isRecord(event) &&
+    exact(event, ['status', 'previousStatus', 'shipmentVersion', 'externalEventId', 'publicReason', 'carrierOccurredAt', 'occurredAt']) &&
+    isText(event.status, 60) &&
+    (event.previousStatus === null || isText(event.previousStatus, 60)) &&
+    isMoney(event.shipmentVersion) &&
+    (event.externalEventId === null || isText(event.externalEventId, 120)) &&
+    (event.publicReason === null || isText(event.publicReason, 120)) &&
+    (event.carrierOccurredAt === null || isInstant(event.carrierOccurredAt)) &&
+    isInstant(event.occurredAt),
+  );
+}
+
 function sum(values: number[]): number | null {
   const total = values.reduce((result, value) => result + value, 0);
   return Number.isSafeInteger(total) ? total : null;
@@ -448,7 +490,7 @@ export function isBuyerOrderSummary(value: unknown): value is BuyerOrderSummary 
         'payableTotalMinor',
         'cancellation',
       ],
-      ['inventoryHold', 'returnCapability'],
+      ['inventoryHold', 'returnCapability', 'shipment'],
     )
   )
     return false;
@@ -473,7 +515,8 @@ export function isBuyerOrderSummary(value: unknown): value is BuyerOrderSummary 
     !Array.isArray(order.lines) ||
     order.lines.length === 0 ||
     !order.lines.every(isLine) ||
-    !isShipping(order.shipping) ||
+    !isOrderHistoryShipping(order.shipping) ||
+    (order.shipment !== undefined && order.shipment !== null && !isShipment(order.shipment)) ||
     order.shipping.shopId !== order.shop.id ||
     !isCancellation(order.cancellation) ||
     (order.inventoryHold !== undefined && !isInventoryHold(order.inventoryHold)) ||

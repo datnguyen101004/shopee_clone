@@ -28,7 +28,9 @@ import {
 type AuditCursor = { createdAt: string; id: string };
 
 function toPersistedRole(role: ElevatedMarketplaceRole): MarketplaceRole {
-  return role === 'seller' ? MarketplaceRole.SELLER : MarketplaceRole.ADMIN;
+  if (role === 'seller') return MarketplaceRole.SELLER;
+  if (role === 'carrier_operator') return MarketplaceRole.CARRIER_OPERATOR;
+  return MarketplaceRole.ADMIN;
 }
 
 function toContractRole(role: MarketplaceRole): ContractMarketplaceRole {
@@ -39,6 +41,8 @@ function toContractRole(role: MarketplaceRole): ContractMarketplaceRole {
       return 'seller';
     case MarketplaceRole.ADMIN:
       return 'admin';
+    case MarketplaceRole.CARRIER_OPERATOR:
+      return 'carrier_operator';
   }
 }
 

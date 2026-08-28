@@ -6,9 +6,10 @@ import {
   type BuyerOrderDetailResponse,
   type BuyerOrderListResponse,
   type BuyerOrderSummary,
+  type BuyerOrderShipment,
   type BuyerOrderVoucherSnapshot,
   type CheckoutAddressSnapshot,
-  type MockShippingBreakdown,
+  type ShippingBreakdown,
 } from '@shopee-clone/contracts';
 import { Injectable } from '@nestjs/common';
 
@@ -32,6 +33,29 @@ function projectSummary(order: BuyerOrderSummaryGraph | BuyerOrderDetailGraph): 
     .find((event) => event.status === 'DELIVERED');
   const returnDeadline =
     !order.returnRequest && delivery ? returnEligibilityDeadline(delivery.occurredAt) : null;
+  const shipment: BuyerOrderShipment | null = order.shipment
+    ? {
+        provider: order.shipment.provider === 'DEMO_CARRIER' ? 'DEMO_CARRIER' : 'MOCK',
+        version: order.shipment.providerVersion,
+        trackingCode: order.shipment.trackingCode,
+        status: order.shipment.status,
+        service: order.shipment.service as BuyerOrderShipment['service'],
+        handedOffAt: order.shipment.handedOffAt.toISOString(),
+        registeredAt: order.shipment.registeredAt?.toISOString() ?? null,
+        deliveredAt: order.shipment.deliveredAt?.toISOString() ?? null,
+        returnedAt: order.shipment.returnedAt?.toISOString() ?? null,
+        lastUpdatedAt: order.shipment.lastUpdatedAt?.toISOString() ?? null,
+        events: order.shipment.events.map((event) => ({
+          status: event.status,
+          previousStatus: event.previousStatus,
+          shipmentVersion: event.shipmentVersion,
+          externalEventId: event.externalEventId,
+          publicReason: event.publicReason,
+          carrierOccurredAt: event.carrierOccurredAt?.toISOString() ?? null,
+          occurredAt: event.occurredAt.toISOString(),
+        })),
+      }
+    : null;
   return {
     orderReference: order.id,
     purchaseReference: order.purchase.id,
@@ -73,7 +97,8 @@ function projectSummary(order: BuyerOrderSummaryGraph | BuyerOrderDetailGraph): 
             reviewId: null,
           },
     })),
-    shipping: jsonObject<MockShippingBreakdown>(order.shippingSnapshot),
+    shipping: jsonObject<ShippingBreakdown>(order.shippingSnapshot),
+    ...(shipment ? { shipment } : {}),
     listSubtotalMinor: checkedMoneyFromBigInt(order.listSubtotalMinor),
     productDiscountMinor: checkedMoneyFromBigInt(order.productDiscountMinor),
     merchandiseSubtotalMinor: checkedMoneyFromBigInt(order.merchandiseSubtotalMinor),

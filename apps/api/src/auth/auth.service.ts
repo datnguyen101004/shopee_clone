@@ -51,6 +51,8 @@ function safeUser(user: PersistedUser): AuthUser {
           return 'seller';
         case MarketplaceRole.ADMIN:
           return 'admin';
+        case MarketplaceRole.CARRIER_OPERATOR:
+          return 'carrier_operator';
       }
     }),
   );

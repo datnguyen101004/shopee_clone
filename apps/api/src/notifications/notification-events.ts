@@ -18,7 +18,7 @@ export function moneyLabel(amountMinor: number | null | undefined, currency = 'V
 export function orderNotificationEvent(input: {
   type: Extract<
     NotificationType,
-    'ORDER_CONFIRMED' | 'ORDER_SHIPPING' | 'ORDER_DELIVERED' | 'ORDER_CANCELLED'
+    'ORDER_CREATED' | 'ORDER_CONFIRMED' | 'ORDER_SHIPPING' | 'ORDER_DELIVERED' | 'ORDER_CANCELLED'
   >;
   orderId: string;
   buyerId: string;
@@ -29,7 +29,32 @@ export function orderNotificationEvent(input: {
 }): NotifyEventInput {
   const amount = moneyLabel(input.amountMinor, input.currency ?? 'VND');
   const shortRef = input.orderId.slice(0, 8);
-  const copy: Record<typeof input.type, { buyerTitle: string; buyerBody: string; sellerTitle: string; sellerBody: string }> = {
+  const meta = (targetUrl: string): NotificationMetadata => ({
+    targetUrl,
+    thumbnailUrl: input.thumbnailUrl ?? null,
+    referenceId: input.orderId,
+    amountMinor: input.amountMinor,
+    currency: input.currency ?? 'VND',
+  });
+  if (input.type === 'ORDER_CREATED') {
+    return {
+      type: input.type,
+      referenceKey: `order:${input.orderId}`,
+      recipients: [
+        {
+          userId: input.sellerOwnerId,
+          roleTag: 'seller',
+          title: 'Có đơn hàng mới',
+          body: `Đơn #${shortRef}${amount ? ` (${amount})` : ''} vừa được tạo. Hãy kiểm tra và xác nhận đơn.`,
+          metadata: meta(`/seller/orders/${input.orderId}`),
+        },
+      ],
+    };
+  }
+  const copy: Record<
+    typeof input.type,
+    { buyerTitle: string; buyerBody: string; sellerTitle: string; sellerBody: string }
+  > = {
     ORDER_CONFIRMED: {
       buyerTitle: 'Đơn hàng đã được xác nhận',
       buyerBody: `Shop đã xác nhận đơn #${shortRef}${amount ? ` (${amount})` : ''}.`,
@@ -38,9 +63,9 @@ export function orderNotificationEvent(input: {
     },
     ORDER_SHIPPING: {
       buyerTitle: 'Đơn hàng đang được giao',
-      buyerBody: `Đơn #${shortRef} đã bàn giao đơn vị vận chuyển.`,
-      sellerTitle: 'Đơn hàng đã bàn giao vận chuyển',
-      sellerBody: `Đơn #${shortRef} đang trong quá trình giao.`,
+      buyerBody: `Đơn vị vận chuyển đã lấy đơn #${shortRef} và đang giao đến bạn.`,
+      sellerTitle: 'Đơn vị vận chuyển đã lấy hàng',
+      sellerBody: `Đơn #${shortRef} đã được lấy và chuyển sang đang giao.`,
     },
     ORDER_DELIVERED: {
       buyerTitle: 'Đơn hàng đã giao thành công',
@@ -56,13 +81,6 @@ export function orderNotificationEvent(input: {
     },
   };
   const text = copy[input.type];
-  const meta = (targetUrl: string): NotificationMetadata => ({
-    targetUrl,
-    thumbnailUrl: input.thumbnailUrl ?? null,
-    referenceId: input.orderId,
-    amountMinor: input.amountMinor,
-    currency: input.currency ?? 'VND',
-  });
   const recipients: NotificationRecipientInput[] = [
     {
       userId: input.buyerId,
@@ -106,7 +124,14 @@ export function returnNotificationEvent(input: {
   const shortRef = input.returnId.slice(0, 8);
   const copy: Record<
     typeof input.type,
-    { buyer: string; seller: string; admin?: string; buyerBody: string; sellerBody: string; adminBody?: string }
+    {
+      buyer: string;
+      seller: string;
+      admin?: string;
+      buyerBody: string;
+      sellerBody: string;
+      adminBody?: string;
+    }
   > = {
     RETURN_REQUESTED: {
       buyer: 'Yêu cầu trả hàng đã gửi',

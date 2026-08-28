@@ -11,6 +11,7 @@ import { useChat } from '../chat/chat-provider';
 import { NotificationInbox } from './notification-inbox';
 
 vi.mock('../../lib/notifications-api', () => ({
+  isNotificationAtOrBefore: vi.fn(() => true),
   listNotifications: vi.fn(),
   markAllNotificationsRead: vi.fn(),
   markNotificationRead: vi.fn(),
@@ -121,6 +122,7 @@ describe('NotificationInbox', () => {
       id: orderId,
       isRead: true,
       readAt: timestamp,
+      updatedCount: 1,
     });
     vi.mocked(useChat).mockReturnValue({
       openConversationFromNotification: vi.fn().mockResolvedValue(true),

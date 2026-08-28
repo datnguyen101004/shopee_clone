@@ -12,6 +12,7 @@ import { NotificationBell } from './notification-bell';
 
 vi.mock('../../lib/notifications-api', () => ({
   getNotificationUnreadCount: vi.fn(),
+  isNotificationAtOrBefore: vi.fn(() => true),
   listNotificationPopover: vi.fn(),
   markNotificationRead: vi.fn(),
 }));
@@ -90,6 +91,7 @@ describe('NotificationBell', () => {
       id: notificationId,
       isRead: true,
       readAt: timestamp,
+      updatedCount: 1,
     });
     vi.mocked(useChat).mockReturnValue({
       openConversationFromNotification: vi.fn().mockResolvedValue(true),

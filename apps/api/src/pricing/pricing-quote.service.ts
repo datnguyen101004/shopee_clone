@@ -76,6 +76,8 @@ const quoteCartSelect = {
                   slug: true,
                   name: true,
                   location: true,
+                  pickupProvince: true,
+                  pickupDistrict: true,
                   status: true,
                   onboardingStatus: true,
                   deletedAt: true,
@@ -212,18 +214,28 @@ export class PricingQuoteService {
       if (!selectedShopIds.has(selection.shopId)) throw new PricingValidationError(['vouchers']);
     }
 
-    const baseQuote = this.calculator.calculate({
-      cartVersion: version,
-      evaluatedAt: input.evaluatedAt,
-      address: {
-        id: address.id,
-        province: address.province,
-        district: address.district,
-      },
-      lines,
-      exclusions,
-      services: input.services,
-    });
+    let baseQuote: PricingQuoteResponse;
+    try {
+      baseQuote = this.calculator.calculate({
+        cartVersion: version,
+        evaluatedAt: input.evaluatedAt,
+        address: {
+          id: address.id,
+          province: address.province,
+          district: address.district,
+        },
+        lines,
+        exclusions,
+        services: input.services,
+      });
+    } catch (error) {
+      const code = error instanceof Error ? error.message : '';
+      if (process.env.DEMO_CARRIER_ENABLED === 'true' && /UNRESOLVED_(?:PROVINCE|DISTRICT)|MISSING_PICKUP_DISTRICT|DISTANCE_UNSUPPORTED/.test(code)) {
+        const fields = code === 'MISSING_PICKUP_DISTRICT' ? ['shopPickupAddress'] : ['shippingAddressId'];
+        throw new PricingValidationError(fields);
+      }
+      throw error;
+    }
     const definitions = await this.loadVoucherDefinitions(
       transaction,
       input.userId,
@@ -399,6 +411,8 @@ export class PricingQuoteService {
           slug: shop.slug,
           name: shop.name,
           location: shop.location,
+          pickupProvince: shop.pickupProvince,
+          pickupDistrict: shop.pickupDistrict,
         },
       });
       snapshots.push({

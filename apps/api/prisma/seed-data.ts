@@ -53,6 +53,8 @@ export const seedShops = [
     slug: 'shopee-tech-store',
     name: 'Shopee Tech Store',
     location: 'TP. Hồ Chí Minh',
+    pickupProvince: '79',
+    pickupDistrict: '79-001',
   },
   {
     id: '00000000-0000-4000-8000-000000000102',
@@ -60,6 +62,8 @@ export const seedShops = [
     slug: 'happy-home-store',
     name: 'Happy Home Store',
     location: 'Hà Nội',
+    pickupProvince: '01',
+    pickupDistrict: '01-001',
   },
 ] as const;
 

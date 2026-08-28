@@ -81,9 +81,10 @@ enum ExternalIdentityProvider {
 }
 
 enum MarketplaceRole {
-  BUYER  @map("buyer")
-  SELLER @map("seller")
-  ADMIN  @map("admin")
+  BUYER            @map("buyer")
+  SELLER           @map("seller")
+  ADMIN            @map("admin")
+  CARRIER_OPERATOR @map("carrier_operator")
 
   @@map("marketplace_role")
 }
@@ -223,6 +224,7 @@ enum NotificationChannel {
 }
 
 enum NotificationType {
+  ORDER_CREATED     @map("order_created")
   ORDER_CONFIRMED   @map("order_confirmed")
   ORDER_SHIPPING    @map("order_shipping")
   ORDER_DELIVERED   @map("order_delivered")
@@ -375,13 +377,24 @@ enum SellerOrderFulfillmentState {
 }
 
 enum SellerOrderShipmentProvider {
-  MOCK @map("mock")
+  MOCK         @map("mock")
+  DEMO_CARRIER @map("demo_carrier")
 
   @@map("seller_order_shipment_provider")
 }
 
 enum SellerOrderShipmentStatus {
-  HANDED_OFF @map("handed_off")
+  HANDED_OFF           @map("handed_off")
+  REGISTRATION_PENDING @map("registration_pending")
+  REGISTRATION_FAILED  @map("registration_failed")
+  CREATED              @map("created")
+  ACCEPTED             @map("accepted")
+  IN_TRANSIT           @map("in_transit")
+  OUT_FOR_DELIVERY     @map("out_for_delivery")
+  DELIVERY_FAILED      @map("delivery_failed")
+  RETURN_IN_TRANSIT    @map("return_in_transit")
+  DELIVERED            @map("delivered")
+  RETURNED             @map("returned")
 
   @@map("seller_order_shipment_status")
 }
@@ -1403,32 +1416,90 @@ model SellerOrderFulfillmentEvent {
 }
 
 model SellerOrderShipment {
-  id               String                      @id @default(uuid()) @db.Uuid
-  orderId          String                      @unique @map("order_id") @db.Uuid
-  provider         SellerOrderShipmentProvider
-  trackingCode     String                      @unique @map("tracking_code") @db.VarChar(80)
-  status           SellerOrderShipmentStatus   @default(HANDED_OFF)
-  service          String                      @db.VarChar(40)
-  shippingSnapshot Json                        @map("shipping_snapshot") @db.JsonB
-  handedOffAt      DateTime                    @map("handed_off_at") @db.Timestamptz(3)
-  createdAt        DateTime                    @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt        DateTime                    @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
-  order            ShopOrder                   @relation(fields: [orderId], references: [id], onDelete: Restrict)
-  events           SellerOrderShipmentEvent[]
+  id                 String                      @id @default(uuid()) @db.Uuid
+  orderId            String                      @unique @map("order_id") @db.Uuid
+  provider           SellerOrderShipmentProvider
+  trackingCode       String                      @unique @map("tracking_code") @db.VarChar(80)
+  status             SellerOrderShipmentStatus   @default(HANDED_OFF)
+  service            String                      @db.VarChar(40)
+  shippingSnapshot   Json                        @map("shipping_snapshot") @db.JsonB
+  handedOffAt        DateTime                    @map("handed_off_at") @db.Timestamptz(3)
+  providerVersion    String?                     @map("provider_version") @db.VarChar(40)
+  externalShipmentId String?                     @unique @map("external_shipment_id") @db.VarChar(120)
+  shipmentVersion    Int                         @default(0) @map("shipment_version")
+  registeredAt       DateTime?                   @map("registered_at") @db.Timestamptz(3)
+  deliveredAt        DateTime?                   @map("delivered_at") @db.Timestamptz(3)
+  returnedAt         DateTime?                   @map("returned_at") @db.Timestamptz(3)
+  lastUpdatedAt      DateTime?                   @map("last_updated_at") @db.Timestamptz(3)
+  createdAt          DateTime                    @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt          DateTime                    @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  order              ShopOrder                   @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  events             SellerOrderShipmentEvent[]
+  dispatchOutbox     CarrierDispatchOutbox?
+  callbackReceipts   CarrierCallbackReceipt[]
 
-  @@index([status, handedOffAt(sort: Desc), id])
+  @@index([status, lastUpdatedAt(sort: Desc), id])
+  @@index([provider, externalShipmentId])
   @@map("seller_order_shipments")
 }
 
 model SellerOrderShipmentEvent {
-  id         String                    @id @default(uuid()) @db.Uuid
-  shipmentId String                    @map("shipment_id") @db.Uuid
-  status     SellerOrderShipmentStatus
-  occurredAt DateTime                  @default(now()) @map("occurred_at") @db.Timestamptz(3)
-  shipment   SellerOrderShipment       @relation(fields: [shipmentId], references: [id], onDelete: Restrict)
+  id                String                     @id @default(uuid()) @db.Uuid
+  shipmentId        String                     @map("shipment_id") @db.Uuid
+  status            SellerOrderShipmentStatus
+  previousStatus    SellerOrderShipmentStatus? @map("previous_status")
+  shipmentVersion   Int                        @default(0) @map("shipment_version")
+  externalEventId   String?                    @unique @map("external_event_id") @db.VarChar(120)
+  publicReason      String?                    @map("public_reason") @db.VarChar(120)
+  carrierOccurredAt DateTime?                  @map("carrier_occurred_at") @db.Timestamptz(3)
+  commandId         String?                    @unique @map("command_id") @db.Uuid
+  commandDigest     String?                    @map("command_digest") @db.Char(64)
+  occurredAt        DateTime                   @default(now()) @map("occurred_at") @db.Timestamptz(3)
+  shipment          SellerOrderShipment        @relation(fields: [shipmentId], references: [id], onDelete: Restrict)
 
+  @@unique([shipmentId, shipmentVersion])
   @@index([shipmentId, occurredAt, id])
+  @@index([externalEventId])
+  @@index([commandId])
   @@map("seller_order_shipment_events")
+}
+
+model CarrierDispatchOutbox {
+  id                String              @id @default(uuid()) @db.Uuid
+  shipmentId        String              @unique @map("shipment_id") @db.Uuid
+  shipmentReference String              @map("shipment_reference") @db.Uuid
+  payload           Json                @db.JsonB
+  payloadDigest     String              @map("payload_digest") @db.Char(64)
+  attemptCount      Int                 @default(0) @map("attempt_count")
+  nextAttemptAt     DateTime            @default(now()) @map("next_attempt_at") @db.Timestamptz(3)
+  leaseUntil        DateTime?           @map("lease_until") @db.Timestamptz(3)
+  leaseOwner        String?             @map("lease_owner") @db.VarChar(120)
+  outcome           String?             @db.VarChar(40)
+  errorCode         String?             @map("error_code") @db.VarChar(80)
+  createdAt         DateTime            @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt         DateTime            @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  shipment          SellerOrderShipment @relation(fields: [shipmentId], references: [id], onDelete: Restrict)
+
+  @@index([nextAttemptAt, leaseUntil])
+  @@index([outcome, nextAttemptAt])
+  @@map("carrier_dispatch_outbox")
+}
+
+model CarrierCallbackReceipt {
+  id              String                      @id @default(uuid()) @db.Uuid
+  provider        SellerOrderShipmentProvider
+  externalEventId String                      @map("external_event_id") @db.VarChar(120)
+  payloadDigest   String                      @map("payload_digest") @db.Char(64)
+  shipmentId      String?                     @map("shipment_id") @db.Uuid
+  outcome         String                      @db.VarChar(40)
+  resultStatus    SellerOrderShipmentStatus?  @map("result_status")
+  resultVersion   Int?                        @map("result_version")
+  receivedAt      DateTime                    @default(now()) @map("received_at") @db.Timestamptz(3)
+  shipment        SellerOrderShipment?        @relation(fields: [shipmentId], references: [id], onDelete: Restrict)
+
+  @@unique([provider, externalEventId])
+  @@index([shipmentId, receivedAt(sort: Desc)])
+  @@map("carrier_callback_receipts")
 }
 
 model SellerOrderInventoryCompensation {

@@ -9,6 +9,7 @@ import {
   isNotificationListResponse,
   isNotificationMetadata,
   isNotificationPreferencesResponse,
+  isMarkNotificationReadResponse,
   isUpdateNotificationPreferenceRequest,
   parseNotificationListQuery,
 } from '../src';
@@ -128,6 +129,20 @@ describe('notification contracts', () => {
         ],
       }),
     ).toBe(true);
+  });
+
+  it('validates read-through responses with the number of notifications updated', () => {
+    expect(
+      isMarkNotificationReadResponse({
+        id,
+        isRead: true,
+        readAt: timestamp,
+        updatedCount: 3,
+      }),
+    ).toBe(true);
+    expect(
+      isMarkNotificationReadResponse({ id, isRead: true, readAt: timestamp }),
+    ).toBe(false);
   });
 
   it('accepts bounded chat aggregates and rejects private fields', () => {

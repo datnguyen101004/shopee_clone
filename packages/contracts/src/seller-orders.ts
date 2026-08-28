@@ -1,5 +1,5 @@
 import type { CheckoutAddressSnapshot, PurchasePaymentStatus, ShopOrderStatus } from './checkout';
-import type { MockShippingBreakdown } from './pricing';
+import type { ShippingBreakdown, ShippingServiceCode } from './pricing';
 
 export const SELLER_ORDER_VERSION = 'seller-orders-v1' as const;
 export const SELLER_ORDER_DEFAULT_LIMIT = 20;
@@ -102,17 +102,38 @@ export interface SellerOrderFulfillmentEvent {
 }
 
 export interface SellerOrderShipmentEvent {
-  status: 'HANDED_OFF';
+  status:
+    | 'HANDED_OFF'
+    | 'REGISTRATION_PENDING'
+    | 'REGISTRATION_FAILED'
+    | 'CREATED'
+    | 'ACCEPTED'
+    | 'IN_TRANSIT'
+    | 'OUT_FOR_DELIVERY'
+    | 'DELIVERY_FAILED'
+    | 'RETURN_IN_TRANSIT'
+    | 'DELIVERED'
+    | 'RETURNED';
+  previousStatus?: SellerOrderShipmentEvent['status'] | null;
+  shipmentVersion?: number;
+  externalEventId?: string | null;
+  publicReason?: string | null;
+  carrierOccurredAt?: string | null;
   occurredAt: string;
 }
 
 export interface SellerOrderShipment {
   id: string;
-  provider: 'MOCK';
+  provider: 'MOCK' | 'DEMO_CARRIER';
+  version?: string;
   trackingCode: string;
-  status: 'HANDED_OFF';
-  service: MockShippingBreakdown['service'];
+  status: SellerOrderShipmentEvent['status'];
+  service: ShippingServiceCode;
   handedOffAt: string;
+  registeredAt?: string | null;
+  deliveredAt?: string | null;
+  returnedAt?: string | null;
+  lastUpdatedAt?: string | null;
   events: SellerOrderShipmentEvent[];
 }
 
@@ -130,7 +151,7 @@ export interface SellerOrderSummary {
   lineCount: number;
   itemQuantity: number;
   payableTotalMinor: number;
-  shippingService: MockShippingBreakdown['service'];
+  shippingService: ShippingServiceCode;
   deadline: SellerOrderDeadline;
   lines: SellerOrderLine[];
   availableActions: SellerOrderAvailableAction[];
@@ -153,7 +174,7 @@ export interface SellerOrderDetail {
   shop: { id: string; slug: string; name: string; pickupAddress: SellerOrderAddress | null };
   buyerNote: string;
   address: SellerOrderAddress;
-  shipping: MockShippingBreakdown;
+  shipping: ShippingBreakdown;
   listSubtotalMinor: number;
   productDiscountMinor: number;
   merchandiseSubtotalMinor: number;

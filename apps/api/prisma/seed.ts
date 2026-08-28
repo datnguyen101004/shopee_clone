@@ -93,6 +93,8 @@ async function seedMarketplace() {
           slug: shop.slug,
           name: shop.name,
           location: shop.location,
+          pickupProvince: shop.pickupProvince,
+          pickupDistrict: shop.pickupDistrict,
           status: ShopStatus.ACTIVE,
           onboardingStatus: ShopOnboardingStatus.APPROVED,
           deletedAt: null,
@@ -146,6 +148,28 @@ async function seedMarketplace() {
           },
         });
       }
+    }
+
+    // The first deterministic local account is also the demo carrier operator.
+    // This keeps the shared-login journey usable without granting carrier
+    // authority to every buyer/seller account in a real environment.
+    const carrierOperator = await transaction.userRoleAssignment.createMany({
+      data: {
+        userId: seedUsers[0].id,
+        role: MarketplaceRole.CARRIER_OPERATOR,
+        source: RoleAuditSource.SEED,
+      },
+      skipDuplicates: true,
+    });
+    if (carrierOperator.count === 1) {
+      await transaction.roleAuditEvent.create({
+        id: '30000000-0000-4000-8000-000000000001',
+        targetUserId: seedUsers[0].id,
+        role: MarketplaceRole.CARRIER_OPERATOR,
+        action: RoleAuditAction.GRANT,
+        source: RoleAuditSource.SEED,
+        reason: 'Carrier operator role assigned to deterministic local demo account',
+      });
     }
 
     for (const category of seedCategories) {

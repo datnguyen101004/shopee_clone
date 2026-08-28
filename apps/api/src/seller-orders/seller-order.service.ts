@@ -1,11 +1,13 @@
 import { randomUUID, createHash } from 'node:crypto';
 
 import type {
+  DemoCarrierShippingBreakdown,
   SellerOrderActionRequest,
   SellerOrderDetailResponse,
   SellerOrderListResponse,
   SellerOrderQueueQuery,
 } from '@shopee-clone/contracts';
+import { isShippingBreakdown } from '@shopee-clone/contracts';
 import { Inject, Injectable } from '@nestjs/common';
 import { Prisma } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
@@ -19,7 +21,6 @@ import { SellerOrderCompensationService } from './seller-order-compensation.serv
 import {
   canExecuteSellerAction,
   deadlineIsLate,
-  SELLER_HANDOFF_DEADLINE_MS,
   targetForSellerAction,
 } from './seller-order-fulfillment';
 import { sellerOrderActionDigest, sellerOrderDigestsEqual } from './seller-order-canonical';
@@ -238,9 +239,7 @@ export class SellerOrderService {
           };
           if (input.action === 'CONFIRM') {
             fulfillmentUpdate.confirmedAt = now;
-            fulfillmentUpdate.handoffDeadlineAt = new Date(
-              now.getTime() + SELLER_HANDOFF_DEADLINE_MS,
-            );
+            fulfillmentUpdate.readyForPickupAt = now;
           }
           if (input.action === 'START_PREPARING') fulfillmentUpdate.preparingAt = now;
           if (input.action === 'MARK_READY_FOR_PICKUP') fulfillmentUpdate.readyForPickupAt = now;
@@ -256,29 +255,68 @@ export class SellerOrderService {
           });
           if (advanced.count !== 1)
             throw new SellerOrderStaleError(current.version, fulfillment.version);
-          if (input.action === 'HAND_OFF') {
+          if (input.action === 'CONFIRM') {
             const shipping = current.shippingSnapshot as { service?: string };
-            const trackingCode = `MOCK-${createHash('sha256').update(`${orderReference}:${idempotencyKey}`).digest('hex').slice(0, 16).toUpperCase()}`;
+            const demoCarrierEnabled = process.env.DEMO_CARRIER_ENABLED === 'true';
+            const trackingCode = `${demoCarrierEnabled ? 'DEMO' : 'MOCK'}-${createHash('sha256').update(`${orderReference}:${idempotencyKey}`).digest('hex').slice(0, 16).toUpperCase()}`;
             const shipment = await tx.sellerOrderShipment.create({
               data: {
                 id: randomUUID(),
                 orderId: orderReference,
-                provider: 'MOCK',
+                provider: demoCarrierEnabled ? 'DEMO_CARRIER' : 'MOCK',
                 trackingCode,
-                status: 'HANDED_OFF',
+                status: demoCarrierEnabled ? 'REGISTRATION_PENDING' : 'HANDED_OFF',
                 service: shipping.service ?? 'STANDARD',
                 shippingSnapshot: current.shippingSnapshot as Prisma.InputJsonValue,
                 handedOffAt: now,
+                providerVersion: demoCarrierEnabled ? 'demo-distance-v1' : null,
+                shipmentVersion: 0,
+                lastUpdatedAt: now,
               },
             });
             await tx.sellerOrderShipmentEvent.create({
               data: {
                 id: randomUUID(),
                 shipmentId: shipment.id,
-                status: 'HANDED_OFF',
+                status: demoCarrierEnabled ? 'REGISTRATION_PENDING' : 'HANDED_OFF',
+                previousStatus: null,
+                shipmentVersion: 0,
                 occurredAt: now,
               },
             });
+            if (demoCarrierEnabled) {
+              if (
+                !isShippingBreakdown(current.shippingSnapshot) ||
+                current.shippingSnapshot.provider !== 'DEMO_CARRIER'
+              ) {
+                throw new SellerOrderValidationError(['shippingSnapshot']);
+              }
+              const demoShipping = current.shippingSnapshot as DemoCarrierShippingBreakdown;
+              const payload = {
+                shipmentReference: orderReference,
+                trackingCode,
+                service: demoShipping.service,
+                pickup: {
+                  provinceCode: demoShipping.originProvinceCode,
+                  districtCode: demoShipping.originDistrictCode,
+                },
+                delivery: {
+                  provinceCode: demoShipping.destinationProvinceCode,
+                  districtCode: demoShipping.destinationDistrictCode,
+                },
+                shipmentWeightGrams: demoShipping.shipmentWeightGrams,
+              } satisfies Prisma.InputJsonObject;
+              await tx.carrierDispatchOutbox.create({
+                data: {
+                  id: randomUUID(),
+                  shipmentId: shipment.id,
+                  shipmentReference: orderReference,
+                  payload,
+                  payloadDigest: createHash('sha256').update(JSON.stringify(payload)).digest('hex'),
+                  nextAttemptAt: now,
+                },
+              });
+            }
           }
           await tx.sellerOrderFulfillmentEvent.create({
             data: {
@@ -333,13 +371,11 @@ export class SellerOrderService {
     action: SellerOrderActionRequest['action'],
   ): Promise<void> {
     const type =
-      action === 'CONFIRM'
-        ? ('ORDER_CONFIRMED' as const)
-        : action === 'HAND_OFF'
-          ? ('ORDER_SHIPPING' as const)
-          : action === 'REJECT'
-            ? ('ORDER_CANCELLED' as const)
-            : null;
+      action === 'HAND_OFF'
+        ? ('ORDER_SHIPPING' as const)
+        : action === 'REJECT'
+          ? ('ORDER_CANCELLED' as const)
+          : null;
     if (!type) return;
     try {
       const order = await this.prisma.shopOrder.findUnique({

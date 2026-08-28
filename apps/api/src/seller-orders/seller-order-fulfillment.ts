@@ -16,7 +16,7 @@ export interface SellerOrderStateContext {
 const transitions: Readonly<
   Record<SellerOrderFulfillmentState, readonly SellerOrderFulfillmentState[]>
 > = {
-  PENDING_CONFIRMATION: ['CONFIRMED', 'REJECTED', 'CANCELLED'],
+  PENDING_CONFIRMATION: ['READY_FOR_PICKUP', 'REJECTED', 'CANCELLED'],
   CONFIRMED: ['PREPARING', 'CANCELLED'],
   PREPARING: ['READY_FOR_PICKUP', 'CANCELLED'],
   READY_FOR_PICKUP: ['HANDED_OFF', 'CANCELLED'],
@@ -26,7 +26,7 @@ const transitions: Readonly<
 };
 
 const actionTargets: Readonly<Record<SellerOrderAction, SellerOrderFulfillmentState>> = {
-  CONFIRM: 'CONFIRMED',
+  CONFIRM: 'READY_FOR_PICKUP',
   START_PREPARING: 'PREPARING',
   MARK_READY_FOR_PICKUP: 'READY_FOR_PICKUP',
   HAND_OFF: 'HANDED_OFF',
@@ -56,25 +56,18 @@ export function canExecuteSellerAction(
     context.orderStatus === 'REFUNDED'
   )
     return false;
-  if (action === 'HAND_OFF' && context.shipmentExists) return false;
-  const target = targetForSellerAction(action);
   if (action === 'CONFIRM' || action === 'REJECT')
     return (
       context.orderStatus === 'PENDING_CONFIRMATION' &&
       context.fulfillmentState === 'PENDING_CONFIRMATION'
     );
-  if (action === 'START_PREPARING' || action === 'MARK_READY_FOR_PICKUP' || action === 'HAND_OFF')
-    return (
-      context.orderStatus === 'AWAITING_PICKUP' &&
-      canTransitionSellerFulfillment(context.fulfillmentState, target)
-    );
   return false;
 }
 
 export function availableSellerActions(context: SellerOrderStateContext): SellerOrderAction[] {
-  return (
-    ['CONFIRM', 'START_PREPARING', 'MARK_READY_FOR_PICKUP', 'HAND_OFF', 'REJECT'] as const
-  ).filter((action) => canExecuteSellerAction(context, action));
+  return (['CONFIRM', 'REJECT'] as const).filter((action) =>
+    canExecuteSellerAction(context, action),
+  );
 }
 
 export function deadlineIsLate(

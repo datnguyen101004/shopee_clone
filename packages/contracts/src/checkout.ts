@@ -1,7 +1,7 @@
 import {
   isPricingQuoteResponse,
   parsePricingQuoteRequest,
-  type MockShippingBreakdown,
+  type ShippingBreakdown,
   type PricingQuoteLine,
   type PricingQuoteResponse,
   type PricingQuoteShop,
@@ -739,4 +739,4 @@ export function isCheckoutProblemDetails(value: unknown): value is CheckoutProbl
 export const parseCheckoutProblemDetails = (value: unknown): CheckoutProblemDetails | null =>
   isCheckoutProblemDetails(value) ? value : null;
 
-export type { MockShippingBreakdown };
+export type { ShippingBreakdown };

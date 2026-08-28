@@ -6,8 +6,8 @@ export const AUTH_PASSWORD_MAX_LENGTH = 128;
 export const ROLE_REASON_MIN_LENGTH = 8;
 export const ROLE_REASON_MAX_LENGTH = 240;
 
-export const marketplaceRoleValues = ['buyer', 'seller', 'admin'] as const;
-export const elevatedMarketplaceRoleValues = ['seller', 'admin'] as const;
+export const marketplaceRoleValues = ['buyer', 'seller', 'admin', 'carrier_operator'] as const;
+export const elevatedMarketplaceRoleValues = ['seller', 'admin', 'carrier_operator'] as const;
 export const roleAuditActionValues = ['grant', 'revoke'] as const;
 export const roleAuditSourceValues = ['system', 'migration', 'seed', 'bootstrap', 'admin'] as const;
 export const authorizationProblemTypeValues = [

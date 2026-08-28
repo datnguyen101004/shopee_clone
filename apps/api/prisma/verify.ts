@@ -143,11 +143,13 @@ async function verifyDatabase(databaseUrl: string): Promise<void> {
       roleAssignments:
         seedUsers.length +
         new Set(seedShops.map(({ ownerId }) => ownerId)).size +
-        datasetOwnerCount * 2,
+        datasetOwnerCount * 2 +
+        1,
       roleAuditEvents:
         seedUsers.length +
         new Set(seedShops.map(({ ownerId }) => ownerId)).size +
-        datasetOwnerCount * 2,
+        datasetOwnerCount * 2 +
+        1,
     });
 
     const category = await prisma.category.findUnique({
@@ -332,6 +334,11 @@ async function verifyDatabase(databaseUrl: string): Promise<void> {
     assert.equal(
       roleAssignments.some(({ role }) => role === MarketplaceRole.ADMIN),
       false,
+    );
+    assert(
+      roleAssignments.some(
+        ({ userId, role }) => userId === seedUsers[0].id && role === MarketplaceRole.CARRIER_OPERATOR,
+      ),
     );
     for (const seedUser of seedUsers) {
       assert(

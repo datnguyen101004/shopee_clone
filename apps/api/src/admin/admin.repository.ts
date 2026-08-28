@@ -26,7 +26,7 @@ export interface AdminUserListItem {
   displayName: string;
   phoneNumber: string | null;
   status: AdminUserStatus;
-  roles: ('buyer' | 'seller' | 'admin')[];
+  roles: ('buyer' | 'seller' | 'admin' | 'carrier_operator')[];
   createdAt: Date;
   updatedAt: Date;
 }
@@ -97,7 +97,7 @@ export class AdminRepository {
     limit?: number;
     cursor?: string;
     status?: AdminUserStatus;
-    role?: 'buyer' | 'seller' | 'admin';
+    role?: 'buyer' | 'seller' | 'admin' | 'carrier_operator';
     q?: string;
   }): Promise<{ items: AdminUserListItem[]; nextCursor: string | null }> {
     const limit = Math.min(options.limit ?? ADMIN_DEFAULT_LIMIT, ADMIN_MAX_LIMIT);
@@ -112,7 +112,9 @@ export class AdminRepository {
           ? MarketplaceRole.ADMIN
           : options.role === 'seller'
             ? MarketplaceRole.SELLER
-            : MarketplaceRole.BUYER;
+            : options.role === 'carrier_operator'
+              ? MarketplaceRole.CARRIER_OPERATOR
+              : MarketplaceRole.BUYER;
       where.roleAssignments = { some: { role: roleEnum } };
     }
     if (options.q && options.q.trim().length > 0) {
@@ -156,7 +158,9 @@ export class AdminRepository {
             ? 'admin'
             : r.role === MarketplaceRole.SELLER
               ? 'seller'
-              : 'buyer',
+              : r.role === MarketplaceRole.CARRIER_OPERATOR
+                ? 'carrier_operator'
+                : 'buyer',
         ),
         createdAt: u.createdAt,
         updatedAt: u.updatedAt,
@@ -192,7 +196,9 @@ export class AdminRepository {
           ? 'admin'
           : r.role === MarketplaceRole.SELLER
             ? 'seller'
-            : 'buyer',
+            : r.role === MarketplaceRole.CARRIER_OPERATOR
+              ? 'carrier_operator'
+              : 'buyer',
       ),
       createdAt: user.createdAt,
       updatedAt: user.updatedAt,

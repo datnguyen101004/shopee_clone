@@ -16,6 +16,7 @@ import {
   type MarkAllNotificationsReadResponse,
   type MarkNotificationReadResponse,
   type NotificationCategory,
+  type NotificationItem,
   type NotificationListResponse,
   type NotificationPreferencesResponse,
   type NotificationProblemDetails,
@@ -157,6 +158,16 @@ export async function markNotificationRead(
     ),
     parseMarkNotificationReadResponse,
   );
+}
+
+export function isNotificationAtOrBefore(
+  candidate: NotificationItem,
+  selected: NotificationItem,
+): boolean {
+  const candidateActivity = Date.parse(candidate.activityAt ?? candidate.createdAt);
+  const selectedActivity = Date.parse(selected.activityAt ?? selected.createdAt);
+  if (candidateActivity !== selectedActivity) return candidateActivity < selectedActivity;
+  return candidate.id.localeCompare(selected.id) <= 0;
 }
 
 export async function markAllNotificationsRead(

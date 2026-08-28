@@ -2,7 +2,7 @@ import {
   CHECKOUT_VERSION,
   parsePurchaseResult,
   type CheckoutAddressSnapshot,
-  type MockShippingBreakdown,
+  type ShippingBreakdown,
   type PurchaseResult,
 } from '@shopee-clone/contracts';
 import { Injectable } from '@nestjs/common';
@@ -54,7 +54,7 @@ export class PurchaseProjector {
         slug: shopSnapshot.slug,
         name: shopSnapshot.name,
       };
-      const shipping = jsonObject<MockShippingBreakdown>(order.shippingSnapshot);
+      const shipping = jsonObject<ShippingBreakdown>(order.shippingSnapshot);
       return {
         orderReference: order.id,
         status: order.status,
@@ -110,7 +110,9 @@ export class PurchaseProjector {
       checkoutVersion: CHECKOUT_VERSION,
       pricingVersion: 'pricing-v2',
       voucherVersion: 'voucher-v1',
-      shippingVersion: 'mock-v1',
+      shippingVersion: orders.some((order) => order.shipping.provider === 'DEMO_CARRIER')
+        ? 'demo-distance-v1'
+        : 'mock-v1',
       currency: 'VND',
       purchaseReference: purchase.id,
       createdAt: purchase.createdAt.toISOString(),

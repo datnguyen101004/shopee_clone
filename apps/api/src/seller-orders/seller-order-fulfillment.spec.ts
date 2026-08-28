@@ -8,7 +8,8 @@ import {
 
 describe('seller order fulfillment state machine', () => {
   it('allows only the documented seller edges', () => {
-    expect(canTransitionSellerFulfillment('PENDING_CONFIRMATION', 'CONFIRMED')).toBe(true);
+    expect(canTransitionSellerFulfillment('PENDING_CONFIRMATION', 'READY_FOR_PICKUP')).toBe(true);
+    expect(canTransitionSellerFulfillment('PENDING_CONFIRMATION', 'CONFIRMED')).toBe(false);
     expect(canTransitionSellerFulfillment('CONFIRMED', 'READY_FOR_PICKUP')).toBe(false);
     expect(canTransitionSellerFulfillment('READY_FOR_PICKUP', 'HANDED_OFF')).toBe(true);
     expect(canTransitionSellerFulfillment('HANDED_OFF', 'PREPARING')).toBe(false);
@@ -28,7 +29,7 @@ describe('seller order fulfillment state machine', () => {
         fulfillmentState: 'PREPARING',
         shipmentExists: false,
       }),
-    ).toEqual(['MARK_READY_FOR_PICKUP']);
+    ).toEqual([]);
     expect(
       canExecuteSellerAction(
         {
@@ -39,6 +40,13 @@ describe('seller order fulfillment state machine', () => {
         'HAND_OFF',
       ),
     ).toBe(false);
+    expect(
+      availableSellerActions({
+        orderStatus: 'AWAITING_PICKUP',
+        fulfillmentState: 'READY_FOR_PICKUP',
+        shipmentExists: true,
+      }),
+    ).toEqual([]);
   });
 
   it('maps lifecycle-changing actions and marks late commands', () => {

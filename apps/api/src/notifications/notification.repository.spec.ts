@@ -64,12 +64,13 @@ describe('NotificationRepository chat aggregates', () => {
 
   it('marks chat aggregate read through the same general read contract without changing its activity order', async () => {
     const existing = row('00000000-0000-4000-8000-000000000213', '2026-08-27T00:00:03.000Z');
-    const updated = { ...existing, isRead: true, readAt: new Date('2026-08-27T00:00:04.000Z') };
     const prisma = {
       notification: {
         findFirst: jest.fn().mockResolvedValue(existing),
-        update: jest.fn().mockResolvedValue(updated),
-        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+        updateMany: jest
+          .fn()
+          .mockResolvedValueOnce({ count: 3 })
+          .mockResolvedValueOnce({ count: 1 }),
       },
     };
     const repository = new NotificationRepository(prisma as never);
@@ -78,13 +79,22 @@ describe('NotificationRepository chat aggregates', () => {
       id: existing.id,
       isRead: true,
       readAt: expect.any(String),
+      updatedCount: 3,
     });
-    expect(prisma.notification.update).toHaveBeenCalledWith({
-      where: { id: existing.id },
+    expect(prisma.notification.updateMany).toHaveBeenNthCalledWith(1, {
+      where: {
+        recipientId: userId,
+        isRead: false,
+        isArchived: false,
+        OR: [
+          { activityAt: { lt: existing.activityAt } },
+          { activityAt: existing.activityAt, id: { lte: existing.id } },
+        ],
+      },
       data: { isRead: true, readAt: expect.any(Date) },
     });
     await expect(repository.markAllRead(userId)).resolves.toMatchObject({ updatedCount: 1 });
-    expect(prisma.notification.updateMany).toHaveBeenCalledWith(expect.objectContaining({
+    expect(prisma.notification.updateMany).toHaveBeenLastCalledWith(expect.objectContaining({
       where: { recipientId: userId, isRead: false, isArchived: false },
     }));
   });

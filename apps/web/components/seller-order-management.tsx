@@ -26,7 +26,7 @@ import { useAuthSession } from './auth-session-provider';
 const money = (value: number) => `${new Intl.NumberFormat('vi-VN').format(value)}₫`;
 const statusLabels: Record<string, string> = {
   PENDING_CONFIRMATION: 'Chờ xác nhận',
-  AWAITING_PICKUP: 'Đang chuẩn bị',
+  AWAITING_PICKUP: 'Chờ đơn vị vận chuyển lấy hàng',
   SHIPPING: 'Đang giao',
   DELIVERED: 'Đã giao',
   CANCELLED: 'Đã hủy',
@@ -38,8 +38,8 @@ const fulfillmentLabels: Record<string, string> = {
   PENDING_CONFIRMATION: 'Chờ xác nhận',
   CONFIRMED: 'Đã xác nhận',
   PREPARING: 'Đang chuẩn bị',
-  READY_FOR_PICKUP: 'Sẵn sàng lấy hàng',
-  HANDED_OFF: 'Đã bàn giao',
+  READY_FOR_PICKUP: 'Chờ đơn vị vận chuyển lấy hàng',
+  HANDED_OFF: 'Đơn vị vận chuyển đã lấy hàng',
   REJECTED: 'Shop từ chối',
   CANCELLED: 'Đã hủy',
 };
@@ -166,7 +166,7 @@ export function SellerOrderQueueScreen() {
   const tabs: Array<[SellerOrderQueueFilter, string]> = [
     ['ALL', 'Tất cả'],
     ['PENDING_CONFIRMATION', 'Chờ xác nhận'],
-    ['AWAITING_PICKUP', 'Chuẩn bị/lấy hàng'],
+    ['AWAITING_PICKUP', 'Chờ lấy hàng'],
     ['SHIPPING', 'Đang giao'],
     ['DELIVERED', 'Hoàn tất'],
     ['CANCELLED', 'Đã hủy'],
@@ -177,7 +177,7 @@ export function SellerOrderQueueScreen() {
         <div>
           <p className="seller-orders-eyebrow">SELLER CENTER</p>
           <h1>Đơn hàng</h1>
-          <p>Quản lý xác nhận, đóng gói và bàn giao đơn của shop.</p>
+          <p>Shop xác nhận đơn và theo dõi quá trình lấy hàng của đơn vị vận chuyển.</p>
         </div>
         <span className="seller-orders-count">{page?.items.length ?? 0} đơn</span>
       </header>
@@ -438,7 +438,7 @@ export function SellerOrderDetailScreen({
         </div>
       ) : null}
       <div className="seller-order-progress">
-        {['PENDING_CONFIRMATION', 'CONFIRMED', 'PREPARING', 'READY_FOR_PICKUP', 'HANDED_OFF'].map(
+        {['PENDING_CONFIRMATION', 'READY_FOR_PICKUP', 'HANDED_OFF'].map(
           (stateName) => (
             <span
               className={
@@ -538,17 +538,14 @@ export function SellerOrderDetailScreen({
             <p>
               Xác nhận: {new Date(order.summary.deadline.confirmationAt).toLocaleString('vi-VN')}
             </p>
-            {order.summary.deadline.handoffAt ? (
-              <p>Bàn giao: {new Date(order.summary.deadline.handoffAt).toLocaleString('vi-VN')}</p>
-            ) : null}
           </section>
           {order.shipment ? (
             <section className="seller-order-panel">
-              <h2>Vận chuyển (MOCK)</h2>
+              <h2>Vận chuyển</h2>
               <p>
                 Mã vận đơn: <strong>{order.shipment.trackingCode}</strong>
               </p>
-              <p>Trạng thái: Đã bàn giao</p>
+              <p>Trạng thái: {order.shipment.status === 'OUT_FOR_DELIVERY' ? 'Đang giao' : order.shipment.status === 'DELIVERED' ? 'Đã giao' : 'Chờ lấy hàng'}</p>
             </section>
           ) : null}
           {!printOnly && actions.length ? (

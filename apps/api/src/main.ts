@@ -8,7 +8,7 @@ import { configureApplication } from './configure-application';
 loadRepositoryEnvironment();
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule, { rawBody: true });
   configureApplication(app, loadAuthConfig());
 
   const port = Number(process.env.PORT ?? 3001);

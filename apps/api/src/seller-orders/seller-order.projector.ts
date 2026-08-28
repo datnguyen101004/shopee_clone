@@ -195,13 +195,23 @@ function projectDetail(graph: SellerOrderGraph, now: Date): SellerOrderDetail {
   const shipment = graph.shipment
     ? {
         id: graph.shipment.id,
-        provider: 'MOCK' as const,
+        provider: graph.shipment.provider === 'DEMO_CARRIER' ? ('DEMO_CARRIER' as const) : ('MOCK' as const),
+        version: graph.shipment.providerVersion ?? undefined,
         trackingCode: graph.shipment.trackingCode,
-        status: 'HANDED_OFF' as const,
+        status: graph.shipment.status,
         service: graph.shipment.service as SellerOrderDetail['shipping']['service'],
         handedOffAt: graph.shipment.handedOffAt.toISOString(),
+        registeredAt: graph.shipment.registeredAt?.toISOString() ?? null,
+        deliveredAt: graph.shipment.deliveredAt?.toISOString() ?? null,
+        returnedAt: graph.shipment.returnedAt?.toISOString() ?? null,
+        lastUpdatedAt: graph.shipment.lastUpdatedAt?.toISOString() ?? null,
         events: graph.shipment.events.map((event) => ({
-          status: 'HANDED_OFF' as const,
+          status: event.status,
+          previousStatus: event.previousStatus,
+          shipmentVersion: event.shipmentVersion,
+          externalEventId: event.externalEventId,
+          publicReason: event.publicReason,
+          carrierOccurredAt: event.carrierOccurredAt?.toISOString() ?? null,
           occurredAt: event.occurredAt.toISOString(),
         })),
       }

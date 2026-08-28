@@ -44,6 +44,8 @@ function contractRole(role: MarketplaceRole): ContractMarketplaceRole {
       return 'seller';
     case MarketplaceRole.ADMIN:
       return 'admin';
+    case MarketplaceRole.CARRIER_OPERATOR:
+      return 'carrier_operator';
   }
 }
 

@@ -97,15 +97,25 @@ export class NotificationRepository {
       where: { id: notificationId, recipientId, isArchived: false },
     });
     if (!existing) throw new NotificationNotFoundError();
-    if (existing.isRead && existing.readAt) {
-      return { id: existing.id, isRead: true, readAt: existing.readAt.toISOString() };
-    }
     const readAt = new Date();
-    const updated = await this.prisma.notification.update({
-      where: { id: existing.id },
+    const updated = await this.prisma.notification.updateMany({
+      where: {
+        recipientId,
+        isRead: false,
+        isArchived: false,
+        OR: [
+          { activityAt: { lt: existing.activityAt } },
+          { activityAt: existing.activityAt, id: { lte: existing.id } },
+        ],
+      },
       data: { isRead: true, readAt },
     });
-    return { id: updated.id, isRead: true, readAt: readAt.toISOString() };
+    return {
+      id: existing.id,
+      isRead: true,
+      readAt: readAt.toISOString(),
+      updatedCount: updated.count,
+    };
   }
 
   async markAllRead(recipientId: string): Promise<MarkAllNotificationsReadResponse> {

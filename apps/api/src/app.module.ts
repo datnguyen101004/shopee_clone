@@ -29,6 +29,7 @@ import { ReturnsModule } from './returns/returns.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { SellerIdentityModule } from './seller-identity/seller-identity.module';
 import { ChatModule } from './chat/chat.module';
+import { CarrierModule } from './carrier/carrier.module';
 
 @Module({
   imports: [
@@ -61,6 +62,7 @@ import { ChatModule } from './chat/chat.module';
     NotificationsModule,
     SellerIdentityModule,
     ChatModule,
+    CarrierModule,
   ],
 })
 export class AppModule {}

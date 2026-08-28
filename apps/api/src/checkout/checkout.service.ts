@@ -40,7 +40,13 @@ import {
 import { OrderWriter } from './order-writer';
 import { purchaseInclude, PurchaseProjector } from './purchase-projector';
 import { InventoryService } from '../inventory/inventory.service';
-import { InventoryIdempotencyConflictError, InventoryInsufficientError } from '../inventory/inventory.errors';
+import {
+  InventoryIdempotencyConflictError,
+  InventoryInsufficientError,
+} from '../inventory/inventory.errors';
+import { orderNotificationEvent } from '../notifications/notification-events';
+import { NotificationService } from '../notifications/notification.service';
+import { publicSellerProductMediaUrl } from '../seller-products/seller-product-media.storage';
 
 const MAX_SERIALIZABLE_ATTEMPTS = 3;
 
@@ -67,6 +73,7 @@ export class CheckoutService {
     private readonly voucherConsumption: VoucherConsumptionService,
     @Inject(SystemUtcClock) private readonly clock: SystemUtcClock,
     @Inject(InventoryService) private readonly inventory: InventoryService,
+    @Inject(NotificationService) private readonly notifications: NotificationService,
   ) {}
 
   preview(
@@ -86,7 +93,7 @@ export class CheckoutService {
     const requestDigest = confirmationRequestDigest(userId, expectedVersion, input);
     for (let attempt = 1; attempt <= MAX_SERIALIZABLE_ATTEMPTS; attempt += 1) {
       try {
-        return await this.prisma.$transaction(
+        const result = await this.prisma.$transaction(
           async (transaction) => {
             const [firstLockKey, secondLockKey] = advisoryLockKeys(userId, idempotencyKey);
             await transaction.$executeRaw(Prisma.sql`
@@ -151,7 +158,12 @@ export class CheckoutService {
               preview: assembled.preview,
               applied: assembled.applied,
             });
-            await this.inventory.consumeInTransaction(transaction, reservation.id, userId, purchaseId);
+            await this.inventory.consumeInTransaction(
+              transaction,
+              reservation.id,
+              userId,
+              purchaseId,
+            );
             const consumption = await this.voucherConsumption.consumeInTransaction(transaction, {
               purchaseReference: purchaseId,
               userId,
@@ -189,6 +201,9 @@ export class CheckoutService {
           },
           { isolationLevel: 'Serializable', maxWait: 5_000, timeout: 20_000 },
         );
+        if (!result.replayed)
+          await this.emitNewOrderNotifications(result.purchase.purchaseReference);
+        return result;
       } catch (error) {
         if (isRetryableTransactionError(error) && attempt < MAX_SERIALIZABLE_ATTEMPTS) continue;
         if (error instanceof VoucherConsumptionUnavailableError) {
@@ -197,8 +212,10 @@ export class CheckoutService {
         if (error instanceof VoucherConsumptionConflictError) {
           throw new CheckoutUnavailableError();
         }
-        if (error instanceof InventoryInsufficientError) throw new CheckoutInventoryConflictError(error.availableQuantity);
-        if (error instanceof InventoryIdempotencyConflictError) throw new CheckoutIdempotencyConflictError();
+        if (error instanceof InventoryInsufficientError)
+          throw new CheckoutInventoryConflictError(error.availableQuantity);
+        if (error instanceof InventoryIdempotencyConflictError)
+          throw new CheckoutIdempotencyConflictError();
         if (
           error instanceof CheckoutCartConflictError ||
           error instanceof CheckoutIdempotencyConflictError ||
@@ -227,7 +244,61 @@ export class CheckoutService {
     return this.projector.project(purchase);
   }
 
-  async markPaymentFailed(userId: string, purchaseReference: string): Promise<{ released: boolean }> {
+  private async emitNewOrderNotifications(purchaseId: string): Promise<void> {
+    try {
+      const orders = await this.prisma.shopOrder.findMany({
+        where: { purchaseId },
+        select: {
+          id: true,
+          payableTotalMinor: true,
+          shop: { select: { ownerId: true } },
+          purchase: { select: { buyerId: true } },
+          lines: {
+            take: 1,
+            select: {
+              productImageUrl: true,
+              product: {
+                select: {
+                  images: {
+                    where: { variantId: null },
+                    orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }],
+                    take: 1,
+                    select: {
+                      url: true,
+                      sellerProductMediaAsset: { select: { storageKey: true } },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      });
+      for (const order of orders) {
+        const image = order.lines[0]?.product.images[0];
+        const cdnUrl = image?.sellerProductMediaAsset?.storageKey
+          ? publicSellerProductMediaUrl(image.sellerProductMediaAsset.storageKey)
+          : null;
+        await this.notifications.notify(
+          orderNotificationEvent({
+            type: 'ORDER_CREATED',
+            orderId: order.id,
+            buyerId: order.purchase.buyerId,
+            sellerOwnerId: order.shop.ownerId,
+            amountMinor: Number(order.payableTotalMinor),
+            thumbnailUrl: cdnUrl ?? order.lines[0]?.productImageUrl ?? image?.url ?? null,
+          }),
+        );
+      }
+    } catch (error) {
+      console.error('[notifications] checkout order-created emit failed', error);
+    }
+  }
+
+  async markPaymentFailed(
+    userId: string,
+    purchaseReference: string,
+  ): Promise<{ released: boolean }> {
     const purchase = await this.prisma.purchase.findFirst({
       where: { id: purchaseReference, buyerId: userId },
       select: { inventoryReservation: { select: { id: true, status: true } } },

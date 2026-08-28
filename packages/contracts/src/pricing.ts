@@ -17,6 +17,7 @@ import {
 
 export const PRICING_VERSION = 'pricing-v2' as const;
 export const MOCK_SHIPPING_VERSION = 'mock-v1' as const;
+export const DEMO_CARRIER_SHIPPING_VERSION = 'demo-distance-v1' as const;
 export const PRICING_CURRENCY = 'VND' as const;
 export const SHIPPING_SERVICES = ['ECONOMY', 'STANDARD', 'EXPRESS'] as const;
 
@@ -98,10 +99,43 @@ export interface MockShippingBreakdown {
   shippingFeeMinor: number;
 }
 
+/** New distance-based quote. Kept separate from MockShippingBreakdown so old
+ * order snapshots can continue to be parsed without optional-field guessing. */
+export interface DemoCarrierShippingBreakdown {
+  provider: 'DEMO_CARRIER';
+  version: typeof DEMO_CARRIER_SHIPPING_VERSION;
+  shopId: string;
+  originProvinceCode: string;
+  originDistrictCode: string;
+  originProvince: string;
+  originDistrict: string;
+  destinationProvinceCode: string;
+  destinationDistrictCode: string;
+  destinationProvince: string;
+  destinationDistrict: string;
+  shipmentWeightGrams: number;
+  service: ShippingServiceCode;
+  simulation: true;
+  straightLineDistanceKm: number;
+  estimatedDistanceKm: number;
+  billableDistanceKm: number;
+  estimatedDaysMin: number;
+  estimatedDaysMax: number;
+  baseFeeMinor: number;
+  nearDistanceFeeMinor: number;
+  longDistanceFeeMinor: number;
+  weightFeeMinor: number;
+  shippingFeeMinor: number;
+  calculationVersion: typeof DEMO_CARRIER_SHIPPING_VERSION;
+  locationSnapshotVersion: string;
+}
+
+export type ShippingBreakdown = MockShippingBreakdown | DemoCarrierShippingBreakdown;
+
 export interface PricingQuoteShop {
   shop: { id: string; ownerUserId: string; slug: string; name: string };
   lines: PricingQuoteLine[];
-  shipping: MockShippingBreakdown;
+  shipping: ShippingBreakdown;
   listSubtotalMinor: number;
   productDiscountMinor: number;
   merchandiseSubtotalMinor: number;
@@ -167,7 +201,7 @@ export interface AvailableShippingVoucher {
 export interface PricingQuoteResponse {
   pricingVersion: typeof PRICING_VERSION;
   voucherVersion: typeof VOUCHER_VERSION;
-  shippingVersion: typeof MOCK_SHIPPING_VERSION;
+  shippingVersion: typeof MOCK_SHIPPING_VERSION | typeof DEMO_CARRIER_SHIPPING_VERSION;
   currency: typeof PRICING_CURRENCY;
   evaluatedAt: string;
   cartVersion: number;
@@ -418,56 +452,145 @@ const SERVICE_RULES: Record<
   EXPRESS: { base: 35_000, perBlock: 6_000, etaMin: 1, etaMax: 2 },
 };
 
-function isShipping(value: unknown): value is MockShippingBreakdown {
+const DEMO_SERVICE_RULES: Record<
+  ShippingServiceCode,
+  { base: number; near: number; long: number; weight: number; etaMin: number; etaMax: number }
+> = {
+  ECONOMY: { base: 15_000, near: 2_000, long: 4_000, weight: 2_000, etaMin: 4, etaMax: 6 },
+  STANDARD: { base: 22_000, near: 3_000, long: 6_000, weight: 3_000, etaMin: 2, etaMax: 4 },
+  EXPRESS: { base: 35_000, near: 4_000, long: 8_000, weight: 4_000, etaMin: 1, etaMax: 2 },
+};
+
+export function isShippingBreakdown(value: unknown): value is ShippingBreakdown {
+  if (!isRecord(value)) return false;
+  if (value.provider === 'MOCK') {
+    if (
+      !hasExactKeys(value, [
+        'provider',
+        'version',
+        'shopId',
+        'originProvince',
+        'destinationProvince',
+        'zone',
+        'shipmentWeightGrams',
+        'service',
+        'estimatedDaysMin',
+        'estimatedDaysMax',
+        'baseFeeMinor',
+        'zoneSurchargeMinor',
+        'weightSurchargeMinor',
+        'shippingFeeMinor',
+      ]) ||
+      value.version !== MOCK_SHIPPING_VERSION ||
+      !isUuid(value.shopId) ||
+      !isText(value.originProvince) ||
+      !isText(value.destinationProvince) ||
+      typeof value.zone !== 'string' ||
+      !zones.has(value.zone as ShippingZone) ||
+      !isPositiveInteger(value.shipmentWeightGrams) ||
+      !isService(value.service) ||
+      !isPositiveInteger(value.estimatedDaysMin) ||
+      !isPositiveInteger(value.estimatedDaysMax) ||
+      value.estimatedDaysMin > value.estimatedDaysMax ||
+      !isMoney(value.baseFeeMinor) ||
+      !isMoney(value.zoneSurchargeMinor) ||
+      !isMoney(value.weightSurchargeMinor) ||
+      !isMoney(value.shippingFeeMinor)
+    )
+      return false;
+
+    const rule = SERVICE_RULES[value.service];
+    const expectedZone =
+      value.zone === 'SAME_PROVINCE' ? 0 : value.zone === 'SAME_REGION' ? 6_000 : 12_000;
+    const extraBlocks = Math.ceil(Math.max(0, value.shipmentWeightGrams - 500) / 500);
+    const expectedWeight = safeMultiply(extraBlocks, rule.perBlock);
+    const expectedFee =
+      expectedWeight === null ? null : safeAdd([rule.base, expectedZone, expectedWeight]);
+    return (
+      value.baseFeeMinor === rule.base &&
+      value.zoneSurchargeMinor === expectedZone &&
+      value.weightSurchargeMinor === expectedWeight &&
+      value.shippingFeeMinor === expectedFee &&
+      value.estimatedDaysMin === rule.etaMin &&
+      value.estimatedDaysMax === rule.etaMax
+    );
+  }
   if (
-    !isRecord(value) ||
+    value.provider !== 'DEMO_CARRIER' ||
     !hasExactKeys(value, [
       'provider',
       'version',
       'shopId',
+      'originProvinceCode',
+      'originDistrictCode',
       'originProvince',
+      'originDistrict',
+      'destinationProvinceCode',
+      'destinationDistrictCode',
       'destinationProvince',
-      'zone',
+      'destinationDistrict',
       'shipmentWeightGrams',
       'service',
+      'simulation',
+      'straightLineDistanceKm',
+      'estimatedDistanceKm',
+      'billableDistanceKm',
       'estimatedDaysMin',
       'estimatedDaysMax',
       'baseFeeMinor',
-      'zoneSurchargeMinor',
-      'weightSurchargeMinor',
+      'nearDistanceFeeMinor',
+      'longDistanceFeeMinor',
+      'weightFeeMinor',
       'shippingFeeMinor',
+      'calculationVersion',
+      'locationSnapshotVersion',
     ]) ||
-    value.provider !== 'MOCK' ||
-    value.version !== MOCK_SHIPPING_VERSION ||
+    value.version !== DEMO_CARRIER_SHIPPING_VERSION ||
     !isUuid(value.shopId) ||
+    !isText(value.originProvinceCode) ||
+    !isText(value.originDistrictCode) ||
     !isText(value.originProvince) ||
+    !isText(value.originDistrict) ||
+    !isText(value.destinationProvinceCode) ||
+    !isText(value.destinationDistrictCode) ||
     !isText(value.destinationProvince) ||
-    typeof value.zone !== 'string' ||
-    !zones.has(value.zone as ShippingZone) ||
+    !isText(value.destinationDistrict) ||
     !isPositiveInteger(value.shipmentWeightGrams) ||
     !isService(value.service) ||
+    value.simulation !== true ||
+    typeof value.straightLineDistanceKm !== 'number' ||
+    !Number.isFinite(value.straightLineDistanceKm) ||
+    !isPositiveInteger(value.estimatedDistanceKm) ||
+    !isPositiveInteger(value.billableDistanceKm) ||
+    value.billableDistanceKm < 3 ||
+    value.billableDistanceKm > 2_000 ||
     !isPositiveInteger(value.estimatedDaysMin) ||
     !isPositiveInteger(value.estimatedDaysMax) ||
     value.estimatedDaysMin > value.estimatedDaysMax ||
     !isMoney(value.baseFeeMinor) ||
-    !isMoney(value.zoneSurchargeMinor) ||
-    !isMoney(value.weightSurchargeMinor) ||
-    !isMoney(value.shippingFeeMinor)
+    !isMoney(value.nearDistanceFeeMinor) ||
+    !isMoney(value.longDistanceFeeMinor) ||
+    !isMoney(value.weightFeeMinor) ||
+    !isMoney(value.shippingFeeMinor) ||
+    !isText(value.locationSnapshotVersion)
   )
     return false;
-
-  const rule = SERVICE_RULES[value.service];
-  const expectedZone =
-    value.zone === 'SAME_PROVINCE' ? 0 : value.zone === 'SAME_REGION' ? 6_000 : 12_000;
-  const extraBlocks = Math.ceil(Math.max(0, value.shipmentWeightGrams - 500) / 500);
-  const expectedWeight = safeMultiply(extraBlocks, rule.perBlock);
-  const expectedFee =
-    expectedWeight === null ? null : safeAdd([rule.base, expectedZone, expectedWeight]);
+  const rule = DEMO_SERVICE_RULES[value.service];
+  const nearBlocks = Math.ceil(Math.min(Math.max(value.billableDistanceKm - 5, 0), 45) / 5);
+  const longBlocks = Math.ceil(Math.max(value.billableDistanceKm - 50, 0) / 100);
+  const weightBlocks = Math.ceil(Math.max(value.shipmentWeightGrams - 500, 0) / 500);
+  const near = safeMultiply(nearBlocks, rule.near);
+  const long = safeMultiply(longBlocks, rule.long);
+  const weight = safeMultiply(weightBlocks, rule.weight);
+  const total = near === null || long === null || weight === null
+    ? null
+    : safeAdd([rule.base, near, long, weight]);
   return (
     value.baseFeeMinor === rule.base &&
-    value.zoneSurchargeMinor === expectedZone &&
-    value.weightSurchargeMinor === expectedWeight &&
-    value.shippingFeeMinor === expectedFee &&
+    value.nearDistanceFeeMinor === near &&
+    value.longDistanceFeeMinor === long &&
+    value.weightFeeMinor === weight &&
+    value.shippingFeeMinor === total &&
     value.estimatedDaysMin === rule.etaMin &&
     value.estimatedDaysMax === rule.etaMax
   );
@@ -501,7 +624,7 @@ function isShop(value: unknown): value is PricingQuoteShop {
     !Array.isArray(value.lines) ||
     value.lines.length === 0 ||
     !value.lines.every(isLine) ||
-    !isShipping(value.shipping) ||
+    !isShippingBreakdown(value.shipping) ||
     value.shipping.shopId !== value.shop.id ||
     !isMoney(value.listSubtotalMinor) ||
     !isMoney(value.productDiscountMinor) ||
@@ -801,7 +924,8 @@ export function isPricingQuoteResponse(value: unknown): value is PricingQuoteRes
     ) ||
     value.pricingVersion !== PRICING_VERSION ||
     value.voucherVersion !== VOUCHER_VERSION ||
-    value.shippingVersion !== MOCK_SHIPPING_VERSION ||
+    value.shippingVersion !== MOCK_SHIPPING_VERSION &&
+      value.shippingVersion !== DEMO_CARRIER_SHIPPING_VERSION ||
     value.currency !== PRICING_CURRENCY ||
     !isIsoInstant(value.evaluatedAt) ||
     !isNonNegativeInteger(value.cartVersion) ||

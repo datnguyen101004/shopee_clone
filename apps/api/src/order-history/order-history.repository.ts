@@ -21,6 +21,9 @@ export const buyerOrderSummaryInclude = {
     orderBy: [{ orderVersion: 'asc' as const }, { id: 'asc' as const }],
     select: { status: true, occurredAt: true },
   },
+  shipment: {
+    include: { events: { orderBy: [{ shipmentVersion: 'asc' as const }, { id: 'asc' as const }] } },
+  },
 } satisfies Prisma.ShopOrderInclude;
 
 export const buyerOrderDetailInclude = {
@@ -37,6 +40,9 @@ export const buyerOrderDetailInclude = {
     include: { review: { select: { id: true } }, product: { select: { deletedAt: true } } },
   },
   timelineEvents: { orderBy: [{ orderVersion: 'asc' as const }, { id: 'asc' as const }] },
+  shipment: {
+    include: { events: { orderBy: [{ shipmentVersion: 'asc' as const }, { id: 'asc' as const }] } },
+  },
   returnRequest: { select: { id: true } },
   voucherAllocations: {
     orderBy: [

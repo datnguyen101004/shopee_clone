@@ -68,7 +68,7 @@ export interface AdminUserSummary {
   displayName: string;
   phoneNumber: string | null;
   status: AdminUserStatus;
-  roles: ('buyer' | 'seller' | 'admin')[];
+  roles: ('buyer' | 'seller' | 'admin' | 'carrier_operator')[];
   createdAt: string;
   updatedAt: string;
 }
@@ -77,7 +77,7 @@ export interface AdminUserListQuery {
   limit?: number;
   cursor?: string;
   status?: AdminUserStatus;
-  role?: 'buyer' | 'seller' | 'admin';
+  role?: 'buyer' | 'seller' | 'admin' | 'carrier_operator';
   q?: string;
 }
 

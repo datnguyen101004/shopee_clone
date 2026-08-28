@@ -26,6 +26,7 @@ export const NOTIFICATION_CHANNELS = ['IN_APP', 'EMAIL'] as const;
 export type NotificationChannel = (typeof NOTIFICATION_CHANNELS)[number];
 
 export const NOTIFICATION_TYPES = [
+  'ORDER_CREATED',
   'ORDER_CONFIRMED',
   'ORDER_SHIPPING',
   'ORDER_DELIVERED',
@@ -42,11 +43,7 @@ export const NOTIFICATION_TYPES = [
 ] as const;
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
 
-export const NOTIFICATION_DELIVERY_STATUSES = [
-  'PENDING',
-  'DELIVERED',
-  'FAILED',
-] as const;
+export const NOTIFICATION_DELIVERY_STATUSES = ['PENDING', 'DELIVERED', 'FAILED'] as const;
 export type NotificationDeliveryStatus = (typeof NOTIFICATION_DELIVERY_STATUSES)[number];
 
 /** Types that must always deliver regardless of user preference opt-outs. */
@@ -59,6 +56,7 @@ export const MANDATORY_NOTIFICATION_TYPES = [
 export type MandatoryNotificationType = (typeof MANDATORY_NOTIFICATION_TYPES)[number];
 
 export const NOTIFICATION_CATEGORY_BY_TYPE: Record<NotificationType, NotificationCategory> = {
+  ORDER_CREATED: 'ORDERS',
   ORDER_CONFIRMED: 'ORDERS',
   ORDER_SHIPPING: 'ORDERS',
   ORDER_DELIVERED: 'ORDERS',
@@ -125,6 +123,7 @@ export interface MarkNotificationReadResponse {
   id: string;
   isRead: true;
   readAt: string;
+  updatedCount: number;
 }
 
 export interface MarkAllNotificationsReadResponse {
@@ -163,20 +162,14 @@ export interface NotificationProblemDetails {
   invalidParameters?: string[];
 }
 
-const canonicalUuid =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const problemType =
-  /^https:\/\/shopee-clone\.local\/problems\/[a-z0-9]+(?:-[a-z0-9]+)*$/;
+const canonicalUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const problemType = /^https:\/\/shopee-clone\.local\/problems\/[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const problemStatuses = new Set([400, 401, 403, 404, 409, 503]);
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
 
-function hasExactKeys(
-  value: Record<string, unknown>,
-  required: string[],
-  optional: string[] = [],
-) {
+function hasExactKeys(value: Record<string, unknown>, required: string[], optional: string[] = []) {
   const allowed = new Set([...required, ...optional]);
   return (
     required.every((key) => Object.hasOwn(value, key)) &&
@@ -200,15 +193,12 @@ function isBoundedString(value: unknown, max: number): value is string {
 
 export function isNotificationCategory(value: unknown): value is NotificationCategory {
   return (
-    typeof value === 'string' &&
-    (NOTIFICATION_CATEGORIES as readonly string[]).includes(value)
+    typeof value === 'string' && (NOTIFICATION_CATEGORIES as readonly string[]).includes(value)
   );
 }
 
 export function isNotificationChannel(value: unknown): value is NotificationChannel {
-  return (
-    typeof value === 'string' && (NOTIFICATION_CHANNELS as readonly string[]).includes(value)
-  );
+  return typeof value === 'string' && (NOTIFICATION_CHANNELS as readonly string[]).includes(value);
 }
 
 export function isNotificationType(value: unknown): value is NotificationType {
@@ -217,8 +207,7 @@ export function isNotificationType(value: unknown): value is NotificationType {
 
 export function isMandatoryNotificationType(value: unknown): value is MandatoryNotificationType {
   return (
-    typeof value === 'string' &&
-    (MANDATORY_NOTIFICATION_TYPES as readonly string[]).includes(value)
+    typeof value === 'string' && (MANDATORY_NOTIFICATION_TYPES as readonly string[]).includes(value)
   );
 }
 
@@ -268,18 +257,22 @@ export function isNotificationMetadata(value: unknown): value is NotificationMet
 export function isNotificationItem(value: unknown): value is NotificationItem {
   if (
     !isRecord(value) ||
-    !hasExactKeys(value, [
-      'id',
-      'category',
-      'type',
-      'title',
-      'body',
-      'metadata',
-      'isRead',
-      'readAt',
-      'isArchived',
-      'createdAt',
-    ], ['activityAt'])
+    !hasExactKeys(
+      value,
+      [
+        'id',
+        'category',
+        'type',
+        'title',
+        'body',
+        'metadata',
+        'isRead',
+        'readAt',
+        'isArchived',
+        'createdAt',
+      ],
+      ['activityAt'],
+    )
   ) {
     return false;
   }
@@ -303,12 +296,7 @@ export function isNotificationItem(value: unknown): value is NotificationItem {
 export function isNotificationListResponse(value: unknown): value is NotificationListResponse {
   if (
     !isRecord(value) ||
-    !hasExactKeys(value, [
-      'notificationVersion',
-      'items',
-      'nextCursor',
-      'unreadCount',
-    ])
+    !hasExactKeys(value, ['notificationVersion', 'items', 'nextCursor', 'unreadCount'])
   ) {
     return false;
   }
@@ -336,11 +324,12 @@ export function isMarkNotificationReadResponse(
 ): value is MarkNotificationReadResponse {
   return (
     isRecord(value) &&
-    hasExactKeys(value, ['id', 'isRead', 'readAt']) &&
+    hasExactKeys(value, ['id', 'isRead', 'readAt', 'updatedCount']) &&
     typeof value.id === 'string' &&
     canonicalUuid.test(value.id) &&
     value.isRead === true &&
-    isCanonicalDateTime(value.readAt)
+    isCanonicalDateTime(value.readAt) &&
+    isNonNegativeInteger(value.updatedCount)
   );
 }
 
@@ -404,9 +393,7 @@ export function isUpdateNotificationPreferenceRequest(
   );
 }
 
-export function isNotificationProblemDetails(
-  value: unknown,
-): value is NotificationProblemDetails {
+export function isNotificationProblemDetails(value: unknown): value is NotificationProblemDetails {
   if (
     !isRecord(value) ||
     !hasExactKeys(value, ['type', 'title', 'status', 'detail'], ['invalidParameters'])
@@ -428,9 +415,7 @@ export function isNotificationProblemDetails(
   );
 }
 
-export function parseNotificationProblemDetails(
-  value: unknown,
-): NotificationProblemDetails | null {
+export function parseNotificationProblemDetails(value: unknown): NotificationProblemDetails | null {
   return isNotificationProblemDetails(value) ? value : null;
 }
 
@@ -499,11 +484,7 @@ export function parseNotificationListQuery(
         : typeof raw === 'string' && /^\d+$/.test(raw)
           ? Number(raw)
           : NaN;
-    if (
-      !Number.isSafeInteger(parsed) ||
-      parsed < 1 ||
-      parsed > NOTIFICATION_MAX_LIMIT
-    ) {
+    if (!Number.isSafeInteger(parsed) || parsed < 1 || parsed > NOTIFICATION_MAX_LIMIT) {
       return null;
     }
     limit = parsed;

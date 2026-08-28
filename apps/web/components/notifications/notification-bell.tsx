@@ -6,6 +6,7 @@ import { useCallback, useEffect, useId, useRef, useState } from 'react';
 
 import {
   getNotificationUnreadCount,
+  isNotificationAtOrBefore,
   listNotificationPopover,
   markNotificationRead,
 } from '../../lib/notifications-api';
@@ -147,17 +148,15 @@ export function NotificationBell() {
         );
         if (!opened) throw new Error('conversation unavailable');
       }
-      if (!item.isRead) {
-        await markNotificationRead(item.id, auth.authenticatedFetch);
-        setItems((current) =>
-          current.map((entry) =>
-            entry.id === item.id
-              ? { ...entry, isRead: true, readAt: new Date().toISOString() }
-              : entry,
-          ),
-        );
-        setUnreadCount((current) => Math.max(0, current - 1));
-      }
+      const readResult = await markNotificationRead(item.id, auth.authenticatedFetch);
+      setItems((current) =>
+        current.map((entry) =>
+          !entry.isRead && isNotificationAtOrBefore(entry, item)
+            ? { ...entry, isRead: true, readAt: readResult.readAt }
+            : entry,
+        ),
+      );
+      setUnreadCount((current) => Math.max(0, current - readResult.updatedCount));
       setOpen(false);
       if (!(item.category === 'CHAT' && item.metadata.chat)) window.location.assign(item.metadata.targetUrl);
     } catch {

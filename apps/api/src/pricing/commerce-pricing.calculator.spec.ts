@@ -6,6 +6,7 @@ import {
 } from './commerce-pricing.calculator';
 import { UnsafePricingArithmeticError } from './money';
 import { MockShippingCalculator } from './mock-shipping.calculator';
+import { DemoCarrierCalculator } from './demo-carrier.calculator';
 
 const calculator = new CommercePricingCalculator(new MockShippingCalculator());
 const snapshot: AuthoritativePricingSnapshot = {
@@ -124,5 +125,33 @@ describe('commerce pricing calculator', () => {
         services: [snapshot.services[0]!, { ...snapshot.services[0]!, service: 'EXPRESS' }],
       }),
     ).toThrow('Duplicate shop service choice');
+  });
+
+  it('uses the distance-based carrier quote when the demo flag is enabled', () => {
+    const previous = process.env.DEMO_CARRIER_ENABLED;
+    process.env.DEMO_CARRIER_ENABLED = 'true';
+    try {
+      const demoCalculator = new CommercePricingCalculator(
+        new MockShippingCalculator(),
+        new DemoCarrierCalculator(),
+      );
+      const quote = demoCalculator.calculate({
+        ...snapshot,
+        address: { ...snapshot.address, district: 'Quận 1' },
+        lines: snapshot.lines.map((line) => ({
+          ...line,
+          shop: {
+            ...line.shop,
+            pickupDistrict: line.shop.location === 'Hà Nội' ? '01-001' : '79-001',
+          },
+        })),
+      });
+      expect(quote.shippingVersion).toBe('demo-distance-v1');
+      expect(quote.shops.every((shop) => shop.shipping.provider === 'DEMO_CARRIER')).toBe(true);
+      expect(isPricingQuoteResponse(quote)).toBe(true);
+    } finally {
+      if (previous === undefined) delete process.env.DEMO_CARRIER_ENABLED;
+      else process.env.DEMO_CARRIER_ENABLED = previous;
+    }
   });
 });

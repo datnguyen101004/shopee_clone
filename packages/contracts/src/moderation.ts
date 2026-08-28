@@ -1,4 +1,4 @@
-export const REPORT_TARGET_TYPES = ['PRODUCT', 'SHOP'] as const;
+export const REPORT_TARGET_TYPES = ['PRODUCT', 'SHOP', 'CHAT_CONVERSATION', 'CHAT_MESSAGE'] as const;
 export type ReportTargetType = (typeof REPORT_TARGET_TYPES)[number];
 
 export const PRODUCT_REPORT_REASON_CODES = [
@@ -57,6 +57,10 @@ export const MODERATION_CASE_OUTCOMES = [
   'NO_ACTION',
   'SUSPEND_TARGET',
   'RESTORE_TARGET',
+  'WARN_USER',
+  'RESTRICT_CHAT_TEMPORARY',
+  'RESTRICT_CHAT_INDEFINITE',
+  'RESTORE_CHAT',
 ] as const;
 export type ModerationCaseOutcome = (typeof MODERATION_CASE_OUTCOMES)[number];
 
@@ -64,6 +68,10 @@ export const MODERATION_DECISION_OUTCOMES = [
   'NO_ACTION',
   'SUSPEND_TARGET',
   'RESTORE_TARGET',
+  'WARN_USER',
+  'RESTRICT_CHAT_TEMPORARY',
+  'RESTRICT_CHAT_INDEFINITE',
+  'RESTORE_CHAT',
 ] as const;
 export type ModerationDecisionOutcome = (typeof MODERATION_DECISION_OUTCOMES)[number];
 
@@ -218,6 +226,19 @@ export interface ModerationCaseTargetDetails {
   shopId?: string;
   shopName?: string;
   ownerUserId?: string;
+  chat?: {
+    conversationId: string;
+    messageId: string | null;
+    reportedUserId: string;
+    reportedUserName: string;
+    messages: Array<{
+      sequence: number;
+      senderUserId: string;
+      senderLabel: string;
+      content: string;
+      createdAt: string;
+    }>;
+  };
 }
 
 export interface ModerationCaseDetail extends ModerationCaseSummary {
@@ -260,6 +281,8 @@ export interface CreateModerationDecisionRequest {
   publicReason: string;
   privateNote?: string | null;
   reversesDecisionId?: string | null;
+  /** Required for temporary chat restrictions; ISO UTC timestamp from the admin form. */
+  restrictionUntil?: string | null;
   expectedVersion: number;
 }
 
@@ -695,7 +718,7 @@ export function parseAddModerationCaseNoteRequest(val: unknown): AddModerationCa
 export function parseCreateModerationDecisionRequest(val: unknown): CreateModerationDecisionRequest | null {
   if (
     !isRecord(val) ||
-    !exact(val, ['outcome', 'publicReason', 'expectedVersion'], ['privateNote', 'reversesDecisionId'])
+    !exact(val, ['outcome', 'publicReason', 'expectedVersion'], ['privateNote', 'reversesDecisionId', 'restrictionUntil'])
   ) {
     return null;
   }
@@ -712,12 +735,24 @@ export function parseCreateModerationDecisionRequest(val: unknown): CreateModera
   if (val.reversesDecisionId !== undefined && val.reversesDecisionId !== null && !isCanonicalUuid(val.reversesDecisionId)) {
     return null;
   }
+  if (
+    val.restrictionUntil !== undefined &&
+    val.restrictionUntil !== null &&
+    (typeof val.restrictionUntil !== 'string' ||
+      Number.isNaN(Date.parse(val.restrictionUntil)) ||
+      new Date(val.restrictionUntil).toISOString() !== val.restrictionUntil)
+  ) {
+    return null;
+  }
   return {
     outcome: val.outcome,
     publicReason: (val.publicReason as string).trim(),
     expectedVersion: version,
     ...(val.privateNote !== undefined && val.privateNote !== null ? { privateNote: (val.privateNote as string).trim() } : {}),
     ...(val.reversesDecisionId !== undefined && val.reversesDecisionId !== null ? { reversesDecisionId: val.reversesDecisionId } : {}),
+    ...(val.restrictionUntil !== undefined && val.restrictionUntil !== null
+      ? { restrictionUntil: val.restrictionUntil as string }
+      : {}),
   };
 }
 

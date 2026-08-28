@@ -50,7 +50,7 @@ import {
 
 describe('Moderation and Reporting Contracts', () => {
   it('defines valid enums and bounds constants', () => {
-    expect(REPORT_TARGET_TYPES).toEqual(['PRODUCT', 'SHOP']);
+    expect(REPORT_TARGET_TYPES).toEqual(['PRODUCT', 'SHOP', 'CHAT_CONVERSATION', 'CHAT_MESSAGE']);
     expect(PRODUCT_REPORT_REASON_CODES).toEqual([
       'PROHIBITED_ITEM',
       'COUNTERFEIT',
@@ -67,8 +67,16 @@ describe('Moderation and Reporting Contracts', () => {
     ]);
     expect(REPORT_STATUSES).toEqual(['SUBMITTED', 'REVIEWED']);
     expect(MODERATION_CASE_STATUSES).toEqual(['OPEN', 'IN_REVIEW', 'RESOLVED']);
-    expect(MODERATION_CASE_OUTCOMES).toEqual(['NO_ACTION', 'SUSPEND_TARGET', 'RESTORE_TARGET']);
-    expect(MODERATION_DECISION_OUTCOMES).toEqual(['NO_ACTION', 'SUSPEND_TARGET', 'RESTORE_TARGET']);
+    expect(MODERATION_CASE_OUTCOMES).toEqual([
+      'NO_ACTION',
+      'SUSPEND_TARGET',
+      'RESTORE_TARGET',
+      'WARN_USER',
+      'RESTRICT_CHAT_TEMPORARY',
+      'RESTRICT_CHAT_INDEFINITE',
+      'RESTORE_CHAT',
+    ]);
+    expect(MODERATION_DECISION_OUTCOMES).toEqual(MODERATION_CASE_OUTCOMES);
     expect(MODERATION_CASE_EVENT_TYPES).toEqual([
       'REPORT_ATTACHED',
       'ASSIGNED',

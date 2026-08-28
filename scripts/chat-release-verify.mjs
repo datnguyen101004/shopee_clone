@@ -37,6 +37,15 @@ run([
 ]);
 run(['--filter', '@shopee-clone/api', 'chat:preflight']);
 run(['test:chat:database'], { ...process.env, RUN_CHAT_DATABASE_TESTS: '1' });
+const chatE2eDatabaseUrl = process.env.TEST_DATABASE_URL ?? process.env.DATABASE_URL;
+if (!chatE2eDatabaseUrl)
+  throw new Error('TEST_DATABASE_URL or DATABASE_URL is required for real chat E2E.');
+run(['test:chat:real'], {
+  ...process.env,
+  DATABASE_URL: chatE2eDatabaseUrl,
+  CHAT_E2E_PREPARE: '1',
+});
+run(['--filter', '@shopee-clone/api', 'chat:safety:cleanup']);
 
 const healthUrl = process.env.CHAT_OUTBOX_HEALTH_URL;
 if (healthUrl) {

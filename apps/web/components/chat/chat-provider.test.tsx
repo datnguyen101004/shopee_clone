@@ -97,6 +97,17 @@ function Probe() {
       <button type="button" onClick={() => void chat.loadOlderMessages()}>
         Older
       </button>
+      <button
+        type="button"
+        onClick={() =>
+          void chat.loadReplyTarget({
+            messageId: '00000000-0000-4000-8000-000000000021',
+            sequence: 1,
+          })
+        }
+      >
+        Reply target
+      </button>
       <button type="button" onClick={chat.closeWidget}>
         Close
       </button>
@@ -382,6 +393,99 @@ describe('ChatProvider', () => {
     await waitFor(() => expect(screen.getByLabelText('message-count')).toHaveTextContent('3'));
     await user.click(screen.getByRole('button', { name: 'Older' }));
     expect(getChatMessages).toHaveBeenCalledTimes(3);
+  });
+
+  it('loads contiguous older history until a quoted original is available', async () => {
+    const existing = {
+      id: '00000000-0000-4000-8000-000000000014',
+      participant: {
+        userId: ownerId,
+        displayName: 'Shop Owner',
+        avatarUrl: null,
+        presence: 'ACTIVE' as const,
+      },
+      lastMessagePreview: 'Tin trả lời',
+      lastMessageAt: timestamp,
+      unreadCount: 0,
+      lastReadSequence: 3,
+      lastMessageSequence: 3,
+    };
+    const oldest = {
+      id: '00000000-0000-4000-8000-000000000021',
+      conversationId: existing.id,
+      sequence: 1,
+      senderUserId: ownerId,
+      clientMessageId: '00000000-0000-4000-8000-000000000031',
+      content: 'Tin gốc',
+      createdAt: '2026-08-25T00:00:00.000Z',
+      deliveryState: 'SENT' as const,
+      isRead: false,
+    };
+    const middle = {
+      ...oldest,
+      id: '00000000-0000-4000-8000-000000000022',
+      clientMessageId: '00000000-0000-4000-8000-000000000032',
+      sequence: 2,
+      content: 'Tin giữa',
+    };
+    const reply = {
+      ...oldest,
+      id: '00000000-0000-4000-8000-000000000023',
+      clientMessageId: '00000000-0000-4000-8000-000000000033',
+      sequence: 3,
+      content: 'Tin trả lời',
+      replyTo: {
+        messageId: oldest.id,
+        sequence: oldest.sequence,
+        senderUserId: oldest.senderUserId,
+        senderLabel: 'Shop Owner',
+        preview: oldest.content,
+      },
+    };
+    vi.mocked(getChatTarget).mockResolvedValue({
+      chatVersion: 'chat-v1',
+      shopId,
+      shopName: 'Shop',
+      ownerUserId: ownerId,
+      ownerDisplayName: 'Shop Owner',
+      ownerAvatarUrl: null,
+      isSelf: false,
+      canMessage: true,
+      existingConversation: existing,
+    });
+    vi.mocked(getChatMessages)
+      .mockResolvedValueOnce({
+        chatVersion: 'chat-v1',
+        conversation: existing,
+        items: [reply],
+        hasMoreBefore: true,
+        hasMoreAfter: false,
+        unreadCount: 0,
+      })
+      .mockResolvedValueOnce({
+        chatVersion: 'chat-v1',
+        conversation: existing,
+        items: [oldest, middle],
+        hasMoreBefore: false,
+        hasMoreAfter: false,
+        unreadCount: 0,
+      });
+
+    const user = userEvent.setup();
+    render(
+      <ChatProvider>
+        <Probe />
+      </ChatProvider>,
+    );
+    await user.click(screen.getByRole('button', { name: 'Chat now' }));
+    await waitFor(() => expect(screen.getByLabelText('message-count')).toHaveTextContent('1'));
+    await user.click(screen.getByRole('button', { name: 'Reply target' }));
+    await waitFor(() => expect(screen.getByLabelText('message-count')).toHaveTextContent('3'));
+    expect(getChatMessages).toHaveBeenLastCalledWith(
+      existing.id,
+      { beforeSequence: 3 },
+      authenticatedFetch,
+    );
   });
 
   it('discards an empty temporary target when the widget closes', async () => {

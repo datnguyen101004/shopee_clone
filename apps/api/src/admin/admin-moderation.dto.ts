@@ -134,6 +134,15 @@ export class CreateModerationDecisionDto implements CreateModerationDecisionRequ
   @IsUUID()
   reversesDecisionId?: string;
 
+  @ApiPropertyOptional({
+    format: 'date-time',
+    nullable: true,
+    description: 'Authoritative UTC expiry required for a temporary chat restriction',
+  })
+  @IsOptional()
+  @IsString()
+  restrictionUntil?: string;
+
   @ApiProperty({ description: 'Expected case version for optimistic locking' })
   @IsInt()
   @Min(0)

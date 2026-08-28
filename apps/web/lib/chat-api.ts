@@ -6,11 +6,17 @@ import {
   parseChatRealtimeTicketResponse,
   parseChatTargetResponse,
   parseChatProblemDetails,
+  parseChatAttentionResponse,
+  parseChatConversationActionResponse,
+  parseChatReportReceipt,
   parseSendChatMessageResponse,
   type ChatConversationListResponse,
   type ChatMessagePage,
   type ChatRealtimeTicketResponse,
   type ChatTargetResponse,
+  type ChatAttentionRequest,
+  type ChatConversationActionResponse,
+  type ChatReportReceipt,
   type SendChatMessageRequest,
   type SendChatMessageResponse,
 } from '@shopee-clone/contracts';
@@ -75,6 +81,75 @@ export async function getChatUnreadCount(fetcher: AuthenticatedFetch) {
 
 export async function sendChatMessage(input: SendChatMessageRequest, fetcher: AuthenticatedFetch): Promise<SendChatMessageResponse> {
   return parsed(await request('/api/v1/chat/messages', { method: 'POST', body: JSON.stringify(input) }, fetcher), parseSendChatMessageResponse);
+}
+
+export async function muteChatConversation(
+  conversationId: string,
+  fetcher: AuthenticatedFetch,
+): Promise<ChatConversationActionResponse> {
+  return parsed(
+    await request(`/api/v1/chat/conversations/${encodeURIComponent(conversationId)}/mute`, { method: 'PUT' }, fetcher),
+    parseChatConversationActionResponse,
+  );
+}
+
+export async function unmuteChatConversation(
+  conversationId: string,
+  fetcher: AuthenticatedFetch,
+): Promise<ChatConversationActionResponse> {
+  return parsed(
+    await request(`/api/v1/chat/conversations/${encodeURIComponent(conversationId)}/mute`, { method: 'DELETE' }, fetcher),
+    parseChatConversationActionResponse,
+  );
+}
+
+export async function blockChatUser(
+  userId: string,
+  fetcher: AuthenticatedFetch,
+): Promise<ChatConversationActionResponse> {
+  return parsed(
+    await request(`/api/v1/chat/users/${encodeURIComponent(userId)}/block`, { method: 'PUT' }, fetcher),
+    parseChatConversationActionResponse,
+  );
+}
+
+export async function unblockChatUser(
+  userId: string,
+  fetcher: AuthenticatedFetch,
+): Promise<ChatConversationActionResponse> {
+  return parsed(
+    await request(`/api/v1/chat/users/${encodeURIComponent(userId)}/block`, { method: 'DELETE' }, fetcher),
+    parseChatConversationActionResponse,
+  );
+}
+
+export async function updateChatAttention(
+  conversationId: string,
+  input: ChatAttentionRequest,
+  fetcher: AuthenticatedFetch,
+) {
+  return parsed(
+    await request(`/api/v1/chat/conversations/${encodeURIComponent(conversationId)}/attention`, {
+      method: 'PUT',
+      body: JSON.stringify(input),
+    }, fetcher),
+    parseChatAttentionResponse,
+  );
+}
+
+export async function reportChat(
+  input: { conversationId: string; messageId?: string | null; reasonCode: string; details?: string | null },
+  idempotencyKey: string,
+  fetcher: AuthenticatedFetch,
+): Promise<ChatReportReceipt> {
+  return parsed(
+    await request('/api/v1/chat/reports', {
+      method: 'POST',
+      headers: { 'Idempotency-Key': idempotencyKey },
+      body: JSON.stringify(input),
+    }, fetcher),
+    parseChatReportReceipt,
+  );
 }
 
 export async function markChatRead(conversationId: string, throughSequence: number, fetcher: AuthenticatedFetch) {

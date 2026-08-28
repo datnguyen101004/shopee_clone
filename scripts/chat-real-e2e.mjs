@@ -6,7 +6,11 @@ const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url))
 const packageManagerPath = process.env.npm_execpath;
 if (!packageManagerPath) throw new Error('Real chat E2E must run through the pinned pnpm script.');
 
-const environment = { ...process.env, CHAT_REAL_E2E: '1', FULL_STACK_E2E: '1' };
+const environment = {
+  ...process.env,
+  CHAT_REAL_E2E: '1',
+  FULL_STACK_E2E: '1',
+};
 if (process.env.CHAT_E2E_PREPARE === '1') {
   const prepared = spawnSync(
     process.execPath,
@@ -45,6 +49,9 @@ if (process.env.CHAT_E2E_PREPARE === '1') {
   environment.CHAT_E2E_TEMPORARY_SHOP_SLUG = payload.temporaryShopSlug;
   environment.CHAT_E2E_BUYER_EMAIL = payload.buyerEmail;
   environment.CHAT_E2E_BUYER_PASSWORD = payload.buyerPassword;
+  environment.CHAT_E2E_ADMIN_REFRESH_TOKENS = JSON.stringify(payload.adminRefreshTokens ?? {});
+  environment.CHAT_E2E_ADMIN_REFRESH_TOKEN = payload.adminRefreshTokens?.desktop;
+  environment.CHAT_E2E_SAFETY_CASE_ID = payload.safetyCaseId;
   environment.CHAT_E2E_BUYER_ADDRESS_ID = payload.buyerAddressId;
 }
 const required = [

@@ -32,9 +32,30 @@ const fillerMessageIds = fillerUserIds.map(
 const fillerClientMessageIds = fillerUserIds.map(
   (_, index) => `00000000-0000-4000-8000-${(0x9400 + index).toString(16).padStart(12, '0')}`,
 );
+const safetyReplyMessageId = '00000000-0000-4000-8000-000000009601';
+const safetyAttentionLeaseId = '00000000-0000-4000-8000-000000009602';
+const safetyNotificationId = '00000000-0000-4000-8000-000000009603';
+const safetyReportId = '00000000-0000-4000-8000-000000009604';
+const safetyCaseId = '00000000-0000-4000-8000-000000009605';
+const safetyAdminIds = [
+  '00000000-0000-4000-8000-000000009611',
+  '00000000-0000-4000-8000-000000009612',
+] as const;
+const safetyAdminSessionIds: Record<ProjectName, string> = {
+  mobile: '00000000-0000-4000-8000-000000009613',
+  tablet: '00000000-0000-4000-8000-000000009614',
+  desktop: '00000000-0000-4000-8000-000000009615',
+};
 type ProjectName = 'mobile' | 'tablet' | 'desktop';
 type ScenarioName =
-  'existing' | 'temporary' | 'public' | 'checkout' | 'accessibility' | 'multitab' | 'exchange';
+  | 'existing'
+  | 'temporary'
+  | 'public'
+  | 'checkout'
+  | 'accessibility'
+  | 'multitab'
+  | 'exchange'
+  | 'safety';
 type SessionPair = { buyer: string; seller: string };
 const scenarioNames: readonly ScenarioName[] = [
   'existing',
@@ -44,6 +65,7 @@ const scenarioNames: readonly ScenarioName[] = [
   'accessibility',
   'multitab',
   'exchange',
+  'safety',
 ];
 
 function fixtureUuid(value: number): string {
@@ -126,11 +148,32 @@ async function main(): Promise<void> {
         ]),
       ) as Record<ScenarioName, SessionPair>,
     };
+    const adminRefreshTokens: Record<ProjectName, string> = {
+      mobile: refreshToken(),
+      tablet: refreshToken(),
+      desktop: refreshToken(),
+    };
     const now = new Date();
     const expiresAt = new Date(now.getTime() + 60 * 60 * 1_000);
     const [low, high] = buyerId < sellerId ? [buyerId, sellerId] : [sellerId, buyerId];
 
     await prisma.$transaction(async (tx) => {
+      const safetyCaseRows = await tx.moderationCase.findMany({
+        where: { chatConversationId: fillerConversationIds[0] },
+        select: { id: true },
+      });
+      const safetyCaseIds = [...new Set([safetyCaseId, ...safetyCaseRows.map((row) => row.id)])];
+      await tx.userReport.deleteMany({ where: { chatConversationId: fillerConversationIds[0] } });
+      await tx.privilegedAuditEvent.deleteMany({ where: { targetId: { in: safetyCaseIds } } });
+      await tx.moderationCommand.deleteMany({ where: { resourceId: { in: safetyCaseIds } } });
+      await tx.moderationDecision.deleteMany({ where: { caseId: { in: safetyCaseIds } } });
+      await tx.moderationCase.deleteMany({ where: { id: { in: safetyCaseIds } } });
+      await tx.chatAttentionLease.deleteMany({ where: { id: safetyAttentionLeaseId } });
+      await tx.notification.deleteMany({ where: { id: safetyNotificationId } });
+      await tx.chatUserBlock.deleteMany({ where: { id: fixtureUuid(0x9501) } });
+      await tx.userRoleAssignment.deleteMany({ where: { userId: { in: [...safetyAdminIds] } } });
+      await tx.authSession.deleteMany({ where: { userId: { in: [...safetyAdminIds] } } });
+      await tx.user.deleteMany({ where: { id: { in: [...safetyAdminIds] } } });
       await tx.chatOutbox.deleteMany({
         where: { conversation: { participantLowUserId: low, participantHighUserId: high } },
       });
@@ -363,6 +406,119 @@ async function main(): Promise<void> {
           },
         });
       }
+
+      const safetyConversationId = fillerConversationIds[0]!;
+      const safetyFillerId = fillerUserIds[0]!;
+      const safetyMessageId = fillerMessageIds[0]!;
+      const safetyAt = new Date(now.getTime() - 5 * 1_000);
+      await tx.chatUserBlock.upsert({
+        where: { blockerUserId_blockedUserId: { blockerUserId: buyerId, blockedUserId: safetyFillerId } },
+        create: { id: fixtureUuid(0x9501), blockerUserId: buyerId, blockedUserId: safetyFillerId },
+        update: {},
+      });
+      await tx.chatMembership.update({
+        where: { conversationId_userId: { conversationId: safetyConversationId, userId: buyerId } },
+        data: { notificationsMutedAt: safetyAt },
+      });
+      await tx.chatMessage.create({
+        data: {
+          id: safetyReplyMessageId,
+          conversationId: safetyConversationId,
+          sequence: 2,
+          senderUserId: buyerId,
+          clientMessageId: fixtureUuid(0x9603),
+          requestDigest: createHash('sha256').update('chat-e2e-safety-reply', 'utf8').digest('hex'),
+          content: 'Tin nhắn phản hồi trong fixture an toàn',
+          replyToMessageId: safetyMessageId,
+          createdAt: safetyAt,
+        },
+      });
+      await tx.chatConversation.update({
+        where: { id: safetyConversationId },
+        data: { nextSequence: 3, lastMessageSequence: 2, lastMessagePreview: 'Tin nhắn phản hồi trong fixture an toàn', lastMessageAt: safetyAt },
+      });
+      await tx.chatAttentionLease.create({
+        data: {
+          id: safetyAttentionLeaseId,
+          userId: buyerId,
+          sessionId: sessionIds.mobile.existing.buyer,
+          clientInstanceId: 'fixture-browser',
+          conversationId: safetyConversationId,
+          atNewestRegion: true,
+          engagedAt: safetyAt,
+          expiresAt: new Date(now.getTime() + 5 * 60 * 1_000),
+        },
+      });
+      await tx.notification.create({
+        data: {
+          id: safetyNotificationId,
+          recipientId: buyerId,
+          category: 'CHAT',
+          type: 'CHAT_MESSAGE',
+          title: 'Tin nhắn fixture chat',
+          body: 'Tin nhắn phản hồi trong fixture an toàn',
+          metadata: {
+            targetUrl: '/', thumbnailUrl: null, referenceId: safetyConversationId, amountMinor: null, currency: null,
+            chat: { conversationId: safetyConversationId, unreadCount: 1, newestSequence: 2, preview: 'Tin nhắn phản hồi trong fixture an toàn', avatarUrl: null, activityAt: safetyAt.toISOString() },
+          },
+          deduplicationKey: `chat:${buyerId}:${safetyConversationId}`,
+          isRead: false,
+          readAt: null,
+          isArchived: false,
+          createdAt: safetyAt,
+          activityAt: safetyAt,
+        },
+      });
+      await tx.user.createMany({
+        data: safetyAdminIds.map((id, index) => ({ id, email: `chat-e2e-admin-${index + 1}@example.test`, displayName: `Chat E2E Admin ${index + 1}`, status: UserStatus.ACTIVE })),
+      });
+      for (const adminId of safetyAdminIds) {
+        await tx.userRoleAssignment.createMany({
+          data: [
+            { userId: adminId, role: MarketplaceRole.BUYER, source: RoleAuditSource.SEED },
+            { userId: adminId, role: MarketplaceRole.ADMIN, source: RoleAuditSource.SEED },
+          ],
+        });
+      }
+      await tx.authSession.createMany({
+        data: (Object.keys(adminRefreshTokens) as ProjectName[]).map((project) => {
+          const sessionId = safetyAdminSessionIds[project];
+          return {
+            id: sessionId,
+            userId: safetyAdminIds[0],
+            familyId: sessionId,
+            tokenHash: tokenHash(adminRefreshTokens[project]),
+            expiresAt,
+          };
+        }),
+      });
+      await tx.moderationCase.create({
+        data: {
+          id: safetyCaseId,
+          targetType: 'CHAT_MESSAGE',
+          chatConversationId: safetyConversationId,
+          reportedUserId: safetyFillerId,
+          targetSnapshot: { conversationId: safetyConversationId, messageId: safetyMessageId, sequence: 1 },
+          primaryReason: 'INAPPROPRIATE_CONTENT',
+          reportCount: 1,
+        },
+      });
+      await tx.userReport.create({
+        data: {
+          id: safetyReportId,
+          reporterUserId: buyerId,
+          caseId: safetyCaseId,
+          targetType: 'CHAT_MESSAGE',
+          chatConversationId: safetyConversationId,
+          chatMessageId: safetyMessageId,
+          reportedUserId: safetyFillerId,
+          reasonCode: 'INAPPROPRIATE_CONTENT',
+          details: 'Fixture report for chat moderation verification.',
+          targetSnapshot: { conversationId: safetyConversationId, messageId: safetyMessageId, sequence: 1, reasonCode: 'INAPPROPRIATE_CONTENT' },
+          idempotencyKey: fixtureUuid(0x9604),
+          requestDigest: createHash('sha256').update('chat-e2e-safety-report', 'utf8').digest('hex'),
+        },
+      });
     });
 
     process.stdout.write(
@@ -377,6 +533,8 @@ async function main(): Promise<void> {
         productId: product.id,
         buyerEmail,
         buyerPassword,
+        adminRefreshTokens,
+        safetyCaseId,
         buyerAddressId,
         existingConversationId,
         refreshTokens,

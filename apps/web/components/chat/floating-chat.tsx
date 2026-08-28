@@ -1,6 +1,11 @@
 'use client';
 
 import { useChat } from './chat-provider';
+import type {
+  ChatConversationSummary,
+  ChatMessage,
+  ChatReplyReference,
+} from '@shopee-clone/contracts';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useAuthSession } from '../auth-session-provider';
 
@@ -53,7 +58,22 @@ export function FloatingChat() {
     Parameters<typeof chat.selectConversation>[0] | null
   >(null);
   const [hasNewMessages, setHasNewMessages] = useState(false);
+  const [contactActionId, setContactActionId] = useState<string | null>(null);
+  const [messageActionId, setMessageActionId] = useState<string | null>(null);
+  const [highlightedMessageId, setHighlightedMessageId] = useState<string | null>(null);
+  const [replyNavigationState, setReplyNavigationState] = useState<{
+    replyMessageId: string;
+    status: 'loading' | 'unavailable' | 'error';
+  } | null>(null);
+  const [reportTarget, setReportTarget] = useState<ChatMessage | null>(null);
+  const [reportReason, setReportReason] = useState('HARASSMENT');
+  const [reportDetails, setReportDetails] = useState('');
+  const [reportError, setReportError] = useState('');
+  const [reportSending, setReportSending] = useState(false);
+  const [reportReceipt, setReportReceipt] = useState<string | null>(null);
+  const [blockTarget, setBlockTarget] = useState<ChatConversationSummary | null>(null);
   const pointerEngaged = useRef(false);
+  const highlightTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const conversations = useMemo(
     () =>
       chat.conversations.filter((conversation) => {
@@ -71,7 +91,13 @@ export function FloatingChat() {
     }
     return null;
   }, [authenticatedUserId, chat.messages]);
-  const latestMessageId = chat.messages.at(-1)?.id ?? null;
+  const latestMessage = chat.messages.at(-1) ?? null;
+  const latestMessageId = latestMessage?.id ?? null;
+  const latestMessageIsOwn =
+    authenticatedUserId !== null && latestMessage?.senderUserId === authenticatedUserId;
+  const selectedConversationLabel = chat.selectedConversation
+    ? conversationLabel(chat.selectedConversation)
+    : 'Người dùng';
   const loadOlderInFlight = useRef(false);
 
   useEffect(() => {
@@ -89,6 +115,19 @@ export function FloatingChat() {
     if (!open) return;
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return;
+      if (contactActionId || messageActionId) {
+        setContactActionId(null);
+        setMessageActionId(null);
+        return;
+      }
+      if (reportTarget) {
+        setReportTarget(null);
+        return;
+      }
+      if (blockTarget) {
+        setBlockTarget(null);
+        return;
+      }
       if (pendingConversation) {
         setPendingConversation(null);
         return;
@@ -97,7 +136,27 @@ export function FloatingChat() {
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [open, closeWidget, pendingConversation]);
+  }, [
+    open,
+    closeWidget,
+    pendingConversation,
+    contactActionId,
+    messageActionId,
+    reportTarget,
+    blockTarget,
+  ]);
+
+  useEffect(() => {
+    if (!open || (!contactActionId && !messageActionId)) return;
+    const onPointerDown = (event: PointerEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (target?.closest('.floating-chat__action-menu, .floating-chat__contact-actions, .floating-chat__message-actions')) return;
+      setContactActionId(null);
+      setMessageActionId(null);
+    };
+    window.addEventListener('pointerdown', onPointerDown);
+    return () => window.removeEventListener('pointerdown', onPointerDown);
+  }, [open, contactActionId, messageActionId]);
 
   useEffect(() => {
     const reopened = open && !previousOpen.current;
@@ -108,11 +167,13 @@ export function FloatingChat() {
       shouldAutoScroll.current = true;
       setHasNewMessages(false);
     }
-    if (
-      previousLatestMessageId.current &&
-      previousLatestMessageId.current !== latestMessageId &&
-      !shouldAutoScroll.current
-    ) {
+    const latestMessageChanged =
+      previousLatestMessageId.current !== null &&
+      previousLatestMessageId.current !== latestMessageId;
+    if (latestMessageChanged && latestMessageIsOwn) {
+      shouldAutoScroll.current = true;
+      setHasNewMessages(false);
+    } else if (latestMessageChanged && !shouldAutoScroll.current) {
       setHasNewMessages(true);
     }
     previousLatestMessageId.current = latestMessageId;
@@ -123,7 +184,14 @@ export function FloatingChat() {
       if (pane) pane.scrollTop = pane.scrollHeight;
     });
     return () => cancelAnimationFrame(frame);
-  }, [chat.selectedConversation, latestMessageId, open]);
+  }, [chat.selectedConversation, latestMessageId, latestMessageIsOwn, open]);
+
+  useEffect(
+    () => () => {
+      if (highlightTimer.current) clearTimeout(highlightTimer.current);
+    },
+    [],
+  );
 
   const loadOlder = async () => {
     const pane = messagesPaneRef.current;
@@ -140,6 +208,54 @@ export function FloatingChat() {
     } finally {
       loadOlderInFlight.current = false;
     }
+  };
+
+  const findMessageElement = (messageId: string) =>
+    messagesPaneRef.current?.querySelector<HTMLElement>(
+      `[data-chat-message-id="${messageId}"]`,
+    ) ?? null;
+
+  const jumpToReplyTarget = async (
+    replyMessageId: string,
+    reference: ChatReplyReference,
+  ) => {
+    setMessageActionId(null);
+    setReplyNavigationState(null);
+    let target = findMessageElement(reference.messageId);
+    if (!target) {
+      setReplyNavigationState({ replyMessageId, status: 'loading' });
+      const result = await chat.loadReplyTarget(reference);
+      if (result !== 'loaded') {
+        setReplyNavigationState({ replyMessageId, status: result });
+        return;
+      }
+      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+      target = findMessageElement(reference.messageId);
+    }
+    if (!target) {
+      setReplyNavigationState({ replyMessageId, status: 'unavailable' });
+      return;
+    }
+
+    shouldAutoScroll.current = false;
+    setHasNewMessages(false);
+    setReplyNavigationState(null);
+    const prefersReducedMotion =
+      typeof window.matchMedia === 'function' &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    target.scrollIntoView?.({
+      behavior: prefersReducedMotion ? 'auto' : 'smooth',
+      block: 'center',
+    });
+    target.focus({ preventScroll: true });
+    setHighlightedMessageId(reference.messageId);
+    if (highlightTimer.current) clearTimeout(highlightTimer.current);
+    highlightTimer.current = setTimeout(() => {
+      setHighlightedMessageId((current) =>
+        current === reference.messageId ? null : current,
+      );
+      highlightTimer.current = null;
+    }, 1_800);
   };
 
   const select = (conversation: Parameters<typeof chat.selectConversation>[0]) => {
@@ -309,51 +425,104 @@ export function FloatingChat() {
                   </p>
                 ) : null}
                 {conversations.map((conversation) => (
-                  <button
-                    type="button"
-                    key={conversation.id}
-                    className={`floating-chat__contact-item ${
-                      chat.selectedConversation?.id === conversation.id ? 'is-selected' : ''
-                    }`}
-                    onClick={() => select(conversation)}
-                  >
-                    <div className="floating-chat__contact-avatar">
-                      {conversation.participant.avatarUrl ? (
-                        <img
-                          src={conversation.participant.avatarUrl}
-                          alt=""
-                          className="floating-chat__avatar-img"
+                  <div className="floating-chat__contact-row" key={conversation.id}>
+                    <button
+                      type="button"
+                      className={`floating-chat__contact-item ${
+                        chat.selectedConversation?.id === conversation.id ? 'is-selected' : ''
+                      }`}
+                      onClick={() => {
+                        setContactActionId(null);
+                        select(conversation);
+                      }}
+                    >
+                      <div className="floating-chat__contact-avatar">
+                        {conversation.participant.avatarUrl ? (
+                          <img
+                            src={conversation.participant.avatarUrl}
+                            alt=""
+                            className="floating-chat__avatar-img"
+                          />
+                        ) : (
+                          <span>{conversationLabel(conversation).charAt(0).toUpperCase()}</span>
+                        )}
+                        <span
+                          className={`floating-chat__presence-indicator ${
+                            conversation.participant.presence === 'ACTIVE'
+                              ? 'is-online'
+                              : 'is-offline'
+                          }`}
                         />
-                      ) : (
-                        <span>{conversationLabel(conversation).charAt(0).toUpperCase()}</span>
-                      )}
-                      <span
-                        className={`floating-chat__presence-indicator ${
-                          conversation.participant.presence === 'ACTIVE'
-                            ? 'is-online'
-                            : 'is-offline'
-                        }`}
-                      />
-                    </div>
-                    <div className="floating-chat__contact-info">
-                      <div className="floating-chat__contact-headline">
-                        <strong>{conversationLabel(conversation)}</strong>
-                        {conversation.unreadCount ? (
-                          <em aria-label={`${conversation.unreadCount} tin chưa đọc`}>
-                            {conversation.unreadCount}
-                          </em>
+                      </div>
+                      <div className="floating-chat__contact-info">
+                        <div className="floating-chat__contact-headline">
+                          <strong>{conversationLabel(conversation)}</strong>
+                          {conversation.unreadCount ? (
+                            <em aria-label={`${conversation.unreadCount} tin chưa đọc`}>
+                              {conversation.unreadCount}
+                            </em>
+                          ) : null}
+                        </div>
+                        <small className="floating-chat__contact-preview">
+                          {conversation.lastMessagePreview || 'Bắt đầu trò chuyện'}
+                        </small>
+                        <small className="floating-chat__contact-status">
+                          {conversation.participant.presence === 'ACTIVE'
+                            ? 'Đang hoạt động'
+                            : 'Không hoạt động'}
+                        </small>
+                        {conversation.notificationsMuted ? (
+                          <small className="floating-chat__contact-state">🔕 Đã tắt thông báo</small>
+                        ) : null}
+                        {conversation.blockedByMe ? (
+                          <small className="floating-chat__contact-state">🚫 Đã chặn</small>
                         ) : null}
                       </div>
-                      <small className="floating-chat__contact-preview">
-                        {conversation.lastMessagePreview || 'Bắt đầu trò chuyện'}
-                      </small>
-                      <small className="floating-chat__contact-status">
-                        {conversation.participant.presence === 'ACTIVE'
-                          ? 'Đang hoạt động'
-                          : 'Không hoạt động'}
-                      </small>
-                    </div>
-                  </button>
+                    </button>
+                    <button
+                      type="button"
+                      className="floating-chat__contact-actions"
+                      aria-label="Tùy chọn cuộc trò chuyện"
+                      aria-expanded={contactActionId === conversation.id}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        setMessageActionId(null);
+                        setContactActionId((current) =>
+                          current === conversation.id ? null : conversation.id,
+                        );
+                      }}
+                    >
+                      ⋮
+                    </button>
+                    {contactActionId === conversation.id ? (
+                      <div className="floating-chat__action-menu" role="menu">
+                        <button
+                          type="button"
+                          role="menuitem"
+                          onClick={() => {
+                            void chat.toggleMute(conversation.id, !conversation.notificationsMuted);
+                            setContactActionId(null);
+                          }}
+                        >
+                          {conversation.notificationsMuted ? 'Bật thông báo' : 'Tắt thông báo'}
+                        </button>
+                        <button
+                          type="button"
+                          role="menuitem"
+                          onClick={() => {
+                            if (conversation.blockedByMe) {
+                              void chat.toggleBlock(conversation.participant.userId, false);
+                            } else {
+                              setBlockTarget(conversation);
+                            }
+                            setContactActionId(null);
+                          }}
+                        >
+                          {conversation.blockedByMe ? 'Bỏ chặn' : 'Chặn'}
+                        </button>
+                      </div>
+                    ) : null}
+                  </div>
                 ))}
               </div>
             </aside>
@@ -449,42 +618,153 @@ export function FloatingChat() {
                               {formatMessageDate(message.createdAt)}
                             </div>
                           ) : null}
-                          <p
-                            key={message.id}
+                          <div
                             className={[
+                              'floating-chat__message-line',
                               isOwnMessage ? 'is-mine' : 'is-theirs',
-                              message.deliveryState === 'FAILED' ? 'is-failed' : '',
+                              highlightedMessageId === message.id ? 'is-reply-target' : '',
                             ]
                               .filter(Boolean)
                               .join(' ')}
-                            onClick={() =>
-                              setExpandedMessageId((current) =>
-                                current === message.id ? null : message.id,
-                              )
-                            }
+                            data-chat-message-id={message.id}
+                            tabIndex={-1}
                           >
-                            <span className="floating-chat__message-bubble">{message.content}</span>
-                            <span className="floating-chat__message-footer">
-                              {showTime ? (
-                                <small className="floating-chat__message-time">
-                                  <time dateTime={message.createdAt}>
-                                    {formatMessageTime(message.createdAt)}
-                                  </time>
-                                </small>
+                            <p
+                              key={message.id}
+                              className={[
+                                isOwnMessage ? 'is-mine' : 'is-theirs',
+                                message.deliveryState === 'FAILED' ? 'is-failed' : '',
+                              ]
+                                .filter(Boolean)
+                                .join(' ')}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                setContactActionId(null);
+                                setMessageActionId((current) =>
+                                  current === message.id ? null : message.id,
+                                );
+                                setExpandedMessageId((current) =>
+                                  current === message.id ? null : message.id,
+                                );
+                                void chat.markSelectedConversationRead();
+                              }}
+                            >
+                              {message.replyTo ? (
+                                <>
+                                  <span className="floating-chat__reply-attribution">
+                                    <span aria-hidden="true">↩</span>
+                                    {isOwnMessage
+                                      ? `Bạn đã trả lời ${selectedConversationLabel}`
+                                      : `${selectedConversationLabel} đã trả lời bạn`}
+                                  </span>
+                                  <button
+                                    type="button"
+                                    className="floating-chat__reply-quote"
+                                    aria-label={`Đi tới tin nhắn gốc của ${message.replyTo.senderLabel}`}
+                                    onClick={(event) => {
+                                      event.stopPropagation();
+                                      void jumpToReplyTarget(message.id, message.replyTo!);
+                                    }}
+                                  >
+                                    <span>{message.replyTo.preview}</span>
+                                  </button>
+                                  {replyNavigationState?.replyMessageId === message.id ? (
+                                    <small
+                                      className="floating-chat__reply-navigation-state"
+                                      role="status"
+                                    >
+                                      {replyNavigationState.status === 'loading'
+                                        ? 'Đang mở tin nhắn gốc…'
+                                        : replyNavigationState.status === 'error'
+                                          ? 'Chưa thể tải tin nhắn gốc. Hãy thử lại.'
+                                          : 'Tin nhắn gốc không còn khả dụng.'}
+                                    </small>
+                                  ) : null}
+                                </>
                               ) : null}
-                              {showReadState ? (
-                                <small className="floating-chat__message-state">
-                                  {message.deliveryState === 'PENDING'
-                                    ? 'Đang gửi…'
-                                    : message.deliveryState === 'FAILED'
-                                      ? 'Gửi thất bại'
-                                      : message.isRead
-                                        ? 'Đã xem'
-                                        : 'Đã gửi'}
-                                </small>
-                              ) : null}
-                            </span>
-                          </p>
+                              <span className="floating-chat__message-main-row">
+                                <span className="floating-chat__message-bubble">
+                                  {message.content}
+                                </span>
+                                <button
+                                  type="button"
+                                  className="floating-chat__message-actions"
+                                  aria-label={`Tùy chọn tin nhắn lúc ${formatMessageTime(message.createdAt)}`}
+                                  aria-expanded={messageActionId === message.id}
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    setContactActionId(null);
+                                    setMessageActionId((current) =>
+                                      current === message.id ? null : message.id,
+                                    );
+                                  }}
+                                >
+                                  ⋮
+                                </button>
+                                {messageActionId === message.id ? (
+                                  <span
+                                    className="floating-chat__action-menu floating-chat__message-menu"
+                                    role="menu"
+                                    onClick={(event) => event.stopPropagation()}
+                                  >
+                                    <button
+                                      type="button"
+                                      role="menuitem"
+                                      onClick={() => {
+                                        chat.setReplyTo({
+                                          messageId: message.id,
+                                          sequence: message.sequence,
+                                          senderUserId: message.senderUserId,
+                                          senderLabel: isOwnMessage
+                                            ? 'Bạn'
+                                            : (chat.selectedConversation?.participant.displayName ??
+                                              'Người dùng'),
+                                          preview: message.content.slice(0, 160),
+                                        });
+                                        setMessageActionId(null);
+                                      }}
+                                    >
+                                      Trả lời
+                                    </button>
+                                    <button
+                                      type="button"
+                                      role="menuitem"
+                                      onClick={() => {
+                                        setReportTarget(message);
+                                        setReportReason('HARASSMENT');
+                                        setReportDetails('');
+                                        setReportError('');
+                                        setReportReceipt(null);
+                                        setMessageActionId(null);
+                                      }}
+                                    >
+                                      Báo cáo
+                                    </button>
+                                  </span>
+                                ) : null}
+                              </span>
+                              <span className="floating-chat__message-footer">
+                                {showTime ? (
+                                  <small className="floating-chat__message-time">
+                                    <time dateTime={message.createdAt}>
+                                      {formatMessageTime(message.createdAt)}
+                                    </time>
+                                  </small>
+                                ) : null}
+                                {showReadState ? (
+                                  <small className="floating-chat__message-state">
+                                    {message.deliveryState === 'PENDING'
+                                      ? 'Đang gửi…'
+                                      : message.deliveryState === 'FAILED'
+                                        ? 'Gửi thất bại'
+                                        : message.isRead
+                                          ? 'Đã xem'
+                                          : 'Đã gửi'}
+                                  </small>
+                                ) : null}
+                              </span>
+                            </p>
+                          </div>
                         </div>
                       );
                     })}
@@ -510,13 +790,24 @@ export function FloatingChat() {
                       Bạn không thể tiếp tục cuộc trò chuyện này
                     </div>
                   ) : (
-                    <form
-                      className="floating-chat__form"
-                      onSubmit={(event) => {
-                        event.preventDefault();
-                        void chat.sendDraft();
-                      }}
-                    >
+                    <>
+                      {chat.replyTo ? (
+                        <div className="floating-chat__reply-composer" role="status">
+                          <span>
+                            Đang trả lời <strong>{chat.replyTo.senderLabel}</strong>: {chat.replyTo.preview}
+                          </span>
+                          <button type="button" onClick={() => chat.setReplyTo(null)}>
+                            Hủy
+                          </button>
+                        </div>
+                      ) : null}
+                      <form
+                        className="floating-chat__form"
+                        onSubmit={(event) => {
+                          event.preventDefault();
+                          void chat.sendDraft();
+                        }}
+                      >
                       <textarea
                         aria-label="Nội dung tin nhắn"
                         value={chat.draft}
@@ -551,7 +842,8 @@ export function FloatingChat() {
                           <polygon points="22 2 15 22 11 13 2 9 22 2" />
                         </svg>
                       </button>
-                    </form>
+                      </form>
+                    </>
                   )}
                 </>
               ) : (
@@ -613,6 +905,98 @@ export function FloatingChat() {
                     onClick={() => setPendingConversation(null)}
                   >
                     Ở lại
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : null}
+
+          {reportTarget ? (
+            <div className="floating-chat__report-overlay" role="dialog" aria-modal="true" aria-label="Báo cáo tin nhắn">
+              <form
+                className="floating-chat__report-dialog"
+                onSubmit={async (event) => {
+                  event.preventDefault();
+                  if (!chat.selectedConversation || reportSending) return;
+                  setReportSending(true);
+                  setReportError('');
+                  try {
+                    const receipt = await chat.reportMessage({
+                      conversationId: chat.selectedConversation.id,
+                      messageId: reportTarget.id,
+                      reasonCode: reportReason,
+                      details: reportDetails.trim() || null,
+                    });
+                    setReportTarget(null);
+                    setReportDetails('');
+                    setReportReceipt(receipt?.id ?? 'submitted');
+                  } catch {
+                    setReportError('Chưa thể gửi báo cáo. Vui lòng thử lại.');
+                  } finally {
+                    setReportSending(false);
+                  }
+                }}
+              >
+                <strong>Báo cáo tin nhắn</strong>
+                <p>Tin nhắn này sẽ được gửi tới đội ngũ kiểm duyệt.</p>
+                <label>
+                  Lý do
+                  <select value={reportReason} onChange={(event) => setReportReason(event.target.value)}>
+                    <option value="HARASSMENT">Quấy rối hoặc xúc phạm</option>
+                    <option value="SPAM">Tin nhắn rác</option>
+                    <option value="SCAM">Lừa đảo</option>
+                    <option value="INAPPROPRIATE_CONTENT">Nội dung không phù hợp</option>
+                    <option value="OTHER">Lý do khác</option>
+                  </select>
+                </label>
+                <label>
+                  Mô tả thêm (không bắt buộc)
+                  <textarea
+                    value={reportDetails}
+                    maxLength={1000}
+                    minLength={reportReason === 'OTHER' ? 20 : undefined}
+                    required={reportReason === 'OTHER'}
+                    onChange={(event) => setReportDetails(event.target.value)}
+                    placeholder="Bạn có thể giải thích thêm…"
+                    rows={3}
+                  />
+                  <small>{reportDetails.length}/1000 ký tự{reportReason === 'OTHER' ? ' · cần ít nhất 20 ký tự' : ''}</small>
+                </label>
+                {reportError ? <span className="floating-chat__report-error" role="alert">{reportError}</span> : null}
+                <div className="floating-chat__report-actions">
+                  <button type="button" onClick={() => setReportTarget(null)} disabled={reportSending}>
+                    Hủy
+                  </button>
+                  <button type="submit" className="is-primary" disabled={reportSending}>
+                    {reportSending ? 'Đang gửi…' : 'Gửi báo cáo'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          ) : null}
+
+          {reportReceipt ? (
+            <p className="floating-chat__report-receipt" role="status" aria-live="polite">
+              Đã gửi báo cáo. Mã biên nhận: {reportReceipt}
+            </p>
+          ) : null}
+
+          {blockTarget ? (
+            <div className="floating-chat__report-overlay" role="alertdialog" aria-modal="true" aria-label="Xác nhận chặn người dùng">
+              <div className="floating-chat__report-dialog">
+                <strong>Chặn {conversationLabel(blockTarget)}?</strong>
+                <p>Bạn sẽ không thể gửi hoặc nhận tin nhắn mới từ người này. Lịch sử hiện tại vẫn được giữ lại.</p>
+                <div className="floating-chat__report-actions">
+                  <button type="button" onClick={() => setBlockTarget(null)}>Hủy</button>
+                  <button
+                    type="button"
+                    className="is-primary"
+                    onClick={() => {
+                      void chat.toggleBlock(blockTarget.participant.userId, true);
+                      setBlockTarget(null);
+                    }}
+                  >
+                    Chặn
                   </button>
                 </div>
               </div>

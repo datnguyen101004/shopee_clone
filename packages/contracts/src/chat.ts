@@ -6,6 +6,9 @@ export const CHAT_DEFAULT_LIMIT = 20;
 export const CHAT_MAX_LIMIT = 50;
 export const CHAT_CONTACT_SEARCH_MAX_LENGTH = 80;
 export const CHAT_REALTIME_TICKET_TTL_SECONDS = 60;
+export const CHAT_REPLY_PREVIEW_MAX_LENGTH = 160;
+export const CHAT_REPORT_DETAILS_MAX_LENGTH = 1_000;
+export const CHAT_ATTENTION_LEASE_SECONDS = 15;
 
 export const CHAT_PRESENCE_STATES = ['ACTIVE', 'INACTIVE'] as const;
 export type ChatPresence = (typeof CHAT_PRESENCE_STATES)[number];
@@ -16,6 +19,8 @@ export const CHAT_EVENT_TYPES = [
   'chat.read.updated',
   'chat.unread.updated',
   'chat.presence.updated',
+  'chat.safety.updated',
+  'chat.notification.updated',
 ] as const;
 export type ChatEventType = (typeof CHAT_EVENT_TYPES)[number];
 
@@ -53,6 +58,16 @@ export interface ChatConversationSummary {
   lastMessageSequence: number;
   /** Generic eligibility flag; omitted by older clients and treated as true. */
   canMessage?: boolean;
+  notificationsMuted?: boolean;
+  blockedByMe?: boolean;
+}
+
+export interface ChatReplyReference {
+  messageId: string;
+  sequence: number;
+  senderUserId: string;
+  senderLabel: string;
+  preview: string;
 }
 
 export interface ChatConversationListResponse {
@@ -72,6 +87,7 @@ export interface ChatMessage {
   createdAt: string;
   deliveryState: ChatMessageDeliveryState;
   isRead: boolean;
+  replyTo?: ChatReplyReference | null;
 }
 
 export interface ChatMessagePage {
@@ -87,6 +103,7 @@ export interface SendChatMessageRequest {
   recipientUserId: string;
   clientMessageId: string;
   content: string;
+  replyToMessageId?: string | null;
 }
 
 export interface SendChatMessageResponse {
@@ -111,6 +128,51 @@ export interface MarkChatReadResponse {
 export interface ChatUnreadCountResponse {
   chatVersion: typeof CHAT_VERSION;
   unreadCount: number;
+}
+
+export interface ChatConversationActionResponse {
+  chatVersion: typeof CHAT_VERSION;
+  conversationId: string;
+  notificationsMuted: boolean;
+  blockedByMe: boolean;
+  canMessage: boolean;
+}
+
+export interface ChatAttentionRequest {
+  clientInstanceId: string;
+  engagedAtNewestRegion: boolean;
+}
+
+export interface ChatAttentionResponse {
+  chatVersion: typeof CHAT_VERSION;
+  conversationId: string;
+  clientInstanceId: string;
+  expiresAt: string | null;
+}
+
+export const CHAT_REPORT_REASON_CODES = [
+  'INAPPROPRIATE_CONTENT',
+  'HARASSMENT',
+  'SPAM',
+  'SCAM',
+  'OTHER',
+] as const;
+export type ChatReportReasonCode = (typeof CHAT_REPORT_REASON_CODES)[number];
+
+export interface ChatReportRequest {
+  conversationId: string;
+  messageId?: string | null;
+  reasonCode: ChatReportReasonCode;
+  details?: string | null;
+}
+
+export interface ChatReportReceipt {
+  id: string;
+  conversationId: string;
+  messageId: string | null;
+  reasonCode: ChatReportReasonCode;
+  status: 'SUBMITTED' | 'REVIEWED';
+  createdAt: string;
 }
 
 export interface ChatOutboxHealthResponse {
@@ -172,12 +234,27 @@ export interface ChatPresenceUpdatedEvent {
   presence: ChatPresence;
 }
 
+export interface ChatSafetyUpdatedEvent {
+  eventVersion: typeof CHAT_VERSION;
+  type: 'chat.safety.updated';
+  conversation: ChatConversationSummary;
+}
+
+export interface ChatNotificationUpdatedEvent {
+  eventVersion: typeof CHAT_VERSION;
+  type: 'chat.notification.updated';
+  conversationId: string;
+  notificationUnreadCount: number;
+}
+
 export type ChatRealtimeEvent =
   | ChatMessageAcceptedEvent
   | ChatConversationUpdatedEvent
   | ChatReadUpdatedEvent
   | ChatUnreadUpdatedEvent
-  | ChatPresenceUpdatedEvent;
+  | ChatPresenceUpdatedEvent
+  | ChatSafetyUpdatedEvent
+  | ChatNotificationUpdatedEvent;
 
 export interface ChatProblemDetails {
   type: string;
@@ -186,6 +263,8 @@ export interface ChatProblemDetails {
   detail: string;
   code?: string;
   errors?: Array<{ field: string; message: string }>;
+  retryAfterSeconds?: number;
+  validation?: unknown;
 }
 
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -233,7 +312,7 @@ export function isChatMessage(value: unknown): value is ChatMessage {
       'createdAt',
       'deliveryState',
       'isRead',
-    ])
+    ], ['replyTo'])
   )
     return false;
   return (
@@ -245,7 +324,21 @@ export function isChatMessage(value: unknown): value is ChatMessage {
     isText(value.content, CHAT_MESSAGE_MAX_LENGTH) &&
     isDate(value.createdAt) &&
     ['SENT', 'PENDING', 'FAILED'].includes(String(value.deliveryState)) &&
-    typeof value.isRead === 'boolean'
+    typeof value.isRead === 'boolean' &&
+    (value.replyTo === undefined || value.replyTo === null || isChatReplyReference(value.replyTo))
+  );
+}
+
+export function isChatReplyReference(value: unknown): value is ChatReplyReference {
+  return (
+    isRecord(value) &&
+    hasExactKeys(value, ['messageId', 'sequence', 'senderUserId', 'senderLabel', 'preview']) &&
+    uuid.test(String(value.messageId)) &&
+    isSafeInt(value.sequence, 1) &&
+    uuid.test(String(value.senderUserId)) &&
+    isText(value.senderLabel, 120) &&
+    typeof value.preview === 'string' &&
+    value.preview.length <= CHAT_REPLY_PREVIEW_MAX_LENGTH
   );
 }
 
@@ -274,7 +367,7 @@ export function isChatConversationSummary(value: unknown): value is ChatConversa
         'lastReadSequence',
         'lastMessageSequence',
       ],
-      ['shopName', 'canMessage'],
+      ['shopName', 'canMessage', 'notificationsMuted', 'blockedByMe'],
     )
   )
     return false;
@@ -283,6 +376,8 @@ export function isChatConversationSummary(value: unknown): value is ChatConversa
     isChatParticipant(value.participant) &&
     (value.shopName === undefined || value.shopName === null || isText(value.shopName, 160)) &&
     (value.canMessage === undefined || typeof value.canMessage === 'boolean') &&
+    (value.notificationsMuted === undefined || typeof value.notificationsMuted === 'boolean') &&
+    (value.blockedByMe === undefined || typeof value.blockedByMe === 'boolean') &&
     typeof value.lastMessagePreview === 'string' &&
     value.lastMessagePreview.length <= CHAT_MESSAGE_MAX_LENGTH &&
     isDate(value.lastMessageAt) &&
@@ -295,7 +390,7 @@ export function isChatConversationSummary(value: unknown): value is ChatConversa
 export function isChatProblemDetails(value: unknown): value is ChatProblemDetails {
   if (
     !isRecord(value) ||
-    !hasExactKeys(value, ['type', 'title', 'status', 'detail'], ['code', 'errors'])
+    !hasExactKeys(value, ['type', 'title', 'status', 'detail'], ['code', 'errors', 'retryAfterSeconds', 'validation'])
   )
     return false;
   return (
@@ -306,17 +401,19 @@ export function isChatProblemDetails(value: unknown): value is ChatProblemDetail
     typeof value.status === 'number' &&
     problemStatuses.has(value.status) &&
     typeof value.detail === 'string' &&
-    value.detail.length > 0
+    value.detail.length > 0 &&
+    (value.retryAfterSeconds === undefined || isSafeInt(value.retryAfterSeconds, 1))
   );
 }
 
 export function isSendChatMessageRequest(value: unknown): value is SendChatMessageRequest {
   return (
     isRecord(value) &&
-    hasExactKeys(value, ['recipientUserId', 'clientMessageId', 'content']) &&
+    hasExactKeys(value, ['recipientUserId', 'clientMessageId', 'content'], ['replyToMessageId']) &&
     uuid.test(String(value.recipientUserId)) &&
     uuid.test(String(value.clientMessageId)) &&
-    isText(value.content, CHAT_MESSAGE_MAX_LENGTH)
+    isText(value.content, CHAT_MESSAGE_MAX_LENGTH) &&
+    (value.replyToMessageId === undefined || value.replyToMessageId === null || uuid.test(String(value.replyToMessageId)))
   );
 }
 
@@ -493,6 +590,73 @@ export function parseChatRealtimeTicketResponse(value: unknown): ChatRealtimeTic
     : null;
 }
 
+export function isChatConversationActionResponse(
+  value: unknown,
+): value is ChatConversationActionResponse {
+  return (
+    isRecord(value) &&
+    hasExactKeys(value, [
+      'chatVersion',
+      'conversationId',
+      'notificationsMuted',
+      'blockedByMe',
+      'canMessage',
+    ]) &&
+    value.chatVersion === CHAT_VERSION &&
+    uuid.test(String(value.conversationId)) &&
+    typeof value.notificationsMuted === 'boolean' &&
+    typeof value.blockedByMe === 'boolean' &&
+    typeof value.canMessage === 'boolean'
+  );
+}
+
+export function parseChatConversationActionResponse(
+  value: unknown,
+): ChatConversationActionResponse | null {
+  return isChatConversationActionResponse(value) ? value : null;
+}
+
+export function isChatAttentionResponse(value: unknown): value is ChatAttentionResponse {
+  return (
+    isRecord(value) &&
+    hasExactKeys(value, ['chatVersion', 'conversationId', 'clientInstanceId', 'expiresAt']) &&
+    value.chatVersion === CHAT_VERSION &&
+    uuid.test(String(value.conversationId)) &&
+    typeof value.clientInstanceId === 'string' &&
+    value.clientInstanceId.length > 0 &&
+    value.clientInstanceId.length <= 80 &&
+    (value.expiresAt === null || isDate(value.expiresAt))
+  );
+}
+
+export function parseChatAttentionResponse(value: unknown): ChatAttentionResponse | null {
+  return isChatAttentionResponse(value) ? value : null;
+}
+
+export function isChatReportReceipt(value: unknown): value is ChatReportReceipt {
+  return (
+    isRecord(value) &&
+    hasExactKeys(value, [
+      'id',
+      'conversationId',
+      'messageId',
+      'reasonCode',
+      'status',
+      'createdAt',
+    ]) &&
+    uuid.test(String(value.id)) &&
+    uuid.test(String(value.conversationId)) &&
+    (value.messageId === null || uuid.test(String(value.messageId))) &&
+    (CHAT_REPORT_REASON_CODES as readonly string[]).includes(String(value.reasonCode)) &&
+    ['SUBMITTED', 'REVIEWED'].includes(String(value.status)) &&
+    isDate(value.createdAt)
+  );
+}
+
+export function parseChatReportReceipt(value: unknown): ChatReportReceipt | null {
+  return isChatReportReceipt(value) ? value : null;
+}
+
 export function parseChatRealtimeEvent(value: unknown): ChatRealtimeEvent | null {
   if (!isRecord(value) || value.eventVersion !== CHAT_VERSION || typeof value.type !== 'string')
     return null;
@@ -543,6 +707,19 @@ export function parseChatRealtimeEvent(value: unknown): ChatRealtimeEvent | null
     isChatPresence(value.presence)
   )
     return value as unknown as ChatPresenceUpdatedEvent;
+  if (
+    value.type === 'chat.safety.updated' &&
+    hasExactKeys(value, ['eventVersion', 'type', 'conversation']) &&
+    isChatConversationSummary(value.conversation)
+  )
+    return value as unknown as ChatSafetyUpdatedEvent;
+  if (
+    value.type === 'chat.notification.updated' &&
+    hasExactKeys(value, ['eventVersion', 'type', 'conversationId', 'notificationUnreadCount']) &&
+    uuid.test(String(value.conversationId)) &&
+    isSafeInt(value.notificationUnreadCount)
+  )
+    return value as unknown as ChatNotificationUpdatedEvent;
   return null;
 }
 

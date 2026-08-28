@@ -5,6 +5,8 @@ import {
   parseChatRealtimeEvent,
   type ChatConversationSummary,
   type ChatMessage,
+  type ChatReportReceipt,
+  type ChatReplyReference,
   type ChatTargetResponse,
 } from '@shopee-clone/contracts';
 import { io, type Socket } from 'socket.io-client';
@@ -26,6 +28,12 @@ import {
   getChatTarget,
   listChatConversations,
   markChatRead,
+  blockChatUser,
+  muteChatConversation,
+  reportChat,
+  unblockChatUser,
+  unmuteChatConversation,
+  updateChatAttention,
   sendChatMessage,
 } from '../../lib/chat-api';
 
@@ -48,6 +56,7 @@ type ChatState = {
   reconnecting: boolean;
   hasMoreBefore: boolean;
   oldestSequence: number | null;
+  replyTo: ChatReplyReference | null;
 };
 
 type ChatContextValue = ChatState & {
@@ -56,10 +65,18 @@ type ChatContextValue = ChatState & {
   closeWidget(): void;
   selectConversation(conversation: ChatConversationSummary): Promise<void>;
   loadOlderMessages(): Promise<void>;
+  loadReplyTarget(
+    reference: Pick<ChatReplyReference, 'messageId' | 'sequence'>,
+  ): Promise<'loaded' | 'unavailable' | 'error'>;
   markSelectedConversationRead(): Promise<void>;
   setDraft(value: string): void;
   sendDraft(): Promise<void>;
   retry(): Promise<void>;
+  toggleMute(conversationId: string, muted: boolean): Promise<void>;
+  toggleBlock(userId: string, blocked: boolean): Promise<void>;
+  setReplyTo(reply: ChatReplyReference | null): void;
+  openConversationFromNotification(conversationId: string, newestSequence?: number): Promise<boolean>;
+  reportMessage(input: { conversationId: string; messageId?: string | null; reasonCode: string; details?: string | null }): Promise<ChatReportReceipt | null>;
 };
 
 const initial: ChatState = {
@@ -81,6 +98,7 @@ const initial: ChatState = {
   reconnecting: false,
   hasMoreBefore: false,
   oldestSequence: null,
+  replyTo: null,
 };
 
 const ChatContext = createContext<ChatContextValue>({
@@ -90,10 +108,16 @@ const ChatContext = createContext<ChatContextValue>({
   closeWidget: () => undefined,
   selectConversation: async () => undefined,
   loadOlderMessages: async () => undefined,
+  loadReplyTarget: async () => 'unavailable',
   markSelectedConversationRead: async () => undefined,
   setDraft: () => undefined,
   sendDraft: async () => undefined,
   retry: async () => undefined,
+  toggleMute: async () => undefined,
+  toggleBlock: async () => undefined,
+  setReplyTo: () => undefined,
+  openConversationFromNotification: async () => false,
+  reportMessage: async () => null,
 });
 const CHAT_ACTIVITY_INTERVAL_MS = 5_000;
 const HANDOFF_MAX_AGE_MS = 10 * 60_000;
@@ -168,9 +192,22 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   const oldestSequenceRef = useRef<number | null>(null);
   const draftRevisionRef = useRef(0);
   const previousUserId = useRef<string | null>(null);
+  const clientInstanceId = useRef<string>('');
+  const attentionEngaged = useRef(false);
   const authStatus = auth.state.status;
   const authenticatedFetch = auth.authenticatedFetch;
   const authenticatedUserId = authStatus === 'authenticated' ? auth.state.user.id : null;
+
+  useEffect(() => {
+    try {
+      const key = 'chat-client-instance-v1';
+      const existing = window.sessionStorage.getItem(key);
+      clientInstanceId.current = existing ?? crypto.randomUUID();
+      if (!existing) window.sessionStorage.setItem(key, clientInstanceId.current);
+    } catch {
+      clientInstanceId.current = crypto.randomUUID();
+    }
+  }, []);
 
   const loadConversations = useCallback(async () => {
     if (authStatus !== 'authenticated') return;
@@ -349,6 +386,33 @@ export function ChatProvider({ children }: { children: ReactNode }) {
               : null,
           }));
         });
+        next.on('chat.safety.updated', (raw: unknown) => {
+          const event = parseChatRealtimeEvent(raw);
+          if (!event || event.type !== 'chat.safety.updated') return;
+          setState((current) => {
+            const existing = current.conversations.find((item) => item.id === event.conversation.id);
+            const conversation = preserveRealtimePresence(
+              event.conversation,
+              existing ?? current.selectedConversation,
+            );
+            return {
+              ...current,
+              conversations: [
+                conversation,
+                ...current.conversations.filter((item) => item.id !== conversation.id),
+              ],
+              selectedConversation:
+                current.selectedConversation?.id === conversation.id
+                  ? preserveRealtimePresence(conversation, current.selectedConversation)
+                  : current.selectedConversation,
+            };
+          });
+        });
+        next.on('chat.notification.updated', (raw: unknown) => {
+          const event = parseChatRealtimeEvent(raw);
+          if (!event || event.type !== 'chat.notification.updated') return;
+          window.dispatchEvent(new Event('chat-notification-sync'));
+        });
         next.on('connect', () => {
           sendActivity();
           setState((current) => ({ ...current, reconnecting: false }));
@@ -448,8 +512,38 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     }
   }, [authStatus, authenticatedUserId, state.open]);
 
+  useEffect(() => {
+    const conversation = state.selectedConversation;
+    if (
+      authStatus !== 'authenticated' ||
+      !state.open ||
+      !conversation ||
+      conversation.id.startsWith('new:') ||
+      !attentionEngaged.current ||
+      !clientInstanceId.current
+    )
+      return;
+    const refresh = () =>
+      void updateChatAttention(
+        conversation.id,
+        { clientInstanceId: clientInstanceId.current, engagedAtNewestRegion: true },
+        authenticatedFetch,
+      ).catch(() => undefined);
+    refresh();
+    const timer = window.setInterval(refresh, 5_000);
+    return () => {
+      window.clearInterval(timer);
+      void updateChatAttention(
+        conversation.id,
+        { clientInstanceId: clientInstanceId.current, engagedAtNewestRegion: false },
+        authenticatedFetch,
+      ).catch(() => undefined);
+    };
+  }, [authStatus, authenticatedFetch, state.open, state.selectedConversation]);
+
   const selectConversation = useCallback(
     async (conversation: ChatConversationSummary) => {
+      attentionEngaged.current = false;
       hasMoreBeforeRef.current = false;
       oldestSequenceRef.current = null;
       let draft = '';
@@ -470,6 +564,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         selectedConversation: conversation,
         selectedShop: null,
         draft,
+        replyTo: null,
         messages: conversation.id.startsWith('new:') ? [] : current.messages,
         loading: !conversation.id.startsWith('new:'),
         historyLoading: !conversation.id.startsWith('new:'),
@@ -497,6 +592,46 @@ export function ChatProvider({ children }: { children: ReactNode }) {
           hasMoreBefore: page.hasMoreBefore,
           oldestSequence: oldest,
         }));
+        attentionEngaged.current = true;
+        const throughSequence = page.items.reduce(
+          (highest, message) => Math.max(highest, message.sequence),
+          0,
+        );
+        if (throughSequence > page.conversation.lastReadSequence) {
+          try {
+            const read = await markChatRead(
+              conversation.id,
+              throughSequence,
+              auth.authenticatedFetch,
+            );
+            setState((current) => ({
+              ...current,
+              selectedConversation:
+                current.selectedConversation?.id === conversation.id
+                  ? {
+                      ...current.selectedConversation,
+                      unreadCount: read.unreadCount,
+                      lastReadSequence: Math.max(
+                        current.selectedConversation.lastReadSequence,
+                        read.throughSequence,
+                      ),
+                    }
+                  : current.selectedConversation,
+              conversations: current.conversations.map((item) =>
+                item.id === conversation.id
+                  ? {
+                      ...item,
+                      unreadCount: read.unreadCount,
+                      lastReadSequence: Math.max(item.lastReadSequence, read.throughSequence),
+                    }
+                  : item,
+              ),
+              unreadCount: read.unreadTotal,
+            }));
+          } catch {
+            /* explicit engagement will retry the read watermark */
+          }
+        }
       } catch {
         setState((current) => ({
           ...current,
@@ -576,7 +711,6 @@ export function ChatProvider({ children }: { children: ReactNode }) {
               : 'Chưa thể tải thông tin shop. Vui lòng thử lại.',
         }));
       }
-      // eslint-disable-next-line react-hooks/exhaustive-deps
     },
     [auth, selectConversation, state.conversations],
   );
@@ -637,11 +771,86 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     }
   }, [auth.authenticatedFetch]);
 
-  const markSelectedConversationRead = useCallback(async () => {
+  const loadReplyTarget = useCallback(
+    async (
+      reference: Pick<ChatReplyReference, 'messageId' | 'sequence'>,
+    ): Promise<'loaded' | 'unavailable' | 'error'> => {
+      const conversation = selectedConversationRef.current;
+      if (!conversation || conversation.id.startsWith('new:')) return 'unavailable';
+      if (messagesRef.current.some((message) => message.id === reference.messageId))
+        return 'loaded';
+      if (olderLoadingRef.current) return 'error';
+
+      let merged = messagesRef.current;
+      let beforeSequence =
+        oldestSequenceRef.current ??
+        merged.find((message) => message.sequence > 0)?.sequence ??
+        reference.sequence + 1;
+      let hasMore = hasMoreBeforeRef.current || merged.length === 0;
+
+      if (reference.sequence >= beforeSequence && merged.length > 0) return 'unavailable';
+
+      olderLoadingRef.current = true;
+      setState((current) => ({ ...current, olderLoading: true, olderError: '' }));
+      try {
+        while (hasMore && beforeSequence > reference.sequence) {
+          const page = await getChatMessages(
+            conversation.id,
+            { beforeSequence },
+            auth.authenticatedFetch,
+          );
+          const next = mergeMessages(merged, page.items);
+          const nextOldest = next.find((message) => message.sequence > 0)?.sequence ?? null;
+          merged = next;
+          hasMore = page.hasMoreBefore;
+
+          if (merged.some((message) => message.id === reference.messageId)) break;
+          if (nextOldest === null || nextOldest >= beforeSequence) {
+            hasMore = false;
+            break;
+          }
+          beforeSequence = nextOldest;
+        }
+
+        const nextOldest = merged.find((message) => message.sequence > 0)?.sequence ?? null;
+        messagesRef.current = merged;
+        hasMoreBeforeRef.current = hasMore;
+        oldestSequenceRef.current = nextOldest;
+        setState((current) => ({
+          ...current,
+          messages: merged,
+          olderLoading: false,
+          olderError: '',
+          hasMoreBefore: hasMore,
+          oldestSequence: nextOldest,
+        }));
+        return merged.some((message) => message.id === reference.messageId)
+          ? 'loaded'
+          : 'unavailable';
+      } catch {
+        setState((current) => ({ ...current, olderLoading: false }));
+        return 'error';
+      } finally {
+        olderLoadingRef.current = false;
+      }
+    },
+    [auth.authenticatedFetch],
+  );
+
+  const markSelectedConversationRead = useCallback(async (
+    conversationOverride?: ChatConversationSummary,
+    messagesOverride?: ChatMessage[],
+  ) => {
     if (auth.state.status !== 'authenticated') return;
-    const conversation = selectedConversationRef.current;
-    if (!conversation || conversation.id.startsWith('new:') || loadingRef.current) return;
-    const throughSequence = messagesRef.current.reduce(
+    const conversation = conversationOverride ?? selectedConversationRef.current;
+    if (
+      !conversation ||
+      conversation.id.startsWith('new:') ||
+      (!conversationOverride && loadingRef.current)
+    )
+      return;
+    attentionEngaged.current = true;
+    const throughSequence = (messagesOverride ?? messagesRef.current).reduce(
       (highest, message) => Math.max(highest, message.sequence),
       0,
     );
@@ -677,6 +886,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
           unreadCount: response.unreadTotal,
         };
       });
+      window.dispatchEvent(new Event('chat-notification-sync'));
     } catch {
       /* next explicit engagement retries the authoritative update */
     }
@@ -690,6 +900,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   const sendDraft = useCallback(async () => {
     const conversation = selectedConversationRef.current;
     const content = state.draft.trim();
+    const replyTo = state.replyTo;
     if (
       !conversation ||
       !content ||
@@ -710,6 +921,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     setState((current) => ({
       ...current,
       draft: '',
+      replyTo: null,
       sending: true,
       error: '',
       messages: mergeMessages(current.messages, [
@@ -723,6 +935,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
           createdAt: new Date().toISOString(),
           deliveryState: 'PENDING',
           isRead: false,
+          replyTo: replyTo ?? null,
         },
       ]),
     }));
@@ -759,7 +972,12 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     );
     try {
       const response = await sendChatMessage(
-        { recipientUserId: conversation.participant.userId, clientMessageId: messageId, content },
+        {
+          recipientUserId: conversation.participant.userId,
+          clientMessageId: messageId,
+          content,
+          replyToMessageId: replyTo?.messageId ?? null,
+        },
         auth.authenticatedFetch,
       );
       const timer = pendingTimers.current.get(messageId);
@@ -789,7 +1007,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       markFailed('Không thể gửi tin nhắn. Nội dung vẫn được giữ để thử lại bằng nút Gửi.');
       pendingAttempts.current.delete(messageId);
     }
-  }, [auth, state.draft, state.sending]);
+  }, [auth, state.draft, state.replyTo, state.sending]);
 
   useEffect(() => {
     if (auth.state.status !== 'authenticated' || !state.selectedConversation) return;
@@ -802,7 +1020,101 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     }
   }, [auth.state, state.draft, state.selectedConversation]);
 
+  const toggleMute = useCallback(
+    async (conversationId: string, muted: boolean) => {
+      if (auth.state.status !== 'authenticated') return;
+      try {
+        const response = muted
+          ? await muteChatConversation(conversationId, auth.authenticatedFetch)
+          : await unmuteChatConversation(conversationId, auth.authenticatedFetch);
+        setState((current) => ({
+          ...current,
+          conversations: current.conversations.map((item) =>
+            item.id === conversationId
+              ? { ...item, notificationsMuted: response.notificationsMuted }
+              : item,
+          ),
+          selectedConversation:
+            current.selectedConversation?.id === conversationId
+              ? { ...current.selectedConversation, notificationsMuted: response.notificationsMuted }
+              : current.selectedConversation,
+          error: '',
+        }));
+      } catch {
+        setState((current) => ({ ...current, error: 'Chưa thể thay đổi thông báo cuộc trò chuyện.' }));
+      }
+    },
+    [auth],
+  );
+
+  const toggleBlock = useCallback(
+    async (userId: string, blocked: boolean) => {
+      if (auth.state.status !== 'authenticated') return;
+      try {
+        const response = blocked
+          ? await blockChatUser(userId, auth.authenticatedFetch)
+          : await unblockChatUser(userId, auth.authenticatedFetch);
+        setState((current) => ({
+          ...current,
+          conversations: current.conversations.map((item) =>
+            item.participant.userId === userId
+              ? { ...item, blockedByMe: response.blockedByMe, canMessage: response.canMessage }
+              : item,
+          ),
+          selectedConversation:
+            current.selectedConversation?.participant.userId === userId
+              ? {
+                  ...current.selectedConversation,
+                  blockedByMe: response.blockedByMe,
+                  canMessage: response.canMessage,
+                }
+              : current.selectedConversation,
+          error: '',
+        }));
+      } catch {
+        setState((current) => ({ ...current, error: 'Chưa thể thay đổi trạng thái chặn.' }));
+      }
+    },
+    [auth],
+  );
+
+  const setReplyTo = useCallback((replyTo: ChatReplyReference | null) => {
+    setState((current) => ({ ...current, replyTo }));
+  }, []);
+
+  const openConversationFromNotification = useCallback(
+    async (conversationId: string, newestSequence?: number): Promise<boolean> => {
+      const existing = state.conversations.find((item) => item.id === conversationId);
+      let conversation = existing;
+      if (!conversation) {
+        try {
+          const response = await listChatConversations({}, auth.authenticatedFetch);
+          conversation = response.items.find((item) => item.id === conversationId);
+          if (conversation)
+            setState((current) => ({ ...current, conversations: response.items, unreadCount: response.unreadCount }));
+        } catch {
+          return false;
+        }
+      }
+      if (!conversation) return false;
+      await selectConversation(conversation);
+      await markSelectedConversationRead();
+      void newestSequence;
+      return true;
+    },
+    [auth.authenticatedFetch, markSelectedConversationRead, selectConversation, state.conversations],
+  );
+
+  const reportMessage = useCallback(
+    async (input: { conversationId: string; messageId?: string | null; reasonCode: string; details?: string | null }) => {
+      if (auth.state.status !== 'authenticated') return null;
+      return reportChat(input, crypto.randomUUID(), auth.authenticatedFetch);
+    },
+    [auth],
+  );
+
   const closeWidget = useCallback(() => {
+    attentionEngaged.current = false;
     setState((current) => {
       const emptyTemporary =
         current.selectedConversation?.id.startsWith('new:') && !current.draft.trim();
@@ -827,7 +1139,13 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       closeWidget,
       selectConversation,
       loadOlderMessages,
+      loadReplyTarget,
       markSelectedConversationRead,
+      toggleMute,
+      toggleBlock,
+      setReplyTo,
+      openConversationFromNotification,
+      reportMessage,
       setDraft,
       sendDraft,
       retry: loadConversations,
@@ -836,12 +1154,18 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       closeWidget,
       loadConversations,
       loadOlderMessages,
+      loadReplyTarget,
       markSelectedConversationRead,
+      openConversationFromNotification,
       openForShop,
+      reportMessage,
       selectConversation,
+      setReplyTo,
       sendDraft,
       setDraft,
       state,
+      toggleBlock,
+      toggleMute,
     ],
   );
   return <ChatContext.Provider value={value}>{children}</ChatContext.Provider>;

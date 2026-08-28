@@ -20,6 +20,7 @@ describe('AdminModerationRepository seller lifecycle adapter', () => {
       restoreShopInTransaction: jest.fn().mockResolvedValue({ shopStatus: ShopStatus.ACTIVE }),
     };
     const tx = {
+      $queryRaw: jest.fn(),
       moderationCommand: { findUnique: jest.fn().mockResolvedValue(null), create: jest.fn() },
       moderationCase: {
         findUnique: jest.fn().mockResolvedValue({

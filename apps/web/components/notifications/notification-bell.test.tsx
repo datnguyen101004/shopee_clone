@@ -7,6 +7,7 @@ import {
   markNotificationRead,
 } from '../../lib/notifications-api';
 import { useAuthSession } from '../auth-session-provider';
+import { useChat } from '../chat/chat-provider';
 import { NotificationBell } from './notification-bell';
 
 vi.mock('../../lib/notifications-api', () => ({
@@ -15,6 +16,7 @@ vi.mock('../../lib/notifications-api', () => ({
   markNotificationRead: vi.fn(),
 }));
 vi.mock('../auth-session-provider', () => ({ useAuthSession: vi.fn() }));
+vi.mock('../chat/chat-provider', () => ({ useChat: vi.fn() }));
 
 const notificationId = '00000000-0000-4000-8000-000000000301';
 const timestamp = '2026-08-22T04:00:00.000Z';
@@ -53,6 +55,26 @@ const sampleItem = {
   createdAt: timestamp,
 };
 
+const chatItem = {
+  ...sampleItem,
+  id: '00000000-0000-4000-8000-000000000302',
+  category: 'CHAT' as const,
+  type: 'CHAT_MESSAGE' as const,
+  title: 'Tin nhắn mới từ Shop',
+  body: 'Bạn có một tin nhắn mới',
+  metadata: {
+    ...sampleItem.metadata,
+    chat: {
+      conversationId: '00000000-0000-4000-8000-000000000303',
+      unreadCount: 1,
+      newestSequence: 4,
+      preview: 'Bạn có một tin nhắn mới',
+      avatarUrl: null,
+      activityAt: timestamp,
+    },
+  },
+};
+
 describe('NotificationBell', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -69,6 +91,9 @@ describe('NotificationBell', () => {
       isRead: true,
       readAt: timestamp,
     });
+    vi.mocked(useChat).mockReturnValue({
+      openConversationFromNotification: vi.fn().mockResolvedValue(true),
+    } as never);
   });
 
   it('renders nothing for guests', () => {
@@ -100,5 +125,27 @@ describe('NotificationBell', () => {
       '/account/notifications',
     );
     await waitFor(() => expect(listNotificationPopover).toHaveBeenCalled());
+  });
+
+  it('opens the exact chat conversation before marking its aggregate notification read', async () => {
+    const user = userEvent.setup();
+    const openConversationFromNotification = vi.fn().mockResolvedValue(true);
+    vi.mocked(useChat).mockReturnValue({ openConversationFromNotification } as never);
+    vi.mocked(listNotificationPopover).mockResolvedValue({
+      notificationVersion: 'notifications-v1',
+      items: [chatItem],
+      nextCursor: null,
+      unreadCount: 1,
+    });
+
+    render(<NotificationBell />);
+    await user.click(await screen.findByRole('button', { name: 'Thông báo, 3 chưa đọc' }));
+    await user.click(await screen.findByRole('button', { name: /Tin nhắn mới từ Shop/ }));
+
+    expect(openConversationFromNotification).toHaveBeenCalledWith(
+      chatItem.metadata.chat.conversationId,
+      chatItem.metadata.chat.newestSequence,
+    );
+    expect(markNotificationRead).toHaveBeenCalledWith(chatItem.id, authenticatedFetch);
   });
 });

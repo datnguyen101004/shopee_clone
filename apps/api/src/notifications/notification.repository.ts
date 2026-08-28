@@ -30,6 +30,7 @@ type NotificationRow = {
   readAt: Date | null;
   isArchived: boolean;
   createdAt: Date;
+  activityAt: Date;
 };
 
 @Injectable()
@@ -59,8 +60,8 @@ export class NotificationRepository {
       ...(position
         ? {
             OR: [
-              { createdAt: { lt: position.createdAt } },
-              { createdAt: position.createdAt, id: { lt: position.id } },
+              { activityAt: { lt: position.activityAt } },
+              { activityAt: position.activityAt, id: { lt: position.id } },
             ],
           }
         : {}),
@@ -69,7 +70,7 @@ export class NotificationRepository {
     const [rows, unreadCount] = await Promise.all([
       this.prisma.notification.findMany({
         where,
-        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+        orderBy: [{ activityAt: 'desc' }, { id: 'desc' }],
         take: limit + 1,
       }),
       this.prisma.notification.count({
@@ -85,7 +86,7 @@ export class NotificationRepository {
       items: page.map((row) => this.toItem(row as NotificationRow)),
       nextCursor:
         hasMore && last
-          ? encodeNotificationCursor(category, { createdAt: last.createdAt, id: last.id })
+          ? encodeNotificationCursor(category, { activityAt: last.activityAt, id: last.id })
           : null,
       unreadCount,
     };
@@ -141,6 +142,7 @@ export class NotificationRepository {
       readAt: row.readAt ? row.readAt.toISOString() : null,
       isArchived: row.isArchived,
       createdAt: row.createdAt.toISOString(),
+      activityAt: row.activityAt.toISOString(),
     };
   }
 }

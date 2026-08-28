@@ -52,10 +52,15 @@ describe('FloatingChat', () => {
         chat.open = false;
       }),
       selectConversation: vi.fn(),
+      loadReplyTarget: vi.fn().mockResolvedValue('loaded'),
       markSelectedConversationRead: vi.fn(),
       setDraft: vi.fn(),
       sendDraft: vi.fn(),
       retry: vi.fn(),
+      toggleMute: vi.fn(),
+      toggleBlock: vi.fn(),
+      setReplyTo: vi.fn(),
+      reportMessage: vi.fn(),
     };
     vi.mocked(useChat).mockImplementation(() => chat as never);
   });
@@ -128,6 +133,153 @@ describe('FloatingChat', () => {
     chat.unreadCount = 1;
     view.rerender(<FloatingChat />);
     expect(header).toHaveClass('has-unread');
+  });
+
+  it('keeps contact actions independent from selecting or reading the conversation', async () => {
+    const user = userEvent.setup();
+    chat.open = true;
+    chat.selectedConversation = conversation;
+    render(<FloatingChat />);
+
+    await user.click(screen.getByRole('button', { name: 'Tùy chọn cuộc trò chuyện' }));
+    expect(screen.getAllByRole('menuitem')).toHaveLength(2);
+    await user.click(screen.getByRole('menuitem', { name: 'Tắt thông báo' }));
+    expect(chat.toggleMute).toHaveBeenCalledWith(conversation.id, true);
+    expect(chat.selectConversation).not.toHaveBeenCalled();
+    expect(chat.markSelectedConversationRead).not.toHaveBeenCalled();
+  });
+
+  it('offers block confirmation and reply from message actions', async () => {
+    const user = userEvent.setup();
+    chat.open = true;
+    chat.selectedConversation = conversation;
+    chat.messages = [
+      {
+        id: '00000000-0000-0000-0000-000000000050',
+        conversationId: conversation.id,
+        sequence: 1,
+        senderUserId: ownerId,
+        clientMessageId: '00000000-0000-0000-0000-000000000051',
+        content: 'Tin cần xử lý',
+        createdAt: '2026-08-27T00:00:00.000Z',
+        deliveryState: 'SENT',
+        isRead: false,
+      },
+    ];
+    render(<FloatingChat />);
+
+    await user.click(screen.getByRole('button', { name: 'Tùy chọn cuộc trò chuyện' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Chặn' }));
+    expect(screen.getByRole('alertdialog')).toHaveTextContent('Chặn Shop Owner');
+    await user.click(screen.getByRole('button', { name: /^Chặn$/ }));
+    expect(chat.toggleBlock).toHaveBeenCalledWith(ownerId, true);
+
+    await user.click(screen.getByRole('button', { name: /Tùy chọn tin nhắn/ }));
+    await user.click(screen.getByRole('menuitem', { name: 'Trả lời' }));
+    expect(chat.setReplyTo).toHaveBeenCalledWith(
+      expect.objectContaining({ messageId: '00000000-0000-0000-0000-000000000050' }),
+    );
+  });
+
+  it('renders a distinct quoted message above the reply and jumps to the original', async () => {
+    const user = userEvent.setup();
+    const originalId = '00000000-0000-4000-8000-000000000052';
+    chat.open = true;
+    chat.selectedConversation = conversation;
+    chat.messages = [
+      {
+        id: originalId,
+        conversationId: conversation.id,
+        sequence: 1,
+        senderUserId: secondOwnerId,
+        clientMessageId: '00000000-0000-4000-8000-000000000053',
+        content: 'Nội dung gốc',
+        createdAt: '2026-08-27T00:00:00.000Z',
+        deliveryState: 'SENT',
+        isRead: true,
+      },
+      {
+        id: '00000000-0000-4000-8000-000000000054',
+        conversationId: conversation.id,
+        sequence: 2,
+        senderUserId: ownerId,
+        clientMessageId: '00000000-0000-4000-8000-000000000055',
+        content: 'Câu trả lời mới',
+        createdAt: '2026-08-27T00:01:00.000Z',
+        deliveryState: 'SENT',
+        isRead: false,
+        replyTo: {
+          messageId: originalId,
+          sequence: 1,
+          senderUserId: secondOwnerId,
+          senderLabel: 'Shop Owner',
+          preview: 'Nội dung gốc',
+        },
+      },
+    ];
+    render(<FloatingChat />);
+
+    const quote = screen.getByRole('button', {
+      name: 'Đi tới tin nhắn gốc của Shop Owner',
+    });
+    const replyBubble = screen.getByText('Câu trả lời mới');
+    const attribution = screen.getByText('Bạn đã trả lời Shop Owner');
+    expect(quote).toHaveClass('floating-chat__reply-quote');
+    expect(attribution).toHaveClass('floating-chat__reply-attribution');
+    expect(attribution.nextElementSibling).toBe(quote);
+    const mainRow = replyBubble.closest('.floating-chat__message-main-row');
+    expect(mainRow).not.toBeNull();
+    expect(mainRow).toContainElement(
+      mainRow!.querySelector<HTMLButtonElement>('.floating-chat__message-actions'),
+    );
+
+    const original = document.querySelector<HTMLElement>(
+      `[data-chat-message-id="${originalId}"]`,
+    )!;
+    const scrollIntoView = vi.fn();
+    Object.defineProperty(original, 'scrollIntoView', {
+      configurable: true,
+      value: scrollIntoView,
+    });
+
+    await user.click(quote);
+    expect(chat.loadReplyTarget).not.toHaveBeenCalled();
+    expect(scrollIntoView).toHaveBeenCalledWith(
+      expect.objectContaining({ block: 'center' }),
+    );
+    expect(original).toHaveFocus();
+    expect(original).toHaveClass('is-reply-target');
+  });
+
+  it('labels a reply from the other participant toward the current user', () => {
+    chat.open = true;
+    chat.selectedConversation = conversation;
+    chat.messages = [
+      {
+        id: '00000000-0000-4000-8000-000000000056',
+        conversationId: conversation.id,
+        sequence: 2,
+        senderUserId: secondOwnerId,
+        clientMessageId: '00000000-0000-4000-8000-000000000057',
+        content: 'Phản hồi từ shop',
+        createdAt: '2026-08-27T00:02:00.000Z',
+        deliveryState: 'SENT',
+        isRead: true,
+        replyTo: {
+          messageId: '00000000-0000-4000-8000-000000000058',
+          sequence: 1,
+          senderUserId: ownerId,
+          senderLabel: 'Bạn',
+          preview: 'Tin nhắn của tôi',
+        },
+      },
+    ];
+
+    render(<FloatingChat />);
+
+    expect(screen.getByText('Shop Owner đã trả lời bạn')).toHaveClass(
+      'floating-chat__reply-attribution',
+    );
   });
 
   it('announces presence and protects an unsent temporary draft before switching', async () => {
@@ -326,6 +478,51 @@ describe('FloatingChat', () => {
     expect(newMessageButton.previousElementSibling).toBe(pane);
     await userEvent.setup().click(newMessageButton);
     expect(pane.scrollTop).toBe(900);
+  });
+
+  it('does not show a new-message notice for a message sent by the current user', async () => {
+    chat.open = true;
+    chat.selectedConversation = conversation;
+    chat.messages = [
+      {
+        id: '00000000-0000-4000-8000-000000000032',
+        conversationId: conversation.id,
+        sequence: 1,
+        senderUserId: secondOwnerId,
+        clientMessageId: '00000000-0000-4000-8000-000000000032',
+        content: 'Tin trước đó',
+        createdAt: '2026-08-27T00:00:00.000Z',
+        deliveryState: 'SENT',
+        isRead: true,
+      },
+    ];
+    const view = render(<FloatingChat />);
+    const pane = screen.getByText('Tin trước đó').closest('.floating-chat__messages')!;
+    Object.defineProperty(pane, 'scrollHeight', { configurable: true, value: 800 });
+    Object.defineProperty(pane, 'clientHeight', { configurable: true, value: 300 });
+    await waitFor(() => expect(pane.scrollTop).toBe(800));
+    pane.scrollTop = 100;
+    fireEvent.scroll(pane);
+
+    chat.messages = [
+      ...(chat.messages as unknown[]),
+      {
+        id: '00000000-0000-4000-8000-000000000033',
+        conversationId: conversation.id,
+        sequence: 2,
+        senderUserId: ownerId,
+        clientMessageId: '00000000-0000-4000-8000-000000000033',
+        content: 'Tin do tôi gửi',
+        createdAt: '2026-08-27T00:01:00.000Z',
+        deliveryState: 'SENT',
+        isRead: false,
+      },
+    ];
+    Object.defineProperty(pane, 'scrollHeight', { configurable: true, value: 900 });
+    view.rerender(<FloatingChat />);
+
+    await waitFor(() => expect(pane.scrollTop).toBe(900));
+    expect(screen.queryByRole('button', { name: 'Tin nhắn mới' })).toBeNull();
   });
 
   it('marks the selected conversation read when the message pane is clicked', async () => {

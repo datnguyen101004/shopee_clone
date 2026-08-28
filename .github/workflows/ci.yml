@@ -138,6 +138,7 @@ jobs:
       AUTH_WEB_BASE_URL: http://127.0.0.1:3000
       AUTH_COOKIE_SECURE: 'false'
       AUTH_RECOVERY_MODE: capture
+      CHAT_REPAIR_CONFIRM: 2f6dd7f3-7982-47af-b230-442b54ba5e57
       GOOGLE_CLIENT_ID: ci-client.apps.googleusercontent.com
       GOOGLE_CLIENT_SECRET: ci-only-google-client-secret-2026
       GOOGLE_CALLBACK_URL: http://127.0.0.1:3001/login/oauth2/code/google
@@ -181,6 +182,11 @@ jobs:
           pnpm db:migrate:deploy
           pnpm db:seed
 
+      - name: Verify migration checksums and chat preflight
+        run: |
+          pnpm db:migration:checksums
+          pnpm --filter @shopee-clone/api chat:preflight
+
       - name: Run non-skippable PostgreSQL chat suite
         run: pnpm test:chat:database
 
@@ -191,6 +197,9 @@ jobs:
         env:
           CHAT_E2E_PREPARE: '1'
         run: pnpm test:chat:real
+
+      - name: Run ordered chat release verification
+        run: pnpm chat:release:verify
 
       - name: Remove isolated PostgreSQL
         if: always()

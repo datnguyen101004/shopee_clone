@@ -1,6 +1,7 @@
-import { IsInt, IsOptional, IsString, IsUUID, Length, Max, Min } from 'class-validator';
+import { IsBoolean, IsIn, IsInt, IsOptional, IsString, IsUUID, Length, Max, Min } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { CHAT_REPORT_DETAILS_MAX_LENGTH, CHAT_REPORT_REASON_CODES } from '@shopee-clone/contracts';
 
 export class SendChatMessageDto {
   @ApiProperty({ format: 'uuid' })
@@ -15,6 +16,43 @@ export class SendChatMessageDto {
   @IsString()
   @Length(1, 2_000)
   content!: string;
+
+  @ApiPropertyOptional({ format: 'uuid', nullable: true })
+  @IsOptional()
+  @IsUUID()
+  replyToMessageId?: string | null;
+}
+
+export class ChatAttentionDto {
+  @ApiProperty({ maxLength: 80 })
+  @IsString()
+  @Length(1, 80)
+  clientInstanceId!: string;
+
+  @ApiProperty()
+  @IsBoolean()
+  engagedAtNewestRegion!: boolean;
+}
+
+export class ChatReportDto {
+  @ApiProperty({ format: 'uuid' })
+  @IsUUID()
+  conversationId!: string;
+
+  @ApiPropertyOptional({ format: 'uuid', nullable: true })
+  @IsOptional()
+  @IsUUID()
+  messageId?: string | null;
+
+  @ApiProperty({ enum: CHAT_REPORT_REASON_CODES })
+  @IsIn([...CHAT_REPORT_REASON_CODES])
+  reasonCode!: string;
+
+  @ApiPropertyOptional({ maxLength: CHAT_REPORT_DETAILS_MAX_LENGTH, nullable: true })
+  @IsOptional()
+  @IsString()
+  @Length(0, CHAT_REPORT_DETAILS_MAX_LENGTH)
+  details?: string | null;
 }
 
 export class MarkChatReadDto {

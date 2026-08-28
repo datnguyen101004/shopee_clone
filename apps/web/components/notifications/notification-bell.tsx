@@ -11,6 +11,7 @@ import {
 } from '../../lib/notifications-api';
 import { marketplaceMediaUrl } from '../../lib/marketplace-media-url';
 import { useAuthSession } from '../auth-session-provider';
+import { useChat } from '../chat/chat-provider';
 
 const POLL_INTERVAL_MS = 30_000;
 
@@ -52,6 +53,7 @@ function badgeLabel(count: number): string {
 
 export function NotificationBell() {
   const auth = useAuthSession();
+  const chat = useChat();
   const popoverId = useId();
   const rootRef = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
@@ -101,11 +103,16 @@ export function NotificationBell() {
     const onFocus = () => {
       void refreshUnread();
     };
+    const onChatNotificationSync = () => {
+      void refreshUnread();
+    };
     window.addEventListener('focus', onFocus);
+    window.addEventListener('chat-notification-sync', onChatNotificationSync);
     return () => {
       window.clearTimeout(initialRefresh);
       window.clearInterval(timer);
       window.removeEventListener('focus', onFocus);
+      window.removeEventListener('chat-notification-sync', onChatNotificationSync);
     };
   }, [authenticated, refreshUnread]);
 
@@ -133,6 +140,13 @@ export function NotificationBell() {
     if (pendingId) return;
     setPendingId(item.id);
     try {
+      if (item.category === 'CHAT' && item.metadata.chat) {
+        const opened = await chat.openConversationFromNotification(
+          item.metadata.chat.conversationId,
+          item.metadata.chat.newestSequence,
+        );
+        if (!opened) throw new Error('conversation unavailable');
+      }
       if (!item.isRead) {
         await markNotificationRead(item.id, auth.authenticatedFetch);
         setItems((current) =>
@@ -145,7 +159,7 @@ export function NotificationBell() {
         setUnreadCount((current) => Math.max(0, current - 1));
       }
       setOpen(false);
-      window.location.assign(item.metadata.targetUrl);
+      if (!(item.category === 'CHAT' && item.metadata.chat)) window.location.assign(item.metadata.targetUrl);
     } catch {
       // Leave the popover open so the user can retry.
     } finally {
@@ -209,7 +223,7 @@ export function NotificationBell() {
                       />
                     ) : (
                       <span className="market-notification__thumb" aria-hidden="true">
-                        🔔
+                        {item.category === 'CHAT' ? '💬' : '🔔'}
                       </span>
                     )}
                     <span>

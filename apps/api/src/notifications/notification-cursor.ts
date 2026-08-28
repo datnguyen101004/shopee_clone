@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto';
 import type { NotificationCategory } from '@shopee-clone/contracts';
 
 export interface NotificationCursorPosition {
-  createdAt: Date;
+  activityAt: Date;
   id: string;
 }
 
@@ -18,7 +18,7 @@ export function encodeNotificationCursor(
   return Buffer.from(
     JSON.stringify({
       f: fingerprint(category),
-      c: position.createdAt.toISOString(),
+      c: position.activityAt.toISOString(),
       i: position.id,
     }),
   ).toString('base64url');
@@ -40,9 +40,9 @@ export function decodeNotificationCursor(
     ) {
       return null;
     }
-    const createdAt = new Date(payload.c);
-    if (Number.isNaN(createdAt.getTime()) || createdAt.toISOString() !== payload.c) return null;
-    return { createdAt, id: payload.i };
+    const activityAt = new Date(payload.c);
+    if (Number.isNaN(activityAt.getTime()) || activityAt.toISOString() !== payload.c) return null;
+    return { activityAt, id: payload.i };
   } catch {
     return null;
   }

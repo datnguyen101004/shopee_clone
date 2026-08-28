@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import {
   MODERATION_DEFAULT_LIMIT,
   MODERATION_MAX_LIMIT,
@@ -13,7 +14,7 @@ import {
   type ReportReasonCode as ContractReportReasonCode,
 } from '@shopee-clone/contracts';
 import { Inject, Injectable, Optional } from '@nestjs/common';
-import type { Prisma } from '../generated/prisma/client';
+import { Prisma } from '../generated/prisma/client';
 import type { ReportReasonCode as PrismaReportReasonCode } from '../generated/prisma/enums';
 import {
   MarketplaceRole,
@@ -75,8 +76,15 @@ export class AdminModerationRepository {
         where.productId = query.targetId;
       } else if (query.targetType === 'SHOP') {
         where.shopId = query.targetId;
+      } else if (query.targetType === 'CHAT_CONVERSATION' || query.targetType === 'CHAT_MESSAGE') {
+        if (query.targetType === 'CHAT_MESSAGE') where.reports = { some: { chatMessageId: query.targetId } };
+        else where.chatConversationId = query.targetId;
       } else {
-        where.OR = [{ productId: query.targetId }, { shopId: query.targetId }];
+        where.OR = [
+          { productId: query.targetId },
+          { shopId: query.targetId },
+          { chatConversationId: query.targetId },
+        ];
       }
     }
     if (query.searchId) {
@@ -84,6 +92,8 @@ export class AdminModerationRepository {
         { id: query.searchId },
         { productId: query.searchId },
         { shopId: query.searchId },
+        { chatConversationId: query.searchId },
+        { reports: { some: { chatMessageId: query.searchId } } },
       ];
     }
     if (query.reasonCode) {
@@ -106,6 +116,7 @@ export class AdminModerationRepository {
             displayName: true,
           },
         },
+        reportedUser: { select: { id: true, displayName: true } },
       },
     });
 
@@ -119,8 +130,15 @@ export class AdminModerationRepository {
         return {
           id: c.id,
           targetType: c.targetType as unknown as 'PRODUCT' | 'SHOP',
-          targetId: (c.productId ?? c.shopId)!,
-          targetName: (snap?.name as string) ?? 'Unknown',
+          targetId:
+            (c.targetType === ReportTargetType.CHAT_MESSAGE
+              ? ((snap?.messageId as string) ?? c.chatConversationId)
+              : (c.productId ?? c.shopId ?? c.chatConversationId ?? c.id))!,
+          targetName:
+            (snap?.name as string) ??
+            (c.targetType === ReportTargetType.CHAT_MESSAGE || c.targetType === ReportTargetType.CHAT_CONVERSATION
+              ? (c.reportedUser?.displayName ?? 'Báo cáo chat')
+              : 'Unknown'),
           targetStatus: (snap?.status as string) ?? 'ACTIVE',
           status: c.status as unknown as 'OPEN' | 'IN_REVIEW' | 'RESOLVED',
           reportCount: c.reportCount,
@@ -188,6 +206,27 @@ export class AdminModerationRepository {
             onboardingStatus: true,
           },
         },
+        chatConversation: {
+          select: {
+            id: true,
+            participantLowUserId: true,
+            participantHighUserId: true,
+            participantLow: { select: { id: true, displayName: true } },
+            participantHigh: { select: { id: true, displayName: true } },
+            messages: {
+              orderBy: [{ sequence: 'desc' }, { id: 'desc' }],
+              take: 20,
+              select: {
+                sequence: true,
+                senderUserId: true,
+                content: true,
+                createdAt: true,
+                sender: { select: { displayName: true } },
+              },
+            },
+          },
+        },
+        reportedUser: { select: { id: true, displayName: true } },
       },
     });
 
@@ -218,6 +257,37 @@ export class AdminModerationRepository {
         shopId: c.product?.shop?.id ?? (snap?.shopId as string) ?? 'Unknown',
         shopName: c.product?.shop?.name ?? (snap?.shopName as string) ?? 'Unknown',
       };
+    } else if (
+      c.targetType === ReportTargetType.CHAT_CONVERSATION ||
+      c.targetType === ReportTargetType.CHAT_MESSAGE
+    ) {
+      const chat = c.chatConversation;
+      const reportedUser = c.reportedUser;
+      targetDetails = {
+        targetType: c.targetType as unknown as 'CHAT_CONVERSATION' | 'CHAT_MESSAGE',
+        id: c.chatConversationId ?? (snap?.conversationId as string) ?? c.id,
+        name: reportedUser?.displayName ?? 'Tài khoản bị báo cáo',
+        slug: null,
+        currentStatus: reportedUser ? 'ACTIVE' : 'UNKNOWN',
+        ownerUserId: reportedUser?.id,
+        chat: chat && reportedUser
+          ? {
+              conversationId: chat.id,
+              messageId: (snap?.messageId as string) ?? null,
+              reportedUserId: reportedUser.id,
+              reportedUserName: reportedUser.displayName,
+              messages: [...chat.messages]
+                .reverse()
+                .map((message) => ({
+                  sequence: message.sequence,
+                  senderUserId: message.senderUserId,
+                  senderLabel: message.sender.displayName,
+                  content: message.content,
+                  createdAt: message.createdAt.toISOString(),
+                })),
+            }
+          : undefined,
+      };
     } else {
       targetDetails = {
         targetType: 'SHOP',
@@ -232,8 +302,15 @@ export class AdminModerationRepository {
     return {
       id: c.id,
       targetType: c.targetType as unknown as 'PRODUCT' | 'SHOP',
-      targetId: (c.productId ?? c.shopId)!,
-      targetName: (snap?.name as string) ?? 'Unknown',
+      targetId:
+        (c.targetType === ReportTargetType.CHAT_MESSAGE
+          ? ((snap?.messageId as string) ?? c.chatConversationId)
+          : (c.productId ?? c.shopId ?? c.chatConversationId ?? c.id))!,
+      targetName:
+        (snap?.name as string) ??
+        (c.targetType === ReportTargetType.CHAT_MESSAGE || c.targetType === ReportTargetType.CHAT_CONVERSATION
+          ? (c.reportedUser?.displayName ?? 'Báo cáo chat')
+          : 'Unknown'),
       targetStatus: (snap?.status as string) ?? 'ACTIVE',
       status: c.status as unknown as 'OPEN' | 'IN_REVIEW' | 'RESOLVED',
       reportCount: c.reportCount,
@@ -305,7 +382,8 @@ export class AdminModerationRepository {
         throw new ModerationIdempotencyConflictError();
       }
 
-      // 2. Lock case row
+      // 2. Lock case row before reading its version to serialize concurrent commands.
+      await tx.$queryRaw(Prisma.sql`SELECT id FROM moderation_cases WHERE id = ${caseId} FOR UPDATE`);
       const targetCase = await tx.moderationCase.findUnique({
         where: { id: caseId },
       });
@@ -411,7 +489,8 @@ export class AdminModerationRepository {
         throw new ModerationIdempotencyConflictError();
       }
 
-      // 2. Lock case row
+      // 2. Lock case row before reading its version to serialize concurrent commands.
+      await tx.$queryRaw(Prisma.sql`SELECT id FROM moderation_cases WHERE id = ${caseId} FOR UPDATE`);
       const targetCase = await tx.moderationCase.findUnique({
         where: { id: caseId },
       });
@@ -477,6 +556,7 @@ export class AdminModerationRepository {
       publicReason: string;
       privateNote?: string;
       reversesDecisionId?: string;
+      restrictionUntil?: string;
       expectedVersion: number;
     },
     idempotencyKey: string,
@@ -500,7 +580,8 @@ export class AdminModerationRepository {
         throw new ModerationIdempotencyConflictError();
       }
 
-      // 2. Lock case row
+      // 2. Lock case row before reading its version to serialize concurrent commands.
+      await tx.$queryRaw(Prisma.sql`SELECT id FROM moderation_cases WHERE id = ${caseId} FOR UPDATE`);
       const targetCase = await tx.moderationCase.findUnique({
         where: { id: caseId },
         include: {
@@ -537,10 +618,75 @@ export class AdminModerationRepository {
       let nextTargetStatus: string;
       let privilegedAction: PrivilegedAction;
       let targetOwnerUserId: string | null = null;
+      let chatRestrictionUntil: Date | null = null;
+      let chatDecisionTarget = false;
       const targetSnapshot = targetCase.targetSnapshot as Prisma.InputJsonValue;
 
       // 4. Lock target row and determine status changes
-      if (targetCase.targetType === ReportTargetType.PRODUCT) {
+      if (
+        targetCase.targetType === ReportTargetType.CHAT_CONVERSATION ||
+        targetCase.targetType === ReportTargetType.CHAT_MESSAGE
+      ) {
+        chatDecisionTarget = true;
+        const reportedUserId = targetCase.reportedUserId;
+        if (!reportedUserId) throw new AdminInvalidInputError('Chat case has no reported account');
+        const reportedUser = await tx.user.findUnique({
+          where: { id: reportedUserId },
+          select: { id: true, status: true, deletedAt: true, displayName: true },
+        });
+        if (!reportedUser) throw new AdminNotFoundError('Reported account not found');
+        targetOwnerUserId = reportedUser.id;
+        const currentRestriction = await tx.userChatRestriction.findUnique({
+          where: { userId: reportedUser.id },
+        });
+        const restrictionActive = Boolean(
+          currentRestriction &&
+            !currentRestriction.restoredAt &&
+            (currentRestriction.restrictedUntil === null || currentRestriction.restrictedUntil > now),
+        );
+        previousTargetStatus = restrictionActive ? 'RESTRICTED' : 'ELIGIBLE';
+        if (input.outcome === ModerationCaseOutcome.RESTRICT_CHAT_TEMPORARY) {
+          if (!input.restrictionUntil) {
+            throw new AdminInvalidInputError('Temporary chat restriction expiry is required', {
+              invalidParameters: ['restrictionUntil'],
+            });
+          }
+          chatRestrictionUntil = new Date(input.restrictionUntil);
+          if (Number.isNaN(chatRestrictionUntil.getTime()) || chatRestrictionUntil <= now) {
+            throw new AdminInvalidInputError('Temporary chat restriction expiry must be in the future', {
+              invalidParameters: ['restrictionUntil'],
+            });
+          }
+          nextTargetStatus = 'RESTRICTED';
+          privilegedAction = PrivilegedAction.UPDATE;
+        } else if (input.outcome === ModerationCaseOutcome.RESTRICT_CHAT_INDEFINITE) {
+          nextTargetStatus = 'RESTRICTED';
+          privilegedAction = PrivilegedAction.UPDATE;
+        } else if (input.outcome === ModerationCaseOutcome.RESTORE_CHAT) {
+          nextTargetStatus = 'ELIGIBLE';
+          privilegedAction = PrivilegedAction.RESTORE;
+        } else if (input.outcome === ModerationCaseOutcome.WARN_USER) {
+          nextTargetStatus = previousTargetStatus;
+          privilegedAction = PrivilegedAction.UPDATE;
+        } else if (input.outcome === ModerationCaseOutcome.NO_ACTION) {
+          nextTargetStatus = previousTargetStatus;
+          privilegedAction = PrivilegedAction.NO_ACTION;
+        } else {
+          throw new AdminInvalidInputError('This outcome is not valid for a chat case', {
+            invalidParameters: ['outcome'],
+          });
+        }
+      } else if (targetCase.targetType === ReportTargetType.PRODUCT) {
+        if (
+          input.outcome === ModerationCaseOutcome.WARN_USER ||
+          input.outcome === ModerationCaseOutcome.RESTRICT_CHAT_TEMPORARY ||
+          input.outcome === ModerationCaseOutcome.RESTRICT_CHAT_INDEFINITE ||
+          input.outcome === ModerationCaseOutcome.RESTORE_CHAT
+        ) {
+          throw new AdminInvalidInputError('This outcome is not valid for a product case', {
+            invalidParameters: ['outcome'],
+          });
+        }
         const product = await tx.product.findUnique({
           where: { id: targetCase.productId! },
           include: { shop: { select: { ownerId: true, name: true } } },
@@ -570,6 +716,16 @@ export class AdminModerationRepository {
           privilegedAction = PrivilegedAction.NO_ACTION;
         }
       } else {
+        if (
+          input.outcome === ModerationCaseOutcome.WARN_USER ||
+          input.outcome === ModerationCaseOutcome.RESTRICT_CHAT_TEMPORARY ||
+          input.outcome === ModerationCaseOutcome.RESTRICT_CHAT_INDEFINITE ||
+          input.outcome === ModerationCaseOutcome.RESTORE_CHAT
+        ) {
+          throw new AdminInvalidInputError('This outcome is not valid for a shop case', {
+            invalidParameters: ['outcome'],
+          });
+        }
         const shop = await tx.shop.findUnique({
           where: { id: targetCase.shopId! },
         });
@@ -625,6 +781,7 @@ export class AdminModerationRepository {
       // 5. Create ModerationDecision
       const decision = await tx.moderationDecision.create({
         data: {
+          id: randomUUID(),
           caseId,
           outcome: input.outcome,
           publicReason: input.publicReason.trim(),
@@ -636,6 +793,73 @@ export class AdminModerationRepository {
           createdAt: now,
         },
       });
+
+      if (chatDecisionTarget && targetOwnerUserId) {
+        if (
+          input.outcome === ModerationCaseOutcome.RESTRICT_CHAT_TEMPORARY ||
+          input.outcome === ModerationCaseOutcome.RESTRICT_CHAT_INDEFINITE
+        ) {
+          await tx.userChatRestriction.upsert({
+            where: { userId: targetOwnerUserId },
+            create: {
+              id: randomUUID(),
+              userId: targetOwnerUserId,
+              restrictedUntil: chatRestrictionUntil,
+              originatingDecisionId: decision.id,
+              restrictedAt: now,
+              restoredAt: null,
+            },
+            update: {
+              restrictedUntil: chatRestrictionUntil,
+              originatingDecisionId: decision.id,
+              restrictedAt: now,
+              restoredAt: null,
+              version: { increment: 1 },
+            },
+          });
+        } else if (input.outcome === ModerationCaseOutcome.RESTORE_CHAT) {
+          await tx.userChatRestriction.updateMany({
+            where: { userId: targetOwnerUserId, restoredAt: null },
+            data: { restoredAt: now, restrictedUntil: now, version: { increment: 1 } },
+          });
+        }
+        if (
+          input.outcome === ModerationCaseOutcome.WARN_USER ||
+          input.outcome === ModerationCaseOutcome.RESTRICT_CHAT_TEMPORARY ||
+          input.outcome === ModerationCaseOutcome.RESTRICT_CHAT_INDEFINITE ||
+          input.outcome === ModerationCaseOutcome.RESTORE_CHAT
+        ) {
+          const notificationCopy =
+            input.outcome === ModerationCaseOutcome.WARN_USER
+              ? {
+                  title: 'Bạn nhận được cảnh báo về chat',
+                  body: 'Một cuộc trò chuyện của bạn đã được báo cáo. Hãy giữ nội dung trao đổi lịch sự.',
+                }
+              : input.outcome === ModerationCaseOutcome.RESTORE_CHAT
+                ? { title: 'Chat đã được mở lại', body: 'Bạn có thể tiếp tục gửi tin nhắn.' }
+                : {
+                    title: 'Tạm hạn chế tính năng chat',
+                    body: chatRestrictionUntil
+                      ? `Bạn không thể gửi tin nhắn cho đến ${chatRestrictionUntil.toISOString()}.`
+                      : 'Bạn không thể gửi tin nhắn cho đến khi được mở lại.',
+                  };
+          await tx.notification.create({
+            data: {
+              id: randomUUID(),
+              recipientId: targetOwnerUserId,
+              category: 'ACCOUNT',
+              type: 'SYSTEM_NOTICE',
+              title: notificationCopy.title,
+              body: notificationCopy.body,
+              metadata: { targetUrl: '/account/notifications', thumbnailUrl: null, referenceId: caseId, amountMinor: null, currency: null },
+              deduplicationKey: `chat-moderation:${decision.id}`,
+              isRead: false,
+              createdAt: now,
+              activityAt: now,
+            },
+          });
+        }
+      }
 
       // 6. Create SellerModerationNotice if target was suspended or restored
       if (

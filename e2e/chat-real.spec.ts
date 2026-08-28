@@ -14,6 +14,8 @@ const shopName = process.env.CHAT_E2E_SHOP_NAME;
 const temporaryShopSlug = process.env.CHAT_E2E_TEMPORARY_SHOP_SLUG;
 const buyerEmail = process.env.CHAT_E2E_BUYER_EMAIL ?? 'chat-e2e-buyer@example.test';
 const buyerPassword = process.env.CHAT_E2E_BUYER_PASSWORD ?? 'ChatE2E-password';
+const adminRefreshToken = process.env.CHAT_E2E_ADMIN_REFRESH_TOKEN;
+const safetyCaseId = process.env.CHAT_E2E_SAFETY_CASE_ID;
 
 type ProjectTokens = { buyer: string; seller: string };
 type TokenMatrix = Record<string, ProjectTokens | undefined>;
@@ -39,6 +41,16 @@ function projectTokens(projectName: string, scenario = 'exchange'): ProjectToken
 function requireFixture(value: string | undefined, name: string): string {
   if (!value) throw new Error(`${name} is required for the real chat Playwright gate.`);
   return value;
+}
+
+function projectAdminToken(projectName: string): string {
+  try {
+    const parsed = JSON.parse(process.env.CHAT_E2E_ADMIN_REFRESH_TOKENS ?? '{}') as Record<string, string>;
+    if (parsed[projectName]) return parsed[projectName];
+  } catch {
+    // Fall back to the manually supplied single token below.
+  }
+  return requireFixture(adminRefreshToken, 'CHAT_E2E_ADMIN_REFRESH_TOKEN');
 }
 
 async function authenticate(context: BrowserContext, refreshToken: string) {
@@ -113,9 +125,15 @@ test.describe('floating chat real PostgreSQL + Socket.IO journeys', () => {
       const buyerPage = await buyer.newPage();
       const sellerPage = await seller.newPage();
       await buyerPage.goto(`/shops/${shopSlug}`);
+      await expect(
+        buyerPage.getByRole('button', { name: /Tài khoản Chat E2E Buyer/ }),
+      ).toBeVisible({ timeout: 15_000 });
       await buyerPage.getByRole('button', { name: 'Chat ngay' }).click();
       await expect(buyerPage.getByRole('dialog', { name: 'Trò chuyện' })).toBeVisible();
       await sellerPage.goto(`/products/${productId}`);
+      await expect(
+        sellerPage.getByRole('button', { name: /Tài khoản/ }),
+      ).toBeVisible({ timeout: 15_000 });
       const selfChat = sellerPage.getByRole('button', { name: 'Chat ngay' });
       await expect(selfChat).toBeDisabled();
       await expect(selfChat).toHaveAttribute('title', 'Bạn không thể chat với chính shop của mình');
@@ -287,6 +305,120 @@ test.describe('floating chat real PostgreSQL + Socket.IO journeys', () => {
       await buyer.close();
       await buyerTab.close();
       await seller.close();
+    }
+  });
+
+  test('covers safety actions, report receipt, notification opening, admin action, and reconnect recovery', async ({
+    browser,
+  }, testInfo) => {
+    testInfo.setTimeout(120_000);
+    const adminToken = projectAdminToken(testInfo.project.name);
+    requireFixture(safetyCaseId, 'CHAT_E2E_SAFETY_CASE_ID');
+    const buyer = await browser.newContext();
+    const admin = await browser.newContext();
+    try {
+      await authenticate(buyer, projectTokens(testInfo.project.name, 'safety').buyer);
+      const buyerPage = await buyer.newPage();
+      await buyerPage.goto('/account/profile');
+      await buyerPage.getByRole('button', { name: 'Mở trò chuyện' }).click();
+      const dialog = buyerPage.getByRole('dialog', { name: 'Trò chuyện' });
+      await expect(dialog).toBeVisible();
+
+      const contactRow = dialog
+        .locator('.floating-chat__contact-row')
+        .filter({ hasText: 'Chat E2E Filler 01' })
+        .first();
+      await expect(contactRow).toBeVisible({ timeout: 15_000 });
+      const contactActions = contactRow.getByRole('button', { name: 'Tùy chọn cuộc trò chuyện' });
+
+      await contactActions.click();
+      const contactMenu = dialog.getByRole('menu');
+      await expect(contactMenu.getByRole('menuitem', { name: 'Bật thông báo' })).toBeVisible();
+      await contactMenu.getByRole('menuitem', { name: 'Bật thông báo' }).click();
+      await expect(contactRow.getByText(/Đã tắt thông báo/)).toHaveCount(0);
+
+      await contactActions.click();
+      await expect(dialog.getByRole('menu').getByRole('menuitem', { name: 'Bỏ chặn' })).toBeVisible();
+      await dialog.getByRole('menu').getByRole('menuitem', { name: 'Bỏ chặn' }).click();
+      await expect(contactRow.getByText(/Đã chặn/)).toHaveCount(0);
+
+      const contact = contactRow.getByRole('button', { name: /Chat E2E Filler 01/ });
+      await contact.click();
+      const messages = dialog.getByLabel('Nội dung cuộc trò chuyện');
+      await expect(messages.getByText('Tin nhắn filler 1', { exact: true }).first()).toBeVisible({ timeout: 15_000 });
+
+      const firstMessage = dialog
+        .locator('.floating-chat__message-line')
+        .filter({ hasText: 'Tin nhắn filler 1' })
+        .first();
+      await firstMessage.getByRole('button', { name: /Tùy chọn tin nhắn lúc/ }).dispatchEvent('click');
+      await buyerPage.getByRole('menuitem', { name: 'Trả lời' }).click();
+      const replyStatus = dialog.getByRole('status').filter({ hasText: 'Đang trả lời' });
+      await expect(replyStatus).toBeVisible();
+      await replyStatus.getByRole('button', { name: 'Hủy' }).click();
+
+      await firstMessage.getByRole('button', { name: /Tùy chọn tin nhắn lúc/ }).dispatchEvent('click');
+      await buyerPage.getByRole('menuitem', { name: 'Báo cáo' }).click();
+      const reportDialog = buyerPage.getByRole('dialog', { name: 'Báo cáo tin nhắn' });
+      await expect(reportDialog).toBeVisible();
+      await reportDialog.getByRole('combobox').selectOption('SPAM');
+      await reportDialog.getByRole('button', { name: 'Gửi báo cáo' }).click();
+      await expect(buyerPage.getByRole('status').filter({ hasText: 'Đã gửi báo cáo' })).toBeVisible({
+        timeout: 15_000,
+      });
+
+      // Restore the seeded state so the same deterministic journey can run at
+      // the tablet and desktop projects without sharing mutations.
+      await contactActions.click();
+      await dialog.getByRole('menu').getByRole('menuitem', { name: 'Tắt thông báo' }).click();
+      await contactActions.click();
+      await dialog.getByRole('menu').getByRole('menuitem', { name: 'Chặn' }).click();
+      const blockDialog = buyerPage.getByRole('alertdialog', { name: 'Xác nhận chặn người dùng' });
+      await blockDialog.getByRole('button', { name: 'Chặn' }).click();
+      await expect(contactRow.getByText(/Đã chặn/)).toBeVisible();
+
+      await dialog.getByRole('button', { name: 'Đóng trò chuyện' }).click();
+      await expect(buyerPage.getByRole('button', { name: 'Mở trò chuyện' })).toBeVisible();
+      await buyerPage.goto('/account/notifications');
+      await expect(buyerPage.getByRole('heading', { name: 'Thông báo', exact: true })).toBeVisible({ timeout: 15_000 });
+      const notification = buyerPage.locator('button').filter({ hasText: 'Tin nhắn fixture chat' }).first();
+      await expect(notification).toHaveCount(1, { timeout: 15_000 });
+      await notification.click({ force: true });
+      await expect(buyerPage.getByRole('dialog', { name: 'Trò chuyện' })).toBeVisible({ timeout: 15_000 });
+      const openedContact = buyerPage.getByRole('button', { name: /Chat E2E Filler 01/ });
+      await expect(openedContact).toHaveClass(/is-selected/, { timeout: 15_000 });
+      await expect(buyerPage.getByLabel('Nội dung cuộc trò chuyện').getByText('Tin nhắn filler 1', { exact: true }).first()).toBeVisible({ timeout: 15_000 });
+      await dialog.getByRole('button', { name: 'Đóng trò chuyện' }).click();
+      await expect(buyerPage.getByRole('button', { name: 'Mở trò chuyện' })).toBeVisible();
+      await buyerPage.reload();
+      await expect(buyerPage.getByRole('button', { name: 'Mở trò chuyện' })).toBeVisible();
+
+      await authenticate(admin, adminToken);
+      const adminPage = await admin.newPage();
+      await adminPage.goto('/admin/moderation');
+      await expect(adminPage.getByRole('heading', { name: 'Trung tâm Kiểm duyệt & Tố cáo' })).toBeVisible({ timeout: 15_000 });
+      await adminPage.getByRole('combobox', { name: 'Trạng thái hồ sơ' }).selectOption('');
+      const caseSearch = adminPage.getByLabel('Tìm mã hồ sơ hoặc đối tượng');
+      await caseSearch.fill(safetyCaseId!);
+      await caseSearch.press('Enter');
+      const caseCard = adminPage
+        .getByRole('button', { name: /Mở hồ sơ Chat E2E Filler 01/ })
+        .filter({ hasText: 'Chờ xử lý' })
+        .first();
+      await expect(caseCard).toBeVisible({ timeout: 15_000 });
+      await caseCard.click();
+      await expect(adminPage.getByRole('heading', { name: 'Ngữ cảnh chat giới hạn' })).toBeVisible({ timeout: 15_000 });
+      await adminPage.getByLabel('Không xử lý').check();
+      await adminPage.getByLabel('Lý do công khai').fill('Đã kiểm tra nội dung báo cáo');
+      await adminPage.getByLabel(/Ghi chú nội bộ/).fill('Xác minh luồng xử lý của quản trị viên.');
+      await adminPage.getByRole('button', { name: 'Xác nhận áp dụng quyết định' }).click();
+      const confirmation = adminPage.getByRole('alertdialog', { name: /Xác nhận/ });
+      await expect(confirmation).toBeVisible();
+      await confirmation.getByRole('button', { name: 'Xác nhận' }).click();
+      await expect(adminPage.locator('.admin-detail-header .admin-badge')).toHaveText('Đã giải quyết', { timeout: 15_000 });
+    } finally {
+      await buyer.close();
+      await admin.close();
     }
   });
 });

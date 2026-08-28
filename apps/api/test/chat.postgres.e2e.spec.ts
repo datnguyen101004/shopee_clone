@@ -20,6 +20,11 @@ const ids = {
   outsider: '00000000-0000-4000-8000-000000007003',
   shop: '00000000-0000-4000-8000-000000007004',
 };
+const sessions = {
+  buyer: '00000000-0000-4000-8000-000000007101',
+  seller: '00000000-0000-4000-8000-000000007102',
+  outsider: '00000000-0000-4000-8000-000000007103',
+};
 
 class ChatDatabaseAuthGuard implements CanActivate {
   canActivate(context: ExecutionContext) {
@@ -41,13 +46,14 @@ class ChatDatabaseAuthGuard implements CanActivate {
       status: 'active',
       roles: ['buyer'],
     };
-    request.authSessionId = `session-${actor}`;
+    request.authSessionId = actor === ids.buyer ? sessions.buyer : actor === ids.seller ? sessions.seller : sessions.outsider;
     return true;
   }
 }
 
 databaseTest('floating chat against PostgreSQL', () => {
   let app: INestApplication;
+  let secondApp: INestApplication;
   let prisma: PrismaService;
   let conversation: string;
 
@@ -63,10 +69,23 @@ databaseTest('floating chat against PostgreSQL', () => {
     configureApplication(app, loadAuthConfig({ NODE_ENV: 'test', AUTH_ALLOWED_ORIGINS: origin }));
     await app.init();
     prisma = app.get(PrismaService);
+    const secondModule = await Test.createTestingModule({ imports: [AppModule] })
+      .overrideGuard(AuthGuard)
+      .useClass(ChatDatabaseAuthGuard)
+      .compile();
+    secondApp = secondModule.createNestApplication();
+    configureApplication(secondApp, loadAuthConfig({ NODE_ENV: 'test', AUTH_ALLOWED_ORIGINS: origin }));
+    await secondApp.init();
   });
 
   afterAll(async () => {
     if (!prisma) return app?.close();
+    await prisma.userReport.deleteMany({ where: { reporterUserId: { in: [ids.buyer, ids.seller, ids.outsider] } } }).catch(() => undefined);
+    await prisma.moderationCase.deleteMany({ where: { chatConversationId: conversation } }).catch(() => undefined);
+    await prisma.chatAttentionLease.deleteMany({ where: { userId: { in: [ids.buyer, ids.seller, ids.outsider] } } }).catch(() => undefined);
+    await prisma.chatUserBlock.deleteMany({ where: { blockerUserId: { in: [ids.buyer, ids.seller, ids.outsider] } } }).catch(() => undefined);
+    await prisma.chatRateLimitEvent.deleteMany({ where: { userId: { in: [ids.buyer, ids.seller, ids.outsider] } } }).catch(() => undefined);
+    await prisma.reportRateLimitEvent.deleteMany({ where: { reporterUserId: { in: [ids.buyer, ids.seller, ids.outsider] } } }).catch(() => undefined);
     await prisma.chatOutbox
       .deleteMany({
         where: {
@@ -84,6 +103,7 @@ databaseTest('floating chat against PostgreSQL', () => {
       .deleteMany({ where: { id: { in: [ids.buyer, ids.seller, ids.outsider] } } })
       .catch(() => undefined);
     await app.close();
+    await secondApp?.close();
   });
 
   it('materializes one pair, preserves idempotency, pagination, and read monotonicity', async () => {
@@ -98,6 +118,15 @@ databaseTest('floating chat against PostgreSQL', () => {
         email: `${id}@example.test`,
         displayName: id === ids.buyer ? 'Buyer' : id === ids.seller ? 'Seller' : 'Outsider',
         status: UserStatus.ACTIVE,
+      })),
+    });
+    await prisma.authSession.createMany({
+      data: [ids.buyer, ids.seller, ids.outsider].map((id, index) => ({
+        id: Object.values(sessions)[index],
+        userId: id,
+        familyId: Object.values(sessions)[index],
+        tokenHash: `${String(index + 1).repeat(64)}`,
+        expiresAt: new Date(Date.now() + 60 * 60 * 1_000),
       })),
     });
     await prisma.shop.create({
@@ -160,6 +189,22 @@ databaseTest('floating chat against PostgreSQL', () => {
     ).toBe(1);
     expect(await prisma.chatMessage.count({ where: { conversationId: conversation } })).toBe(2);
 
+    const independentResults = await Promise.all([
+      request(secondApp.getHttpServer())
+        .post('/api/v1/chat/messages')
+        .set(auth('buyer'))
+        .set('Origin', origin)
+        .send({ recipientUserId: ids.seller, clientMessageId: '00000000-0000-4000-8000-000000007020', content: 'Đồng bộ instance buyer' }),
+      request(app.getHttpServer())
+        .post('/api/v1/chat/messages')
+        .set(auth('seller'))
+        .set('Origin', origin)
+        .send({ recipientUserId: ids.buyer, clientMessageId: '00000000-0000-4000-8000-000000007021', content: 'Đồng bộ instance seller' }),
+    ]);
+    expect(independentResults.map((result) => result.status)).toEqual([200, 200]);
+    expect(independentResults[0]?.body.conversation.id).toBe(conversation);
+    expect(independentResults[1]?.body.conversation.id).toBe(conversation);
+
     const replay = await request(app.getHttpServer())
       .post('/api/v1/chat/messages')
       .set(auth('buyer'))
@@ -195,6 +240,120 @@ databaseTest('floating chat against PostgreSQL', () => {
       .set(auth('buyer'))
       .set('Origin', origin)
       .send({ throughSequence: 2 })
+      .expect(200);
+
+    const muteResponse = await request(app.getHttpServer())
+      .put(`/api/v1/chat/conversations/${conversation}/mute`)
+      .set(auth('buyer'))
+      .set('Origin', origin)
+      .expect(200);
+    expect(muteResponse.body.notificationsMuted).toBe(true);
+    await request(app.getHttpServer())
+      .put(`/api/v1/chat/conversations/${conversation}/mute`)
+      .set(auth('buyer'))
+      .set('Origin', origin)
+      .expect(200);
+    await request(app.getHttpServer())
+      .delete(`/api/v1/chat/conversations/${conversation}/mute`)
+      .set(auth('buyer'))
+      .set('Origin', origin)
+      .expect(200);
+
+    await request(app.getHttpServer())
+      .put(`/api/v1/chat/users/${ids.seller}/block`)
+      .set(auth('buyer'))
+      .set('Origin', origin)
+      .expect(200);
+    const blockedSummary = await request(app.getHttpServer())
+      .get(`/api/v1/chat/conversations/${conversation}/messages`)
+      .set(auth('buyer'))
+      .expect(200);
+    expect(blockedSummary.body.conversation).toMatchObject({ blockedByMe: true, canMessage: false });
+    await request(app.getHttpServer())
+      .post('/api/v1/chat/messages')
+      .set(auth('buyer'))
+      .set('Origin', origin)
+      .send({ recipientUserId: ids.seller, clientMessageId: '00000000-0000-4000-8000-000000007013', content: 'blocked' })
+      .expect(403);
+    await request(app.getHttpServer())
+      .delete(`/api/v1/chat/users/${ids.seller}/block`)
+      .set(auth('buyer'))
+      .set('Origin', origin)
+      .expect(200);
+
+    const reply = await request(app.getHttpServer())
+      .post('/api/v1/chat/messages')
+      .set(auth('buyer'))
+      .set('Origin', origin)
+      .send({ recipientUserId: ids.seller, clientMessageId: '00000000-0000-4000-8000-000000007014', content: 'Phản hồi', replyToMessageId: first.body.message.id })
+      .expect(200);
+    expect(reply.body.message.replyTo.messageId).toBe(first.body.message.id);
+    await request(app.getHttpServer())
+      .post('/api/v1/chat/messages')
+      .set(auth('buyer'))
+      .set('Origin', origin)
+      .send({ recipientUserId: ids.seller, clientMessageId: '00000000-0000-4000-8000-000000007015', content: 'Reply lỗi', replyToMessageId: '00000000-0000-4000-8000-000000007099' })
+      .expect(400);
+
+    const reportKey = '00000000-0000-4000-8000-000000007016';
+    const report = await request(app.getHttpServer())
+      .post('/api/v1/chat/reports')
+      .set(auth('buyer'))
+      .set('Origin', origin)
+      .set('Idempotency-Key', reportKey)
+      .send({ conversationId: conversation, messageId: reply.body.message.id, reasonCode: 'SPAM' })
+      .expect(201);
+    expect(report.body).toMatchObject({ messageId: reply.body.message.id, reasonCode: 'SPAM', status: 'SUBMITTED' });
+    const duplicateReport = await request(app.getHttpServer())
+      .post('/api/v1/chat/reports')
+      .set(auth('buyer'))
+      .set('Origin', origin)
+      .set('Idempotency-Key', '00000000-0000-4000-8000-000000007017')
+      .send({ conversationId: conversation, messageId: reply.body.message.id, reasonCode: 'SPAM' })
+      .expect(201);
+    expect(duplicateReport.body.id).toBe(report.body.id);
+    await request(app.getHttpServer())
+      .post('/api/v1/chat/reports')
+      .set(auth('buyer'))
+      .set('Origin', origin)
+      .set('Idempotency-Key', reportKey)
+      .send({ conversationId: conversation, reasonCode: 'OTHER', details: 'Nội dung khác với lần báo cáo trước đây' })
+      .expect(409);
+    await request(app.getHttpServer())
+      .post('/api/v1/chat/reports')
+      .set(auth('buyer'))
+      .set('Origin', origin)
+      .set('Idempotency-Key', '00000000-0000-4000-8000-000000007018')
+      .send({ conversationId: conversation, reasonCode: 'OTHER', details: 'ngắn' })
+      .expect(400);
+    await request(app.getHttpServer())
+      .get(`/api/v1/chat/reports?conversationId=${conversation}`)
+      .set(auth('buyer'))
+      .expect(200);
+    await request(app.getHttpServer())
+      .get(`/api/v1/chat/conversations/${conversation}/messages`)
+      .set(auth('outsider'))
+      .expect(403);
+
+    const beforeSellerNotices = await prisma.notification.count({ where: { recipientId: ids.seller, category: 'CHAT', deduplicationKey: `chat:${ids.seller}:${conversation}` } });
+    await request(app.getHttpServer())
+      .put(`/api/v1/chat/conversations/${conversation}/attention`)
+      .set(auth('seller'))
+      .set('Origin', origin)
+      .send({ clientInstanceId: 'postgres-browser', engagedAtNewestRegion: true })
+      .expect(200);
+    await request(app.getHttpServer())
+      .post('/api/v1/chat/messages')
+      .set(auth('buyer'))
+      .set('Origin', origin)
+      .send({ recipientUserId: ids.seller, clientMessageId: '00000000-0000-4000-8000-000000007019', content: 'Không tạo thông báo khi đang xem' })
+      .expect(200);
+    expect(await prisma.notification.count({ where: { recipientId: ids.seller, category: 'CHAT', deduplicationKey: `chat:${ids.seller}:${conversation}` } })).toBe(beforeSellerNotices);
+    await request(app.getHttpServer())
+      .put(`/api/v1/chat/conversations/${conversation}/attention`)
+      .set(auth('seller'))
+      .set('Origin', origin)
+      .send({ clientInstanceId: 'postgres-browser', engagedAtNewestRegion: false })
       .expect(200);
     await request(app.getHttpServer())
       .put(`/api/v1/chat/conversations/${conversation}/read`)

@@ -7,6 +7,7 @@ import {
   isMandatoryNotificationType,
   isNotificationItem,
   isNotificationListResponse,
+  isNotificationMetadata,
   isNotificationPreferencesResponse,
   isUpdateNotificationPreferenceRequest,
   parseNotificationListQuery,
@@ -40,7 +41,7 @@ describe('notification contracts', () => {
     expect(NOTIFICATION_CATEGORY_BY_TYPE.ORDER_CONFIRMED).toBe('ORDERS');
     expect(NOTIFICATION_CATEGORY_BY_TYPE.VOUCHER_ASSIGNED).toBe('PROMOTIONS');
     expect(NOTIFICATION_CATEGORY_BY_TYPE.PRODUCT_REJECTED).toBe('SYSTEM');
-    expect(NOTIFICATION_CATEGORY_BY_TYPE.CHAT_MESSAGE).toBe('ACCOUNT');
+    expect(NOTIFICATION_CATEGORY_BY_TYPE.CHAT_MESSAGE).toBe('CHAT');
     expect(isMandatoryNotificationType('REFUNDED')).toBe(true);
     expect(isMandatoryNotificationType('VOUCHER_ASSIGNED')).toBe(false);
     expect(MANDATORY_NOTIFICATION_TYPES).toContain('DISPUTE_ESCALATED');
@@ -127,5 +128,22 @@ describe('notification contracts', () => {
         ],
       }),
     ).toBe(true);
+  });
+
+  it('accepts bounded chat aggregates and rejects private fields', () => {
+    const chatMetadata = {
+      ...item.metadata,
+      chat: {
+        conversationId: '00000000-0000-4000-8000-000000000401',
+        unreadCount: 2,
+        newestSequence: 9,
+        preview: 'Tin nhắn mới nhất',
+        avatarUrl: null,
+        activityAt: timestamp,
+      },
+    };
+    expect(isNotificationMetadata(chatMetadata)).toBe(true);
+    expect(isNotificationMetadata({ ...chatMetadata, chat: { ...chatMetadata.chat, messageBody: 'secret' } })).toBe(false);
+    expect(isNotificationMetadata({ ...chatMetadata, sourceAddress: '192.0.2.1' })).toBe(false);
   });
 });

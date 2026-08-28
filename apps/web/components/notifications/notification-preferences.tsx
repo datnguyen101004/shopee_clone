@@ -26,6 +26,7 @@ const categoryLabels: Record<NotificationCategory, string> = {
   PROMOTIONS: 'Khuyến mãi',
   ACCOUNT: 'Tài khoản',
   SYSTEM: 'Hệ thống',
+  CHAT: 'Tin nhắn',
 };
 
 const channelLabels: Record<NotificationChannel, string> = {

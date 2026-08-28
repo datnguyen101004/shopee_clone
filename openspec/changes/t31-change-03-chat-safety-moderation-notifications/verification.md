@@ -1,0 +1,13 @@
+# Ghi chú kiểm tra và phát hành
+
+- Prisma schema đã bổ sung block, mute, reply, rate event, attention lease, report chat, restriction và thứ tự hoạt động notification.
+- Migration `20260828100000_t31_chat_safety_notifications` là migration tiến về phía trước; dữ liệu notification cũ được đặt `activityAt = createdAt`.
+- Rate event và attention lease có script dọn theo lô: `pnpm --filter @shopee-clone/api chat:safety:cleanup`.
+- Hạn chế tạm thời dùng thời gian UTC do máy chủ ghi nhận; client chỉ hiển thị thời điểm trả về.
+- Nội dung chat chỉ xuất hiện trong chi tiết hồ sơ admin và tối đa 20 tin gần nhất; danh sách hồ sơ, nhật ký và báo cáo của người dùng không chứa nội dung riêng tư.
+- Đã kiểm tra: contracts 25 suite/131 test, API 107 suite/555 test (471 pass, 84 skip), web 82 suite/320 test; các suite chat/admin mới đều pass. API/web/contracts typecheck, contracts/API/web lint (0 lỗi; web có warning sẵn có), production build toàn workspace, Prisma generate/validate, migration contract test và OpenSpec strict validation đều pass.
+- Component chat đã kiểm tra menu hành động, xác nhận chặn, trả lời, focus/Escape, giữ bản nháp, cuộn cuối và ngưỡng nút 44 × 44 px trong CSS; telemetry rate chỉ ghi kết quả tổng hợp và nhóm thời gian thử lại.
+- Nút “Tin nhắn mới” trong widget chỉ xuất hiện với tin đến từ đối phương khi người dùng đang xem lịch sử cũ; tin do chính người dùng gửi luôn cuộn tới cuối và không tự tạo cảnh báo phía người gửi.
+- Tinh chỉnh reply navigation đã kiểm tra bằng 3 suite component/provider/style với 33/33 test pass: dòng “Bạn đã trả lời…”/“…đã trả lời bạn” không có nền, trích dẫn tin gốc có màu riêng và nằm dưới lớp nền của tin trả lời, nút tùy chọn nằm cùng hàng với tin trả lời và popup mở phía trên, tải lịch sử liên tục tới tin gốc, cuộn/focus/highlight tin gốc và xử lý trạng thái không còn khả dụng. Web typecheck và lint phạm vi file thay đổi đạt; không chạy E2E theo yêu cầu của người dùng.
+- Báo cáo chat cùng một cuộc trò chuyện/tin nhắn được chống trùng bằng khóa theo người báo cáo và mục tiêu; gửi lại với mã yêu cầu mới trả về biên nhận cũ mà không trừ lượt hay tăng số vụ việc.
+- Release gate đã chạy trên PostgreSQL thật: 47 migration up-to-date và checksum hợp lệ; preflight trước/sau repair đều `valid: true`, backup `D:\Web_Project\Shopee_clone\.runtime\backups\shopee_clone_t31_backup.dump` đã được tạo và conversation mục tiêu không còn bản ghi. PostgreSQL chat suite đạt 1/1. Real Socket.IO journey safety mới đạt 3/3 ở mobile/tablet/desktop; bộ journey nền trước đó đạt 21/21, không skip. `pnpm ci:validate` pass; cảnh báo còn lại chỉ là warning của `next start` với output standalone và deprecation từ pg, không làm fail gate.

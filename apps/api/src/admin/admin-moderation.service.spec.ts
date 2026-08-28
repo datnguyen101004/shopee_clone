@@ -67,6 +67,36 @@ describe('AdminModerationService', () => {
     ).rejects.toThrow(AdminInvalidInputError);
   });
 
+  it('requires a future expiry and private note for chat restrictions', async () => {
+    await expect(
+      service.makeDecision(
+        adminId,
+        validUuid,
+        {
+          outcome: 'RESTRICT_CHAT_TEMPORARY',
+          publicReason: 'Temporary restriction for repeated abuse.',
+          privateNote: 'Reviewed evidence',
+          restrictionUntil: '2020-01-01T00:00:00.000Z',
+          expectedVersion: 0,
+        },
+        idempotencyKey,
+      ),
+    ).rejects.toThrow(AdminInvalidInputError);
+
+    await expect(
+      service.makeDecision(
+        adminId,
+        validUuid,
+        {
+          outcome: 'RESTRICT_CHAT_INDEFINITE',
+          publicReason: 'Indefinite restriction for severe abuse.',
+          expectedVersion: 0,
+        },
+        idempotencyKey,
+      ),
+    ).rejects.toThrow(AdminInvalidInputError);
+  });
+
   it('delegates assignCase, addNote, and makeDecision to repository with computed digests', async () => {
     repository.assignCase.mockResolvedValue({ caseDetail: {} as unknown as ModerationCaseDetail });
     repository.addNote.mockResolvedValue({ caseDetail: {} as unknown as ModerationCaseDetail });

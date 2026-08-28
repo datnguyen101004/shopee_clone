@@ -137,8 +137,10 @@ enum PrivilegedAction {
 }
 
 enum ReportTargetType {
-  PRODUCT @map("product")
-  SHOP    @map("shop")
+  PRODUCT           @map("product")
+  SHOP              @map("shop")
+  CHAT_CONVERSATION @map("chat_conversation")
+  CHAT_MESSAGE      @map("chat_message")
 
   @@map("report_target_type")
 }
@@ -172,9 +174,13 @@ enum ModerationCaseStatus {
 }
 
 enum ModerationCaseOutcome {
-  NO_ACTION      @map("no_action")
-  SUSPEND_TARGET @map("suspend_target")
-  RESTORE_TARGET @map("restore_target")
+  NO_ACTION                @map("no_action")
+  SUSPEND_TARGET           @map("suspend_target")
+  RESTORE_TARGET           @map("restore_target")
+  WARN_USER                @map("warn_user")
+  RESTRICT_CHAT_TEMPORARY  @map("restrict_chat_temporary")
+  RESTRICT_CHAT_INDEFINITE @map("restrict_chat_indefinite")
+  RESTORE_CHAT             @map("restore_chat")
 
   @@map("moderation_case_outcome")
 }
@@ -204,6 +210,7 @@ enum NotificationCategory {
   PROMOTIONS @map("promotions")
   ACCOUNT    @map("account")
   SYSTEM     @map("system")
+  CHAT       @map("chat")
 
   @@map("notification_category")
 }
@@ -444,6 +451,13 @@ enum ChatOutboxStatus {
   @@map("chat_user_outbox_status")
 }
 
+enum ChatRateLimitScope {
+  ACCOUNT @map("account")
+  SOURCE  @map("source")
+
+  @@map("chat_rate_limit_scope")
+}
+
 enum RefundLedgerKind {
   MOCK_CREDIT @map("mock_credit")
 
@@ -490,6 +504,7 @@ model User {
   privilegedAuditActions   PrivilegedAuditEvent[]             @relation("PrivilegedAuditActor")
   userReports              UserReport[]                       @relation("UserReportsSubmitted")
   moderationAssignments    ModerationCase[]                   @relation("ModerationCaseAssignee")
+  moderationCasesReported  ModerationCase[]                   @relation("ModerationCaseReportedUser")
   moderationCaseEvents     ModerationCaseEvent[]              @relation("ModerationCaseEventActor")
   moderationDecisions      ModerationDecision[]               @relation("ModerationDecisionActor")
   moderationCommands       ModerationCommand[]                @relation("ModerationCommandActor")
@@ -507,6 +522,12 @@ model User {
   chatMemberships          ChatMembership[]                   @relation("ChatMembershipUser")
   chatMessagesSent         ChatMessage[]                      @relation("ChatMessageSender")
   chatOutboxRecipients     ChatOutbox[]                       @relation("ChatOutboxRecipient")
+  chatBlocksCreated        ChatUserBlock[]                    @relation("ChatBlocker")
+  chatBlocksReceived       ChatUserBlock[]                    @relation("ChatBlocked")
+  chatRateLimitEvents      ChatRateLimitEvent[]               @relation("ChatRateSubject")
+  chatAttentionLeases      ChatAttentionLease[]               @relation("ChatAttentionUser")
+  chatRestriction          UserChatRestriction?               @relation("ChatRestrictionUser")
+  chatReportsTargeted      UserReport[]                       @relation("UserReportsTarget")
 
   @@index([status])
   @@index([deletedAt])
@@ -1891,6 +1912,9 @@ model UserReport {
   targetType         ReportTargetType          @map("target_type")
   productId          String?                   @map("product_id") @db.Uuid
   shopId             String?                   @map("shop_id") @db.Uuid
+  chatConversationId String?                   @map("chat_conversation_id") @db.Uuid
+  chatMessageId      String?                   @map("chat_message_id") @db.Uuid
+  reportedUserId     String?                   @map("reported_user_id") @db.Uuid
   reasonCode         ReportReasonCode          @map("reason_code")
   details            String                    @db.VarChar(1000)
   targetSnapshot     Json                      @map("target_snapshot")
@@ -1903,6 +1927,9 @@ model UserReport {
   case               ModerationCase            @relation(fields: [caseId], references: [id], onDelete: Restrict)
   product            Product?                  @relation(fields: [productId], references: [id], onDelete: Restrict)
   shop               Shop?                     @relation(fields: [shopId], references: [id], onDelete: Restrict)
+  chatConversation   ChatConversation?         @relation(fields: [chatConversationId], references: [id], onDelete: Restrict)
+  chatMessage        ChatMessage?              @relation(fields: [chatMessageId], references: [id], onDelete: Restrict)
+  reportedUser       User?                     @relation("UserReportsTarget", fields: [reportedUserId], references: [id], onDelete: Restrict)
   evidenceReferences ReportEvidenceReference[]
 
   @@unique([reporterUserId, idempotencyKey])
@@ -1910,6 +1937,8 @@ model UserReport {
   @@index([caseId, createdAt])
   @@index([productId])
   @@index([shopId])
+  @@index([chatConversationId, reportedUserId, createdAt])
+  @@index([chatMessageId])
   @@map("user_reports")
 }
 
@@ -1926,34 +1955,39 @@ model ReportEvidenceReference {
 }
 
 model ModerationCase {
-  id              String                 @id @default(uuid()) @db.Uuid
-  targetType      ReportTargetType       @map("target_type")
-  productId       String?                @map("product_id") @db.Uuid
-  shopId          String?                @map("shop_id") @db.Uuid
-  targetSnapshot  Json                   @map("target_snapshot")
-  status          ModerationCaseStatus   @default(OPEN)
-  reportCount     Int                    @default(1) @map("report_count")
-  primaryReason   ReportReasonCode       @map("primary_reason")
-  assignedAdminId String?                @map("assigned_admin_id") @db.Uuid
-  currentOutcome  ModerationCaseOutcome? @map("current_outcome")
-  version         Int                    @default(0)
-  firstReportAt   DateTime               @default(now()) @map("first_report_at") @db.Timestamptz(3)
-  lastActivityAt  DateTime               @default(now()) @map("last_activity_at") @db.Timestamptz(3)
-  resolvedAt      DateTime?              @map("resolved_at") @db.Timestamptz(3)
-  createdAt       DateTime               @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt       DateTime               @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
-  product         Product?               @relation(fields: [productId], references: [id], onDelete: Restrict)
-  shop            Shop?                  @relation(fields: [shopId], references: [id], onDelete: Restrict)
-  assignedAdmin   User?                  @relation("ModerationCaseAssignee", fields: [assignedAdminId], references: [id], onDelete: Restrict)
-  reports         UserReport[]
-  events          ModerationCaseEvent[]
-  decisions       ModerationDecision[]
+  id                 String                 @id @default(uuid()) @db.Uuid
+  targetType         ReportTargetType       @map("target_type")
+  productId          String?                @map("product_id") @db.Uuid
+  shopId             String?                @map("shop_id") @db.Uuid
+  chatConversationId String?                @map("chat_conversation_id") @db.Uuid
+  reportedUserId     String?                @map("reported_user_id") @db.Uuid
+  targetSnapshot     Json                   @map("target_snapshot")
+  status             ModerationCaseStatus   @default(OPEN)
+  reportCount        Int                    @default(1) @map("report_count")
+  primaryReason      ReportReasonCode       @map("primary_reason")
+  assignedAdminId    String?                @map("assigned_admin_id") @db.Uuid
+  currentOutcome     ModerationCaseOutcome? @map("current_outcome")
+  version            Int                    @default(0)
+  firstReportAt      DateTime               @default(now()) @map("first_report_at") @db.Timestamptz(3)
+  lastActivityAt     DateTime               @default(now()) @map("last_activity_at") @db.Timestamptz(3)
+  resolvedAt         DateTime?              @map("resolved_at") @db.Timestamptz(3)
+  createdAt          DateTime               @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt          DateTime               @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  product            Product?               @relation(fields: [productId], references: [id], onDelete: Restrict)
+  shop               Shop?                  @relation(fields: [shopId], references: [id], onDelete: Restrict)
+  chatConversation   ChatConversation?      @relation(fields: [chatConversationId], references: [id], onDelete: Restrict)
+  reportedUser       User?                  @relation("ModerationCaseReportedUser", fields: [reportedUserId], references: [id], onDelete: Restrict)
+  assignedAdmin      User?                  @relation("ModerationCaseAssignee", fields: [assignedAdminId], references: [id], onDelete: Restrict)
+  reports            UserReport[]
+  events             ModerationCaseEvent[]
+  decisions          ModerationDecision[]
 
   @@index([status, lastActivityAt(sort: Desc), id])
   @@index([targetType, lastActivityAt(sort: Desc)])
   @@index([assignedAdminId, status])
   @@index([productId])
   @@index([shopId])
+  @@index([chatConversationId, reportedUserId, status])
   @@map("moderation_cases")
 }
 
@@ -1990,6 +2024,7 @@ model ModerationDecision {
   reversesDecision     ModerationDecision?     @relation("DecisionReversal", fields: [reversesDecisionId], references: [id], onDelete: Restrict)
   reversedByDecisions  ModerationDecision[]    @relation("DecisionReversal")
   sellerNotice         SellerModerationNotice?
+  chatRestriction      UserChatRestriction?    @relation("ChatRestrictionDecision")
   auditEvents          PrivilegedAuditEvent[]
 
   @@index([caseId, createdAt(sort: Desc)])
@@ -2054,20 +2089,23 @@ model SellerModerationNotice {
 }
 
 model ChatConversation {
-  id                    String          @id @default(uuid()) @db.Uuid
-  participantLowUserId  String          @map("participant_low_user_id") @db.Uuid
-  participantHighUserId String          @map("participant_high_user_id") @db.Uuid
-  nextSequence          Int             @default(1) @map("next_sequence")
-  lastMessageSequence   Int             @default(0) @map("last_message_sequence")
-  lastMessagePreview    String?         @map("last_message_preview") @db.VarChar(2000)
-  lastMessageAt         DateTime?       @map("last_message_at") @db.Timestamptz(3)
-  createdAt              DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt              DateTime        @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
-  participantLow        User            @relation("ChatConversationLowParticipant", fields: [participantLowUserId], references: [id], onDelete: Restrict)
-  participantHigh       User            @relation("ChatConversationHighParticipant", fields: [participantHighUserId], references: [id], onDelete: Restrict)
+  id                    String               @id @default(uuid()) @db.Uuid
+  participantLowUserId  String               @map("participant_low_user_id") @db.Uuid
+  participantHighUserId String               @map("participant_high_user_id") @db.Uuid
+  nextSequence          Int                  @default(1) @map("next_sequence")
+  lastMessageSequence   Int                  @default(0) @map("last_message_sequence")
+  lastMessagePreview    String?              @map("last_message_preview") @db.VarChar(2000)
+  lastMessageAt         DateTime?            @map("last_message_at") @db.Timestamptz(3)
+  createdAt             DateTime             @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt             DateTime             @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  participantLow        User                 @relation("ChatConversationLowParticipant", fields: [participantLowUserId], references: [id], onDelete: Restrict)
+  participantHigh       User                 @relation("ChatConversationHighParticipant", fields: [participantHighUserId], references: [id], onDelete: Restrict)
   memberships           ChatMembership[]
   messages              ChatMessage[]
   outbox                ChatOutbox[]
+  reports               UserReport[]
+  moderationCases       ModerationCase[]
+  attentionLeases       ChatAttentionLease[]
 
   @@unique([participantLowUserId, participantHighUserId])
   @@index([participantLowUserId, lastMessageAt(sort: Desc), id(sort: Desc)])
@@ -2076,16 +2114,17 @@ model ChatConversation {
 }
 
 model ChatMembership {
-  id                String          @id @default(uuid()) @db.Uuid
-  conversationId    String          @map("conversation_id") @db.Uuid
-  userId            String          @map("user_id") @db.Uuid
-  lastReadSequence  Int             @default(0) @map("last_read_sequence")
-  unreadCount       Int             @default(0) @map("unread_count")
-  lastReadAt        DateTime?       @map("last_read_at") @db.Timestamptz(3)
-  createdAt         DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt         DateTime        @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
-  conversation      ChatConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  user              User            @relation("ChatMembershipUser", fields: [userId], references: [id], onDelete: Restrict)
+  id                   String           @id @default(uuid()) @db.Uuid
+  conversationId       String           @map("conversation_id") @db.Uuid
+  userId               String           @map("user_id") @db.Uuid
+  lastReadSequence     Int              @default(0) @map("last_read_sequence")
+  unreadCount          Int              @default(0) @map("unread_count")
+  notificationsMutedAt DateTime?        @map("notifications_muted_at") @db.Timestamptz(3)
+  lastReadAt           DateTime?        @map("last_read_at") @db.Timestamptz(3)
+  createdAt            DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt            DateTime         @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  conversation         ChatConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  user                 User             @relation("ChatMembershipUser", fields: [userId], references: [id], onDelete: Restrict)
 
   @@unique([conversationId, userId])
   @@index([userId, updatedAt(sort: Desc), conversationId])
@@ -2093,45 +2132,113 @@ model ChatMembership {
 }
 
 model ChatMessage {
-  id              String          @id @default(uuid()) @db.Uuid
-  conversationId  String          @map("conversation_id") @db.Uuid
-  sequence        Int
-  senderUserId    String          @map("sender_user_id") @db.Uuid
-  clientMessageId String          @map("client_message_id") @db.Uuid
-  requestDigest   String          @map("request_digest") @db.Char(64)
-  content         String          @db.VarChar(2000)
-  createdAt       DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
-  conversation    ChatConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  sender          User            @relation("ChatMessageSender", fields: [senderUserId], references: [id], onDelete: Restrict)
+  id               String           @id @default(uuid()) @db.Uuid
+  conversationId   String           @map("conversation_id") @db.Uuid
+  sequence         Int
+  senderUserId     String           @map("sender_user_id") @db.Uuid
+  clientMessageId  String           @map("client_message_id") @db.Uuid
+  requestDigest    String           @map("request_digest") @db.Char(64)
+  content          String           @db.VarChar(2000)
+  replyToMessageId String?          @map("reply_to_message_id") @db.Uuid
+  createdAt        DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
+  conversation     ChatConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender           User             @relation("ChatMessageSender", fields: [senderUserId], references: [id], onDelete: Restrict)
+  replyTo          ChatMessage?     @relation("ChatMessageReply", fields: [replyToMessageId], references: [id], onDelete: SetNull)
+  replies          ChatMessage[]    @relation("ChatMessageReply")
+  reports          UserReport[]
 
   @@unique([conversationId, sequence])
   @@unique([conversationId, senderUserId, clientMessageId])
   @@index([conversationId, sequence(sort: Desc)])
   @@index([senderUserId, createdAt(sort: Desc)])
+  @@index([replyToMessageId])
   @@map("chat_user_messages")
 }
 
 model ChatOutbox {
-  id                 String          @id @default(uuid()) @db.Uuid
-  conversationId     String          @map("conversation_id") @db.Uuid
-  messageId          String?         @map("message_id") @db.Uuid
-  recipientUserId    String          @map("recipient_user_id") @db.Uuid
-  eventType          String          @map("event_type") @db.VarChar(80)
-  payload            Json            @db.JsonB
-  deduplicationKey   String          @unique @map("deduplication_key") @db.VarChar(240)
-  status             ChatOutboxStatus @default(PENDING)
-  attemptCount      Int             @default(0) @map("attempt_count")
-  nextAttemptAt     DateTime?       @map("next_attempt_at") @db.Timestamptz(3)
-  lockedUntil       DateTime?       @map("locked_until") @db.Timestamptz(3)
-  lastError         String?         @map("last_error") @db.VarChar(500)
-  createdAt         DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt         DateTime        @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
-  conversation      ChatConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  recipient         User            @relation("ChatOutboxRecipient", fields: [recipientUserId], references: [id], onDelete: Restrict)
+  id               String           @id @default(uuid()) @db.Uuid
+  conversationId   String           @map("conversation_id") @db.Uuid
+  messageId        String?          @map("message_id") @db.Uuid
+  recipientUserId  String           @map("recipient_user_id") @db.Uuid
+  eventType        String           @map("event_type") @db.VarChar(80)
+  payload          Json             @db.JsonB
+  deduplicationKey String           @unique @map("deduplication_key") @db.VarChar(240)
+  status           ChatOutboxStatus @default(PENDING)
+  attemptCount     Int              @default(0) @map("attempt_count")
+  nextAttemptAt    DateTime?        @map("next_attempt_at") @db.Timestamptz(3)
+  lockedUntil      DateTime?        @map("locked_until") @db.Timestamptz(3)
+  lastError        String?          @map("last_error") @db.VarChar(500)
+  createdAt        DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt        DateTime         @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  conversation     ChatConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  recipient        User             @relation("ChatOutboxRecipient", fields: [recipientUserId], references: [id], onDelete: Restrict)
 
   @@index([status, nextAttemptAt, createdAt])
   @@index([recipientUserId, createdAt])
   @@map("chat_user_outbox")
+}
+
+model ChatUserBlock {
+  id            String   @id @default(uuid()) @db.Uuid
+  blockerUserId String   @map("blocker_user_id") @db.Uuid
+  blockedUserId String   @map("blocked_user_id") @db.Uuid
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt     DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  blocker       User     @relation("ChatBlocker", fields: [blockerUserId], references: [id], onDelete: Cascade)
+  blocked       User     @relation("ChatBlocked", fields: [blockedUserId], references: [id], onDelete: Cascade)
+
+  @@unique([blockerUserId, blockedUserId])
+  @@index([blockedUserId, createdAt(sort: Desc)])
+  @@map("chat_user_blocks")
+}
+
+model ChatRateLimitEvent {
+  id          String             @id @default(uuid()) @db.Uuid
+  scope       ChatRateLimitScope
+  subjectHash String             @map("subject_hash") @db.Char(64)
+  userId      String?            @map("user_id") @db.Uuid
+  accepted    Boolean            @default(false)
+  attemptedAt DateTime           @default(now()) @map("attempted_at") @db.Timestamptz(3)
+  user        User?              @relation("ChatRateSubject", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([scope, subjectHash, attemptedAt(sort: Desc)])
+  @@index([attemptedAt])
+  @@map("chat_rate_limit_events")
+}
+
+model ChatAttentionLease {
+  id               String           @id @default(uuid()) @db.Uuid
+  userId           String           @map("user_id") @db.Uuid
+  sessionId        String           @map("session_id") @db.Uuid
+  clientInstanceId String           @map("client_instance_id") @db.VarChar(80)
+  conversationId   String           @map("conversation_id") @db.Uuid
+  atNewestRegion   Boolean          @map("at_newest_region")
+  engagedAt        DateTime         @map("engaged_at") @db.Timestamptz(3)
+  expiresAt        DateTime         @map("expires_at") @db.Timestamptz(3)
+  createdAt        DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt        DateTime         @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  user             User             @relation("ChatAttentionUser", fields: [userId], references: [id], onDelete: Cascade)
+  conversation     ChatConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, sessionId, clientInstanceId, conversationId])
+  @@index([conversationId, userId, expiresAt])
+  @@index([expiresAt])
+  @@map("chat_attention_leases")
+}
+
+model UserChatRestriction {
+  id                    String              @id @default(uuid()) @db.Uuid
+  userId                String              @unique @map("user_id") @db.Uuid
+  restrictedAt          DateTime            @default(now()) @map("restricted_at") @db.Timestamptz(3)
+  restrictedUntil       DateTime?           @map("restricted_until") @db.Timestamptz(3)
+  originatingDecisionId String?             @unique @map("originating_decision_id") @db.Uuid
+  version               Int                 @default(1)
+  restoredAt            DateTime?           @map("restored_at") @db.Timestamptz(3)
+  user                  User                @relation("ChatRestrictionUser", fields: [userId], references: [id], onDelete: Cascade)
+  originatingDecision   ModerationDecision? @relation("ChatRestrictionDecision", fields: [originatingDecisionId], references: [id], onDelete: SetNull)
+
+  @@index([restrictedUntil])
+  @@map("user_chat_restrictions")
 }
 
 model Notification {
@@ -2146,6 +2253,7 @@ model Notification {
   isRead           Boolean                       @default(false) @map("is_read")
   readAt           DateTime?                     @map("read_at") @db.Timestamptz(3)
   isArchived       Boolean                       @default(false) @map("is_archived")
+  activityAt       DateTime                      @default(now()) @map("activity_at") @db.Timestamptz(3)
   createdAt        DateTime                      @default(now()) @map("created_at") @db.Timestamptz(3)
   recipient        User                          @relation("NotificationRecipient", fields: [recipientId], references: [id], onDelete: Cascade)
   deliveryAttempts NotificationDeliveryAttempt[]
@@ -2153,6 +2261,7 @@ model Notification {
   @@index([recipientId, isArchived, createdAt(sort: Desc), id])
   @@index([recipientId, isRead, isArchived])
   @@index([recipientId, category, isArchived, createdAt(sort: Desc), id])
+  @@index([recipientId, category, isArchived, activityAt(sort: Desc), id])
   @@map("notifications")
 }
 

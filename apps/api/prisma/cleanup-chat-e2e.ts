@@ -9,6 +9,11 @@ const fillerUserIds = Array.from(
   { length: 25 },
   (_, index) => `00000000-0000-4000-8000-${(0x9100 + index).toString(16).padStart(12, '0')}`,
 );
+const safetyCaseId = '00000000-0000-4000-8000-000000009605';
+const safetyAdminIds = [
+  '00000000-0000-4000-8000-000000009611',
+  '00000000-0000-4000-8000-000000009612',
+] as const;
 if (!databaseUrl) throw new Error('TEST_DATABASE_URL or DATABASE_URL is required.');
 if (!sellerId || !/^[0-9a-f-]{36}$/i.test(sellerId))
   throw new Error('CHAT_E2E_SELLER_ID is required for scoped cleanup.');
@@ -17,6 +22,19 @@ const prisma = createPrismaClient(databaseUrl);
 async function main(): Promise<void> {
   try {
     await prisma.$transaction(async (tx) => {
+      const safetyCaseRows = await tx.moderationCase.findMany({
+        where: { chatConversationId: fillerConversationIds[0] },
+        select: { id: true },
+      });
+      const safetyCaseIds = [...new Set([safetyCaseId, ...safetyCaseRows.map((row) => row.id)])];
+      await tx.userReport.deleteMany({ where: { chatConversationId: fillerConversationIds[0] } });
+      await tx.privilegedAuditEvent.deleteMany({ where: { targetId: { in: safetyCaseIds } } });
+      await tx.moderationCommand.deleteMany({ where: { resourceId: { in: safetyCaseIds } } });
+      await tx.moderationDecision.deleteMany({ where: { caseId: { in: safetyCaseIds } } });
+      await tx.moderationCase.deleteMany({ where: { id: { in: safetyCaseIds } } });
+      await tx.chatAttentionLease.deleteMany({ where: { userId: { in: [buyerId, ...fillerUserIds] } } });
+      await tx.chatUserBlock.deleteMany({ where: { blockerUserId: { in: [buyerId, ...fillerUserIds] } } });
+      await tx.notification.deleteMany({ where: { recipientId: buyerId, category: 'CHAT' } });
       await tx.chatOutbox.deleteMany({
         where: {
           conversation: {
@@ -44,6 +62,9 @@ async function main(): Promise<void> {
       await tx.userRoleAssignment.deleteMany({ where: { userId: buyerId } });
       await tx.user.deleteMany({ where: { id: buyerId } });
       await tx.user.deleteMany({ where: { id: { in: fillerUserIds } } });
+      await tx.userRoleAssignment.deleteMany({ where: { userId: { in: [...safetyAdminIds] } } });
+      await tx.authSession.deleteMany({ where: { userId: { in: [...safetyAdminIds] } } });
+      await tx.user.deleteMany({ where: { id: { in: [...safetyAdminIds] } } });
       await tx.shop.deleteMany({ where: { id: temporaryShopId } });
       await tx.userRoleAssignment.deleteMany({ where: { userId: temporarySellerId } });
       await tx.user.deleteMany({ where: { id: temporarySellerId } });

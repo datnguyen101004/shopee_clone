@@ -18,6 +18,7 @@ export const NOTIFICATION_CATEGORIES = [
   'PROMOTIONS',
   'ACCOUNT',
   'SYSTEM',
+  'CHAT',
 ] as const;
 export type NotificationCategory = (typeof NOTIFICATION_CATEGORIES)[number];
 
@@ -69,7 +70,7 @@ export const NOTIFICATION_CATEGORY_BY_TYPE: Record<NotificationType, Notificatio
   PRODUCT_APPROVED: 'SYSTEM',
   PRODUCT_REJECTED: 'SYSTEM',
   VOUCHER_ASSIGNED: 'PROMOTIONS',
-  CHAT_MESSAGE: 'ACCOUNT',
+  CHAT_MESSAGE: 'CHAT',
   SYSTEM_NOTICE: 'SYSTEM',
 };
 
@@ -79,6 +80,14 @@ export interface NotificationMetadata {
   referenceId: string | null;
   amountMinor: number | null;
   currency: string | null;
+  chat?: {
+    conversationId: string;
+    unreadCount: number;
+    newestSequence: number;
+    preview: string;
+    avatarUrl: string | null;
+    activityAt: string;
+  };
 }
 
 export interface NotificationItem {
@@ -92,6 +101,7 @@ export interface NotificationItem {
   readAt: string | null;
   isArchived: boolean;
   createdAt: string;
+  activityAt?: string;
 }
 
 export interface NotificationListQuery {
@@ -213,15 +223,35 @@ export function isMandatoryNotificationType(value: unknown): value is MandatoryN
 }
 
 export function isNotificationMetadata(value: unknown): value is NotificationMetadata {
-  if (!isRecord(value) || !hasExactKeys(value, [
-    'targetUrl',
-    'thumbnailUrl',
-    'referenceId',
-    'amountMinor',
-    'currency',
-  ])) {
+  if (
+    !isRecord(value) ||
+    !hasExactKeys(
+      value,
+      ['targetUrl', 'thumbnailUrl', 'referenceId', 'amountMinor', 'currency'],
+      ['chat'],
+    )
+  ) {
     return false;
   }
+  const chat = value.chat;
+  const chatValid =
+    chat === undefined ||
+    (isRecord(chat) &&
+      hasExactKeys(chat, [
+        'conversationId',
+        'unreadCount',
+        'newestSequence',
+        'preview',
+        'avatarUrl',
+        'activityAt',
+      ]) &&
+      canonicalUuid.test(String(chat.conversationId)) &&
+      isNonNegativeInteger(chat.unreadCount) &&
+      isNonNegativeInteger(chat.newestSequence) &&
+      typeof chat.preview === 'string' &&
+      chat.preview.length <= NOTIFICATION_BODY_MAX_LENGTH &&
+      (chat.avatarUrl === null || typeof chat.avatarUrl === 'string') &&
+      isCanonicalDateTime(chat.activityAt));
   return (
     isBoundedString(value.targetUrl, NOTIFICATION_TARGET_URL_MAX_LENGTH) &&
     (value.thumbnailUrl === null ||
@@ -230,7 +260,8 @@ export function isNotificationMetadata(value: unknown): value is NotificationMet
       (typeof value.referenceId === 'string' && value.referenceId.length <= 120)) &&
     (value.amountMinor === null || isNonNegativeInteger(value.amountMinor)) &&
     (value.currency === null ||
-      (typeof value.currency === 'string' && /^[A-Z]{3}$/.test(value.currency)))
+      (typeof value.currency === 'string' && /^[A-Z]{3}$/.test(value.currency))) &&
+    chatValid
   );
 }
 
@@ -248,7 +279,7 @@ export function isNotificationItem(value: unknown): value is NotificationItem {
       'readAt',
       'isArchived',
       'createdAt',
-    ])
+    ], ['activityAt'])
   ) {
     return false;
   }
@@ -264,6 +295,7 @@ export function isNotificationItem(value: unknown): value is NotificationItem {
     (value.readAt === null || isCanonicalDateTime(value.readAt)) &&
     typeof value.isArchived === 'boolean' &&
     isCanonicalDateTime(value.createdAt) &&
+    (value.activityAt === undefined || isCanonicalDateTime(value.activityAt)) &&
     (!value.isRead ? value.readAt === null : value.readAt !== null)
   );
 }

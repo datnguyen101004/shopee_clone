@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Header,
   HttpCode,
@@ -24,11 +25,14 @@ import {
 } from '@nestjs/swagger';
 import { AuthGuard, type AuthenticatedRequest } from '../auth/auth.guard';
 import { ChatService } from './chat.service';
+import { ChatError } from './chat.errors';
 // These classes are runtime values used by Nest's validation and filter metadata.
 // eslint-disable-next-line @typescript-eslint/consistent-type-imports
 import {
   ChatConversationQueryDto,
   ChatMessageQueryDto,
+  ChatAttentionDto,
+  ChatReportDto,
   MarkChatReadDto,
   SendChatMessageDto,
 } from './chat.dto';
@@ -63,6 +67,8 @@ const chatSummarySchema = {
     lastReadSequence: { type: 'integer', minimum: 0 },
     lastMessageSequence: { type: 'integer', minimum: 0 },
     canMessage: { type: 'boolean' },
+    notificationsMuted: { type: 'boolean' },
+    blockedByMe: { type: 'boolean' },
   },
 };
 
@@ -89,6 +95,17 @@ const chatMessageSchema = {
     createdAt: { type: 'string', format: 'date-time' },
     deliveryState: { type: 'string', enum: ['SENT', 'PENDING', 'FAILED'] },
     isRead: { type: 'boolean' },
+    replyTo: {
+      nullable: true,
+      type: 'object',
+      properties: {
+        messageId: { type: 'string', format: 'uuid' },
+        sequence: { type: 'integer', minimum: 1 },
+        senderUserId: { type: 'string', format: 'uuid' },
+        senderLabel: { type: 'string' },
+        preview: { type: 'string', maxLength: 160 },
+      },
+    },
   },
 };
 
@@ -245,6 +262,74 @@ export class ChatController {
   @Header('Cache-Control', 'private, no-store')
   send(@Req() req: AuthenticatedRequest, @Body() body: SendChatMessageDto) {
     return this.chat.send(req.authUser!.id, body, req.ip ?? 'unknown');
+  }
+
+  @Put('conversations/:conversationId/mute')
+  @ApiOperation({ summary: 'Mute notifications for one conversation' })
+  @ApiParam({ name: 'conversationId', format: 'uuid' })
+  @Header('Cache-Control', 'private, no-store')
+  mute(@Req() req: AuthenticatedRequest, @Param('conversationId') conversationId: string) {
+    return this.chat.setMute(req.authUser!.id, conversationId, true);
+  }
+
+  @Delete('conversations/:conversationId/mute')
+  @ApiOperation({ summary: 'Unmute notifications for one conversation' })
+  @ApiParam({ name: 'conversationId', format: 'uuid' })
+  @Header('Cache-Control', 'private, no-store')
+  unmute(@Req() req: AuthenticatedRequest, @Param('conversationId') conversationId: string) {
+    return this.chat.setMute(req.authUser!.id, conversationId, false);
+  }
+
+  @Put('users/:userId/block')
+  @ApiOperation({ summary: 'Block a chat participant' })
+  @ApiParam({ name: 'userId', format: 'uuid' })
+  @Header('Cache-Control', 'private, no-store')
+  block(@Req() req: AuthenticatedRequest, @Param('userId') userId: string) {
+    return this.chat.setBlock(req.authUser!.id, userId, true);
+  }
+
+  @Delete('users/:userId/block')
+  @ApiOperation({ summary: 'Unblock a chat participant' })
+  @ApiParam({ name: 'userId', format: 'uuid' })
+  @Header('Cache-Control', 'private, no-store')
+  unblock(@Req() req: AuthenticatedRequest, @Param('userId') userId: string) {
+    return this.chat.setBlock(req.authUser!.id, userId, false);
+  }
+
+  @Put('conversations/:conversationId/attention')
+  @ApiOperation({ summary: 'Refresh or clear active chat attention' })
+  @ApiParam({ name: 'conversationId', format: 'uuid' })
+  @ApiBody({ type: ChatAttentionDto })
+  @Header('Cache-Control', 'private, no-store')
+  attention(
+    @Req() req: AuthenticatedRequest,
+    @Param('conversationId') conversationId: string,
+    @Body() body: ChatAttentionDto,
+  ) {
+    return this.chat.attention(req.authUser!.id, req.authSessionId!, conversationId, body);
+  }
+
+  @Post('reports')
+  @ApiOperation({ summary: 'Report a chat conversation or message' })
+  @ApiBody({ type: ChatReportDto })
+  @ApiResponse({ status: 409, description: 'Report idempotency conflict.' })
+  @Header('Cache-Control', 'private, no-store')
+  report(
+    @Req() req: AuthenticatedRequest,
+    @Body() body: ChatReportDto,
+  ) {
+    const idempotencyKey = req.headers['idempotency-key'];
+    if (typeof idempotencyKey !== 'string')
+      throw new ChatError('chat-report-invalid', 400, 'Idempotency-Key header is required.', ['Idempotency-Key']);
+    return this.chat.report(req.authUser!.id, body, idempotencyKey);
+  }
+
+  @Get('reports')
+  @ApiOperation({ summary: 'List the caller chat report receipts' })
+  @ApiQuery({ name: 'conversationId', required: false, format: 'uuid' })
+  @Header('Cache-Control', 'private, no-store')
+  reports(@Req() req: AuthenticatedRequest, @Query('conversationId') conversationId?: string) {
+    return this.chat.listReports(req.authUser!.id, conversationId);
   }
 
   @Put('conversations/:conversationId/read')

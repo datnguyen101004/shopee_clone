@@ -32,6 +32,8 @@ export class ChatExceptionFilter implements ExceptionFilter {
       return;
     }
     if (exception instanceof ChatError) {
+      if (exception.retryAfterSeconds)
+        response.setHeader('Retry-After', String(exception.retryAfterSeconds));
       response
         .status(exception.status)
         .type('application/problem+json')
@@ -42,6 +44,9 @@ export class ChatExceptionFilter implements ExceptionFilter {
           detail: exception.message,
           ...(exception.fields.length
             ? { errors: exception.fields.map((field) => ({ field, message: 'Invalid value.' })) }
+            : {}),
+          ...(exception.retryAfterSeconds
+            ? { retryAfterSeconds: exception.retryAfterSeconds }
             : {}),
         });
       return;

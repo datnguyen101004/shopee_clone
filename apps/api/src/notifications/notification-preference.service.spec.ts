@@ -21,7 +21,10 @@ describe('NotificationPreferenceService', () => {
     prisma.notificationPreference.findMany.mockResolvedValue([]);
     const result = await service.list('user-1');
     expect(result.notificationVersion).toBe('notifications-v1');
-    expect(result.preferences).toHaveLength(8);
+    expect(result.preferences).toHaveLength(10);
+    expect(
+      result.preferences.find((item) => item.category === 'CHAT' && item.channel === 'IN_APP'),
+    ).toMatchObject({ enabled: true, mandatory: false });
     expect(
       result.preferences.find((item) => item.category === 'ORDERS' && item.channel === 'EMAIL'),
     ).toMatchObject({ enabled: true, mandatory: true });

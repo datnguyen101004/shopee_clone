@@ -64,6 +64,7 @@ function safeHttpsHref(raw: string): string | null {
 
 function targetHref(detail: ModerationCaseDetail): string | null {
   if (detail.targetType === 'PRODUCT') return `/products/${detail.targetId}`;
+  if (detail.targetType === 'CHAT_CONVERSATION' || detail.targetType === 'CHAT_MESSAGE') return null;
   return detail.targetDetails.slug ? `/shops/${encodeURIComponent(detail.targetDetails.slug)}` : null;
 }
 
@@ -74,6 +75,10 @@ function summaryTargetHref(item: ModerationCaseSummary): string | null {
 function decisionLabel(outcome: ModerationDecisionOutcome): string {
   if (outcome === 'SUSPEND_TARGET') return 'đình chỉ đối tượng';
   if (outcome === 'RESTORE_TARGET') return 'khôi phục đối tượng';
+  if (outcome === 'WARN_USER') return 'cảnh cáo người dùng';
+  if (outcome === 'RESTRICT_CHAT_TEMPORARY') return 'hạn chế chat tạm thời';
+  if (outcome === 'RESTRICT_CHAT_INDEFINITE') return 'hạn chế chat vô thời hạn';
+  if (outcome === 'RESTORE_CHAT') return 'mở lại chat';
   return 'kết thúc hồ sơ mà không áp dụng chế tài';
 }
 
@@ -84,7 +89,7 @@ export default function AdminModerationPage() {
   const [activeTab, setActiveTab] = useState<'cases' | 'reviews'>('cases');
   const [cases, setCases] = useState<ModerationCaseSummary[]>([]);
   const [statusFilter, setStatusFilter] = useState<'OPEN' | 'IN_REVIEW' | 'RESOLVED' | ''>('OPEN');
-  const [typeFilter, setTypeFilter] = useState<'PRODUCT' | 'SHOP' | ''>('');
+  const [typeFilter, setTypeFilter] = useState<'PRODUCT' | 'SHOP' | 'CHAT_CONVERSATION' | 'CHAT_MESSAGE' | ''>('');
   const [targetIdSearch, setTargetIdSearch] = useState('');
   const [targetIdFilter, setTargetIdFilter] = useState('');
   const [nextCursor, setNextCursor] = useState<string | null>(null);
@@ -96,6 +101,7 @@ export default function AdminModerationPage() {
   const [decisionOutcome, setDecisionOutcome] = useState<ModerationDecisionOutcome>('SUSPEND_TARGET');
   const [decisionReason, setDecisionReason] = useState('');
   const [decisionPrivateNote, setDecisionPrivateNote] = useState('');
+  const [restrictionUntil, setRestrictionUntil] = useState('');
   const [actionError, setActionError] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [isMutating, setIsMutating] = useState(false);
@@ -145,9 +151,16 @@ export default function AdminModerationPage() {
         const detail = await getModerationCaseDetail(authenticatedFetch, caseId);
         setCaseDetail(detail);
         if (!preserveDrafts) {
-          setDecisionOutcome(detail.targetStatus === 'SUSPENDED' ? 'RESTORE_TARGET' : 'SUSPEND_TARGET');
+          setDecisionOutcome(
+            detail.targetType === 'CHAT_CONVERSATION' || detail.targetType === 'CHAT_MESSAGE'
+              ? 'NO_ACTION'
+              : detail.targetStatus === 'SUSPENDED'
+                ? 'RESTORE_TARGET'
+                : 'SUSPEND_TARGET',
+          );
           setDecisionReason('');
           setDecisionPrivateNote('');
+          setRestrictionUntil('');
         }
       } catch (error) {
         setActionError(messageFrom(error, 'Không thể tải chi tiết hồ sơ kiểm duyệt.'));
@@ -208,6 +221,17 @@ export default function AdminModerationPage() {
       setActionError('Lý do công khai phải dài từ 8 đến 240 ký tự.');
       return;
     }
+    if (decisionOutcome === 'RESTRICT_CHAT_TEMPORARY' && !restrictionUntil) {
+      setActionError('Vui lòng chọn thời điểm mở lại chat.');
+      return;
+    }
+    if (
+      ['WARN_USER', 'RESTRICT_CHAT_TEMPORARY', 'RESTRICT_CHAT_INDEFINITE', 'RESTORE_CHAT'].includes(decisionOutcome) &&
+      decisionPrivateNote.trim().length < 8
+    ) {
+      setActionError('Các quyết định chat cần ghi chú nội bộ ít nhất 8 ký tự.');
+      return;
+    }
     confirmationTriggerRef.current = decisionButtonRef.current;
     setConfirmation({
       kind: 'decision',
@@ -233,6 +257,9 @@ export default function AdminModerationPage() {
           ...(decisionOutcome === 'RESTORE_TARGET' && priorSuspension
             ? { reversesDecisionId: priorSuspension.id }
             : {}),
+          ...(decisionOutcome === 'RESTRICT_CHAT_TEMPORARY'
+            ? { restrictionUntil: new Date(restrictionUntil).toISOString() }
+            : {}),
           expectedVersion: caseDetail.version,
         },
         crypto.randomUUID(),
@@ -240,6 +267,7 @@ export default function AdminModerationPage() {
       setConfirmation(null);
       setDecisionReason('');
       setDecisionPrivateNote('');
+      setRestrictionUntil('');
       setStatusMessage('Quyết định kiểm duyệt đã được ghi nhận.');
       await loadCaseDetail(caseDetail.id);
       await fetchCases();
@@ -455,6 +483,8 @@ export default function AdminModerationPage() {
                   <option value="">Tất cả đối tượng</option>
                   <option value="PRODUCT">Sản phẩm</option>
                   <option value="SHOP">Cửa hàng</option>
+                  <option value="CHAT_CONVERSATION">Cuộc trò chuyện</option>
+                  <option value="CHAT_MESSAGE">Tin nhắn</option>
                 </select>
               </label>
             </div>
@@ -483,8 +513,8 @@ export default function AdminModerationPage() {
                       onClick={() => void loadCaseDetail(item.id)}
                     >
                       <span className="admin-case-card__header">
-                        <span className={`admin-badge ${item.targetType === 'PRODUCT' ? 'admin-badge--product' : 'admin-badge--shop'}`}>
-                          {item.targetType === 'PRODUCT' ? 'Sản phẩm' : 'Cửa hàng'}
+                        <span className={`admin-badge ${item.targetType === 'PRODUCT' ? 'admin-badge--product' : item.targetType === 'SHOP' ? 'admin-badge--shop' : 'admin-badge--chat'}`}>
+                          {item.targetType === 'PRODUCT' ? 'Sản phẩm' : item.targetType === 'SHOP' ? 'Cửa hàng' : item.targetType === 'CHAT_MESSAGE' ? 'Tin nhắn' : 'Cuộc trò chuyện'}
                         </span>
                         <span className={`admin-badge ${item.status === 'RESOLVED' ? 'admin-badge--resolved' : item.status === 'IN_REVIEW' ? 'admin-badge--inreview' : 'admin-badge--open'}`}>
                           {STATUS_LABELS[item.status]}
@@ -565,6 +595,22 @@ export default function AdminModerationPage() {
                   </div>
                 </section>
 
+                {caseDetail.targetDetails.chat ? (
+                  <section aria-labelledby="chat-evidence-title" className="admin-chat-evidence">
+                    <h3 id="chat-evidence-title" className="admin-section-title">Ngữ cảnh chat giới hạn</h3>
+                    <p>Chỉ hiển thị tối đa 20 tin nhắn gần nhất để phục vụ quyết định.</p>
+                    <ol>
+                      {caseDetail.targetDetails.chat.messages.map((message) => (
+                        <li key={`${message.senderUserId}-${message.sequence}`}>
+                          <strong>{message.senderLabel}</strong>
+                          <span>{message.content}</span>
+                          <time dateTime={message.createdAt}>{new Date(message.createdAt).toLocaleString('vi-VN')}</time>
+                        </li>
+                      ))}
+                    </ol>
+                  </section>
+                ) : null}
+
                 <section aria-labelledby="events-title">
                   <h3 id="events-title" className="admin-section-title">Nhật ký hoạt động</h3>
                   {caseDetail.events.length === 0 ? <p>Chưa có hoạt động nào.</p> : (
@@ -577,7 +623,15 @@ export default function AdminModerationPage() {
                 <section aria-labelledby="decision-title" className="admin-decision-box">
                   <h3 id="decision-title">Ra quyết định kiểm duyệt</h3>
                   <div className="admin-outcome-options" role="radiogroup" aria-label="Hành động xử lý">
-                    {caseDetail.targetStatus === 'SUSPENDED' ? (
+                    {caseDetail.targetType === 'CHAT_CONVERSATION' || caseDetail.targetType === 'CHAT_MESSAGE' ? (
+                      <>
+                        <label className="admin-outcome-pill"><input type="radio" name="outcome" checked={decisionOutcome === 'NO_ACTION'} onChange={() => setDecisionOutcome('NO_ACTION')} />Không xử lý</label>
+                        <label className="admin-outcome-pill"><input type="radio" name="outcome" checked={decisionOutcome === 'WARN_USER'} onChange={() => setDecisionOutcome('WARN_USER')} />Cảnh cáo</label>
+                        <label className="admin-outcome-pill"><input type="radio" name="outcome" checked={decisionOutcome === 'RESTRICT_CHAT_TEMPORARY'} onChange={() => setDecisionOutcome('RESTRICT_CHAT_TEMPORARY')} />Hạn chế tạm thời</label>
+                        <label className="admin-outcome-pill"><input type="radio" name="outcome" checked={decisionOutcome === 'RESTRICT_CHAT_INDEFINITE'} onChange={() => setDecisionOutcome('RESTRICT_CHAT_INDEFINITE')} />Hạn chế vô thời hạn</label>
+                        <label className="admin-outcome-pill"><input type="radio" name="outcome" checked={decisionOutcome === 'RESTORE_CHAT'} onChange={() => setDecisionOutcome('RESTORE_CHAT')} />Mở lại chat</label>
+                      </>
+                    ) : caseDetail.targetStatus === 'SUSPENDED' ? (
                       <label className="admin-outcome-pill"><input type="radio" name="outcome" checked={decisionOutcome === 'RESTORE_TARGET'} onChange={() => setDecisionOutcome('RESTORE_TARGET')} />Khôi phục</label>
                     ) : (
                       <>
@@ -587,10 +641,16 @@ export default function AdminModerationPage() {
                     )}
                   </div>
                   <div className="admin-form-stack">
-                    <label htmlFor="decision-reason">Lý do công khai cho người bán (8–240 ký tự)</label>
+                    <label htmlFor="decision-reason">Lý do công khai (8–240 ký tự)</label>
                     <textarea id="decision-reason" className="admin-form-input" value={decisionReason} onChange={(event) => setDecisionReason(event.target.value)} minLength={8} maxLength={240} rows={3} />
-                    <label htmlFor="decision-private-note">Ghi chú nội bộ (tùy chọn)</label>
+                    <label htmlFor="decision-private-note">Ghi chú nội bộ {caseDetail.targetType === 'CHAT_CONVERSATION' || caseDetail.targetType === 'CHAT_MESSAGE' ? '(bắt buộc với quyết định chat)' : '(tùy chọn)'}</label>
                     <textarea id="decision-private-note" className="admin-form-input" value={decisionPrivateNote} onChange={(event) => setDecisionPrivateNote(event.target.value)} maxLength={2000} rows={3} />
+                    {caseDetail.targetType === 'CHAT_CONVERSATION' || caseDetail.targetType === 'CHAT_MESSAGE' ? (
+                      <>
+                        <label htmlFor="restriction-until">Mở lại lúc (chỉ áp dụng hạn chế tạm thời)</label>
+                        <input id="restriction-until" className="admin-form-input" type="datetime-local" value={restrictionUntil} onChange={(event) => setRestrictionUntil(event.target.value)} disabled={decisionOutcome !== 'RESTRICT_CHAT_TEMPORARY'} />
+                      </>
+                    ) : null}
                     <button ref={decisionButtonRef} type="button" className="admin-btn-action admin-btn-action--danger" onClick={openDecisionConfirmation} disabled={isMutating}>
                       Xác nhận áp dụng quyết định
                     </button>

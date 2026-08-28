@@ -4,6 +4,9 @@ const webPort = Number(process.env.E2E_WEB_PORT ?? 3000);
 const apiPort = Number(process.env.PORT ?? 3001);
 const fullStack = process.env.FULL_STACK_E2E === '1';
 const chatReal = process.env.CHAT_REAL_E2E === '1';
+const browserHost =
+  process.env.E2E_WEB_HOST ??
+  (process.env.NEXT_PUBLIC_API_BASE_URL?.includes('127.0.0.1') ? '127.0.0.1' : 'localhost');
 
 export default defineConfig({
   testDir: './e2e',
@@ -16,9 +19,12 @@ export default defineConfig({
   forbidOnly: Boolean(process.env.CI),
   retries: process.env.CI ? 2 : 0,
   reporter: process.env.CI ? [['github'], ['html', { open: 'never' }]] : 'list',
+  expect: { timeout: fullStack || chatReal ? 15_000 : 5_000 },
   snapshotPathTemplate: '{testDir}/snapshots/{arg}-{projectName}{ext}',
   use: {
-    baseURL: `http://127.0.0.1:${webPort}`,
+    // Keep the storefront origin aligned with the API cookie host used by
+    // real chat fixtures; localhost and 127.0.0.1 are different cookie sites.
+    baseURL: `http://${browserHost}:${webPort}`,
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
   },

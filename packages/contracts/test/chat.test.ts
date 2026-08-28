@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
   CHAT_MESSAGE_MAX_LENGTH,
+  parseChatConversationActionResponse,
   parseChatConversationListResponse,
+  parseChatAttentionResponse,
   parseChatMessagePage,
   parseChatOutboxHealthResponse,
+  parseChatReportReceipt,
   parseSendChatMessageRequest,
   parseChatRealtimeEvent,
 } from '../src/chat';
@@ -149,5 +152,55 @@ describe('chat contracts', () => {
         content: 'secret',
       }),
     ).toBeNull();
+  });
+
+  it('covers safety, reply, attention, and report contracts with exact-key rejection', () => {
+    expect(
+      parseSendChatMessageRequest({
+        recipientUserId: user,
+        clientMessageId: message,
+        content: 'reply',
+        replyToMessageId: conversation.id,
+      }),
+    ).not.toBeNull();
+    expect(
+      parseSendChatMessageRequest({
+        recipientUserId: user,
+        clientMessageId: message,
+        content: 'reply',
+        replyToMessageId: conversation.id,
+        privateNote: 'must not cross the chat boundary',
+      }),
+    ).toBeNull();
+
+    const action = {
+      chatVersion: 'chat-v1',
+      conversationId: conversation.id,
+      notificationsMuted: true,
+      blockedByMe: false,
+      canMessage: true,
+    };
+    expect(parseChatConversationActionResponse(action)).toEqual(action);
+    expect(parseChatConversationActionResponse({ ...action, reporterUserId: user })).toBeNull();
+
+    const attention = {
+      chatVersion: 'chat-v1',
+      conversationId: conversation.id,
+      clientInstanceId: 'browser-a',
+      expiresAt: '2026-01-01T00:00:15.000Z',
+    };
+    expect(parseChatAttentionResponse(attention)).toEqual(attention);
+    expect(parseChatAttentionResponse({ ...attention, sourceAddress: '192.0.2.1' })).toBeNull();
+
+    const receipt = {
+      id: message,
+      conversationId: conversation.id,
+      messageId: null,
+      reasonCode: 'SPAM',
+      status: 'SUBMITTED',
+      createdAt: '2026-01-01T00:00:00.000Z',
+    };
+    expect(parseChatReportReceipt(receipt)).toEqual(receipt);
+    expect(parseChatReportReceipt({ ...receipt, details: 'private text' })).toBeNull();
   });
 });

@@ -65,6 +65,13 @@ const SUMMARY_VALUE_LABELS: Record<string, string> = {
   NO_ACTION: 'Không áp dụng biện pháp',
   SUSPEND_TARGET: 'Tạm ngưng đối tượng',
   RESTORE_TARGET: 'Khôi phục đối tượng',
+  WARN_USER: 'Cảnh cáo người dùng',
+  RESTRICT_CHAT_TEMPORARY: 'Hạn chế chat tạm thời',
+  RESTRICT_CHAT_INDEFINITE: 'Hạn chế chat vô thời hạn',
+  RESTORE_CHAT: 'Mở lại chat',
+  RESTRICTED: 'Đang hạn chế chat',
+  ELIGIBLE: 'Được phép chat',
+  WARNED: 'Đã cảnh cáo',
 };
 
 export interface AuditSummaryChange {

@@ -12,19 +12,21 @@ import {
 } from '../../lib/notifications-api';
 import { marketplaceMediaUrl } from '../../lib/marketplace-media-url';
 import { useAuthSession } from '../auth-session-provider';
+import { useChat } from '../chat/chat-provider';
 import {
   AccountLoadFailure,
   AccountWorkspace,
   ProtectedAccountState,
 } from '../protected-account-state';
 
-type InboxTab = 'ALL' | 'ORDERS' | 'PROMOTIONS' | 'SYSTEM';
+type InboxTab = 'ALL' | 'ORDERS' | 'PROMOTIONS' | 'SYSTEM' | 'CHAT';
 
 const tabs: { id: InboxTab; label: string }[] = [
   { id: 'ALL', label: 'Tất cả' },
   { id: 'ORDERS', label: 'Đơn hàng' },
   { id: 'PROMOTIONS', label: 'Khuyến mãi' },
   { id: 'SYSTEM', label: 'Hệ thống' },
+  { id: 'CHAT', label: 'Tin nhắn' },
 ];
 
 const pageSize = 20;
@@ -54,12 +56,14 @@ function categoryLabel(category: NotificationCategory): string {
       return 'Tài khoản';
     case 'SYSTEM':
       return 'Hệ thống';
+    case 'CHAT':
+      return 'Tin nhắn';
   }
 }
 
 function sortByNewest(items: NotificationItem[]): NotificationItem[] {
   return [...items].sort((left, right) => {
-    const byTime = right.createdAt.localeCompare(left.createdAt);
+    const byTime = (right.activityAt ?? right.createdAt).localeCompare(left.activityAt ?? left.createdAt);
     return byTime !== 0 ? byTime : right.id.localeCompare(left.id);
   });
 }
@@ -77,6 +81,7 @@ function mergeUnique(existing: NotificationItem[], incoming: NotificationItem[])
 
 export function NotificationInbox() {
   const auth = useAuthSession();
+  const chat = useChat();
   const authenticatedUserId = auth.state.status === 'authenticated' ? auth.state.user.id : null;
   const [tab, setTab] = useState<InboxTab>('ALL');
   const [items, setItems] = useState<NotificationItem[]>([]);
@@ -205,6 +210,13 @@ export function NotificationInbox() {
     if (pendingId || auth.state.status !== 'authenticated') return;
     setPendingId(item.id);
     try {
+      if (item.category === 'CHAT' && item.metadata.chat) {
+        const opened = await chat.openConversationFromNotification(
+          item.metadata.chat.conversationId,
+          item.metadata.chat.newestSequence,
+        );
+        if (!opened) throw new Error('conversation unavailable');
+      }
       if (!item.isRead) {
         await markNotificationRead(item.id, auth.authenticatedFetch);
         setItems((current) =>
@@ -216,7 +228,7 @@ export function NotificationInbox() {
         );
         setUnreadCount((current) => Math.max(0, current - 1));
       }
-      window.location.assign(item.metadata.targetUrl);
+      if (!(item.category === 'CHAT' && item.metadata.chat)) window.location.assign(item.metadata.targetUrl);
     } catch {
       setFailed(true);
     } finally {
@@ -302,7 +314,7 @@ export function NotificationInbox() {
                           />
                         ) : (
                           <span className="notification-inbox__thumb" aria-hidden="true">
-                            🔔
+                            {item.category === 'CHAT' ? '💬' : '🔔'}
                           </span>
                         )}
                         <span className="notification-inbox__body">

@@ -1,8 +1,13 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
-import { listNotifications, markAllNotificationsRead } from '../../lib/notifications-api';
+import {
+  listNotifications,
+  markAllNotificationsRead,
+  markNotificationRead,
+} from '../../lib/notifications-api';
 import { useAuthSession } from '../auth-session-provider';
+import { useChat } from '../chat/chat-provider';
 import { NotificationInbox } from './notification-inbox';
 
 vi.mock('../../lib/notifications-api', () => ({
@@ -11,6 +16,7 @@ vi.mock('../../lib/notifications-api', () => ({
   markNotificationRead: vi.fn(),
 }));
 vi.mock('../auth-session-provider', () => ({ useAuthSession: vi.fn() }));
+vi.mock('../chat/chat-provider', () => ({ useChat: vi.fn() }));
 
 const orderId = '00000000-0000-4000-8000-000000000401';
 const promoId = '00000000-0000-4000-8000-000000000402';
@@ -31,13 +37,19 @@ const authenticated = {
   authenticatedFetch,
 };
 
-function item(id: string, category: 'ORDERS' | 'PROMOTIONS' | 'SYSTEM' | 'ACCOUNT', title: string) {
+function item(
+  id: string,
+  category: 'ORDERS' | 'PROMOTIONS' | 'SYSTEM' | 'ACCOUNT' | 'CHAT',
+  title: string,
+) {
   const type =
     category === 'PROMOTIONS'
       ? ('VOUCHER_ASSIGNED' as const)
       : category === 'ORDERS'
         ? ('ORDER_CONFIRMED' as const)
-        : ('SYSTEM_NOTICE' as const);
+        : category === 'CHAT'
+          ? ('CHAT_MESSAGE' as const)
+          : ('SYSTEM_NOTICE' as const);
   return {
     id,
     category,
@@ -50,6 +62,18 @@ function item(id: string, category: 'ORDERS' | 'PROMOTIONS' | 'SYSTEM' | 'ACCOUN
       referenceId: null,
       amountMinor: null,
       currency: null,
+      ...(category === 'CHAT'
+        ? {
+            chat: {
+              conversationId: '00000000-0000-4000-8000-000000000404',
+              unreadCount: 1,
+              newestSequence: 5,
+              preview: title,
+              avatarUrl: null,
+              activityAt: timestamp,
+            },
+          }
+        : {}),
     },
     isRead: false,
     readAt: null,
@@ -93,6 +117,14 @@ describe('NotificationInbox', () => {
       updatedCount: 2,
       readAt: timestamp,
     });
+    vi.mocked(markNotificationRead).mockResolvedValue({
+      id: orderId,
+      isRead: true,
+      readAt: timestamp,
+    });
+    vi.mocked(useChat).mockReturnValue({
+      openConversationFromNotification: vi.fn().mockResolvedValue(true),
+    } as never);
   });
 
   it('loads the all tab and switches category filters', async () => {
@@ -134,5 +166,32 @@ describe('NotificationInbox', () => {
     await screen.findByText('Đơn hàng đã xác nhận');
     await user.click(screen.getByRole('button', { name: 'Đánh dấu tất cả đã đọc' }));
     await waitFor(() => expect(markAllNotificationsRead).toHaveBeenCalledWith(authenticatedFetch));
+  });
+
+  it('routes a chat notification to the exact conversation before marking it read', async () => {
+    const user = userEvent.setup();
+    const chatNotification = item(
+      '00000000-0000-4000-8000-000000000405',
+      'CHAT',
+      'Tin nhắn mới',
+    );
+    const openConversationFromNotification = vi.fn().mockResolvedValue(true);
+    vi.mocked(useChat).mockReturnValue({ openConversationFromNotification } as never);
+    vi.mocked(listNotifications).mockResolvedValue({
+      notificationVersion: 'notifications-v1',
+      items: [chatNotification],
+      nextCursor: null,
+      unreadCount: 1,
+    });
+
+    render(<NotificationInbox />);
+    await user.click(await screen.findByRole('tab', { name: 'Tin nhắn' }));
+    await user.click(await screen.findByRole('button', { name: /Tin nhắn mới/ }));
+
+    expect(openConversationFromNotification).toHaveBeenCalledWith(
+      chatNotification.metadata.chat?.conversationId,
+      chatNotification.metadata.chat?.newestSequence,
+    );
+    expect(markNotificationRead).toHaveBeenCalledWith(chatNotification.id, authenticatedFetch);
   });
 });

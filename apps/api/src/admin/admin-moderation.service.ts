@@ -118,6 +118,18 @@ export class AdminModerationService {
     if (input.reversesDecisionId && !isCanonicalUuid(input.reversesDecisionId)) {
       throw new AdminInvalidInputError('Invalid reversesDecisionId identifier', { invalidParameters: ['reversesDecisionId'] });
     }
+    if (input.restrictionUntil) {
+      const expiry = new Date(input.restrictionUntil);
+      if (Number.isNaN(expiry.getTime()) || expiry <= new Date()) {
+        throw new AdminInvalidInputError('Temporary chat restriction expiry must be in the future', { invalidParameters: ['restrictionUntil'] });
+      }
+    }
+    if (
+      ['WARN_USER', 'RESTRICT_CHAT_TEMPORARY', 'RESTRICT_CHAT_INDEFINITE', 'RESTORE_CHAT'].includes(input.outcome) &&
+      (!input.privateNote || input.privateNote.trim().length < 8)
+    ) {
+      throw new AdminInvalidInputError('A private moderation note is required for chat actions', { invalidParameters: ['privateNote'] });
+    }
 
     const digest = createHash('sha256')
       .update(
@@ -128,6 +140,7 @@ export class AdminModerationService {
           publicReason: trimmedReason,
           privateNote: input.privateNote?.trim(),
           reversesDecisionId: input.reversesDecisionId,
+          restrictionUntil: input.restrictionUntil,
           expectedVersion: input.expectedVersion,
         }),
       )
@@ -141,6 +154,7 @@ export class AdminModerationService {
         publicReason: trimmedReason,
         privateNote: input.privateNote?.trim() ?? undefined,
         reversesDecisionId: input.reversesDecisionId ?? undefined,
+        restrictionUntil: input.restrictionUntil ?? undefined,
         expectedVersion: input.expectedVersion,
       },
       idempotencyKey,

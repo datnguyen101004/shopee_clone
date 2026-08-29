@@ -91,7 +91,7 @@ export class SellerProductMediaController {
   async attached(@Param('mediaId') mediaId: string, @Res() response: Response): Promise<void> {
     const media = await this.products.attachedMedia(mediaId);
     if (!media) { response.status(404).end(); return; }
-    const target = await this.storage.readTarget(media.storageKey, { allowPublic: true });
+    const target = await this.storage.readTarget(media.storageKey);
     if (!target) { response.status(404).end(); return; }
     this.setPrivateMediaHeaders(response);
     if (target.kind === 'cloudfront') {

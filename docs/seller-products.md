@@ -55,17 +55,16 @@ Each value in the first classification group can optionally reuse one selected g
 example, the image assigned to `Đỏ` is resolved by both `Đỏ · M` and `Đỏ · L`; the second group does
 not create extra image uploads.
 
-## Private S3 delivery configuration
+## Private S3 with public CloudFront delivery
 
 Keep S3 Block Public Access enabled and grant the CloudFront distribution an Origin Access Control
 with a prefix-scoped bucket policy. The browser uploads directly to
 `seller-product-media/{uuid}.{ext}` using the five-minute S3 presigned `PUT`; the API stores that
-object key and metadata, never the presigned URL. Set `AWS_S3_PUBLIC_BASE_URL=https://cdn.videod.me`
-so attached product responses expose the CDN object URL. This makes the CDN viewer path public while
-the S3 bucket remains private; CloudFront, not S3, is the only public origin. Staged seller previews
-remain authenticated and may use CloudFront viewer signing when
-`AWS_CLOUDFRONT_KEY_PAIR_ID` and `AWS_CLOUDFRONT_PRIVATE_KEY_PATH` are configured. Never persist or
-log presigned or signed URL query parameters.
+object key and metadata, never the presigned URL. Set
+`AWS_CLOUDFRONT_BASE_URL=https://cdn.videod.me` so product responses and staged previews redirect to
+the public CDN object URL. The S3 bucket remains private; CloudFront, not S3, is the only public
+origin. CloudFront viewer-signing credentials are not required. Never persist or log presigned S3
+upload URL query parameters.
 
 ## Local verification
 

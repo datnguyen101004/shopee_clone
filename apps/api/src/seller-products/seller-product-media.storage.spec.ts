@@ -1,17 +1,15 @@
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { S3Client } from '@aws-sdk/client-s3';
-import { getSignedUrl } from '@aws-sdk/cloudfront-signer';
 import { getSignedUrl as getS3SignedUrl } from '@aws-sdk/s3-request-presigner';
 
 import { SellerProductMediaStorage } from './seller-product-media.storage';
 
-jest.mock('@aws-sdk/cloudfront-signer', () => ({ getSignedUrl: jest.fn() }));
 jest.mock('@aws-sdk/s3-request-presigner', () => ({ getSignedUrl: jest.fn() }));
 
 describe('SellerProductMediaStorage', () => {
-  const environmentKeys = ['SELLER_PRODUCT_MEDIA_ROOT', 'AWS_S3_BUCKET', 'AWS_S3_REGION', 'AWS_S3_PREFIX', 'AWS_S3_PUBLIC_BASE_URL', 'AWS_S3_UPLOAD_URL_TTL_SECONDS', 'AWS_CLOUDFRONT_BASE_URL', 'AWS_CLOUDFRONT_KEY_PAIR_ID', 'AWS_CLOUDFRONT_PRIVATE_KEY_PATH', 'AWS_CLOUDFRONT_SIGNED_URL_TTL_SECONDS'] as const;
+  const environmentKeys = ['SELLER_PRODUCT_MEDIA_ROOT', 'AWS_S3_BUCKET', 'AWS_S3_REGION', 'AWS_S3_PREFIX', 'AWS_S3_PUBLIC_BASE_URL', 'AWS_S3_UPLOAD_URL_TTL_SECONDS', 'AWS_CLOUDFRONT_BASE_URL'] as const;
   const previous = Object.fromEntries(environmentKeys.map((key) => [key, process.env[key]]));
   let root = '';
   beforeEach(async () => {
@@ -19,7 +17,6 @@ describe('SellerProductMediaStorage', () => {
     process.env.SELLER_PRODUCT_MEDIA_ROOT = root;
     for (const key of environmentKeys.slice(1)) delete process.env[key];
     jest.restoreAllMocks();
-    (getSignedUrl as jest.Mock).mockReset();
     (getS3SignedUrl as jest.Mock).mockReset();
   });
   afterEach(async () => {
@@ -41,22 +38,17 @@ describe('SellerProductMediaStorage', () => {
     await expect(storage.read(key)).resolves.toBeNull();
   });
 
-  it('writes private S3 objects and returns a bounded signed CDN target', async () => {
+  it('writes S3 objects with immutable caching and returns a public CDN target', async () => {
     process.env.AWS_S3_BUCKET = 'private-media-bucket';
     process.env.AWS_S3_REGION = 'ap-southeast-1';
     process.env.AWS_S3_PREFIX = 'seller-product-media';
     process.env.AWS_CLOUDFRONT_BASE_URL = 'https://cdn.videod.me';
-    process.env.AWS_CLOUDFRONT_KEY_PAIR_ID = 'KTEST123';
-    process.env.AWS_CLOUDFRONT_PRIVATE_KEY_PATH = join(root, 'cloudfront.pem');
-    process.env.AWS_CLOUDFRONT_SIGNED_URL_TTL_SECONDS = '300';
-    await writeFile(process.env.AWS_CLOUDFRONT_PRIVATE_KEY_PATH, 'private-key');
     const send = jest.spyOn(S3Client.prototype, 'send').mockResolvedValue({} as never);
-    (getSignedUrl as jest.Mock).mockImplementation((input: { url: string; dateLessThan: Date; keyPairId: string }) => `${input.url}?Expires=${Math.floor(input.dateLessThan.getTime() / 1000)}&Signature=signature&Key-Pair-Id=${input.keyPairId}`);
 
     const storage = new SellerProductMediaStorage();
     const key = await storage.write('image/png', Buffer.from('safe-image'));
     expect(key).toMatch(/^seller-product-media\/[0-9a-f-]{36}\.png$/);
-    expect(send).toHaveBeenCalledWith(expect.objectContaining({ input: expect.objectContaining({ CacheControl: 'private, no-store' }) }));
+    expect(send).toHaveBeenCalledWith(expect.objectContaining({ input: expect.objectContaining({ CacheControl: 'public, max-age=31536000, immutable' }) }));
 
     const target = await storage.readTarget(key);
     expect(target?.kind).toBe('cloudfront');
@@ -64,10 +56,8 @@ describe('SellerProductMediaStorage', () => {
     const url = new URL(target.url);
     expect(url.hostname).toBe('cdn.videod.me');
     expect(url.pathname).toBe(`/${key}`);
-    expect(url.searchParams.get('Key-Pair-Id')).toBe('KTEST123');
-    expect(url.searchParams.get('Signature')).toBe('signature');
-    expect(Number(url.searchParams.get('Expires')) - Math.floor(Date.now() / 1000)).toBeGreaterThanOrEqual(299);
-    expect(Number(url.searchParams.get('Expires')) - Math.floor(Date.now() / 1000)).toBeLessThanOrEqual(301);
+    expect(url.search).toBe('');
+    expect(target.expiresAt).toBeNull();
   });
 
   it('creates a single-object S3 PUT URL with the fixed five-minute expiry and signed headers', async () => {
@@ -99,50 +89,41 @@ describe('SellerProductMediaStorage', () => {
     expect(storage.publicUrl('seller-product-media/../../secrets.png')).toBeNull();
   });
 
-  it('returns an unsigned CDN target only when an attached-media read explicitly allows public delivery', async () => {
+  it('returns an unsigned CDN target for an existing S3 object', async () => {
     process.env.AWS_S3_BUCKET = 'private-media-bucket';
     process.env.AWS_S3_REGION = 'ap-southeast-1';
     process.env.AWS_S3_PREFIX = 'seller-product-media';
     process.env.AWS_S3_PUBLIC_BASE_URL = 'https://cdn.videod.me';
     jest.spyOn(S3Client.prototype, 'send').mockResolvedValue({} as never);
     const storage = new SellerProductMediaStorage();
-    await expect(storage.readTarget('seller-product-media/00000000-0000-4000-8000-000000000001.png', { allowPublic: true })).resolves.toEqual({
+    await expect(storage.readTarget('seller-product-media/00000000-0000-4000-8000-000000000001.png')).resolves.toEqual({
       kind: 'cloudfront',
       url: 'https://cdn.videod.me/seller-product-media/00000000-0000-4000-8000-000000000001.png',
       expiresAt: null,
     });
-    expect(getSignedUrl).not.toHaveBeenCalled();
   });
 
-  it('does not sign missing objects and rejects invalid signer configuration safely', async () => {
+  it('does not return a CDN target for a missing object', async () => {
     process.env.AWS_S3_BUCKET = 'private-media-bucket';
-    process.env.AWS_CLOUDFRONT_KEY_PAIR_ID = 'KTEST123';
-    process.env.AWS_CLOUDFRONT_PRIVATE_KEY_PATH = join(root, 'cloudfront.pem');
-    await writeFile(process.env.AWS_CLOUDFRONT_PRIVATE_KEY_PATH, 'private-key');
     jest.spyOn(S3Client.prototype, 'send').mockRejectedValue(new Error('NotFound') as never);
     const storage = new SellerProductMediaStorage();
     await expect(storage.readTarget('seller-product-media/00000000-0000-4000-8000-000000000001.png')).resolves.toBeNull();
-    expect(getSignedUrl).not.toHaveBeenCalled();
-
-    delete process.env.AWS_CLOUDFRONT_KEY_PAIR_ID;
-    expect(() => new SellerProductMediaStorage()).toThrow('AWS_CLOUDFRONT_KEY_PAIR_ID and AWS_CLOUDFRONT_PRIVATE_KEY_PATH must be provided together');
   });
 
-  it('keeps local reads discriminated and never invokes the signer', async () => {
+  it('keeps local reads discriminated', async () => {
     const storage = new SellerProductMediaStorage();
     const key = await storage.write('image/png', Buffer.from('local-image'));
     await expect(storage.readTarget(key)).resolves.toEqual({ kind: 'local', data: Buffer.from('local-image') });
-    expect(getSignedUrl).not.toHaveBeenCalled();
   });
 
-  it('propagates signer failure without falling back to an unsigned origin URL', async () => {
+  it('starts in production without CloudFront signing credentials', async () => {
     process.env.AWS_S3_BUCKET = 'private-media-bucket';
-    process.env.AWS_CLOUDFRONT_KEY_PAIR_ID = 'KTEST123';
-    process.env.AWS_CLOUDFRONT_PRIVATE_KEY_PATH = join(root, 'cloudfront.pem');
-    await writeFile(process.env.AWS_CLOUDFRONT_PRIVATE_KEY_PATH, 'private-key');
     jest.spyOn(S3Client.prototype, 'send').mockResolvedValue({} as never);
-    (getSignedUrl as jest.Mock).mockImplementation(() => { throw new Error('signer failed'); });
     const storage = new SellerProductMediaStorage();
-    await expect(storage.readTarget('seller-product-media/00000000-0000-4000-8000-000000000001.png')).rejects.toThrow('signer failed');
+    await expect(storage.readTarget('seller-product-media/00000000-0000-4000-8000-000000000001.png')).resolves.toEqual({
+      kind: 'cloudfront',
+      url: 'https://cdn.videod.me/seller-product-media/00000000-0000-4000-8000-000000000001.png',
+      expiresAt: null,
+    });
   });
 });

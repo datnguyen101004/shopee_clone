@@ -1,7 +1,6 @@
 import { DeleteObjectCommand, GetObjectCommand, HeadObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
-import { getSignedUrl } from '@aws-sdk/cloudfront-signer';
 import { getSignedUrl as getS3SignedUrl } from '@aws-sdk/s3-request-presigner';
-import { promises as fs, readFileSync } from 'node:fs';
+import { promises as fs } from 'node:fs';
 import { join } from 'node:path';
 import { createHash, randomUUID } from 'node:crypto';
 import { Injectable } from '@nestjs/common';
@@ -26,11 +25,8 @@ export type VerifiedUploadedObject = {
   height: number;
 };
 
-export type CloudFrontSigningConfig = {
+export type CloudFrontDeliveryConfig = {
   baseUrl: string;
-  keyPairId: string;
-  privateKey: string;
-  ttlSeconds: number;
 };
 
 export class SellerProductMediaDeliveryUnavailableError extends Error {
@@ -45,22 +41,13 @@ function envValue(...names: string[]): string | undefined {
   return undefined;
 }
 
-function readTtl(environment: NodeJS.ProcessEnv): number {
-  const raw = environment.AWS_CLOUDFRONT_SIGNED_URL_TTL_SECONDS?.trim();
-  if (!raw) return 300;
-  if (!/^\d+$/.test(raw)) throw new Error('AWS_CLOUDFRONT_SIGNED_URL_TTL_SECONDS must be an integer from 60 to 300.');
-  const value = Number(raw);
-  if (!Number.isSafeInteger(value) || value < 60 || value > 300) throw new Error('AWS_CLOUDFRONT_SIGNED_URL_TTL_SECONDS must be an integer from 60 to 300.');
-  return value;
-}
-
 function readUploadTtl(environment: NodeJS.ProcessEnv): number {
   const raw = environment.AWS_S3_UPLOAD_URL_TTL_SECONDS?.trim();
   if (raw && raw !== '300') throw new Error('AWS_S3_UPLOAD_URL_TTL_SECONDS must be exactly 300.');
   return 300;
 }
 
-export function loadCloudFrontSigningConfig(environment: NodeJS.ProcessEnv = process.env, required = false): CloudFrontSigningConfig | null {
+export function loadCloudFrontDeliveryConfig(environment: NodeJS.ProcessEnv = process.env): CloudFrontDeliveryConfig {
   const rawBaseUrl = environment.AWS_CLOUDFRONT_BASE_URL?.trim() || cloudFrontDefaultBaseUrl;
   let parsedBaseUrl: URL;
   try {
@@ -71,17 +58,7 @@ export function loadCloudFrontSigningConfig(environment: NodeJS.ProcessEnv = pro
   if (parsedBaseUrl.protocol !== 'https:' || parsedBaseUrl.hostname !== 'cdn.videod.me' || parsedBaseUrl.pathname !== '/' || parsedBaseUrl.search || parsedBaseUrl.hash) {
     throw new Error('AWS_CLOUDFRONT_BASE_URL must be exactly https://cdn.videod.me.');
   }
-  const keyPairId = environment.AWS_CLOUDFRONT_KEY_PAIR_ID?.trim();
-  const privateKeyPath = environment.AWS_CLOUDFRONT_PRIVATE_KEY_PATH?.trim();
-  const ttlSeconds = readTtl(environment);
-  if (!keyPairId && !privateKeyPath) return required ? (() => { throw new Error('AWS_CLOUDFRONT_KEY_PAIR_ID and AWS_CLOUDFRONT_PRIVATE_KEY_PATH are required for private S3 media delivery.'); })() : null;
-  if (!keyPairId || !privateKeyPath) throw new Error('AWS_CLOUDFRONT_KEY_PAIR_ID and AWS_CLOUDFRONT_PRIVATE_KEY_PATH must be provided together.');
-  try {
-    return { baseUrl: parsedBaseUrl.toString().replace(/\/$/, ''), keyPairId, privateKey: readFileSync(privateKeyPath, 'utf8'), ttlSeconds };
-  } catch {
-    if (required || environment.NODE_ENV === 'production') throw new Error('AWS CloudFront private signing key could not be loaded.');
-    return null;
-  }
+  return { baseUrl: parsedBaseUrl.toString().replace(/\/$/, '') };
 }
 
 export function stableProductMediaUrl(mediaId: string): string {
@@ -114,7 +91,7 @@ export class SellerProductMediaStorage {
   private readonly prefix = envValue('AWS_S3_PREFIX') ?? 'seller-product-media';
   private readonly region = envValue('AWS_S3_REGION', 'AWS_REGION') ?? 'us-east-1';
   private readonly client: S3Client | null;
-  private readonly cloudFront: CloudFrontSigningConfig | null;
+  private readonly cloudFront: CloudFrontDeliveryConfig | null;
   private readonly uploadTtlSeconds: number;
 
   constructor() {
@@ -146,7 +123,7 @@ export class SellerProductMediaStorage {
       ...(envValue('AWS_S3_ENDPOINT') ? { endpoint: envValue('AWS_S3_ENDPOINT') } : {}),
       ...(process.env.AWS_S3_FORCE_PATH_STYLE === 'true' ? { forcePathStyle: true } : {}),
     });
-    this.cloudFront = loadCloudFrontSigningConfig(process.env, process.env.NODE_ENV === 'production');
+    this.cloudFront = loadCloudFrontDeliveryConfig(process.env);
   }
 
   private get s3Enabled(): boolean {
@@ -163,8 +140,7 @@ export class SellerProductMediaStorage {
   /**
    * Return the configured CDN object URL for persisted product references.
    * The API only uses this when the deployment explicitly provides a public
-   * media base (the local environment points it at cdn.videod.me). Signed
-   * CloudFront preview delivery remains separate in readTarget().
+   * media base (the local environment points it at cdn.videod.me).
    */
   publicUrl(key: string): string | null {
     const remoteKey = this.s3Key(key);
@@ -172,17 +148,8 @@ export class SellerProductMediaStorage {
   }
 
   private cloudFrontUrl(remoteKey: string): string {
-    if (!this.cloudFront) throw new Error('CloudFront signing is not configured for private S3 media delivery.');
+    if (!this.cloudFront) throw new Error('CloudFront delivery is not configured for S3 media.');
     return `${this.cloudFront.baseUrl}/${remoteKey.split('/').map((part) => encodeURIComponent(part)).join('/')}`;
-  }
-
-  private signedCloudFrontUrl(remoteKey: string): { url: string; expiresAt: Date } {
-    if (!this.cloudFront) throw new Error('CloudFront signing is not configured for private S3 media delivery.');
-    const expiresAt = new Date(Date.now() + this.cloudFront.ttlSeconds * 1000);
-    return {
-      url: getSignedUrl({ url: this.cloudFrontUrl(remoteKey), keyPairId: this.cloudFront.keyPairId, privateKey: this.cloudFront.privateKey, dateLessThan: expiresAt }),
-      expiresAt,
-    };
   }
 
   async write(mimeType: string, data: Buffer): Promise<string> {
@@ -197,7 +164,7 @@ export class SellerProductMediaStorage {
         Key: key,
         Body: data,
         ContentType: mimeType,
-        CacheControl: 'private, no-store',
+        CacheControl: 'public, max-age=31536000, immutable',
       }));
       return key;
     }
@@ -273,7 +240,7 @@ export class SellerProductMediaStorage {
     }
   }
 
-  async readTarget(key: string, options: { allowPublic?: boolean } = {}): Promise<MediaReadTarget | null> {
+  async readTarget(key: string): Promise<MediaReadTarget | null> {
     const remoteKey = this.s3Key(key);
     if (remoteKey) {
       try {
@@ -287,11 +254,7 @@ export class SellerProductMediaStorage {
         if (status === 404 || name === 'NotFound' || name === 'NoSuchKey' || message === 'NotFound' || message === 'NoSuchKey') return null;
         throw new SellerProductMediaDeliveryUnavailableError();
       }
-      if (options.allowPublic) {
-        const publicUrl = this.publicUrl(remoteKey);
-        if (publicUrl) return { kind: 'cloudfront', url: publicUrl, expiresAt: null };
-      }
-      return { kind: 'cloudfront', ...this.signedCloudFrontUrl(remoteKey) };
+      return { kind: 'cloudfront', url: this.cloudFrontUrl(remoteKey), expiresAt: null };
     }
     const data = await this.read(key);
     return data ? { kind: 'local', data } : null;

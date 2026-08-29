@@ -47,6 +47,7 @@
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
     "test": "pnpm test:infra && turbo run test",
+    "test:ci": "pnpm test:infra && pnpm --filter @shopee-clone/contracts build && pnpm --filter @shopee-clone/contracts test && pnpm --filter @shopee-clone/api test:ci",
     "test:e2e": "playwright test",
     "test:chat:database": "node scripts/chat-database-test.mjs",
     "test:chat:real": "node scripts/chat-real-e2e.mjs",

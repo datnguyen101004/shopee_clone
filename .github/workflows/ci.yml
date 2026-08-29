@@ -1,23 +1,26 @@
-name: CI
+name: Development CI/CD
 
 on:
-  # Automatic CI is temporarily paused. Run this workflow explicitly when needed.
+  push:
+    branches:
+      - development
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: ci-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  group: development-cicd
+  # Migration and deployment must never be interrupted or overlap.
+  cancel-in-progress: false
 
 env:
   NODE_VERSION: 22.12.0
   PNPM_VERSION: 10.34.5
 
 jobs:
-  repository-quality:
-    name: Repository quality
+  quality:
+    name: CI checks (no E2E)
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -43,7 +46,9 @@ jobs:
       - name: Validate infrastructure and CI definitions
         run: |
           pnpm infra:config:example
+          PROD_ENV_FILE=.env.example docker compose --env-file .env.example -f compose-prod.yaml --profile migration config --quiet
           pnpm ci:validate
+          bash -n scripts/deploy-development-via-ssm.sh
 
       - name: Check Prisma schema and generated client
         run: |
@@ -52,155 +57,117 @@ jobs:
           pnpm db:validate
           pnpm db:generate
 
-      - name: Check formatting
-        run: pnpm format:check
-
       - name: Lint
-        run: pnpm lint
+        run: |
+          pnpm --filter @shopee-clone/contracts lint
+          pnpm --filter @shopee-clone/api lint
 
       - name: Typecheck
-        run: pnpm typecheck
+        run: |
+          pnpm --filter @shopee-clone/contracts build
+          pnpm --filter @shopee-clone/contracts typecheck
+          pnpm --filter @shopee-clone/api typecheck
 
       - name: Run database-independent tests
-        run: pnpm test
+        run: pnpm test:ci
 
-      - name: Build production applications and packages
-        run: pnpm build
+      - name: Build production API and contracts
+        run: |
+          pnpm --filter @shopee-clone/contracts build
+          pnpm --filter @shopee-clone/api build
 
-      - name: Install Playwright Chromium
-        run: pnpm exec playwright install --with-deps chromium
-
-      - name: Run real API-driven homepage browser and accessibility checks
-        run: pnpm test:e2e:homepage
-
-      - name: Upload Playwright report on failure
-        if: failure()
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
-        with:
-          name: playwright-report
-          path: playwright-report/
-          retention-days: 7
-
-  persistence-smoke:
-    name: PostgreSQL persistence smoke
+  publish-images:
+    name: Build and push API images
+    needs: quality
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
+    env:
+      DOCKERHUB_USERNAME: ${{ vars.DOCKERHUB_USERNAME }}
+      DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
     steps:
-      - name: Check out repository
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - name: Install pinned pnpm
-        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
-        with:
-          version: ${{ env.PNPM_VERSION }}
-          run_install: false
-
-      - name: Set up pinned Node.js
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: pnpm
-          cache-dependency-path: pnpm-lock.yaml
-
-      - name: Install dependencies from lockfile
-        run: pnpm install --frozen-lockfile
-
-      - name: Run isolated infrastructure smoke verification
-        run: pnpm infra:smoke
-
-      - name: Confirm smoke resources were removed
-        if: always()
+      - name: Check deployment registry configuration
         shell: bash
         run: |
-          leftovers="$({
-            docker ps --all --format '{{.Names}}'
-            docker network ls --format '{{.Name}}'
-            docker volume ls --format '{{.Name}}'
-          } | grep '^shopee-clone-smoke-' || true)"
-          if [[ -n "$leftovers" ]]; then
-            echo 'Isolated smoke resources remain after verification:'
-            echo "$leftovers"
-            exit 1
-          fi
+          test -n "$DOCKERHUB_USERNAME" || { echo 'Missing repository variable DOCKERHUB_USERNAME'; exit 1; }
+          test -n "$DOCKERHUB_TOKEN" || { echo 'Missing repository secret DOCKERHUB_TOKEN'; exit 1; }
 
-  chat-integration:
-    name: Floating chat PostgreSQL and realtime gate
-    runs-on: ubuntu-latest
-    timeout-minutes: 35
-    env:
-      CHAT_DB_USER: shopee_chat_ci
-      CHAT_DB_PASSWORD: shopee_chat_ci_password_2026
-      CHAT_DB_NAME: shopee_chat_ci
-      PORT: 3001
-      E2E_WEB_PORT: 3000
-      NEXT_PUBLIC_API_BASE_URL: http://127.0.0.1:3001
-      AUTH_ALLOWED_ORIGINS: http://127.0.0.1:3000
-      AUTH_WEB_BASE_URL: http://127.0.0.1:3000
-      AUTH_COOKIE_SECURE: 'false'
-      AUTH_RECOVERY_MODE: capture
-      CHAT_REPAIR_CONFIRM: 2f6dd7f3-7982-47af-b230-442b54ba5e57
-      GOOGLE_CLIENT_ID: ci-client.apps.googleusercontent.com
-      GOOGLE_CLIENT_SECRET: ci-only-google-client-secret-2026
-      GOOGLE_CALLBACK_URL: http://127.0.0.1:3001/login/oauth2/code/google
-      RUN_CHAT_DATABASE_TESTS: '1'
-    steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - name: Install pinned pnpm
-        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@b45d80f862d83dbcd57f89517bcf500b2ab88fb2 # v4.0.0
         with:
-          version: ${{ env.PNPM_VERSION }}
-          run_install: false
+          username: ${{ env.DOCKERHUB_USERNAME }}
+          password: ${{ env.DOCKERHUB_TOKEN }}
 
-      - name: Set up pinned Node.js
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+      - name: Build and push API runtime
+        uses: docker/build-push-action@d08e5c354a6adb9ed34480a06d141179aa583294 # v7.0.0
         with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: pnpm
-          cache-dependency-path: pnpm-lock.yaml
+          context: .
+          file: docker/Dockerfile.api
+          target: runner
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ${{ env.DOCKERHUB_USERNAME }}/shopee-clone-api:${{ github.sha }}
+            ${{ env.DOCKERHUB_USERNAME }}/shopee-clone-api:development
+          cache-from: type=gha,scope=api-runtime
+          cache-to: type=gha,mode=max,scope=api-runtime
 
-      - name: Install dependencies from lockfile
-        run: pnpm install --frozen-lockfile
+      - name: Build and push Prisma migrator
+        uses: docker/build-push-action@d08e5c354a6adb9ed34480a06d141179aa583294 # v7.0.0
+        with:
+          context: .
+          file: docker/Dockerfile.api
+          target: migrator
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ${{ env.DOCKERHUB_USERNAME }}/shopee-clone-api-migrator:${{ github.sha }}
+            ${{ env.DOCKERHUB_USERNAME }}/shopee-clone-api-migrator:development
+          cache-from: |
+            type=gha,scope=api-runtime
+            type=gha,scope=api-migrator
+          cache-to: type=gha,mode=max,scope=api-migrator
 
-      - name: Start isolated PostgreSQL and configure test URLs
+  deploy:
+    name: Migrate Aurora and deploy EC2
+    needs: publish-images
+    if: github.ref == 'refs/heads/development'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      AWS_REGION: ${{ vars.AWS_REGION }}
+      AWS_ROLE_TO_ASSUME: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+      EC2_INSTANCE_ID: ${{ vars.EC2_INSTANCE_ID }}
+      DEPLOY_PATH: ${{ vars.EC2_DEPLOY_PATH }}
+      IMAGE_TAG: ${{ github.sha }}
+      API_IMAGE: ${{ vars.DOCKERHUB_USERNAME }}/shopee-clone-api
+      MIGRATOR_IMAGE: ${{ vars.DOCKERHUB_USERNAME }}/shopee-clone-api-migrator
+    steps:
+      - name: Check deployment configuration
+        shell: bash
         run: |
-          docker run --detach --name shopee-chat-postgres --publish 5432:5432 \
-            --env POSTGRES_USER="$CHAT_DB_USER" --env POSTGRES_PASSWORD="$CHAT_DB_PASSWORD" \
-            --env POSTGRES_DB="$CHAT_DB_NAME" postgres:18.4-alpine
-          for attempt in {1..30}; do
-            if docker exec shopee-chat-postgres pg_isready -U "$CHAT_DB_USER" -d "$CHAT_DB_NAME"; then break; fi
-            sleep 2
+          for name in AWS_REGION AWS_ROLE_TO_ASSUME EC2_INSTANCE_ID DEPLOY_PATH API_IMAGE MIGRATOR_IMAGE; do
+            test -n "${!name}" || { echo "Missing deployment setting: $name"; exit 1; }
           done
-          db_scheme=postgresql
-          echo "DATABASE_URL=${db_scheme}://${CHAT_DB_USER}:${CHAT_DB_PASSWORD}@127.0.0.1:5432/${CHAT_DB_NAME}" >> "$GITHUB_ENV"
-          echo "TEST_DATABASE_URL=${db_scheme}://${CHAT_DB_USER}:${CHAT_DB_PASSWORD}@127.0.0.1:5432/${CHAT_DB_NAME}" >> "$GITHUB_ENV"
 
-      - name: Apply schema and seed deterministic marketplace
-        run: |
-          pnpm db:generate
-          pnpm db:migrate:deploy
-          pnpm db:seed
+      - name: Check out deployment tooling
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - name: Verify migration checksums and chat preflight
-        run: |
-          pnpm db:migration:checksums
-          pnpm --filter @shopee-clone/api chat:preflight
+      - name: Configure AWS credentials through GitHub OIDC
+        uses: aws-actions/configure-aws-credentials@e6de054238d6b7531b4efff3b6587d9aade6a06c # v6.2.3
+        with:
+          role-to-assume: ${{ env.AWS_ROLE_TO_ASSUME }}
+          aws-region: ${{ env.AWS_REGION }}
+          role-session-name: shopee-development-${{ github.run_id }}
 
-      - name: Run non-skippable PostgreSQL chat suite
-        run: pnpm test:chat:database
-
-      - name: Build API and web for real browser transport
-        run: pnpm build
-
-      - name: Run real two-account Socket.IO chat journeys
-        env:
-          CHAT_E2E_PREPARE: '1'
-        run: pnpm test:chat:real
-
-      - name: Run ordered chat release verification
-        run: pnpm chat:release:verify
-
-      - name: Remove isolated PostgreSQL
-        if: always()
-        run: docker rm --force shopee-chat-postgres
+      - name: Run migration and deploy through AWS Systems Manager
+        shell: bash
+        run: bash scripts/deploy-development-via-ssm.sh

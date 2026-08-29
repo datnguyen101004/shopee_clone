@@ -13,6 +13,8 @@
     "typecheck": "tsc --noEmit",
     "pretest": "pnpm db:generate",
     "test": "jest --runInBand",
+    "pretest:ci": "pnpm db:generate",
+    "test:ci": "jest --runInBand --testPathIgnorePatterns=/test/",
     "db:generate": "prisma generate",
     "db:format": "prisma format",
     "db:validate": "prisma validate",

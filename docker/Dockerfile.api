@@ -24,6 +24,7 @@ RUN pnpm install --frozen-lockfile
 # Copy source files
 COPY packages ./packages
 COPY apps/api ./apps/api
+COPY asserts ./asserts
 
 # Build shared contracts, generate Prisma client, and build NestJS API
 RUN pnpm --filter @shopee-clone/contracts build

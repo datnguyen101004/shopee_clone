@@ -1,4 +1,4 @@
-import { BadRequestException, Body, Controller, Get, Headers, Inject, NotFoundException, Param, Post, Query, Res, UseFilters, UseGuards } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, Headers, Inject, Param, Post, Query, Res, UseFilters, UseGuards } from '@nestjs/common';
 import type { Response } from 'express';
 import { createHash } from 'node:crypto';
 import {
@@ -22,13 +22,11 @@ export class CarrierOperationsController {
 
   @Get('dashboard')
   dashboard() {
-    this.ensureSimulationAvailable();
     return this.operations.dashboard();
   }
 
   @Get('shipments')
   list(@Query() query: DemoCarrierShipmentListQuery, @Res({ passthrough: true }) response: Response) {
-    this.ensureSimulationAvailable();
     if (query.status && !isDemoCarrierShipmentState(query.status)) throw new BadRequestException('Invalid shipment status filter');
     if (query.service && !isDemoCarrierServiceCode(query.service)) throw new BadRequestException('Invalid shipment service filter');
     if ((query.from && !Number.isFinite(Date.parse(query.from))) || (query.to && !Number.isFinite(Date.parse(query.to)))) throw new BadRequestException('Invalid shipment date filter');
@@ -49,7 +47,6 @@ export class CarrierOperationsController {
 
   @Get('shipments/:trackingCode')
   async detail(@Param('trackingCode') trackingCode: string, @Res({ passthrough: true }) response: Response) {
-    this.ensureSimulationAvailable();
     const body = await this.operations.detail(trackingCode);
     response.setHeader('ETag', `"${createHash('sha256').update(JSON.stringify(body)).digest('hex').slice(0, 32)}"`);
     return body;
@@ -57,13 +54,9 @@ export class CarrierOperationsController {
 
   @Post('shipments/:trackingCode/actions')
   action(@Param('trackingCode') trackingCode: string, @Body() body: DemoCarrierOperationRequest, @Headers('idempotency-key') idempotencyKey?: string) {
-    this.ensureSimulationAvailable();
     if (!isDemoCarrierOperationRequest(body)) throw new BadRequestException('Invalid carrier operation request');
     if (!idempotencyKey || !/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(idempotencyKey)) throw new BadRequestException('Invalid idempotency key');
     return this.operations.action(trackingCode, body, idempotencyKey);
   }
 
-  private ensureSimulationAvailable(): void {
-    if (process.env.NODE_ENV === 'production') throw new NotFoundException();
-  }
 }

@@ -10,6 +10,7 @@ const deploymentScript = readFileSync(
   'utf8',
 );
 const packageManifest = JSON.parse(readFileSync(path.join(repositoryRoot, 'package.json'), 'utf8'));
+const developmentCompose = readFileSync(path.join(repositoryRoot, 'compose.yaml'), 'utf8');
 
 const requiredWorkflowFragments = [
   'push:',
@@ -100,6 +101,10 @@ assert.doesNotMatch(
   workflow,
   /POSTGRES_PASSWORD\s*:/i,
   'CI/CD must not embed PostgreSQL credentials.',
+);
+assert(
+  developmentCompose.includes('${DEV_ENV_FILE:-.env}'),
+  'Development Compose must allow CI to select the non-secret example env file.',
 );
 
 console.log('CI/CD workflow validation passed.');

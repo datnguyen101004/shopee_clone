@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 
 const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const workflow = readFileSync(path.join(repositoryRoot, '.github', 'workflows', 'ci.yml'), 'utf8');
+const workflow = readFileSync(path.join(repositoryRoot, '.github', 'workflows', 'cicd.yml'), 'utf8');
 const deploymentScript = readFileSync(
   path.join(repositoryRoot, 'scripts', 'deploy-development-via-ssm.sh'),
   'utf8',

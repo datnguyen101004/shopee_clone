@@ -6,7 +6,7 @@ Aurora from the EC2 host, and recreates the API container. Pushes to `developmen
 deployment automatically. E2E and seed commands are deliberately excluded from this demo pipeline.
 
 When starting it, select the `development` branch so the images and deployment use that branch's
-current commit.
+current commit. The workflow rejects any manual run that selects another branch.
 
 ## Pipeline order
 

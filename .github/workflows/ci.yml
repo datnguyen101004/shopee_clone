@@ -16,7 +16,22 @@ env:
   PNPM_VERSION: 10.34.5
 
 jobs:
+  validate-branch:
+    name: Require development branch
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Reject a non-development dispatch
+        env:
+          SELECTED_BRANCH: ${{ github.ref_name }}
+        run: |
+          if [ "$SELECTED_BRANCH" != "development" ]; then
+            echo "::error::Select the development branch when starting Development CICD."
+            exit 1
+          fi
+
   quality:
+    needs: validate-branch
     name: CI checks (no E2E)
     runs-on: ubuntu-latest
     timeout-minutes: 30

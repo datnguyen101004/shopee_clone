@@ -1,0 +1,18 @@
+name: Development CICD
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  select-development:
+    name: Select development branch
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Reject deployment from main
+        run: |
+          echo "::error::Start this workflow again and select the development branch."
+          exit 1

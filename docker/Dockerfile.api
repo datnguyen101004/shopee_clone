@@ -37,6 +37,13 @@ RUN pnpm --filter @shopee-clone/api --prod --legacy deploy /app/deploy && \
     cp -r apps/api/src/generated /app/deploy/src/generated && \
     cp pnpm-workspace.yaml /app/deploy/pnpm-workspace.yaml
 
+# Optional production migration image. This deliberately keeps the builder's
+# Prisma CLI and source-side Prisma config, while the API runtime stays lean.
+FROM builder AS migrator
+WORKDIR /app
+USER node
+CMD ["pnpm", "--filter", "@shopee-clone/api", "db:migrate:deploy"]
+
 # Stage 3: Runtime
 FROM node:22-alpine AS runner
 WORKDIR /app

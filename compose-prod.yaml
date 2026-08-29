@@ -1,0 +1,49 @@
+name: shopee-clone-production
+
+x-api-environment: &api-environment
+  NODE_ENV: production
+  PORT: '3001'
+  DATABASE_URL: ${DATABASE_URL:?Production Aurora DATABASE_URL is required}
+
+x-api-labels: &api-labels
+  com.shopee-clone.scope: production
+
+services:
+  migrate:
+    profiles: ['migration']
+    image: ${MIGRATOR_IMAGE:-datnguyen10102004/shopee-clone-api-migrator}:${IMAGE_TAG:-0.1.0}
+    pull_policy: always
+    env_file:
+      - ${PROD_ENV_FILE:-.env.production}
+    environment: *api-environment
+    restart: 'no'
+    labels:
+      <<: *api-labels
+      com.shopee-clone.component: database-migration
+
+  api:
+    image: ${API_IMAGE:-datnguyen10102004/shopee-clone-api}:${IMAGE_TAG:-0.1.0}
+    pull_policy: always
+    init: true
+    restart: unless-stopped
+    env_file:
+      - ${PROD_ENV_FILE:-.env.production}
+    environment: *api-environment
+    ports:
+      - '${API_BIND_ADDRESS:-0.0.0.0}:${API_HOST_PORT:-3001}:3001'
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://127.0.0.1:3001/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    stop_grace_period: 30s
+    labels:
+      <<: *api-labels
+      com.shopee-clone.component: api

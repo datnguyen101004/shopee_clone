@@ -163,12 +163,14 @@ async function seedMarketplace() {
     });
     if (carrierOperator.count === 1) {
       await transaction.roleAuditEvent.create({
-        id: '30000000-0000-4000-8000-000000000001',
-        targetUserId: seedUsers[0].id,
-        role: MarketplaceRole.CARRIER_OPERATOR,
-        action: RoleAuditAction.GRANT,
-        source: RoleAuditSource.SEED,
-        reason: 'Carrier operator role assigned to deterministic local demo account',
+        data: {
+          id: '30000000-0000-4000-8000-000000000001',
+          targetUserId: seedUsers[0].id,
+          role: MarketplaceRole.CARRIER_OPERATOR,
+          action: RoleAuditAction.GRANT,
+          source: RoleAuditSource.SEED,
+          reason: 'Carrier operator role assigned to deterministic local demo account',
+        },
       });
     }
 

@@ -1,8 +1,12 @@
-# Development CI/CD
+# Development CICD
 
-Every push to `development` runs CI, publishes immutable API and migrator images to Docker Hub,
-applies pending Prisma migrations to Aurora from the EC2 host, and recreates the API container. E2E
-and seed commands are deliberately excluded from this demo pipeline.
+The `Development CICD` workflow is started manually from the GitHub Actions **Run workflow** button.
+It publishes immutable API and migrator images to Docker Hub, applies pending Prisma migrations to
+Aurora from the EC2 host, and recreates the API container. Pushes to `development` do not start a
+deployment automatically. E2E and seed commands are deliberately excluded from this demo pipeline.
+
+When starting it, select the `development` branch so the images and deployment use that branch's
+current commit.
 
 ## Pipeline order
 

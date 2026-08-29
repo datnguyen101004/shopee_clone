@@ -13,8 +13,7 @@ const packageManifest = JSON.parse(readFileSync(path.join(repositoryRoot, 'packa
 const developmentCompose = readFileSync(path.join(repositoryRoot, 'compose.yaml'), 'utf8');
 
 const requiredWorkflowFragments = [
-  'push:',
-  '- development',
+  'name: Development CICD',
   'workflow_dispatch:',
   'permissions:\n  contents: read',
   'cancel-in-progress: false',
@@ -46,6 +45,13 @@ for (const fragment of requiredWorkflowFragments) {
 
 for (const forbiddenFragment of ['playwright install', 'test:e2e', 'test:chat:real', 'db:seed']) {
   assert(!workflow.includes(forbiddenFragment), `Demo CI/CD must not run ${forbiddenFragment}.`);
+}
+
+for (const automaticTrigger of ['\n  push:', '\n  pull_request:', '\n  schedule:']) {
+  assert(
+    !workflow.includes(automaticTrigger),
+    `Development CICD must be manual-only and cannot declare ${automaticTrigger.trim()}.`,
+  );
 }
 
 const requiredDeploymentFragments = [

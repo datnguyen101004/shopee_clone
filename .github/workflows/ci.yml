@@ -1,9 +1,6 @@
-name: Development CI/CD
+name: Development CICD
 
 on:
-  push:
-    branches:
-      - development
   workflow_dispatch:
 
 permissions:

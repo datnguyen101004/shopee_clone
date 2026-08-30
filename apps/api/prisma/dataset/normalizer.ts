@@ -199,6 +199,14 @@ function assertPlan(plan: CanonicalDatasetPlan): void {
   const slugs = new Set<string>();
   const skus = new Set<string>();
   for (const source of plan.sources) {
+    const pickupProvince = source.shop.pickupProvince.trim();
+    const pickupDistrict = source.shop.pickupDistrict.trim();
+    if (
+      !/^\d{2}$/.test(pickupProvince) ||
+      !new RegExp(`^${pickupProvince}-\\d{3}$`).test(pickupDistrict)
+    ) {
+      throw new Error(`Invalid dataset shop pickup location for ${source.key}.`);
+    }
     for (const product of source.products) {
       const scopedStableKey = `${source.key}:${product.stableRecordKey}`;
       const scopedSlug = `${source.shop.id}:${product.slug}`;

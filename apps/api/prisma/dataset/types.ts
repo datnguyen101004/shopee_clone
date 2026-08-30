@@ -19,6 +19,8 @@ export interface DatasetManifestEntry {
     slug: string;
     name: string;
     location: string;
+    pickupProvince: string;
+    pickupDistrict: string;
   };
 }
 

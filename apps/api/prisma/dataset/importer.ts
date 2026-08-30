@@ -125,6 +125,8 @@ async function importSource(
       slug: source.shop.slug,
       name: source.shop.name,
       location: source.shop.location,
+      pickupProvince: source.shop.pickupProvince,
+      pickupDistrict: source.shop.pickupDistrict,
       status: ShopStatus.ACTIVE,
       onboardingStatus: ShopOnboardingStatus.APPROVED,
       deletedAt: null,

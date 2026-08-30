@@ -13,6 +13,8 @@ export const canonicalDatasetManifest = [
       slug: 'bach-hoa-xanh-dataset',
       name: 'Bách Hóa Xanh',
       location: 'TP. Hồ Chí Minh',
+      pickupProvince: '79',
+      pickupDistrict: '79-001',
     },
   },
   {
@@ -29,6 +31,8 @@ export const canonicalDatasetManifest = [
       slug: 'dien-thoai-hay-dataset',
       name: 'Điện Thoại Hay',
       location: 'Hà Nội',
+      pickupProvince: '01',
+      pickupDistrict: '01-001',
     },
   },
   {
@@ -40,6 +44,8 @@ export const canonicalDatasetManifest = [
       slug: 'linh-cosmetics-dataset',
       name: 'Linh Cosmetics',
       location: 'TP. Hồ Chí Minh',
+      pickupProvince: '79',
+      pickupDistrict: '79-001',
     },
   },
   {
@@ -51,6 +57,8 @@ export const canonicalDatasetManifest = [
       slug: 'space-t-dataset',
       name: 'Space T',
       location: 'TP. Hồ Chí Minh',
+      pickupProvince: '79',
+      pickupDistrict: '79-001',
     },
   },
   {
@@ -58,7 +66,13 @@ export const canonicalDatasetManifest = [
     fileName: 'thethao.json',
     expectedCount: 294,
     category: { slug: 'the-thao', name: 'Thể thao', iconKey: 'sport', sortOrder: 50 },
-    shop: { slug: 'myshoes-dataset', name: 'MyShoes', location: 'Hà Nội' },
+    shop: {
+      slug: 'myshoes-dataset',
+      name: 'MyShoes',
+      location: 'Hà Nội',
+      pickupProvince: '01',
+      pickupDistrict: '01-001',
+    },
   },
   {
     key: 'thoitrang',
@@ -69,6 +83,8 @@ export const canonicalDatasetManifest = [
       slug: 'icon-denim-dataset',
       name: 'ICON DENIM',
       location: 'TP. Hồ Chí Minh',
+      pickupProvince: '79',
+      pickupDistrict: '79-001',
     },
   },
 ] as const satisfies readonly DatasetManifestEntry[];

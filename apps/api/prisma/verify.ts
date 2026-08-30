@@ -152,6 +152,19 @@ async function verifyDatabase(databaseUrl: string): Promise<void> {
         1,
     });
 
+    const expectedShops = [...seedShops, ...datasetPlan.sources.map(({ shop }) => shop)];
+    const storedShops = await prisma.shop.findMany({
+      where: { id: { in: expectedShops.map(({ id }) => id) } },
+      select: { id: true, pickupProvince: true, pickupDistrict: true },
+    });
+    const storedShopById = new Map(storedShops.map((shop) => [shop.id, shop]));
+    for (const expected of expectedShops) {
+      const stored = storedShopById.get(expected.id);
+      assert(stored);
+      assert.equal(stored.pickupProvince, expected.pickupProvince);
+      assert.equal(stored.pickupDistrict, expected.pickupDistrict);
+    }
+
     const category = await prisma.category.findUnique({
       where: { id: seedCategories[0].id },
       include: { children: true },

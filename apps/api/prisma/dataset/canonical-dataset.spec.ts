@@ -31,6 +31,13 @@ describe('canonical product dataset', () => {
         name: 'Thiết bị điện tử',
       },
     );
+    expect(
+      canonicalDatasetManifest.every(
+        ({ shop }) =>
+          /^\d{2}$/.test(shop.pickupProvince) &&
+          shop.pickupDistrict.startsWith(`${shop.pickupProvince}-`),
+      ),
+    ).toBe(true);
   });
 
   it('normalizes every source deterministically with expected missing-field counts', async () => {
@@ -183,6 +190,15 @@ describe('canonical product dataset', () => {
     } finally {
       await rm(directory, { recursive: true, force: true });
     }
+  });
+
+  it('rejects a dataset shop without a canonical pickup district', () => {
+    const source = fixtureSource([validRecord('https://example.test/products/pickup')]);
+    source.manifest.shop.pickupDistrict = '';
+
+    expect(() => createCanonicalDatasetPlan([source])).toThrow(
+      'Invalid dataset shop pickup location for bachhoa',
+    );
   });
 });
 

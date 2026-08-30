@@ -13,7 +13,7 @@ import {
   UseFilters,
   UseGuards,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiHeader, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiBody, ApiHeader, ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { OnlinePaymentCheckoutResponse, PaymentStatusResponse } from '@shopee-clone/contracts';
 import { CHECKOUT_IDEMPOTENCY_KEY_PATTERN, parseOnlinePaymentCheckoutRequest } from '@shopee-clone/contracts';
 import type { Response } from 'express';
@@ -41,6 +41,7 @@ export class PaymentsController {
   constructor(@Inject(OnlinePaymentService) private readonly payments: OnlinePaymentService) {}
 
   @Post('checkout/online-payments')
+  @ApiBody({ type: OnlinePaymentCheckoutDto })
   @ApiOperation({ summary: 'Create or replay a MoMo sandbox checkout' })
   @ApiHeader({ name: 'If-Match', required: true, example: '"cart-7"' })
   @ApiHeader({ name: 'Idempotency-Key', required: true })

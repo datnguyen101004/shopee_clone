@@ -2012,24 +2012,24 @@ model InventoryAdjustment {
 }
 
 model InventoryReservation {
-  id              String                     @id @default(uuid()) @db.Uuid
-  buyerId         String                     @map("buyer_id") @db.Uuid
-  cartVersion     Int                        @map("cart_version")
-  idempotencyKey  String                     @map("idempotency_key") @db.Uuid
-  requestDigest   String                     @map("request_digest") @db.Char(64)
-  generationToken String                     @unique @map("generation_token") @db.Uuid
-  status          InventoryReservationStatus @default(ACTIVE)
-  expiresAt       DateTime                   @map("expires_at") @db.Timestamptz(3)
-  purchaseId      String?                    @unique @map("purchase_id") @db.Uuid
-  terminalReason  String?                    @map("terminal_reason") @db.VarChar(120)
-  terminalIdempotencyKey String?             @map("terminal_idempotency_key") @db.Uuid
-  createdAt       DateTime                   @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt       DateTime                   @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
-  consumedAt      DateTime?                  @map("consumed_at") @db.Timestamptz(3)
-  releasedAt      DateTime?                  @map("released_at") @db.Timestamptz(3)
-  buyer           User                       @relation("InventoryReservationBuyer", fields: [buyerId], references: [id], onDelete: Restrict)
-  purchase        Purchase?                  @relation(fields: [purchaseId], references: [id], onDelete: Restrict)
-  lines           InventoryReservationLine[]
+  id                     String                     @id @default(uuid()) @db.Uuid
+  buyerId                String                     @map("buyer_id") @db.Uuid
+  cartVersion            Int                        @map("cart_version")
+  idempotencyKey         String                     @map("idempotency_key") @db.Uuid
+  requestDigest          String                     @map("request_digest") @db.Char(64)
+  generationToken        String                     @unique @map("generation_token") @db.Uuid
+  status                 InventoryReservationStatus @default(ACTIVE)
+  expiresAt              DateTime                   @map("expires_at") @db.Timestamptz(3)
+  purchaseId             String?                    @unique @map("purchase_id") @db.Uuid
+  terminalReason         String?                    @map("terminal_reason") @db.VarChar(120)
+  terminalIdempotencyKey String?                    @map("terminal_idempotency_key") @db.Uuid
+  createdAt              DateTime                   @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt              DateTime                   @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  consumedAt             DateTime?                  @map("consumed_at") @db.Timestamptz(3)
+  releasedAt             DateTime?                  @map("released_at") @db.Timestamptz(3)
+  buyer                  User                       @relation("InventoryReservationBuyer", fields: [buyerId], references: [id], onDelete: Restrict)
+  purchase               Purchase?                  @relation(fields: [purchaseId], references: [id], onDelete: Restrict)
+  lines                  InventoryReservationLine[]
 
   @@index([buyerId, idempotencyKey, status])
   @@index([status, expiresAt])

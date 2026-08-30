@@ -1,5 +1,5 @@
 import { BadRequestException, Body, Controller, HttpCode, Inject, Post } from '@nestjs/common';
-import { ApiNoContentResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiBody, ApiNoContentResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 
 import { ExternalRequest } from '../security/external-request.decorator';
 import { MomoIpnDto } from './momo-ipn.dto';
@@ -21,6 +21,7 @@ export class MomoIpnController {
 
   @Post('ipn')
   @HttpCode(204)
+  @ApiBody({ type: MomoIpnDto })
   @ApiOperation({ summary: 'Receive a signed MoMo sandbox payment notification' })
   @ApiNoContentResponse({ description: 'Notification accepted, including an idempotent replay' })
   async receive(@Body() body: MomoIpnDto): Promise<void> {

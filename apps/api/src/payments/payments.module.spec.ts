@@ -1,5 +1,6 @@
 import { Test } from '@nestjs/testing';
 
+import { PrismaService } from '../prisma/prisma.service';
 import { FakePaymentProvider } from './fake-payment-provider';
 import { MomoPaymentProvider } from './momo-payment-provider';
 import { PAYMENT_PROVIDER } from './payment-provider.port';
@@ -29,7 +30,10 @@ describe('PaymentsModule provider selection', () => {
 
   it('uses the network-free fake provider when MoMo is disabled by default', async () => {
     delete process.env.MOMO_ENABLED;
-    const moduleRef = await Test.createTestingModule({ imports: [PaymentsModule] }).compile();
+    const moduleRef = await Test.createTestingModule({ imports: [PaymentsModule] })
+      .overrideProvider(PrismaService)
+      .useValue({})
+      .compile();
     expect(moduleRef.get(PAYMENT_PROVIDER)).toBeInstanceOf(FakePaymentProvider);
     await moduleRef.close();
   });
@@ -45,7 +49,10 @@ describe('PaymentsModule provider selection', () => {
       MOMO_IPN_URL: 'https://api.example.test/api/v1/payment-providers/momo/ipn',
       MOMO_REDIRECT_URL: 'https://shop.example.test/checkout/payment/result',
     });
-    const moduleRef = await Test.createTestingModule({ imports: [PaymentsModule] }).compile();
+    const moduleRef = await Test.createTestingModule({ imports: [PaymentsModule] })
+      .overrideProvider(PrismaService)
+      .useValue({})
+      .compile();
     expect(moduleRef.get(PAYMENT_PROVIDER)).toBeInstanceOf(MomoPaymentProvider);
     await moduleRef.close();
   });

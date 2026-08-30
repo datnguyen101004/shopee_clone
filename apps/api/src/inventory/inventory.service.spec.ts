@@ -187,8 +187,8 @@ describe('InventoryService', () => {
     await expect(service.reacquireForPendingOrder(tx as never, userId, reservation.id, 1, idempotencyKey, 'a'.repeat(64), [])).resolves.toBe(reservation);
 
     tx.inventoryReservation.findUnique.mockResolvedValueOnce({ ...reservation, status: 'RELEASED', lines: [] });
-    await expect(service.release(reservation.id, 'payment-failed')).resolves.toEqual({ ...reservation, status: 'RELEASED' });
+    await expect(service.release(reservation.id, 'payment-failed', idempotencyKey)).resolves.toEqual({ ...reservation, status: 'RELEASED' });
     tx.inventoryReservation.findUnique.mockResolvedValueOnce({ ...reservation, status: 'CONSUMED', lines: [] });
-    await expect(service.release(reservation.id, 'expired')).resolves.toEqual({ ...reservation, status: 'CONSUMED' });
+    await expect(service.release(reservation.id, 'expired', idempotencyKey)).resolves.toEqual({ ...reservation, status: 'CONSUMED' });
   });
 });

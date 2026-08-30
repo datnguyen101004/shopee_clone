@@ -27,8 +27,20 @@ export const CHECKOUT_BLOCKER_CODES = [
   'VOUCHER_REJECTED',
   'MISSING_SHIPPING_SERVICE',
 ] as const;
-export const PURCHASE_PAYMENT_METHODS = ['COD'] as const;
-export const PURCHASE_PAYMENT_STATUSES = ['UNPAID'] as const;
+export const PURCHASE_PAYMENT_METHODS = ['COD', 'MOMO'] as const;
+export const PURCHASE_PAYMENT_STATUSES = [
+  'UNPAID',
+  'PENDING',
+  'PENDING_RECONCILIATION',
+  'UNKNOWN',
+  'PAID',
+  'FAILED',
+  'CANCELLED',
+  'EXPIRED',
+  'REFUND_PENDING',
+  'PARTIALLY_REFUNDED',
+  'REFUNDED',
+] as const;
 export const SHOP_ORDER_STATUSES = [
   'PENDING_CONFIRMATION',
   'AWAITING_PICKUP',
@@ -172,6 +184,8 @@ const problemStatuses = new Set([400, 401, 403, 404, 409, 413, 415, 503]);
 const blockerCodes = new Set<string>(CHECKOUT_BLOCKER_CODES);
 const shopOrderStatuses = new Set<string>(SHOP_ORDER_STATUSES);
 const inventoryHoldStatuses = new Set<string>(INVENTORY_HOLD_STATUSES);
+const purchasePaymentMethods = new Set<string>(PURCHASE_PAYMENT_METHODS);
+const purchasePaymentStatuses = new Set<string>(PURCHASE_PAYMENT_STATUSES);
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -580,36 +594,47 @@ export const parseCheckoutPreviewResponse = (value: unknown): CheckoutPreviewRes
 function isOrder(value: unknown): value is PurchaseShopOrder {
   if (
     !isRecord(value) ||
-    !hasExactKeys(value, [
-      'orderReference',
-      'status',
-      'paymentStatus',
-      'shop',
-      'note',
-      'lines',
-      'shipping',
-      'listSubtotalMinor',
-      'productDiscountMinor',
-      'merchandiseSubtotalMinor',
-      'shopVoucherDiscountMinor',
-      'platformVoucherDiscountMinor',
-      'merchandiseVoucherDiscountMinor',
-      'shippingVoucherDiscountMinor',
-      'voucherDiscountMinor',
-      'shippingPayableMinor',
-      'payableTotalMinor',
-    ], ['inventoryHold']) ||
+    !hasExactKeys(
+      value,
+      [
+        'orderReference',
+        'status',
+        'paymentStatus',
+        'shop',
+        'note',
+        'lines',
+        'shipping',
+        'listSubtotalMinor',
+        'productDiscountMinor',
+        'merchandiseSubtotalMinor',
+        'shopVoucherDiscountMinor',
+        'platformVoucherDiscountMinor',
+        'merchandiseVoucherDiscountMinor',
+        'shippingVoucherDiscountMinor',
+        'voucherDiscountMinor',
+        'shippingPayableMinor',
+        'payableTotalMinor',
+      ],
+      ['inventoryHold'],
+    ) ||
     !isUuid(value.orderReference) ||
     typeof value.status !== 'string' ||
     !shopOrderStatuses.has(value.status) ||
-    value.paymentStatus !== 'UNPAID' ||
+    typeof value.paymentStatus !== 'string' ||
+    !purchasePaymentStatuses.has(value.paymentStatus) ||
     (value.inventoryHold !== undefined &&
       (!isRecord(value.inventoryHold) ||
         !hasExactKeys(value.inventoryHold, ['status', 'expiresAt', 'terminalReason']) ||
         typeof value.inventoryHold.status !== 'string' ||
         !inventoryHoldStatuses.has(value.inventoryHold.status) ||
-        !(value.inventoryHold.expiresAt === null || isCanonicalDateTime(value.inventoryHold.expiresAt)) ||
-        !(value.inventoryHold.terminalReason === null || isNonEmptyString(value.inventoryHold.terminalReason, 120))))
+        !(
+          value.inventoryHold.expiresAt === null ||
+          isCanonicalDateTime(value.inventoryHold.expiresAt)
+        ) ||
+        !(
+          value.inventoryHold.terminalReason === null ||
+          isNonEmptyString(value.inventoryHold.terminalReason, 120)
+        )))
   ) {
     return false;
   }
@@ -664,8 +689,10 @@ export function isPurchaseResult(value: unknown): value is PurchaseResult {
     !isUuid(value.purchaseReference) ||
     !isCanonicalDateTime(value.createdAt) ||
     !isNonNegativeInteger(value.sourceCartVersion) ||
-    value.paymentMethod !== 'COD' ||
-    value.paymentStatus !== 'UNPAID' ||
+    typeof value.paymentMethod !== 'string' ||
+    !purchasePaymentMethods.has(value.paymentMethod) ||
+    typeof value.paymentStatus !== 'string' ||
+    !purchasePaymentStatuses.has(value.paymentStatus) ||
     !isAddress(value.address) ||
     !Array.isArray(value.orders) ||
     value.orders.length === 0 ||
@@ -716,7 +743,10 @@ export function isCheckoutProblemDetails(value: unknown): value is CheckoutProbl
     typeof value.status !== 'number' ||
     !problemStatuses.has(value.status) ||
     !isNonEmptyString(value.detail, 500) ||
-    !(value.code === undefined || (typeof value.code === 'string' && /^[A-Z][A-Z0-9_]{1,63}$/.test(value.code))) ||
+    !(
+      value.code === undefined ||
+      (typeof value.code === 'string' && /^[A-Z][A-Z0-9_]{1,63}$/.test(value.code))
+    ) ||
     !(value.currentCartVersion === undefined || isNonNegativeInteger(value.currentCartVersion)) ||
     !(value.availableQuantity === undefined || isNonNegativeInteger(value.availableQuantity)) ||
     !(value.preview === undefined || isCheckoutPreviewResponse(value.preview))

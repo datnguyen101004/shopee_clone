@@ -132,6 +132,7 @@ databaseTest('transaction-owned voucher consumption with PostgreSQL', () => {
     const committed = await prisma.$transaction((transaction) =>
       service.consumeInTransaction(transaction, {
         purchaseReference: purchaseA,
+        idempotencyKey: purchaseA,
         userId: userA,
         evaluatedAt,
         applied: [applied(voucherB), applied(voucherA)],
@@ -152,6 +153,7 @@ databaseTest('transaction-owned voucher consumption with PostgreSQL', () => {
       prisma.$transaction(async (transaction) => {
         await service.consumeInTransaction(transaction, {
           purchaseReference: purchaseB,
+          idempotencyKey: purchaseB,
           userId: userB,
           evaluatedAt,
           applied: [applied(raceVoucher)],
@@ -170,6 +172,7 @@ databaseTest('transaction-owned voucher consumption with PostgreSQL', () => {
   it('is idempotent for an identical purchase reference and rejects inconsistent reuse', async () => {
     const input = {
       purchaseReference: purchaseA,
+      idempotencyKey: purchaseA,
       userId: userA,
       evaluatedAt,
       applied: [applied(voucherA)],
@@ -180,6 +183,11 @@ databaseTest('transaction-owned voucher consumption with PostgreSQL', () => {
     expect(
       await prisma.$transaction((transaction) => service.consumeInTransaction(transaction, input)),
     ).toMatchObject({ created: false, redemptionCount: 1 });
+    await expect(
+      prisma.$transaction((transaction) =>
+        service.consumeInTransaction(transaction, { ...input, idempotencyKey: purchaseB }),
+      ),
+    ).rejects.toBeInstanceOf(VoucherConsumptionConflictError);
     await expect(
       prisma.$transaction((transaction) =>
         service.consumeInTransaction(transaction, {
@@ -198,6 +206,7 @@ databaseTest('transaction-owned voucher consumption with PostgreSQL', () => {
       prisma.$transaction((transaction) =>
         service.consumeInTransaction(transaction, {
           purchaseReference: purchaseA,
+          idempotencyKey: purchaseA,
           userId: userA,
           evaluatedAt,
           applied: [applied(voucherA), applied(voucherB)],
@@ -216,6 +225,7 @@ databaseTest('transaction-owned voucher consumption with PostgreSQL', () => {
         (transaction) =>
           service.consumeInTransaction(transaction, {
             purchaseReference: purchaseB,
+            idempotencyKey: purchaseB,
             userId: userA,
             evaluatedAt,
             applied: [applied(raceVoucher)],
@@ -226,6 +236,7 @@ databaseTest('transaction-owned voucher consumption with PostgreSQL', () => {
         (transaction) =>
           service.consumeInTransaction(transaction, {
             purchaseReference: purchaseC,
+            idempotencyKey: purchaseC,
             userId: userB,
             evaluatedAt,
             applied: [applied(raceVoucher)],

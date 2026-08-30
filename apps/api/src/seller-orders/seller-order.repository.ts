@@ -22,7 +22,7 @@ export const sellerOrderInclude = {
       pickupAddressLine: true,
     },
   },
-  purchase: { select: { id: true, addressSnapshot: true } },
+  purchase: { select: { id: true, addressSnapshot: true, paymentMethod: true } },
   lines: {
     orderBy: [{ sourceCartLineId: 'asc' as const }, { id: 'asc' as const }],
     include: {

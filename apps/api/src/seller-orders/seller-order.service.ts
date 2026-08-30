@@ -170,6 +170,9 @@ export class SellerOrderService {
           const fulfillment =
             current.fulfillment ??
             (await this.ensureFulfillmentEvent(tx, orderReference, current.createdAt));
+          if (current.purchase.paymentMethod === 'MOMO' && current.paymentStatus !== 'PAID') {
+            throw new SellerOrderTransitionError();
+          }
           if (
             current.version !== expectedOrderVersion ||
             fulfillment.version !== expectedFulfillmentVersion

@@ -11,6 +11,7 @@ export class VoucherConsumptionUnavailableError extends Error {}
 
 export interface ConsumeVouchersInput {
   purchaseReference: string;
+  idempotencyKey: string;
   userId: string;
   evaluatedAt: Date;
   applied: readonly AppliedVoucherSnapshot[];
@@ -92,10 +93,11 @@ export class VoucherConsumptionService {
     const proposedId = randomUUID();
     const inserted = await transaction.$queryRaw<{ id: string }[]>(Prisma.sql`
       INSERT INTO "voucher_consumptions" (
-        "id", "purchase_reference", "user_id", "voucher_set_digest"
+        "id", "purchase_reference", "idempotency_key", "user_id", "voucher_set_digest"
       ) VALUES (
         ${proposedId}::uuid,
         ${input.purchaseReference}::uuid,
+        ${input.idempotencyKey}::uuid,
         ${input.userId}::uuid,
         ${digest}
       )
@@ -104,13 +106,23 @@ export class VoucherConsumptionService {
     `);
     const created = inserted.length === 1;
     const consumption = created
-      ? { id: inserted[0]!.id, userId: input.userId, voucherSetDigest: digest, redemptions: [] }
+      ? {
+          id: inserted[0]!.id,
+          idempotencyKey: input.idempotencyKey,
+          userId: input.userId,
+          voucherSetDigest: digest,
+          redemptions: [],
+        }
       : await transaction.voucherConsumption.findUnique({
           where: { purchaseReference: input.purchaseReference },
           include: { redemptions: true },
         });
     if (!consumption) throw new VoucherConsumptionUnavailableError('Consumption disappeared.');
-    if (consumption.userId !== input.userId || consumption.voucherSetDigest !== digest) {
+    if (
+      consumption.idempotencyKey !== input.idempotencyKey ||
+      consumption.userId !== input.userId ||
+      consumption.voucherSetDigest !== digest
+    ) {
       throw new VoucherConsumptionConflictError('Purchase reference was already used differently.');
     }
     if (!created) {

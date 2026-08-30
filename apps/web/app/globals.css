@@ -3158,6 +3158,31 @@ textarea {
   gap: 10px;
 }
 
+.checkout-payment p {
+  margin: 8px 0 0 26px;
+  color: #667085;
+}
+
+.momo-instructions {
+  display: grid;
+  justify-items: center;
+  gap: 14px;
+}
+
+.momo-instructions img {
+  width: min(280px, 80vw);
+  aspect-ratio: 1;
+  object-fit: contain;
+}
+
+.momo-instructions a {
+  border-radius: 6px;
+  background: #a50064;
+  padding: 11px 18px;
+  color: #fff;
+  font-weight: 700;
+}
+
 .checkout-feedback,
 .checkout-blockers {
   padding: 14px 18px;

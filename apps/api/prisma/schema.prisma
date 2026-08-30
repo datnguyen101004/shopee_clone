@@ -273,15 +273,66 @@ enum SellerPromotionResource {
 }
 
 enum PurchasePaymentMethod {
-  COD @map("cod")
+  COD  @map("cod")
+  MOMO @map("momo")
 
   @@map("purchase_payment_method")
 }
 
 enum PurchasePaymentStatus {
-  UNPAID @map("unpaid")
+  UNPAID                 @map("unpaid")
+  PENDING                @map("pending")
+  PENDING_RECONCILIATION @map("pending_reconciliation")
+  UNKNOWN                @map("unknown")
+  PAID                   @map("paid")
+  FAILED                 @map("failed")
+  CANCELLED              @map("cancelled")
+  EXPIRED                @map("expired")
+  REFUND_PENDING         @map("refund_pending")
+  PARTIALLY_REFUNDED     @map("partially_refunded")
+  REFUNDED               @map("refunded")
 
   @@map("purchase_payment_status")
+}
+
+enum PaymentProvider {
+  MOMO @map("momo")
+
+  @@map("payment_provider")
+}
+
+enum PaymentEnvironment {
+  SANDBOX @map("sandbox")
+
+  @@map("payment_environment")
+}
+
+enum PaymentEventSource {
+  CREATE @map("create")
+  IPN    @map("ipn")
+  QUERY  @map("query")
+  REFUND @map("refund")
+
+  @@map("payment_event_source")
+}
+
+enum PaymentEventDecision {
+  APPLIED   @map("applied")
+  IGNORED   @map("ignored")
+  DUPLICATE @map("duplicate")
+  MISMATCH  @map("mismatch")
+
+  @@map("payment_event_decision")
+}
+
+enum PaymentRefundStatus {
+  PENDING                @map("pending")
+  PENDING_RECONCILIATION @map("pending_reconciliation")
+  UNKNOWN                @map("unknown")
+  SUCCEEDED              @map("succeeded")
+  FAILED                 @map("failed")
+
+  @@map("payment_refund_status")
 }
 
 enum ShopOrderStatus {
@@ -1149,6 +1200,7 @@ model VoucherUserUsage {
 model VoucherConsumption {
   id                String              @id @default(uuid()) @db.Uuid
   purchaseReference String              @unique @map("purchase_reference") @db.Uuid
+  idempotencyKey    String              @unique @map("idempotency_key") @db.Uuid
   userId            String              @map("user_id") @db.Uuid
   voucherSetDigest  String              @map("voucher_set_digest") @db.Char(64)
   createdAt         DateTime            @default(now()) @map("created_at") @db.Timestamptz(3)
@@ -1189,11 +1241,99 @@ model Purchase {
   vouchers                        PurchaseVoucher[]
   voucherConsumption              VoucherConsumption?
   inventoryReservation            InventoryReservation?
+  paymentAttempt                  PaymentAttempt?
 
   @@unique([buyerId, idempotencyKey])
   @@index([buyerId, createdAt(sort: Desc), id])
   @@index([createdAt, id])
   @@map("purchases")
+}
+
+model PaymentAttempt {
+  id                    String                @id @default(uuid()) @db.Uuid
+  publicReference       String                @unique @default(uuid()) @map("public_reference") @db.Uuid
+  purchaseId            String                @unique @map("purchase_id") @db.Uuid
+  provider              PaymentProvider       @default(MOMO)
+  environment           PaymentEnvironment    @default(SANDBOX)
+  orderId               String                @map("order_id") @db.VarChar(64)
+  requestId             String                @map("request_id") @db.VarChar(50)
+  amountMinor           BigInt                @map("amount_minor")
+  currency              String                @default("VND") @db.VarChar(3)
+  status                PurchasePaymentStatus @default(PENDING)
+  providerTransactionId BigInt?               @map("provider_transaction_id")
+  lastResultCode        Int?                  @map("last_result_code")
+  lastResultClass       String?               @map("last_result_class") @db.VarChar(32)
+  expiresAt             DateTime              @map("expires_at") @db.Timestamptz(3)
+  createRequestedAt     DateTime?             @map("create_requested_at") @db.Timestamptz(3)
+  instructionsIssuedAt  DateTime?             @map("instructions_issued_at") @db.Timestamptz(3)
+  lastObservedAt        DateTime?             @map("last_observed_at") @db.Timestamptz(3)
+  nextReconcileAt       DateTime?             @map("next_reconcile_at") @db.Timestamptz(3)
+  reconcileAttempts     Int                   @default(0) @map("reconcile_attempts")
+  leaseExpiresAt        DateTime?             @map("lease_expires_at") @db.Timestamptz(3)
+  version               Int                   @default(0)
+  createdAt             DateTime              @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt             DateTime              @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  purchase              Purchase              @relation(fields: [purchaseId], references: [id], onDelete: Restrict)
+  events                PaymentEvent[]
+  refunds               PaymentRefund[]
+
+  @@unique([provider, orderId])
+  @@unique([provider, requestId])
+  @@unique([provider, providerTransactionId])
+  @@index([status, nextReconcileAt, id])
+  @@index([expiresAt, status, id])
+  @@map("payment_attempts")
+}
+
+model PaymentEvent {
+  id                    String                 @id @default(uuid()) @db.Uuid
+  attemptId             String                 @map("attempt_id") @db.Uuid
+  source                PaymentEventSource
+  dedupeKey             String                 @unique @map("dedupe_key") @db.Char(64)
+  fingerprint           String                 @map("fingerprint") @db.Char(64)
+  resultCode            Int?                   @map("result_code")
+  resultClass           String                 @map("result_class") @db.VarChar(32)
+  observedStatus        PurchasePaymentStatus? @map("observed_status")
+  providerTransactionId BigInt?                @map("provider_transaction_id")
+  sanitizedMetadata     Json                   @map("sanitized_metadata") @db.JsonB
+  decision              PaymentEventDecision
+  receivedAt            DateTime               @default(now()) @map("received_at") @db.Timestamptz(3)
+  processedAt           DateTime?              @map("processed_at") @db.Timestamptz(3)
+  attempt               PaymentAttempt         @relation(fields: [attemptId], references: [id], onDelete: Restrict)
+
+  @@index([attemptId, receivedAt, id])
+  @@index([source, resultClass, receivedAt])
+  @@map("payment_events")
+}
+
+model PaymentRefund {
+  id                    String              @id @default(uuid()) @db.Uuid
+  attemptId             String              @map("attempt_id") @db.Uuid
+  provider              PaymentProvider     @default(MOMO)
+  orderId               String              @map("order_id") @db.VarChar(64)
+  requestId             String              @map("request_id") @db.VarChar(50)
+  amountMinor           BigInt              @map("amount_minor")
+  currency              String              @default("VND") @db.VarChar(3)
+  status                PaymentRefundStatus @default(PENDING)
+  providerTransactionId BigInt?             @map("provider_transaction_id")
+  lastResultCode        Int?                @map("last_result_code")
+  lastResultClass       String?             @map("last_result_class") @db.VarChar(32)
+  requestedAt           DateTime?           @map("requested_at") @db.Timestamptz(3)
+  completedAt           DateTime?           @map("completed_at") @db.Timestamptz(3)
+  nextReconcileAt       DateTime?           @map("next_reconcile_at") @db.Timestamptz(3)
+  reconcileAttempts     Int                 @default(0) @map("reconcile_attempts")
+  leaseExpiresAt        DateTime?           @map("lease_expires_at") @db.Timestamptz(3)
+  version               Int                 @default(0)
+  createdAt             DateTime            @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt             DateTime            @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  attempt               PaymentAttempt      @relation(fields: [attemptId], references: [id], onDelete: Restrict)
+
+  @@unique([provider, orderId])
+  @@unique([provider, requestId])
+  @@unique([provider, providerTransactionId])
+  @@index([attemptId, createdAt, id])
+  @@index([status, nextReconcileAt, id])
+  @@map("payment_refunds")
 }
 
 model ShopOrder {
@@ -1882,6 +2022,7 @@ model InventoryReservation {
   expiresAt       DateTime                   @map("expires_at") @db.Timestamptz(3)
   purchaseId      String?                    @unique @map("purchase_id") @db.Uuid
   terminalReason  String?                    @map("terminal_reason") @db.VarChar(120)
+  terminalIdempotencyKey String?             @map("terminal_idempotency_key") @db.Uuid
   createdAt       DateTime                   @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt       DateTime                   @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
   consumedAt      DateTime?                  @map("consumed_at") @db.Timestamptz(3)

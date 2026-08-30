@@ -7,11 +7,17 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { confirmCodCheckout, getCheckoutPurchase } from '../../lib/checkout-api';
+import {
+  confirmCodCheckout,
+  confirmMomoCheckout,
+  getCheckoutPurchase,
+  getPaymentStatus,
+} from '../../lib/checkout-api';
 import { useAuthSession } from '../auth-session-provider';
 import { useCart } from '../cart/cart-provider';
 import { CheckoutScreen } from './checkout-screen';
 import { PurchaseSuccessScreen } from './purchase-success-screen';
+import { MomoPaymentScreen } from './momo-payment-screen';
 import { useCheckoutPreview } from './use-checkout-preview';
 
 const replace = vi.fn();
@@ -19,7 +25,9 @@ vi.mock('next/navigation', () => ({ useRouter: () => ({ replace }) }));
 vi.mock('../../lib/checkout-api', () => ({
   CheckoutApiError: class extends Error {},
   confirmCodCheckout: vi.fn(),
+  confirmMomoCheckout: vi.fn(),
   getCheckoutPurchase: vi.fn(),
+  getPaymentStatus: vi.fn(),
 }));
 vi.mock('../auth-session-provider', () => ({ useAuthSession: vi.fn() }));
 vi.mock('../cart/cart-provider', () => ({ useCart: vi.fn() }));
@@ -258,6 +266,82 @@ describe('checkout screens', () => {
     render(<CheckoutScreen />);
     expect(screen.getByText('Sản phẩm đã hết hàng.')).toBeVisible();
     expect(screen.getByRole('button', { name: 'Đặt hàng' })).toBeDisabled();
+  });
+
+  it('selects MoMo, stores safe instructions, and opens the authoritative payment route', async () => {
+    const user = userEvent.setup();
+    const momoPurchase: PurchaseResult = {
+      ...purchase,
+      paymentMethod: 'MOMO',
+      paymentStatus: 'PENDING',
+      orders: purchase.orders.map((order) => ({ ...order, paymentStatus: 'PENDING' })),
+    };
+    vi.mocked(confirmMomoCheckout).mockResolvedValue({
+      replayed: false,
+      purchase: momoPurchase,
+      payment: {
+        paymentReference: purchaseReference,
+        purchaseReference,
+        provider: 'MOMO',
+        paymentMethod: 'MOMO',
+        status: 'PENDING',
+        amountMinor: 122_000,
+        currency: 'VND',
+        expiresAt: '2026-08-14T05:10:00.000Z',
+        nextAction: 'OPEN_MOMO',
+        instructions: {
+          payUrl: 'https://test-payment.momo.vn/pay',
+          deeplink: 'momo://sandbox/pay',
+          qrCodeValue: 'https://test-payment.momo.vn/qr',
+        },
+      },
+    });
+    render(<CheckoutScreen />);
+    await user.click(screen.getByRole('radio', { name: /Ví MoMo/ }));
+    expect(screen.getByText(/MoMo Test/)).toBeVisible();
+    await user.click(screen.getByRole('button', { name: 'Đặt hàng' }));
+    await vi.waitFor(() =>
+      expect(replace).toHaveBeenCalledWith(`/checkout/payment/${purchaseReference}`),
+    );
+    expect(confirmMomoCheckout).toHaveBeenCalledTimes(1);
+    expect(window.sessionStorage.getItem(`momo:instructions:${purchaseReference}`)).toContain(
+      'test-payment.momo.vn',
+    );
+  });
+
+  it('renders transient MoMo instructions while polling backend status', async () => {
+    window.sessionStorage.setItem(
+      `momo:instructions:${purchaseReference}`,
+      JSON.stringify({
+        payUrl: 'https://test-payment.momo.vn/pay',
+        deeplink: 'momo://sandbox/pay',
+        qrCodeValue: 'https://test-payment.momo.vn/qr',
+      }),
+    );
+    vi.mocked(getPaymentStatus).mockResolvedValue({
+      paymentReference: purchaseReference,
+      purchaseReference,
+      provider: 'MOMO',
+      paymentMethod: 'MOMO',
+      status: 'PENDING',
+      amountMinor: 122_000,
+      currency: 'VND',
+      expiresAt: new Date(Date.now() + 60_000).toISOString(),
+      nextAction: 'WAIT',
+      instructions: null,
+    });
+    render(<MomoPaymentScreen paymentReference={purchaseReference} />);
+    expect(await screen.findByRole('heading', { name: 'Đang chờ thanh toán MoMo' })).toBeVisible();
+    expect(screen.getByRole('img', { name: 'Mã QR MoMo sandbox' })).toBeVisible();
+    expect(screen.getByRole('link', { name: 'Mở MoMo Test' })).toHaveAttribute(
+      'href',
+      'momo://sandbox/pay',
+    );
+    expect(getPaymentStatus).toHaveBeenCalledWith(
+      purchaseReference,
+      authenticatedFetch,
+      expect.any(AbortSignal),
+    );
   });
 
   it('reloads and displays immutable child-order snapshots on success', async () => {

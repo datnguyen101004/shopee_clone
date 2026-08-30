@@ -2,6 +2,9 @@ import {
   isCheckoutConfirmationResponse,
   isCheckoutPreviewResponse,
   isPurchaseResult,
+  isOnlinePaymentCheckoutResponse,
+  isPaymentStatusResponse,
+  parseCheckoutConfirmationRequest,
 } from '@shopee-clone/contracts';
 import type { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
@@ -23,6 +26,19 @@ import {
 } from '../src/generated/prisma/enums';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { OrderWriter } from '../src/checkout/order-writer';
+import { CheckoutService } from '../src/checkout/checkout.service';
+import { CheckoutUnavailableError } from '../src/checkout/checkout.errors';
+import {
+  FAKE_NOTIFICATION_SIGNATURE,
+  FakePaymentProvider,
+} from '../src/payments/fake-payment-provider';
+import { OnlinePaymentService } from '../src/payments/online-payment.service';
+import { PAYMENT_PROVIDER } from '../src/payments/payment-provider.port';
+import { ProviderTimeoutError } from '../src/payments/payment-result';
+import { PaymentObservationService } from '../src/payments/payment-observation.service';
+import { PaymentReconciliationService } from '../src/payments/payment-reconciliation.service';
+import { RefundReconciliationService } from '../src/payments/refund-reconciliation.service';
+import { InventoryService } from '../src/inventory/inventory.service';
 
 const databaseTest = process.env.RUN_CART_DATABASE_TESTS === '1' ? describe : describe.skip;
 const buyerId = '00000000-0000-4000-8000-000000009950';
@@ -45,6 +61,13 @@ databaseTest('authenticated COD checkout HTTP with PostgreSQL', () => {
   let app: INestApplication;
   let prisma: PrismaService;
   let orderWriter: OrderWriter;
+  let checkoutService: CheckoutService;
+  let inventoryService: InventoryService;
+  let onlinePaymentService: OnlinePaymentService;
+  let paymentObservationService: PaymentObservationService;
+  let paymentReconciliationService: PaymentReconciliationService;
+  let refundReconciliationService: RefundReconciliationService;
+  const fakePaymentProvider = new FakePaymentProvider();
   let variants: {
     id: string;
     priceMinor: bigint;
@@ -57,7 +80,31 @@ databaseTest('authenticated COD checkout HTTP with PostgreSQL', () => {
       select: { id: true },
     });
     const purchaseIds = purchases.map(({ id }) => id);
+    const reservations = await prisma.inventoryReservation.findMany({
+      where: {
+        OR: [{ purchaseId: { in: purchaseIds } }, { buyerId: { in: [buyerId, foreignBuyerId] } }],
+      },
+      select: { id: true, status: true },
+    });
+    for (const reservation of reservations) {
+      if (reservation.status === 'ACTIVE')
+        await inventoryService.release(reservation.id, 'released', reservation.id);
+    }
+    if (reservations.length > 0) {
+      const reservationIds = reservations.map(({ id }) => id);
+      await prisma.inventoryReservationLine.deleteMany({
+        where: { reservationId: { in: reservationIds } },
+      });
+      await prisma.inventoryReservation.deleteMany({ where: { id: { in: reservationIds } } });
+    }
     if (purchaseIds.length > 0) {
+      await prisma.paymentRefund.deleteMany({
+        where: { attempt: { purchaseId: { in: purchaseIds } } },
+      });
+      await prisma.paymentEvent.deleteMany({
+        where: { attempt: { purchaseId: { in: purchaseIds } } },
+      });
+      await prisma.paymentAttempt.deleteMany({ where: { purchaseId: { in: purchaseIds } } });
       await prisma.purchaseVoucherAllocation.deleteMany({
         where: { purchaseVoucher: { purchaseId: { in: purchaseIds } } },
       });
@@ -74,12 +121,13 @@ databaseTest('authenticated COD checkout HTTP with PostgreSQL', () => {
       await prisma.orderTimelineEvent.deleteMany({
         where: { order: { purchaseId: { in: purchaseIds } } },
       });
+      await prisma.sellerOrderFulfillmentEvent.deleteMany({
+        where: { fulfillment: { order: { purchaseId: { in: purchaseIds } } } },
+      });
+      await prisma.sellerOrderFulfillment.deleteMany({
+        where: { order: { purchaseId: { in: purchaseIds } } },
+      });
       await prisma.shopOrder.deleteMany({ where: { purchaseId: { in: purchaseIds } } });
-      const reservations = await prisma.inventoryReservation.findMany({ where: { purchaseId: { in: purchaseIds } }, select: { id: true } });
-      if (reservations.length > 0) {
-        await prisma.inventoryReservationLine.deleteMany({ where: { reservationId: { in: reservations.map(({ id }) => id) } } });
-        await prisma.inventoryReservation.deleteMany({ where: { id: { in: reservations.map(({ id }) => id) } } });
-      }
       await prisma.purchase.deleteMany({ where: { id: { in: purchaseIds } } });
     }
   }
@@ -140,19 +188,29 @@ databaseTest('authenticated COD checkout HTTP with PostgreSQL', () => {
           roles: ['buyer'],
         })),
       })
+      .overrideProvider(PAYMENT_PROVIDER)
+      .useValue(fakePaymentProvider)
       .compile();
     app = moduleRef.createNestApplication();
     configureApplication(app, loadAuthConfig({ NODE_ENV: 'test' }));
     await app.init();
     prisma = app.get(PrismaService);
     orderWriter = app.get(OrderWriter);
+    checkoutService = app.get(CheckoutService);
+    inventoryService = app.get(InventoryService);
+    onlinePaymentService = app.get(OnlinePaymentService);
+    paymentObservationService = app.get(PaymentObservationService);
+    paymentReconciliationService = app.get(PaymentReconciliationService);
+    refundReconciliationService = app.get(RefundReconciliationService);
 
     await cleanupPurchases();
     await prisma.shippingAddress.deleteMany({
       where: { id: { in: [addressId, foreignAddressId] } },
     });
     await prisma.cart.deleteMany({ where: { id: cartId } });
-    await prisma.voucherUserUsage.deleteMany({ where: { userId: { in: [buyerId, foreignBuyerId] } } });
+    await prisma.voucherUserUsage.deleteMany({
+      where: { userId: { in: [buyerId, foreignBuyerId] } },
+    });
     await prisma.user.deleteMany({ where: { id: { in: [buyerId, foreignBuyerId] } } });
     await prisma.user.createMany({
       data: [
@@ -242,6 +300,13 @@ databaseTest('authenticated COD checkout HTTP with PostgreSQL', () => {
   });
 
   beforeEach(resetCart);
+  afterEach(() => {
+    jest.restoreAllMocks();
+    fakePaymentProvider.createCalls.length = 0;
+    fakePaymentProvider.queryCalls.length = 0;
+    fakePaymentProvider.refundCalls.length = 0;
+    fakePaymentProvider.refundQueryCalls.length = 0;
+  });
 
   afterAll(async () => {
     if (prisma) {
@@ -263,7 +328,7 @@ databaseTest('authenticated COD checkout HTTP with PostgreSQL', () => {
       shippingAddressId: addressId,
       services: variants.map((variant) => ({
         shopId: variant.product.shop.id,
-        service: 'STANDARD',
+        service: 'STANDARD' as const,
       })),
       vouchers: { platformCode: voucherCode },
       notes: [{ shopId: variants[0]!.product.shop.id, note: '  Giao giờ hành chính  ' }],
@@ -340,10 +405,864 @@ databaseTest('authenticated COD checkout HTTP with PostgreSQL', () => {
       .expect(404);
   });
 
+  it('creates and replays one pending MoMo intent while keeping inventory and voucher held', async () => {
+    const previewResponse = await request(app.getHttpServer())
+      .post('/api/v1/checkout/preview')
+      .set('Authorization', buyerBearer)
+      .set('Origin', 'http://localhost:3000')
+      .set('If-Match', '"cart-2"')
+      .send(previewBody())
+      .expect(200);
+    const confirmation = parseCheckoutConfirmationRequest({
+      ...previewBody(),
+      checkoutFingerprint: previewResponse.body.checkoutFingerprint as string,
+    });
+    if (!confirmation) throw new Error('Expected a valid normalized confirmation');
+
+    const created = await checkoutService.createMomoPendingIntent(
+      buyerId,
+      2,
+      idempotencyKey,
+      confirmation,
+      600,
+    );
+    expect(created).toMatchObject({
+      replayed: false,
+      purchase: { paymentMethod: 'MOMO', paymentStatus: 'PENDING' },
+      attempt: { amountMinor: BigInt(created.purchase.summary.payableTotalMinor) },
+    });
+    expect(created.purchase.orders.every(({ paymentStatus }) => paymentStatus === 'PENDING')).toBe(
+      true,
+    );
+    expect(
+      created.purchase.orders.every(({ inventoryHold }) => inventoryHold?.status === 'ACTIVE'),
+    ).toBe(true);
+    expect(
+      await prisma.paymentAttempt.count({
+        where: { purchaseId: created.purchase.purchaseReference },
+      }),
+    ).toBe(1);
+    const paymentGraph = await prisma.purchase.findUniqueOrThrow({
+      where: { id: created.purchase.purchaseReference },
+      include: { paymentAttempt: true, orders: true },
+    });
+    expect(paymentGraph.paymentAttempt?.amountMinor).toBe(paymentGraph.payableTotalMinor);
+    expect(
+      paymentGraph.orders.reduce((total, order) => total + order.payableTotalMinor, 0n),
+    ).toBe(paymentGraph.payableTotalMinor);
+    expect(await prisma.voucherConsumption.count({ where: { userId: buyerId } })).toBe(0);
+    expect(await prisma.voucherRedemption.count({ where: { userId: buyerId } })).toBe(0);
+    expect((await prisma.voucher.findUniqueOrThrow({ where: { id: voucherId } })).usedCount).toBe(
+      0,
+    );
+    expect(fakePaymentProvider.createCalls).toHaveLength(0);
+
+    const replayed = await checkoutService.createMomoPendingIntent(
+      buyerId,
+      2,
+      idempotencyKey,
+      confirmation,
+      600,
+    );
+    expect(replayed.replayed).toBe(true);
+    expect(replayed.purchase.purchaseReference).toBe(created.purchase.purchaseReference);
+    expect(replayed.attempt.id).toBe(created.attempt.id);
+    expect(await prisma.purchase.count({ where: { buyerId } })).toBe(1);
+    expect(await prisma.cartLine.count({ where: { cartId } })).toBe(0);
+  });
+
+  it('rolls back the entire MoMo intent before any provider call when order writing fails', async () => {
+    const previewResponse = await request(app.getHttpServer())
+      .post('/api/v1/checkout/preview')
+      .set('Authorization', buyerBearer)
+      .set('Origin', 'http://localhost:3000')
+      .set('If-Match', '"cart-2"')
+      .send(previewBody())
+      .expect(200);
+    jest.spyOn(orderWriter, 'write').mockRejectedValueOnce(new Error('forced write failure'));
+    const confirmation = parseCheckoutConfirmationRequest({
+      ...previewBody(),
+      checkoutFingerprint: previewResponse.body.checkoutFingerprint as string,
+    });
+    if (!confirmation) throw new Error('Expected a valid normalized confirmation');
+
+    await expect(
+      checkoutService.createMomoPendingIntent(buyerId, 2, idempotencyKey, confirmation, 600),
+    ).rejects.toBeInstanceOf(CheckoutUnavailableError);
+    expect(await prisma.purchase.count({ where: { buyerId } })).toBe(0);
+    expect(await prisma.paymentAttempt.count({ where: { purchase: { buyerId } } })).toBe(0);
+    expect(await prisma.inventoryReservation.count({ where: { buyerId } })).toBe(0);
+    expect(await prisma.cartLine.count({ where: { cartId } })).toBe(2);
+    expect(fakePaymentProvider.createCalls).toHaveLength(0);
+  });
+
+  it('calls MoMo only after the pending purchase commits and returns transient instructions', async () => {
+    const previewResponse = await request(app.getHttpServer())
+      .post('/api/v1/checkout/preview')
+      .set('Authorization', buyerBearer)
+      .set('Origin', 'http://localhost:3000')
+      .set('If-Match', '"cart-2"')
+      .send(previewBody())
+      .expect(200);
+    const confirmation = parseCheckoutConfirmationRequest({
+      ...previewBody(),
+      checkoutFingerprint: previewResponse.body.checkoutFingerprint as string,
+    });
+    if (!confirmation) throw new Error('Expected a valid normalized confirmation');
+
+    const originalCreate = fakePaymentProvider.createPayment.bind(fakePaymentProvider);
+    jest
+      .spyOn(fakePaymentProvider, 'createPayment')
+      .mockImplementationOnce(async (command) => {
+        expect(await prisma.purchase.count({ where: { buyerId } })).toBe(1);
+        expect(
+          await prisma.paymentAttempt.count({
+            where: { orderId: command.orderId, status: 'PENDING' },
+          }),
+        ).toBe(1);
+        return originalCreate(command);
+      });
+
+    const result = await onlinePaymentService.checkoutWithMomo(
+      buyerId,
+      2,
+      idempotencyKey,
+      { ...confirmation, provider: 'MOMO' },
+    );
+
+    expect(result).toMatchObject({
+      replayed: false,
+      purchase: { paymentMethod: 'MOMO', paymentStatus: 'PENDING' },
+      payment: {
+        provider: 'MOMO',
+        status: 'PENDING',
+        nextAction: 'OPEN_MOMO',
+        instructions: {
+          payUrl: expect.stringContaining('test-payment.momo.vn'),
+          deeplink: expect.stringContaining('momo://'),
+        },
+      },
+    });
+    expect(fakePaymentProvider.createCalls).toHaveLength(1);
+    const attempt = await prisma.paymentAttempt.findUniqueOrThrow({
+      where: { purchaseId: result.purchase.purchaseReference },
+    });
+    expect(attempt.createRequestedAt).not.toBeNull();
+    expect(attempt.instructionsIssuedAt).not.toBeNull();
+    expect(attempt.nextReconcileAt).toBeNull();
+  });
+
+  it('moves a timed-out MoMo create into reconciliation without issuing instructions', async () => {
+    const previewResponse = await request(app.getHttpServer())
+      .post('/api/v1/checkout/preview')
+      .set('Authorization', buyerBearer)
+      .set('Origin', 'http://localhost:3000')
+      .set('If-Match', '"cart-2"')
+      .send(previewBody())
+      .expect(200);
+    const confirmation = parseCheckoutConfirmationRequest({
+      ...previewBody(),
+      checkoutFingerprint: previewResponse.body.checkoutFingerprint as string,
+    });
+    if (!confirmation) throw new Error('Expected a valid normalized confirmation');
+    jest
+      .spyOn(fakePaymentProvider, 'createPayment')
+      .mockRejectedValueOnce(new ProviderTimeoutError('forced timeout'));
+
+    const result = await onlinePaymentService.checkoutWithMomo(
+      buyerId,
+      2,
+      idempotencyKey,
+      { ...confirmation, provider: 'MOMO' },
+    );
+
+    expect(result).toMatchObject({
+      purchase: { paymentStatus: 'PENDING_RECONCILIATION' },
+      payment: {
+        status: 'PENDING_RECONCILIATION',
+        nextAction: 'WAIT',
+        instructions: null,
+      },
+    });
+    const attempt = await prisma.paymentAttempt.findUniqueOrThrow({
+      where: { purchaseId: result.purchase.purchaseReference },
+    });
+    expect(attempt).toMatchObject({
+      status: 'PENDING_RECONCILIATION',
+      lastResultClass: 'PROVIDER_TIMEOUT',
+      instructionsIssuedAt: null,
+    });
+    expect(attempt.nextReconcileAt).not.toBeNull();
+    expect(
+      await prisma.shopOrder.count({
+        where: {
+          purchaseId: result.purchase.purchaseReference,
+          paymentStatus: 'PENDING_RECONCILIATION',
+        },
+      }),
+    ).toBe(2);
+
+  });
+
+  it('does not let a late create response downgrade an already paid purchase', async () => {
+    const previewResponse = await request(app.getHttpServer())
+      .post('/api/v1/checkout/preview')
+      .set('Authorization', buyerBearer)
+      .set('Origin', 'http://localhost:3000')
+      .set('If-Match', '"cart-2"')
+      .send(previewBody())
+      .expect(200);
+    const confirmation = parseCheckoutConfirmationRequest({
+      ...previewBody(),
+      checkoutFingerprint: previewResponse.body.checkoutFingerprint as string,
+    });
+    if (!confirmation) throw new Error('Expected a valid normalized confirmation');
+    const originalCreate = fakePaymentProvider.createPayment.bind(fakePaymentProvider);
+    jest
+      .spyOn(fakePaymentProvider, 'createPayment')
+      .mockImplementationOnce(async (command) => {
+        const attempt = await prisma.paymentAttempt.findUniqueOrThrow({
+          where: { provider_orderId: { provider: 'MOMO', orderId: command.orderId } },
+        });
+        await prisma.$transaction([
+          prisma.paymentAttempt.update({
+            where: { id: attempt.id },
+            data: { status: 'PAID', version: { increment: 1 } },
+          }),
+          prisma.purchase.update({
+            where: { id: attempt.purchaseId },
+            data: { paymentStatus: 'PAID' },
+          }),
+          prisma.shopOrder.updateMany({
+            where: { purchaseId: attempt.purchaseId },
+            data: { paymentStatus: 'PAID' },
+          }),
+        ]);
+        return originalCreate(command);
+      });
+
+    const result = await onlinePaymentService.checkoutWithMomo(
+      buyerId,
+      2,
+      idempotencyKey,
+      { ...confirmation, provider: 'MOMO' },
+    );
+
+    expect(result).toMatchObject({
+      purchase: { paymentStatus: 'PAID' },
+      payment: { status: 'PAID', nextAction: 'DONE', instructions: null },
+    });
+    const attempt = await prisma.paymentAttempt.findUniqueOrThrow({
+      where: { purchaseId: result.purchase.purchaseReference },
+    });
+    expect(attempt.status).toBe('PAID');
+    expect(attempt.instructionsIssuedAt).toBeNull();
+  });
+
+  it('reuses one purchase and stable merchant IDs for concurrent MoMo retries', async () => {
+    const previewResponse = await request(app.getHttpServer())
+      .post('/api/v1/checkout/preview')
+      .set('Authorization', buyerBearer)
+      .set('Origin', 'http://localhost:3000')
+      .set('If-Match', '"cart-2"')
+      .send(previewBody())
+      .expect(200);
+    const confirmation = parseCheckoutConfirmationRequest({
+      ...previewBody(),
+      checkoutFingerprint: previewResponse.body.checkoutFingerprint as string,
+    });
+    if (!confirmation) throw new Error('Expected a valid normalized confirmation');
+    const onlineRequest = { ...confirmation, provider: 'MOMO' as const };
+
+    const results = await Promise.all([
+      onlinePaymentService.checkoutWithMomo(buyerId, 2, idempotencyKey, onlineRequest),
+      onlinePaymentService.checkoutWithMomo(buyerId, 2, idempotencyKey, onlineRequest),
+    ]);
+
+    expect(results.map(({ replayed }) => replayed).sort()).toEqual([false, true]);
+    expect(new Set(results.map(({ purchase }) => purchase.purchaseReference)).size).toBe(1);
+    expect(new Set(results.map(({ payment }) => payment.paymentReference)).size).toBe(1);
+    expect(await prisma.purchase.count({ where: { buyerId } })).toBe(1);
+    expect(await prisma.paymentAttempt.count({ where: { purchase: { buyerId } } })).toBe(1);
+    expect(fakePaymentProvider.createCalls).toHaveLength(2);
+    expect(new Set(fakePaymentProvider.createCalls.map(({ orderId }) => orderId)).size).toBe(1);
+    expect(new Set(fakePaymentProvider.createCalls.map(({ requestId }) => requestId)).size).toBe(1);
+    expect(new Set(fakePaymentProvider.createCalls.map(({ amountMinor }) => amountMinor)).size).toBe(
+      1,
+    );
+  });
+
+  it('applies, deduplicates, and prevents regression for provider observations', async () => {
+    const previewResponse = await request(app.getHttpServer())
+      .post('/api/v1/checkout/preview')
+      .set('Authorization', buyerBearer)
+      .set('Origin', 'http://localhost:3000')
+      .set('If-Match', '"cart-2"')
+      .send(previewBody())
+      .expect(200);
+    const confirmation = parseCheckoutConfirmationRequest({
+      ...previewBody(),
+      checkoutFingerprint: previewResponse.body.checkoutFingerprint as string,
+    });
+    if (!confirmation) throw new Error('Expected a valid normalized confirmation');
+    const intent = await checkoutService.createMomoPendingIntent(
+      buyerId,
+      2,
+      idempotencyKey,
+      confirmation,
+      600,
+    );
+    const paidObservation = {
+      provider: 'MOMO' as const,
+      environment: 'SANDBOX' as const,
+      orderId: intent.attempt.orderId,
+      requestId: intent.attempt.requestId,
+      amountMinor: intent.attempt.amountMinor,
+      currency: 'VND' as const,
+      resultCode: 0,
+      message: 'success',
+      providerTransactionId: 8_000_001n,
+      observedAt: new Date(),
+    };
+
+    const applied = await paymentObservationService.applyProviderObservation({
+      source: 'IPN',
+      observation: paidObservation,
+      sanitizedMetadata: { resultCode: 0, transId: '8000001' },
+    });
+    expect(applied).toMatchObject({ decision: 'APPLIED', status: 'PAID', duplicate: false });
+    const duplicate = await paymentObservationService.applyProviderObservation({
+      source: 'IPN',
+      observation: paidObservation,
+      sanitizedMetadata: { resultCode: 0, transId: '8000001' },
+    });
+    expect(duplicate).toMatchObject({
+      eventId: applied.eventId,
+      decision: 'DUPLICATE',
+      status: 'PAID',
+      duplicate: true,
+    });
+    const stale = await paymentObservationService.applyProviderObservation({
+      source: 'IPN',
+      observation: { ...paidObservation, resultCode: 1000, observedAt: new Date() },
+    });
+    expect(stale).toMatchObject({ decision: 'IGNORED', status: 'PAID' });
+    expect(
+      await prisma.paymentEvent.count({ where: { attemptId: intent.attempt.id } }),
+    ).toBe(2);
+    expect(
+      await prisma.shopOrder.count({
+        where: { purchaseId: intent.purchase.purchaseReference, paymentStatus: 'PAID' },
+      }),
+    ).toBe(2);
+    expect(
+      await prisma.inventoryReservation.findUniqueOrThrow({
+        where: { purchaseId: intent.purchase.purchaseReference },
+      }),
+    ).toMatchObject({
+      status: 'CONSUMED',
+      terminalReason: 'checkout-completed',
+      terminalIdempotencyKey: intent.attempt.id,
+    });
+    expect(await prisma.voucherConsumption.count({
+      where: { purchaseReference: intent.purchase.purchaseReference },
+    })).toBe(1);
+    expect((await prisma.voucher.findUniqueOrThrow({ where: { id: voucherId } })).usedCount).toBe(
+      1,
+    );
+    expect(
+      await prisma.orderTimelineEvent.count({
+        where: {
+          order: { purchaseId: intent.purchase.purchaseReference },
+          reasonCode: 'MOMO_PAYMENT_CONFIRMED',
+        },
+      }),
+    ).toBe(2);
+    expect(
+      await prisma.notification.count({
+        where: { deduplicationKey: `payment:${intent.attempt.id}:paid:buyer` },
+      }),
+    ).toBe(1);
+    expect(
+      await prisma.notificationDeliveryAttempt.count({
+        where: { notification: { deduplicationKey: `payment:${intent.attempt.id}:paid:buyer` } },
+      }),
+    ).toBe(1);
+  });
+
+  it('records correlation mismatch and moves an uncertain payment to reconciliation', async () => {
+    const previewResponse = await request(app.getHttpServer())
+      .post('/api/v1/checkout/preview')
+      .set('Authorization', buyerBearer)
+      .set('Origin', 'http://localhost:3000')
+      .set('If-Match', '"cart-2"')
+      .send(previewBody())
+      .expect(200);
+    const confirmation = parseCheckoutConfirmationRequest({
+      ...previewBody(),
+      checkoutFingerprint: previewResponse.body.checkoutFingerprint as string,
+    });
+    if (!confirmation) throw new Error('Expected a valid normalized confirmation');
+    const intent = await checkoutService.createMomoPendingIntent(
+      buyerId,
+      2,
+      idempotencyKey,
+      confirmation,
+      600,
+    );
+
+    const mismatch = await paymentObservationService.applyProviderObservation({
+      source: 'QUERY',
+      observation: {
+        provider: 'MOMO',
+        environment: 'SANDBOX',
+        orderId: intent.attempt.orderId,
+        requestId: 'req_mismatched',
+        amountMinor: intent.attempt.amountMinor,
+        currency: 'VND',
+        resultCode: 0,
+        message: null,
+        providerTransactionId: 8_000_002n,
+        observedAt: new Date(),
+      },
+    });
+
+    expect(mismatch).toMatchObject({
+      decision: 'MISMATCH',
+      status: 'PENDING_RECONCILIATION',
+      duplicate: false,
+    });
+    expect(
+      await prisma.purchase.findUniqueOrThrow({
+        where: { id: intent.purchase.purchaseReference },
+        select: { paymentStatus: true },
+      }),
+    ).toEqual({ paymentStatus: 'PENDING_RECONCILIATION' });
+  });
+
+  it('terminalizes a cancelled MoMo purchase and releases its holds exactly once', async () => {
+    const previewResponse = await request(app.getHttpServer())
+      .post('/api/v1/checkout/preview')
+      .set('Authorization', buyerBearer)
+      .set('Origin', 'http://localhost:3000')
+      .set('If-Match', '"cart-2"')
+      .send(previewBody())
+      .expect(200);
+    const confirmation = parseCheckoutConfirmationRequest({
+      ...previewBody(),
+      checkoutFingerprint: previewResponse.body.checkoutFingerprint as string,
+    });
+    if (!confirmation) throw new Error('Expected a valid normalized confirmation');
+    const intent = await checkoutService.createMomoPendingIntent(
+      buyerId,
+      2,
+      idempotencyKey,
+      confirmation,
+      600,
+    );
+    const cancelledObservation = {
+      provider: 'MOMO' as const,
+      environment: 'SANDBOX' as const,
+      orderId: intent.attempt.orderId,
+      requestId: intent.attempt.requestId,
+      amountMinor: intent.attempt.amountMinor,
+      currency: 'VND' as const,
+      resultCode: 1017,
+      message: 'cancelled',
+      providerTransactionId: 8_000_003n,
+      observedAt: new Date(),
+    };
+
+    const cancelled = await paymentObservationService.applyProviderObservation({
+      source: 'QUERY',
+      observation: cancelledObservation,
+    });
+    const duplicate = await paymentObservationService.applyProviderObservation({
+      source: 'QUERY',
+      observation: cancelledObservation,
+    });
+    await request(app.getHttpServer())
+      .post('/api/v1/payment-providers/momo/ipn')
+      .send({
+        partnerCode: 'FAKE',
+        orderId: intent.attempt.orderId,
+        requestId: intent.attempt.requestId,
+        amount: Number(intent.attempt.amountMinor),
+        orderInfo: 'Sandbox purchase',
+        orderType: 'momo_wallet',
+        transId: '8000003',
+        resultCode: 99,
+        message: 'Failure after cancellation.',
+        payType: 'qr',
+        responseTime: Date.now(),
+        extraData: '',
+        signature: FAKE_NOTIFICATION_SIGNATURE,
+      })
+      .expect(204);
+
+    expect(cancelled).toMatchObject({ decision: 'APPLIED', status: 'CANCELLED' });
+    expect(duplicate).toMatchObject({ decision: 'DUPLICATE', status: 'CANCELLED' });
+    expect(
+      await prisma.paymentAttempt.findUniqueOrThrow({
+        where: { id: intent.attempt.id },
+        select: { status: true },
+      }),
+    ).toEqual({ status: 'CANCELLED' });
+    expect(
+      await prisma.inventoryReservation.findUniqueOrThrow({
+        where: { purchaseId: intent.purchase.purchaseReference },
+      }),
+    ).toMatchObject({
+      status: 'RELEASED',
+      terminalReason: 'payment-failed',
+      terminalIdempotencyKey: intent.attempt.id,
+    });
+    expect(
+      await prisma.shopOrder.count({
+        where: {
+          purchaseId: intent.purchase.purchaseReference,
+          status: 'CANCELLED',
+          paymentStatus: 'CANCELLED',
+          fulfillment: { state: 'CANCELLED' },
+        },
+      }),
+    ).toBe(2);
+    expect(await prisma.voucherConsumption.count({
+      where: { purchaseReference: intent.purchase.purchaseReference },
+    })).toBe(0);
+    expect((await prisma.voucher.findUniqueOrThrow({ where: { id: voucherId } })).usedCount).toBe(
+      0,
+    );
+
+    const lateSuccess = await paymentObservationService.applyProviderObservation({
+      source: 'IPN',
+      observation: {
+        ...cancelledObservation,
+        resultCode: 0,
+        message: 'late success',
+        observedAt: new Date(),
+      },
+    });
+    expect(lateSuccess).toMatchObject({ decision: 'APPLIED', status: 'REFUND_PENDING' });
+    expect(
+      await prisma.paymentRefund.findFirstOrThrow({
+        where: { attemptId: intent.attempt.id },
+      }),
+    ).toMatchObject({
+      amountMinor: intent.attempt.amountMinor,
+      status: 'PENDING',
+    });
+    expect(
+      await prisma.inventoryReservation.findUniqueOrThrow({
+        where: { purchaseId: intent.purchase.purchaseReference },
+      }),
+    ).toMatchObject({ status: 'RELEASED' });
+    expect(
+      await prisma.shopOrder.count({
+        where: {
+          purchaseId: intent.purchase.purchaseReference,
+          status: 'CANCELLED',
+          paymentStatus: 'REFUND_PENDING',
+        },
+      }),
+    ).toBe(2);
+    const originalRefund = fakePaymentProvider.refundPayment.bind(fakePaymentProvider);
+    const timedOutRefund = jest
+      .spyOn(fakePaymentProvider, 'refundPayment')
+      .mockImplementationOnce(async (command) => {
+        await originalRefund(command);
+        throw new ProviderTimeoutError('response lost after provider accepted refund');
+      });
+    expect(await refundReconciliationService.reconcileDue(1)).toBe(1);
+    expect(fakePaymentProvider.refundCalls).toHaveLength(1);
+    expect(
+      await prisma.paymentRefund.findFirstOrThrow({ where: { attemptId: intent.attempt.id } }),
+    ).toMatchObject({ status: 'PENDING_RECONCILIATION' });
+    await prisma.paymentRefund.updateMany({
+      where: { attemptId: intent.attempt.id },
+      data: { nextReconcileAt: new Date(0) },
+    });
+    timedOutRefund.mockRestore();
+    expect(await refundReconciliationService.reconcileDue(1)).toBe(1);
+    expect(fakePaymentProvider.refundCalls).toHaveLength(1);
+    expect(fakePaymentProvider.refundQueryCalls).toHaveLength(1);
+    expect(
+      await prisma.paymentRefund.findFirstOrThrow({ where: { attemptId: intent.attempt.id } }),
+    ).toMatchObject({ status: 'SUCCEEDED' });
+    expect(
+      await prisma.paymentAttempt.findUniqueOrThrow({ where: { id: intent.attempt.id } }),
+    ).toMatchObject({ status: 'REFUNDED' });
+    expect(
+      await prisma.notification.count({
+        where: { deduplicationKey: `payment:${intent.attempt.id}:refunded:buyer` },
+      }),
+    ).toBe(1);
+  });
+
+  it('accepts a public signed MoMo IPN with idempotent HTTP 204 handling', async () => {
+    const previewResponse = await request(app.getHttpServer())
+      .post('/api/v1/checkout/preview')
+      .set('Authorization', buyerBearer)
+      .set('Origin', 'http://localhost:3000')
+      .set('If-Match', '"cart-2"')
+      .send(previewBody())
+      .expect(200);
+    const confirmation = parseCheckoutConfirmationRequest({
+      ...previewBody(),
+      checkoutFingerprint: previewResponse.body.checkoutFingerprint as string,
+    });
+    if (!confirmation) throw new Error('Expected a valid normalized confirmation');
+    const intent = await checkoutService.createMomoPendingIntent(
+      buyerId,
+      2,
+      idempotencyKey,
+      confirmation,
+      600,
+    );
+    const ipn = {
+      partnerCode: 'FAKE',
+      orderId: intent.attempt.orderId,
+      requestId: intent.attempt.requestId,
+      amount: Number(intent.attempt.amountMinor),
+      orderInfo: 'Sandbox purchase',
+      orderType: 'momo_wallet',
+      transId: '8000004',
+      resultCode: 0,
+      message: 'Successful.',
+      payType: 'qr',
+      responseTime: Date.now(),
+      extraData: '',
+      signature: FAKE_NOTIFICATION_SIGNATURE,
+    };
+
+    await request(app.getHttpServer())
+      .post('/api/v1/payment-providers/momo/ipn')
+      .send(ipn)
+      .expect(204);
+    await request(app.getHttpServer())
+      .post('/api/v1/payment-providers/momo/ipn')
+      .send({ ...ipn, resultCode: 1000, responseTime: Date.now() + 1 })
+      .expect(204);
+    await request(app.getHttpServer())
+      .post('/api/v1/payment-providers/momo/ipn')
+      .send(ipn)
+      .expect(204);
+
+    expect(
+      await prisma.purchase.findUniqueOrThrow({
+        where: { id: intent.purchase.purchaseReference },
+        select: { paymentStatus: true },
+      }),
+    ).toEqual({ paymentStatus: 'PAID' });
+    expect(await prisma.paymentEvent.count({ where: { attemptId: intent.attempt.id } })).toBe(2);
+  });
+
+  it('rejects an invalid IPN signature without mutating payment state', async () => {
+    const previewResponse = await request(app.getHttpServer())
+      .post('/api/v1/checkout/preview')
+      .set('Authorization', buyerBearer)
+      .set('Origin', 'http://localhost:3000')
+      .set('If-Match', '"cart-2"')
+      .send(previewBody())
+      .expect(200);
+    const confirmation = parseCheckoutConfirmationRequest({
+      ...previewBody(),
+      checkoutFingerprint: previewResponse.body.checkoutFingerprint as string,
+    });
+    if (!confirmation) throw new Error('Expected a valid normalized confirmation');
+    const intent = await checkoutService.createMomoPendingIntent(
+      buyerId,
+      2,
+      idempotencyKey,
+      confirmation,
+      600,
+    );
+
+    await request(app.getHttpServer())
+      .post('/api/v1/payment-providers/momo/ipn')
+      .send({
+        partnerCode: 'FAKE',
+        orderId: intent.attempt.orderId,
+        requestId: intent.attempt.requestId,
+        amount: Number(intent.attempt.amountMinor),
+        orderInfo: 'Sandbox purchase',
+        orderType: 'momo_wallet',
+        transId: '8000005',
+        resultCode: 0,
+        message: 'Successful.',
+        payType: 'qr',
+        responseTime: Date.now(),
+        extraData: '',
+        signature: 'b'.repeat(64),
+      })
+      .expect(400);
+    expect(
+      await prisma.paymentAttempt.findUniqueOrThrow({
+        where: { id: intent.attempt.id },
+        select: { status: true },
+      }),
+    ).toEqual({ status: 'PENDING' });
+    expect(await prisma.paymentEvent.count({ where: { attemptId: intent.attempt.id } })).toBe(0);
+  });
+
+  it('accepts signed IPN correlation mismatches without marking the purchase paid', async () => {
+    const previewResponse = await request(app.getHttpServer())
+      .post('/api/v1/checkout/preview')
+      .set('Authorization', buyerBearer)
+      .set('Origin', 'http://localhost:3000')
+      .set('If-Match', '"cart-2"')
+      .send(previewBody())
+      .expect(200);
+    const confirmation = parseCheckoutConfirmationRequest({
+      ...previewBody(),
+      checkoutFingerprint: previewResponse.body.checkoutFingerprint as string,
+    });
+    if (!confirmation) throw new Error('Expected a valid normalized confirmation');
+    const intent = await checkoutService.createMomoPendingIntent(
+      buyerId,
+      2,
+      idempotencyKey,
+      confirmation,
+      600,
+    );
+    const ipn = {
+      partnerCode: 'FAKE',
+      orderId: intent.attempt.orderId,
+      requestId: intent.attempt.requestId,
+      amount: Number(intent.attempt.amountMinor),
+      orderInfo: 'Sandbox purchase',
+      orderType: 'momo_wallet',
+      transId: '8000006',
+      resultCode: 0,
+      message: 'Successful.',
+      payType: 'qr',
+      responseTime: Date.now(),
+      extraData: '',
+      signature: FAKE_NOTIFICATION_SIGNATURE,
+    };
+
+    await request(app.getHttpServer())
+      .post('/api/v1/payment-providers/momo/ipn')
+      .send({ ...ipn, amount: ipn.amount + 1 })
+      .expect(204);
+    await request(app.getHttpServer())
+      .post('/api/v1/payment-providers/momo/ipn')
+      .send({ ...ipn, requestId: 'req_mismatched', responseTime: Date.now() + 1 })
+      .expect(204);
+    await request(app.getHttpServer())
+      .post('/api/v1/payment-providers/momo/ipn')
+      .send({ ...ipn, orderId: 'momo_unknown_order', responseTime: Date.now() + 2 })
+      .expect(204);
+
+    expect(
+      await prisma.paymentAttempt.findUniqueOrThrow({
+        where: { id: intent.attempt.id },
+        select: { status: true },
+      }),
+    ).toEqual({ status: 'PENDING_RECONCILIATION' });
+    expect(
+      await prisma.paymentEvent.count({
+        where: { attemptId: intent.attempt.id, decision: 'MISMATCH' },
+      }),
+    ).toBe(2);
+  });
+
+  it('leases reconciliation work once and finalizes a payment through provider query', async () => {
+    const previewResponse = await request(app.getHttpServer())
+      .post('/api/v1/checkout/preview')
+      .set('Authorization', buyerBearer)
+      .set('Origin', 'http://localhost:3000')
+      .set('If-Match', '"cart-2"')
+      .send(previewBody())
+      .expect(200);
+    const confirmation = parseCheckoutConfirmationRequest({
+      ...previewBody(),
+      checkoutFingerprint: previewResponse.body.checkoutFingerprint as string,
+    });
+    if (!confirmation) throw new Error('Expected a valid normalized confirmation');
+    const checkout = await onlinePaymentService.checkoutWithMomo(
+      buyerId,
+      2,
+      idempotencyKey,
+      { ...confirmation, provider: 'MOMO' },
+    );
+    await prisma.paymentAttempt.update({
+      where: { purchaseId: checkout.purchase.purchaseReference },
+      data: { nextReconcileAt: new Date(0) },
+    });
+
+    const claimed = await Promise.all([
+      paymentReconciliationService.reconcileDue(1),
+      paymentReconciliationService.reconcileDue(1),
+    ]);
+
+    expect(claimed.reduce((total, value) => total + value, 0)).toBe(1);
+    expect(fakePaymentProvider.queryCalls).toHaveLength(1);
+    expect(
+      await prisma.paymentAttempt.findUniqueOrThrow({
+        where: { purchaseId: checkout.purchase.purchaseReference },
+      }),
+    ).toMatchObject({
+      status: 'PAID',
+      leaseExpiresAt: null,
+    });
+  });
+
+  it('exposes online checkout and owner-scoped payment polling without client mutation', async () => {
+    const previewResponse = await request(app.getHttpServer())
+      .post('/api/v1/checkout/preview')
+      .set('Authorization', buyerBearer)
+      .set('Origin', 'http://localhost:3000')
+      .set('If-Match', '"cart-2"')
+      .send(previewBody())
+      .expect(200);
+    const created = await request(app.getHttpServer())
+      .post('/api/v1/checkout/online-payments')
+      .set('Authorization', buyerBearer)
+      .set('Origin', 'http://localhost:3000')
+      .set('If-Match', '"cart-2"')
+      .set('Idempotency-Key', idempotencyKey)
+      .send({
+        ...previewBody(),
+        checkoutFingerprint: previewResponse.body.checkoutFingerprint,
+        provider: 'MOMO',
+      })
+      .expect(201);
+    expect(isOnlinePaymentCheckoutResponse(created.body)).toBe(true);
+
+    const status = await request(app.getHttpServer())
+      .get(`/api/v1/payments/${created.body.payment.paymentReference}`)
+      .set('Authorization', buyerBearer)
+      .expect(200);
+    expect(isPaymentStatusResponse(status.body)).toBe(true);
+    expect(status.body).toMatchObject({
+      purchaseReference: created.body.purchase.purchaseReference,
+      status: 'PENDING',
+      instructions: null,
+      nextAction: 'WAIT',
+    });
+    await request(app.getHttpServer())
+      .get(`/api/v1/payments/${created.body.payment.paymentReference}`)
+      .set('Authorization', foreignBearer)
+      .expect(404);
+    await request(app.getHttpServer())
+      .post(`/api/v1/checkout/purchases/${created.body.purchase.purchaseReference}/payment-failed`)
+      .set('Authorization', buyerBearer)
+      .set('Origin', 'http://localhost:3000')
+      .expect(200, { released: false });
+    expect(
+      await prisma.inventoryReservation.findUniqueOrThrow({
+        where: { purchaseId: created.body.purchase.purchaseReference },
+        select: { status: true },
+      }),
+    ).toEqual({ status: 'ACTIVE' });
+  });
+
   it('rejects auth, Origin, foreign address, stale cart, and different idempotent intent', async () => {
     await request(app.getHttpServer())
       .post('/api/v1/checkout/preview')
       .set('Origin', 'http://localhost:3000')
+      .set('If-Match', '"cart-2"')
       .send(previewBody())
       .expect(401);
     await request(app.getHttpServer())

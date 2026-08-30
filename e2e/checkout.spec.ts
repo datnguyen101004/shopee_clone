@@ -97,7 +97,7 @@ function line(
 }
 function shop(shopId: string, slug: string, name: string, orderLine: ReturnType<typeof line>) {
   return {
-    shop: { id: shopId, slug, name },
+    shop: { id: shopId, ownerUserId: ids.buyer, slug, name },
     note: '',
     lines: [orderLine],
     shipping: shipping(shopId),
@@ -171,12 +171,23 @@ const purchase: PurchaseResult = {
   vouchers: [],
   summary,
 };
+const momoPurchase: PurchaseResult = {
+  ...purchase,
+  paymentMethod: 'MOMO',
+  paymentStatus: 'PENDING',
+  orders: purchase.orders.map((order) => ({ ...order, paymentStatus: 'PENDING' })),
+};
 const cart: CartResponse = {
   owner: 'authenticated',
   version: 7,
   groups: [
     {
-      shop: { ...shopA.shop, href: `/shops/${shopA.shop.slug}` },
+      shop: {
+        id: shopA.shop.id,
+        slug: shopA.shop.slug,
+        name: shopA.shop.name,
+        href: `/shops/${shopA.shop.slug}`,
+      },
       lines: [
         {
           id: ids.lineA,
@@ -204,7 +215,12 @@ const cart: CartResponse = {
       selectedEligibleLineCount: 1,
     },
     {
-      shop: { ...shopB.shop, href: `/shops/${shopB.shop.slug}` },
+      shop: {
+        id: shopB.shop.id,
+        slug: shopB.shop.slug,
+        name: shopB.shop.name,
+        href: `/shops/${shopB.shop.slug}`,
+      },
       lines: [
         {
           id: ids.lineB,
@@ -254,9 +270,11 @@ async function json(
   });
 }
 
-async function installCheckout(page: Page) {
+async function installCheckout(page: Page, paymentStatuses = ['PENDING', 'PAID']) {
   let confirmations = 0;
   let purchaseReads = 0;
+  let paymentReads = 0;
+  let forcedPaymentStatus: string | null = null;
   await page.route('**/api/v1/**', async (route) => {
     const request = route.request();
     const path = new URL(request.url()).pathname;
@@ -295,6 +313,56 @@ async function installCheckout(page: Page) {
       await new Promise((resolve) => setTimeout(resolve, 180));
       await json(route, { replayed: false, purchase }, 201, { ETag: '"cart-8"' });
     } else if (
+      request.method() === 'POST' &&
+      path === '/api/v1/checkout/online-payments'
+    ) {
+      confirmations += 1;
+      await json(route, {
+        replayed: false,
+        purchase: momoPurchase,
+        payment: {
+          paymentReference: ids.purchase,
+          purchaseReference: ids.purchase,
+          provider: 'MOMO',
+          paymentMethod: 'MOMO',
+          status: 'PENDING',
+          amountMinor: 344_000,
+          currency: 'VND',
+          expiresAt: new Date(Date.now() + 600_000).toISOString(),
+          nextAction: 'OPEN_MOMO',
+          instructions: {
+            payUrl: 'https://test-payment.momo.vn/pay',
+            deeplink: 'momo://sandbox/pay',
+            qrCodeValue: 'https://test-payment.momo.vn/qr',
+          },
+        },
+      }, 201);
+    } else if (request.method() === 'GET' && path === `/api/v1/payments/${ids.purchase}`) {
+      const status =
+        forcedPaymentStatus ??
+        paymentStatuses[Math.min(paymentReads, paymentStatuses.length - 1)]!;
+      paymentReads += 1;
+      const nextAction =
+        status === 'PAID' || status === 'REFUNDED'
+          ? 'DONE'
+          : status === 'PARTIALLY_REFUNDED'
+            ? 'CONTACT_SUPPORT'
+            : ['FAILED', 'CANCELLED', 'EXPIRED'].includes(status)
+              ? 'CHECKOUT_AGAIN'
+              : 'WAIT';
+      await json(route, {
+        paymentReference: ids.purchase,
+        purchaseReference: ids.purchase,
+        provider: 'MOMO',
+        paymentMethod: 'MOMO',
+        status,
+        amountMinor: 344_000,
+        currency: 'VND',
+        expiresAt: new Date(Date.now() + 600_000).toISOString(),
+        nextAction,
+        instructions: null,
+      });
+    } else if (
       request.method() === 'GET' &&
       path === `/api/v1/checkout/purchases/${ids.purchase}`
     ) {
@@ -304,7 +372,14 @@ async function installCheckout(page: Page) {
       await route.fulfill({ status: 404 });
     }
   });
-  return { confirmations: () => confirmations, purchaseReads: () => purchaseReads };
+  return {
+    confirmations: () => confirmations,
+    purchaseReads: () => purchaseReads,
+    paymentReads: () => paymentReads,
+    setPaymentStatus: (status: string) => {
+      forcedPaymentStatus = status;
+    },
+  };
 }
 
 async function expectNoOverflow(page: Page) {
@@ -342,4 +417,36 @@ test.describe('authenticated COD checkout', () => {
     await expect(page.getByText(ids.purchase, { exact: false })).toBeVisible();
     expect(calls.purchaseReads()).toBeGreaterThanOrEqual(2);
   });
+});
+
+test.describe('MoMo sandbox checkout', () => {
+  test('shows safe instructions, polls through a late callback, and survives reload', async ({ page }) => {
+    const calls = await installCheckout(page, ['PENDING']);
+    await page.goto('/checkout');
+    await page.getByRole('radio', { name: /Ví MoMo/ }).check();
+    await page.getByRole('button', { name: 'Đặt hàng' }).click();
+    await expect(page).toHaveURL(`/checkout/payment/${ids.purchase}`);
+    await expect(page.getByRole('img', { name: 'Mã QR MoMo sandbox' })).toBeVisible();
+    calls.setPaymentStatus('PAID');
+    await expect(page.getByRole('heading', { name: 'Thanh toán thành công' })).toBeVisible({ timeout: 8_000 });
+    expect(calls.confirmations()).toBe(1);
+    expect(calls.paymentReads()).toBeGreaterThanOrEqual(2);
+    await page.reload();
+    await expect(page.getByRole('heading', { name: 'Thanh toán thành công' })).toBeVisible();
+    await expectNoOverflow(page);
+  });
+
+  for (const [status, heading] of [
+    ['CANCELLED', 'Thanh toán đã hủy'],
+    ['EXPIRED', 'Giao dịch đã hết hạn'],
+    ['PENDING_RECONCILIATION', 'Đang đối soát với MoMo'],
+    ['REFUND_PENDING', 'Đang hoàn tiền'],
+    ['REFUNDED', 'Đã hoàn tiền'],
+  ] as const) {
+    test(`renders ${status} from backend without trusting redirect data`, async ({ page }) => {
+      await installCheckout(page, [status]);
+      await page.goto(`/checkout/payment/${ids.purchase}?resultCode=0&status=PAID`);
+      await expect(page.getByRole('heading', { name: heading })).toBeVisible();
+    });
+  }
 });

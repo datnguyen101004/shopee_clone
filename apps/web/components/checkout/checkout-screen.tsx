@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useRef, useState } from 'react';
 
-import { CheckoutApiError, confirmCodCheckout } from '../../lib/checkout-api';
+import { CheckoutApiError, confirmCodCheckout, confirmMomoCheckout } from '../../lib/checkout-api';
 import { clearCheckoutDraft } from '../../lib/checkout-draft';
 import { CheckoutSubmitIntent } from '../../lib/checkout-intent';
 import { AddressCreationDialog } from '../address-creation-dialog';
@@ -36,6 +36,7 @@ export function CheckoutScreen() {
   const [submitting, setSubmitting] = useState(false);
   const [submitMessage, setSubmitMessage] = useState('');
   const [addressDialogOpen, setAddressDialogOpen] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState<'COD' | 'MOMO'>('COD');
 
   if (auth.state.status === 'guest' || cart.state.status === 'unauthenticated') {
     return (
@@ -85,20 +86,42 @@ export function CheckoutScreen() {
     }
     submitLock.current = true;
     setSubmitting(true);
-    setSubmitMessage('Đang tạo đơn hàng COD…');
+    setSubmitMessage(
+      paymentMethod === 'MOMO' ? 'Đang tạo giao dịch MoMo sandbox…' : 'Đang tạo đơn hàng COD…',
+    );
     const request = { ...checkout.request, checkoutFingerprint: preview.checkoutFingerprint };
-    const signature = JSON.stringify({ cartVersion: currentCart!.version, request });
+    const signature = JSON.stringify({ cartVersion: currentCart!.version, request, paymentMethod });
     try {
-      const result = await confirmCodCheckout(
-        request,
-        currentCart!.version,
-        intent.current.keyFor(signature),
-        auth.authenticatedFetch,
-      );
-      clearCheckoutDraft(window.sessionStorage);
-      intent.current.clear();
-      await cart.refresh();
-      router.replace(`/checkout/success/${result.purchase.purchaseReference}`);
+      const idempotencyKey = intent.current.keyFor(signature);
+      if (paymentMethod === 'MOMO') {
+        const result = await confirmMomoCheckout(
+          { ...request, provider: 'MOMO' },
+          currentCart!.version,
+          idempotencyKey,
+          auth.authenticatedFetch,
+        );
+        clearCheckoutDraft(window.sessionStorage);
+        intent.current.clear();
+        await cart.refresh();
+        if (result.payment.instructions) {
+          window.sessionStorage.setItem(
+            `momo:instructions:${result.payment.paymentReference}`,
+            JSON.stringify(result.payment.instructions),
+          );
+        }
+        router.replace(`/checkout/payment/${result.payment.paymentReference}`);
+      } else {
+        const result = await confirmCodCheckout(
+          request,
+          currentCart!.version,
+          idempotencyKey,
+          auth.authenticatedFetch,
+        );
+        clearCheckoutDraft(window.sessionStorage);
+        intent.current.clear();
+        await cart.refresh();
+        router.replace(`/checkout/success/${result.purchase.purchaseReference}`);
+      }
     } catch (error) {
       if (error instanceof CheckoutApiError && error.status === 401) {
         router.replace('/login?returnTo=%2Fcheckout');
@@ -284,8 +307,26 @@ export function CheckoutScreen() {
       <section className="checkout-card checkout-payment">
         <h2>Phương thức thanh toán</h2>
         <label>
-          <input type="radio" checked readOnly /> Thanh toán khi nhận hàng (COD)
+          <input
+            type="radio"
+            name="payment-method"
+            checked={paymentMethod === 'COD'}
+            onChange={() => setPaymentMethod('COD')}
+          />{' '}
+          Thanh toán khi nhận hàng (COD)
         </label>
+        <label>
+          <input
+            type="radio"
+            name="payment-method"
+            checked={paymentMethod === 'MOMO'}
+            onChange={() => setPaymentMethod('MOMO')}
+          />{' '}
+          Ví MoMo (sandbox)
+        </label>
+        {paymentMethod === 'MOMO' ? (
+          <p>Bạn sẽ dùng QR hoặc ứng dụng MoMo Test để thanh toán tổng tiền đã xác nhận.</p>
+        ) : null}
       </section>
 
       <div

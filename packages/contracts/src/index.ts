@@ -462,6 +462,24 @@ export type {
   ShopOrderStatus,
 } from './checkout';
 export {
+  PAYMENT_NEXT_ACTIONS,
+  PAYMENT_PROVIDERS,
+  isOnlinePaymentCheckoutResponse,
+  isPaymentInstructions,
+  isPaymentStatusResponse,
+  parseOnlinePaymentCheckoutRequest,
+  parseOnlinePaymentCheckoutResponse,
+  parsePaymentStatusResponse,
+} from './payments';
+export type {
+  OnlinePaymentCheckoutRequest,
+  OnlinePaymentCheckoutResponse,
+  PaymentInstructions,
+  PaymentNextAction,
+  PaymentProvider,
+  PaymentStatusResponse,
+} from './payments';
+export {
   ORDER_CANCELLATION_NOTE_MAX_LENGTH,
   ORDER_CANCELLATION_REASON_CODES,
   ORDER_HISTORY_VERSION,

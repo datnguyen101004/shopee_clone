@@ -6,6 +6,7 @@ import { VouchersModule } from '../vouchers/vouchers.module';
 import { InventoryModule } from '../inventory/inventory.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { CheckoutAssembler } from './checkout-assembler';
+import { CheckoutPurchaseBuilder } from './checkout-purchase-builder';
 import { CheckoutController } from './checkout.controller';
 import { CheckoutExceptionFilter } from './checkout-exception.filter';
 import { CheckoutService } from './checkout.service';
@@ -18,6 +19,7 @@ import { PurchaseProjector } from './purchase-projector';
   providers: [
     CheckoutExceptionFilter,
     CheckoutAssembler,
+    CheckoutPurchaseBuilder,
     CheckoutService,
     OrderWriter,
     PurchaseProjector,

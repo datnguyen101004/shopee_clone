@@ -1,6 +1,10 @@
 import { randomUUID } from 'node:crypto';
 
-import type { CheckoutPreviewResponse } from '@shopee-clone/contracts';
+import type {
+  CheckoutPreviewResponse,
+  PurchasePaymentMethod,
+  PurchasePaymentStatus,
+} from '@shopee-clone/contracts';
 import { Injectable } from '@nestjs/common';
 
 import { Prisma } from '../generated/prisma/client';
@@ -13,6 +17,8 @@ export interface WritePurchaseInput {
   buyerId: string;
   idempotencyKey: string;
   requestDigest: string;
+  paymentMethod: PurchasePaymentMethod;
+  paymentStatus: PurchasePaymentStatus;
   preview: CheckoutPreviewResponse;
   applied: readonly AppliedVoucherSnapshot[];
 }
@@ -31,7 +37,9 @@ export class OrderWriter {
     input: WritePurchaseInput,
   ): Promise<WrittenPurchaseVouchers> {
     const { summary } = input.preview;
-    const clock = await transaction.$queryRaw<Array<{ now: Date }>>(Prisma.sql`SELECT clock_timestamp() AS "now"`);
+    const clock = await transaction.$queryRaw<Array<{ now: Date }>>(
+      Prisma.sql`SELECT clock_timestamp() AS "now"`,
+    );
     const createdAt = clock[0]?.now instanceof Date ? clock[0].now : new Date();
     await transaction.purchase.create({
       data: {
@@ -41,6 +49,8 @@ export class OrderWriter {
         requestDigest: input.requestDigest,
         checkoutFingerprint: input.preview.checkoutFingerprint!,
         sourceCartVersion: input.preview.cartVersion,
+        paymentMethod: input.paymentMethod,
+        paymentStatus: input.paymentStatus,
         addressSnapshot: json(input.preview.address),
         listSubtotalMinor: money(summary.listSubtotalMinor),
         productDiscountMinor: money(summary.productDiscountMinor),
@@ -68,6 +78,7 @@ export class OrderWriter {
           id: orderId,
           purchaseId: input.purchaseId,
           shopId: shop.shop.id,
+          paymentStatus: input.paymentStatus,
           shopSnapshot: json(shop.shop),
           note: shop.note,
           shippingSnapshot: json(shop.shipping),
@@ -96,7 +107,7 @@ export class OrderWriter {
           actorUserId: null,
           reasonCode: 'ORDER_CREATED',
           reasonNote: null,
-          },
+        },
       });
       await transaction.sellerOrderFulfillment.create({
         data: {

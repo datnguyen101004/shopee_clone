@@ -6,12 +6,18 @@ import {
   parseCheckoutPreviewResponse,
   parseCheckoutProblemDetails,
   parsePurchaseResult,
+  parseOnlinePaymentCheckoutRequest,
+  parseOnlinePaymentCheckoutResponse,
+  parsePaymentStatusResponse,
   type CheckoutConfirmationRequest,
   type CheckoutConfirmationResponse,
   type CheckoutPreviewRequest,
   type CheckoutPreviewResponse,
   type CheckoutProblemDetails,
   type PurchaseResult,
+  type OnlinePaymentCheckoutRequest,
+  type OnlinePaymentCheckoutResponse,
+  type PaymentStatusResponse,
 } from '@shopee-clone/contracts';
 
 import type { AuthenticatedFetch } from './account-api';
@@ -122,6 +128,61 @@ export async function confirmCodCheckout(
   );
   const parsed = parseCheckoutConfirmationResponse(await response.json());
   if (!parsed || parsed.purchase.sourceCartVersion !== cartVersion) {
+    throw new CheckoutApiError('contract', response.status);
+  }
+  return parsed;
+}
+
+export async function confirmMomoCheckout(
+  input: OnlinePaymentCheckoutRequest,
+  cartVersion: number,
+  idempotencyKey: string,
+  authenticatedFetch: AuthenticatedFetch,
+): Promise<OnlinePaymentCheckoutResponse> {
+  const parsedInput = parseOnlinePaymentCheckoutRequest(input);
+  if (
+    !parsedInput ||
+    !Number.isSafeInteger(cartVersion) ||
+    cartVersion < 0 ||
+    !CHECKOUT_IDEMPOTENCY_KEY_PATTERN.test(idempotencyKey)
+  ) {
+    throw new CheckoutApiError('input');
+  }
+  const response = await checkoutRequest(
+    '/api/v1/checkout/online-payments',
+    {
+      method: 'POST',
+      headers: {
+        'If-Match': `"cart-${cartVersion}"`,
+        'Idempotency-Key': idempotencyKey,
+      },
+      body: JSON.stringify(parsedInput),
+    },
+    authenticatedFetch,
+  );
+  const parsed = parseOnlinePaymentCheckoutResponse(await response.json());
+  if (!parsed || parsed.purchase.sourceCartVersion !== cartVersion) {
+    throw new CheckoutApiError('contract', response.status);
+  }
+  return parsed;
+}
+
+export async function getPaymentStatus(
+  paymentReference: string,
+  authenticatedFetch: AuthenticatedFetch,
+  signal?: AbortSignal,
+): Promise<PaymentStatusResponse> {
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(paymentReference)) {
+    throw new CheckoutApiError('input');
+  }
+  const response = await checkoutRequest(
+    `/api/v1/payments/${encodeURIComponent(paymentReference)}`,
+    { method: 'GET' },
+    authenticatedFetch,
+    signal,
+  );
+  const parsed = parsePaymentStatusResponse(await response.json());
+  if (!parsed || parsed.paymentReference !== paymentReference) {
     throw new CheckoutApiError('contract', response.status);
   }
   return parsed;

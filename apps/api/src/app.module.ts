@@ -30,6 +30,7 @@ import { NotificationsModule } from './notifications/notifications.module';
 import { SellerIdentityModule } from './seller-identity/seller-identity.module';
 import { ChatModule } from './chat/chat.module';
 import { CarrierModule } from './carrier/carrier.module';
+import { PaymentsModule } from './payments/payments.module';
 
 @Module({
   imports: [
@@ -63,7 +64,7 @@ import { CarrierModule } from './carrier/carrier.module';
     SellerIdentityModule,
     ChatModule,
     CarrierModule,
+    PaymentsModule,
   ],
 })
 export class AppModule {}
-

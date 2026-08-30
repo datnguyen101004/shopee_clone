@@ -22,7 +22,12 @@ const orderReference = '00000000-0000-4000-8000-000000000701';
 const fingerprint = 'a'.repeat(64);
 
 const shop = {
-  shop: { id: shopId, ownerUserId: '00000000-0000-4000-8000-000000000601', slug: 'shop-a', name: 'Shop A' },
+  shop: {
+    id: shopId,
+    ownerUserId: '00000000-0000-4000-8000-000000000601',
+    slug: 'shop-a',
+    name: 'Shop A',
+  },
   note: 'Giao giờ hành chính',
   lines: [
     {
@@ -138,7 +143,11 @@ const purchase: PurchaseResult = {
       orderReference,
       status: 'PENDING_CONFIRMATION',
       paymentStatus: 'UNPAID',
-      inventoryHold: { status: 'CONSUMED', expiresAt: '2026-08-14T05:16:00.000Z', terminalReason: 'checkout-completed' },
+      inventoryHold: {
+        status: 'CONSUMED',
+        expiresAt: '2026-08-14T05:16:00.000Z',
+        terminalReason: 'checkout-completed',
+      },
     },
   ],
   vouchers: [],
@@ -266,6 +275,15 @@ describe('checkout contracts', () => {
         orders: [{ ...purchase.orders[0], payableTotalMinor: Number.MAX_SAFE_INTEGER }],
       }),
     ).toBe(false);
+    expect(
+      isPurchaseResult({
+        ...purchase,
+        paymentMethod: 'MOMO',
+        paymentStatus: 'PENDING',
+        orders: purchase.orders.map((order) => ({ ...order, paymentStatus: 'PENDING' })),
+      }),
+    ).toBe(true);
+    expect(isPurchaseResult({ ...purchase, paymentMethod: 'OTHER' })).toBe(false);
   });
 
   it('validates stable Problem Details extensions', () => {

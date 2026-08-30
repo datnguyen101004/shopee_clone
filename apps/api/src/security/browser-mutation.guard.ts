@@ -40,9 +40,9 @@ export class BrowserMutationGuard implements CanActivate {
 
     if (!unsafeMethods.has(request.method)) return true;
     if (requestClass === 'provider-signed-webhook') {
-      const verified = (request as Request & { externalRequestVerified?: string })
-        .externalRequestVerified;
-      if (verified === requestClass) return true;
+      // Provider webhooks do not carry browser Origin/CSRF state. Their controller
+      // must verify the signed body before invoking any domain mutation.
+      return true;
     }
 
     const origin = request.headers.origin;

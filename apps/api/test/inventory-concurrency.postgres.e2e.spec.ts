@@ -10,6 +10,7 @@ const keyA = '00000000-0000-4000-8000-000000009972';
 const keyB = '00000000-0000-4000-8000-000000009973';
 const adjustmentKeyA = '00000000-0000-4000-8000-000000009974';
 const adjustmentKeyB = '00000000-0000-4000-8000-000000009975';
+const finalizationKey = '00000000-0000-4000-8000-000000009976';
 
 loadRepositoryEnvironment();
 if (process.env.TEST_DATABASE_URL) process.env.DATABASE_URL = process.env.TEST_DATABASE_URL;
@@ -69,6 +70,31 @@ databaseTest('inventory PostgreSQL concurrency', () => {
     const balance = await prisma.inventory.findUniqueOrThrow({ where: { variantId } });
     expect(balance.quantityReserved).toBe(1);
     expect(balance.quantityReserved).toBeLessThanOrEqual(balance.quantityOnHand);
+  });
+
+  it('releases a reservation exactly once when finalizers race with the same key', async () => {
+    const reservation = await prisma.inventoryReservation.findFirstOrThrow({
+      where: { buyerId: { in: [buyerA, buyerB] }, status: 'ACTIVE' },
+    });
+    const before = await prisma.inventory.findUniqueOrThrow({ where: { variantId } });
+
+    const results = await Promise.all([
+      service.release(reservation.id, 'payment-failed', finalizationKey),
+      service.release(reservation.id, 'payment-failed', finalizationKey),
+    ]);
+
+    expect(results.every((result) => result?.status === 'RELEASED')).toBe(true);
+    const after = await prisma.inventory.findUniqueOrThrow({ where: { variantId } });
+    expect(after.quantityReserved).toBe(before.quantityReserved - 1);
+    expect(after.quantityOnHand).toBe(before.quantityOnHand);
+    expect(after.quantitySold).toBe(before.quantitySold);
+    expect(
+      await prisma.inventoryReservation.findUniqueOrThrow({ where: { id: reservation.id } }),
+    ).toMatchObject({
+      status: 'RELEASED',
+      terminalReason: 'payment-failed',
+      terminalIdempotencyKey: finalizationKey,
+    });
   });
 
   it('lists published inventory with the primary image projection before pagination', async () => {

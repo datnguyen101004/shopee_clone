@@ -1,4 +1,9 @@
-import { isPublicScheduledPriceBreakdown, type PublicScheduledPriceBreakdown } from './pricing';
+import {
+  isBuyerBestPricePreview,
+  isPublicScheduledPriceBreakdown,
+  type BuyerBestPricePreview,
+  type PublicScheduledPriceBreakdown,
+} from './pricing';
 
 export const CATALOG_DEFAULT_PAGE = 1;
 export const CATALOG_DEFAULT_PAGE_SIZE = 12;
@@ -71,6 +76,7 @@ export interface CatalogProductCard {
   compareAtPriceMinor?: number;
   discountPercent?: number;
   scheduledPrice?: PublicScheduledPriceBreakdown;
+  buyerBestPrice?: BuyerBestPricePreview;
   ratingAverageBasisPoints: number;
   ratingCount: number;
   soldCount: number;
@@ -145,9 +151,25 @@ export const isCatalogProductCard = (value: unknown): value is CatalogProductCar
     value.ratingAverageBasisPoints > 500 ||
     !isSafeNonNegativeInteger(value.ratingCount) ||
     !isSafeNonNegativeInteger(value.soldCount) ||
-    !(value.scheduledPrice === undefined || isPublicScheduledPriceBreakdown(value.scheduledPrice)) ||
+    !(
+      value.scheduledPrice === undefined || isPublicScheduledPriceBreakdown(value.scheduledPrice)
+    ) ||
+    !(value.buyerBestPrice === undefined || isBuyerBestPricePreview(value.buyerBestPrice)) ||
     !isShop(value.shop) ||
     !isCategory(value.category)
+  ) {
+    return false;
+  }
+
+  if (
+    value.scheduledPrice !== undefined &&
+    value.scheduledPrice.effectivePriceMinor !== value.priceMinor
+  ) {
+    return false;
+  }
+  if (
+    value.buyerBestPrice !== undefined &&
+    value.buyerBestPrice.effectivePriceMinor !== value.priceMinor
   ) {
     return false;
   }

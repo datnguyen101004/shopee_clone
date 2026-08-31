@@ -9355,6 +9355,61 @@ textarea {
   animation: fadeIn 0.18s ease;
 }
 
+.self-purchase-warning-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100000;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background: rgba(15, 23, 42, 0.52);
+}
+
+.self-purchase-warning {
+  width: min(100%, 400px);
+  padding: 1.5rem;
+  border-radius: 1rem;
+  background: #ffffff;
+  color: #1f2937;
+  text-align: center;
+  box-shadow: 0 24px 64px rgba(15, 23, 42, 0.3);
+}
+
+.self-purchase-warning__icon {
+  display: grid;
+  place-items: center;
+  width: 3rem;
+  height: 3rem;
+  margin: 0 auto 0.9rem;
+  border-radius: 999px;
+  background: #fff1f0;
+  color: #ee4d2d;
+  font-size: 1.5rem;
+  font-weight: 800;
+}
+
+.self-purchase-warning h2 {
+  margin: 0;
+  font-size: 1.2rem;
+}
+
+.self-purchase-warning p {
+  margin: 0.75rem 0 1.25rem;
+  color: #64748b;
+  line-height: 1.5;
+}
+
+.self-purchase-warning button {
+  min-width: 8rem;
+  min-height: 2.75rem;
+  border: 0;
+  border-radius: 0.6rem;
+  background: #ee4d2d;
+  color: #ffffff;
+  font-weight: 700;
+  cursor: pointer;
+}
+
 .product-detail-toast {
   pointer-events: auto;
   display: flex;

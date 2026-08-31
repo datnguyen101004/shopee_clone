@@ -9,6 +9,8 @@ import { PricingController } from './pricing.controller';
 import { PricingExceptionFilter } from './pricing-exception.filter';
 import { PricingQuoteService } from './pricing-quote.service';
 import { ScheduledDiscountService } from './scheduled-discount.service';
+import { BuyerBestPriceRepository } from './buyer-best-price.repository';
+import { BuyerBestPriceService } from './buyer-best-price.service';
 
 @Module({
   imports: [AuthModule, VouchersModule],
@@ -20,7 +22,15 @@ import { ScheduledDiscountService } from './scheduled-discount.service';
     CommercePricingCalculator,
     PricingQuoteService,
     ScheduledDiscountService,
+    BuyerBestPriceRepository,
+    BuyerBestPriceService,
   ],
-  exports: [CommercePricingCalculator, MockShippingCalculator, PricingQuoteService, ScheduledDiscountService],
+  exports: [
+    CommercePricingCalculator,
+    MockShippingCalculator,
+    PricingQuoteService,
+    ScheduledDiscountService,
+    BuyerBestPriceService,
+  ],
 })
 export class PricingModule {}

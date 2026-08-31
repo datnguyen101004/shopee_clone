@@ -1,6 +1,11 @@
 'use client';
 
-import type { CatalogProductCard, FavoritePage, RecentlyViewedPage } from '@shopee-clone/contracts';
+import {
+  buyerDisplayProductPriceMinor,
+  type CatalogProductCard,
+  type FavoritePage,
+  type RecentlyViewedPage,
+} from '@shopee-clone/contracts';
 import { Card } from '@shopee-clone/ui';
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
@@ -31,7 +36,10 @@ function ProductSummary({ product }: { product: CatalogProductCard }) {
         <small>
           {product.shop.name} · {product.shop.location}
         </small>
-        <b>₫{money(product.priceMinor)}</b>
+        <b>₫{money(buyerDisplayProductPriceMinor(product))}</b>
+        {product.buyerBestPrice?.merchandiseDiscountMinor ? (
+          <small>Giá tốt nhất dự kiến · Voucher đã áp dụng</small>
+        ) : null}
       </span>
     </Link>
   );

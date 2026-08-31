@@ -5,9 +5,10 @@ import { HomepageController } from './homepage.controller';
 import { HomepageRepository } from './homepage.repository';
 import { HomepageService } from './homepage.service';
 import { PricingModule } from '../pricing/pricing.module';
+import { AuthModule } from '../auth/auth.module';
 
 @Module({
-  imports: [PricingModule],
+  imports: [PricingModule, AuthModule],
   controllers: [HomepageController],
   providers: [
     HomepageRepository,

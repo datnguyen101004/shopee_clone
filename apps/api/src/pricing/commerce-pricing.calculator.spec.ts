@@ -77,8 +77,8 @@ describe('commerce pricing calculator', () => {
       merchandiseSubtotalMinor: 200_000,
       shipmentWeightGrams: 600,
     });
-    expect(quote.shops[0]!.shipping.service).toBe('STANDARD');
-    expect(quote.shops[1]!.shipping.service).toBe('ECONOMY');
+    expect(quote.shops[0]!.shipping?.service).toBe('STANDARD');
+    expect(quote.shops[1]!.shipping?.service).toBe('ECONOMY');
     expect(quote.summary).toMatchObject({
       selectedLineCount: 2,
       selectedQuantity: 3,
@@ -137,7 +137,7 @@ describe('commerce pricing calculator', () => {
       );
       const quote = demoCalculator.calculate({
         ...snapshot,
-        address: { ...snapshot.address, district: 'Quận 1' },
+        address: { ...snapshot.address!, district: 'Quận 1' },
         lines: snapshot.lines.map((line) => ({
           ...line,
           shop: {
@@ -147,7 +147,7 @@ describe('commerce pricing calculator', () => {
         })),
       });
       expect(quote.shippingVersion).toBe('demo-distance-v1');
-      expect(quote.shops.every((shop) => shop.shipping.provider === 'DEMO_CARRIER')).toBe(true);
+      expect(quote.shops.every((shop) => shop.shipping?.provider === 'DEMO_CARRIER')).toBe(true);
       expect(isPricingQuoteResponse(quote)).toBe(true);
     } finally {
       if (previous === undefined) delete process.env.DEMO_CARRIER_ENABLED;

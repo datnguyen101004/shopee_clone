@@ -259,10 +259,14 @@ export function CheckoutScreen() {
                   ))}
                 </select>
               </label>
-              <span>
-                Nhận sau {shop.shipping.estimatedDaysMin}–{shop.shipping.estimatedDaysMax} ngày ·{' '}
-                {money(shop.shippingPayableMinor)}
-              </span>
+              {shop.shipping ? (
+                <span>
+                  Nhận sau {shop.shipping.estimatedDaysMin}–{shop.shipping.estimatedDaysMax} ngày ·{' '}
+                  {money(shop.shippingPayableMinor)}
+                </span>
+              ) : (
+                <span>Chưa có báo giá vận chuyển.</span>
+              )}
               <label>
                 Lời nhắn cho shop
                 <textarea

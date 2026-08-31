@@ -82,9 +82,13 @@ export class ShopStorefrontService {
     };
   }
 
-  async products(slug: string, query: ShopCatalogQuery): Promise<PublicShopCatalogPage> {
+  async products(
+    slug: string,
+    query: ShopCatalogQuery,
+    buyerId: string | null = null,
+  ): Promise<PublicShopCatalogPage> {
     const shop = await this.resolvePublicShop(slug);
-    return this.catalog.getShopProducts(shop.id, query);
+    return this.catalog.getShopProducts(shop.id, query, buyerId);
   }
 
   async status(userId: string, shopIds: string[]): Promise<ShopFollowStateList> {

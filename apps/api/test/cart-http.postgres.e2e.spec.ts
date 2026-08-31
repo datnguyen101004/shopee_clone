@@ -43,6 +43,7 @@ interface CatalogFixtureSnapshot {
   quantityOnHand: number;
   quantityReserved: number;
   shopId: string;
+  shopOwnerId: string;
   shopLocation: string;
 }
 
@@ -151,7 +152,7 @@ databaseTest('Authenticated cart HTTP and browser security with isolated Postgre
         maxPurchaseQuantity: true,
         inventory: { select: { quantityOnHand: true, quantityReserved: true } },
         product: {
-          select: { id: true, shop: { select: { id: true, location: true } } },
+          select: { id: true, shop: { select: { id: true, ownerId: true, location: true } } },
         },
       },
     });
@@ -176,6 +177,7 @@ databaseTest('Authenticated cart HTTP and browser security with isolated Postgre
       quantityOnHand: candidate.inventory!.quantityOnHand,
       quantityReserved: candidate.inventory!.quantityReserved,
       shopId: candidate.product.shop.id,
+      shopOwnerId: candidate.product.shop.ownerId,
       shopLocation: candidate.product.shop.location,
     }));
     await prisma.voucherUserUsage.deleteMany({
@@ -291,7 +293,7 @@ databaseTest('Authenticated cart HTTP and browser security with isolated Postgre
         }),
         prisma.shop.update({
           where: { id: snapshot.shopId },
-          data: { location: snapshot.shopLocation },
+          data: { ownerId: snapshot.shopOwnerId, location: snapshot.shopLocation },
         }),
       ]),
     );
@@ -350,6 +352,54 @@ databaseTest('Authenticated cart HTTP and browser security with isolated Postgre
     expect(response.headers.etag).toBe('"cart-0"');
     expect(response.headers['set-cookie']).toBeUndefined();
     expect(response.body).toMatchObject({ owner: 'authenticated', version: 0, groups: [] });
+  });
+
+  it('blocks self-purchase before cart writes and excludes a stale own-shop line from checkout', async () => {
+    const added = await request(app.getHttpServer())
+      .post('/api/v1/cart/items')
+      .set('Authorization', bearer)
+      .set('Origin', 'http://localhost:3000')
+      .set('If-Match', '"cart-0"')
+      .send({ variantId, quantity: 1 })
+      .expect(200);
+
+    await prisma.shop.update({ where: { id: firstShopId }, data: { ownerId: userId } });
+
+    const preview = await request(app.getHttpServer())
+      .post('/api/v1/checkout/preview')
+      .set('Authorization', bearer)
+      .set('Origin', 'http://localhost:3000')
+      .set('If-Match', added.headers.etag as string)
+      .send({ shippingAddressId: addressId, services: [] })
+      .expect(200);
+    expect(preview.body).toMatchObject({
+      ready: false,
+      shops: [],
+      blockers: [
+        expect.objectContaining({
+          code: 'EMPTY_SELECTION',
+        }),
+        expect.objectContaining({
+          code: 'LINE_UNAVAILABLE',
+          message: 'Bạn không thể mua sản phẩm từ cửa hàng của chính mình.',
+        }),
+      ],
+    });
+    expect(await prisma.purchase.count({ where: { buyerId: userId } })).toBe(0);
+
+    await prisma.cart.deleteMany({ where: { userId } });
+    const rejected = await request(app.getHttpServer())
+      .post('/api/v1/cart/items')
+      .set('Authorization', bearer)
+      .set('Origin', 'http://localhost:3000')
+      .set('If-Match', '"cart-0"')
+      .send({ variantId, quantity: 1 })
+      .expect(409);
+    expect(rejected.body).toMatchObject({
+      type: 'https://shopee-clone.local/problems/self-purchase-forbidden',
+      status: 409,
+    });
+    expect(await prisma.cart.count({ where: { userId } })).toBe(0);
   });
 
   it('denies missing/untrusted Origin and form-compatible payloads before mutation', async () => {

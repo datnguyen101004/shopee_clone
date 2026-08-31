@@ -159,7 +159,10 @@ function rejected(
 function remainingUses(definition: VoucherDefinitionSnapshot): number {
   return Math.max(
     0,
-    Math.min(definition.usageLimit - definition.usedCount, definition.perBuyerLimit - definition.buyerUsedCount),
+    Math.min(
+      definition.usageLimit - definition.usedCount,
+      definition.perBuyerLimit - definition.buyerUsedCount,
+    ),
   );
 }
 
@@ -291,8 +294,10 @@ export function listAvailableShippingVouchers(
     const remainingCount = remainingUses(definition);
     if (remainingCount < 1) continue;
     const productScope = new Set(definition.productIds);
-    const eligibleShops = quote.shops.filter((shop) =>
-      shop.lines.some((line) => productScope.size === 0 || productScope.has(line.productId)),
+    const eligibleShops = quote.shops.filter(
+      (shop) =>
+        shop.shipping !== null &&
+        shop.lines.some((line) => productScope.size === 0 || productScope.has(line.productId)),
     );
     if (eligibleShops.length === 0) continue;
     const spend = checkedAdd(
@@ -304,7 +309,7 @@ export function listAvailableShippingVouchers(
     );
     if (spend < definition.minimumSpendMinor) continue;
     const eligibleShipping = checkedAdd(
-      ...eligibleShops.map((shop) => shop.shipping.shippingFeeMinor),
+      ...eligibleShops.map((shop) => shop.shipping?.shippingFeeMinor ?? 0),
     );
     if (eligibleShipping === 0) continue;
     const estimatedDiscountMinor = benefitFor(definition, eligibleShipping);
@@ -431,12 +436,12 @@ export class VoucherPricingCalculator {
       if (request.slot === 'FREE_SHIPPING') {
         const eligibleShopIds = new Set(eligibleLines.map(({ shopId }) => shopId));
         const targets = baseQuote.shops
-          .filter(({ shop }) => eligibleShopIds.has(shop.id))
+          .filter(({ shop, shipping }) => eligibleShopIds.has(shop.id) && shipping !== null)
           .map(({ shop, shipping }) => ({
             key: shop.id,
             shopId: shop.id,
             lineId: null,
-            weightMinor: shipping.shippingFeeMinor,
+            weightMinor: shipping?.shippingFeeMinor ?? 0,
           }));
         const eligibleShipping = checkedAdd(...targets.map(({ weightMinor }) => weightMinor));
         if (eligibleShipping === 0) {
@@ -550,7 +555,7 @@ export class VoucherPricingCalculator {
           shippingVoucherDiscountMinor,
         );
         const shippingPayableMinor = checkedSubtract(
-          shop.shipping.shippingFeeMinor,
+          shop.shipping?.shippingFeeMinor ?? 0,
           shippingVoucherDiscountMinor,
         );
         return {

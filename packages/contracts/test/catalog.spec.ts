@@ -46,6 +46,29 @@ describe('catalog contract', () => {
     expect(parseCatalogProductsResponse(response)).toEqual(response);
   });
 
+  it('accepts matching scheduled pricing and rejects a divergent canonical price', () => {
+    const scheduledPrice = {
+      basePriceMinor: 499_000,
+      effectivePriceMinor: 399_000,
+      compareAtPriceMinor: 499_000,
+      discountBasisPoints: 2_000,
+      campaignId: 'campaign-1',
+      evaluatedAt: '2026-08-31T00:00:00.000Z',
+    };
+    expect(
+      isCatalogProductsResponse({
+        ...response,
+        items: [{ ...response.items[0], scheduledPrice }],
+      }),
+    ).toBe(true);
+    expect(
+      isCatalogProductsResponse({
+        ...response,
+        items: [{ ...response.items[0], priceMinor: 398_000, scheduledPrice }],
+      }),
+    ).toBe(false);
+  });
+
   it('rejects malformed payloads and inconsistent pagination', () => {
     expect(isCatalogProductsResponse({ ...response, items: 'products' })).toBe(false);
     expect(

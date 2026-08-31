@@ -138,7 +138,7 @@ describe('cart pricing coordination', () => {
     expect(result.current.quote?.summary.payableTotalMinor).toBe(35_000);
   });
 
-  it('reloads the cart after a stale quote and shows an address-required state', async () => {
+  it('reloads after a stale quote and still requests merchandise pricing without an address', async () => {
     vi.mocked(getPricingQuote).mockRejectedValueOnce(
       new PricingApiError('status', 409, {
         type: 'https://shopee-clone.local/problems/pricing-conflict',
@@ -153,9 +153,16 @@ describe('cart pricing coordination', () => {
     unmount();
 
     vi.mocked(getShippingAddresses).mockResolvedValueOnce({ items: [] });
+    vi.mocked(getPricingQuote).mockResolvedValueOnce({
+      ...quote(0),
+      shippingVersion: null,
+      address: null,
+    });
     const missing = renderHook(() => useCartPricing(cart, refresh));
     await waitFor(() => expect(missing.result.current.status).toBe('missing-address'));
-    expect(missing.result.current.quote).toBeNull();
+    await waitFor(() => expect(missing.result.current.quote).not.toBeNull());
+    expect(vi.mocked(getPricingQuote).mock.calls.at(-1)?.[0]).toEqual({});
+    expect(missing.result.current.quote?.shippingVersion).toBeNull();
   });
 
   it('applies and removes complete selections while pruning a shop no longer selected', async () => {

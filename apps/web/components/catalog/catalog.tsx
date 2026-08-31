@@ -1,17 +1,21 @@
 'use client';
 
-import type {
-  CatalogProductCard,
-  CatalogProductsResponse,
-  CatalogQueryContext,
+import {
+  buyerDisplayProductPriceMinor,
+  isCatalogProductsResponse,
+  parsePublicShopCatalogPage,
+  type CatalogProductCard,
+  type CatalogProductsResponse,
+  type CatalogQueryContext,
 } from '@shopee-clone/contracts';
-import { Badge, Card } from '@shopee-clone/ui';
+import { Card } from '@shopee-clone/ui';
 import Link from 'next/link';
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 import { MarketplaceProductImage } from '../marketplace-product-image';
 import { FavoriteButton } from '../engagement/favorite-button';
 import { FavoriteStateProvider } from '../engagement/favorite-state-provider';
+import { useAuthSession } from '../auth-session-provider';
 import {
   catalogSearchHref,
   replaceCatalogQuery,
@@ -24,7 +28,14 @@ export type CatalogRouteContext = CatalogQueryContext & { pageSize: number };
 // Font Awesome SVG Icons
 function FaFilter({ className }: { className?: string }) {
   return (
-    <svg className={className} width="14" height="14" viewBox="0 0 512 512" fill="currentColor" aria-hidden="true">
+    <svg
+      className={className}
+      width="14"
+      height="14"
+      viewBox="0 0 512 512"
+      fill="currentColor"
+      aria-hidden="true"
+    >
       <path d="M3.9 54.9C10.5 36.5 28 24 48 24l416 0c19.9 0 37.5 12.5 44.1 30.9s2.4 38.8-10.9 51.8L320 284.1 320 432c0 14.7-6.7 28.5-18.1 37.6l-64 51.2c-15.5 12.4-37.9 10-50.3-5.5s-10-37.9 5.5-50.3l42.9-34.3 0-146.6L3.9 106.7C-9.4 93.7-12.7 73.3 3.9 54.9z" />
     </svg>
   );
@@ -32,7 +43,14 @@ function FaFilter({ className }: { className?: string }) {
 
 function FaListUl({ className }: { className?: string }) {
   return (
-    <svg className={className} width="14" height="14" viewBox="0 0 512 512" fill="currentColor" aria-hidden="true">
+    <svg
+      className={className}
+      width="14"
+      height="14"
+      viewBox="0 0 512 512"
+      fill="currentColor"
+      aria-hidden="true"
+    >
       <path d="M64 144a48 48 0 1 0 0-96 48 48 0 1 0 0 96zM192 64c-17.7 0-32 14.3-32 32s14.3 32 32 32l288 0c17.7 0 32-14.3 32-32s-14.3-32-32-32L192 64zm0 160c-17.7 0-32 14.3-32 32s14.3 32 32 32l288 0c17.7 0 32-14.3 32-32s-14.3-32-32-32l-288 0zm0 160c-17.7 0-32 14.3-32 32s14.3 32 32 32l288 0c17.7 0 32-14.3 32-32s-14.3-32-32-32l-288 0zM64 304a48 48 0 1 0 0-96 48 48 0 1 0 0 96zm48 112a48 48 0 1 0 -96 0 48 48 0 1 0 96 0z" />
     </svg>
   );
@@ -40,7 +58,14 @@ function FaListUl({ className }: { className?: string }) {
 
 function FaLocationDot({ className }: { className?: string }) {
   return (
-    <svg className={className} width="14" height="14" viewBox="0 0 384 512" fill="currentColor" aria-hidden="true">
+    <svg
+      className={className}
+      width="14"
+      height="14"
+      viewBox="0 0 384 512"
+      fill="currentColor"
+      aria-hidden="true"
+    >
       <path d="M215.7 499.2C267 435 384 279.4 384 192C384 86 298 0 192 0S0 86 0 192c0 87.4 117 243 168.3 307.2c12.3 15.3 35.1 15.3 47.4 0zM192 128a64 64 0 1 1 0 128 64 64 0 1 1 0-128z" />
     </svg>
   );
@@ -48,7 +73,14 @@ function FaLocationDot({ className }: { className?: string }) {
 
 function FaTag({ className }: { className?: string }) {
   return (
-    <svg className={className} width="14" height="14" viewBox="0 0 448 512" fill="currentColor" aria-hidden="true">
+    <svg
+      className={className}
+      width="14"
+      height="14"
+      viewBox="0 0 448 512"
+      fill="currentColor"
+      aria-hidden="true"
+    >
       <path d="M0 80L0 229.5c0 17 6.7 33.3 18.7 45.3l176 176c25 25 65.5 25 90.5 0L414.5 321.5c25-25 25-65.5 0-90.5l-176-176C226.5 42.7 210.2 36 193.2 36L44 36c-24.3 0-44 19.7-44 44zm112 56a32 32 0 1 1 0-64 32 32 0 1 1 0 64z" />
     </svg>
   );
@@ -56,7 +88,14 @@ function FaTag({ className }: { className?: string }) {
 
 function FaStar({ className }: { className?: string }) {
   return (
-    <svg className={className} width="12" height="12" viewBox="0 0 576 512" fill="currentColor" aria-hidden="true">
+    <svg
+      className={className}
+      width="12"
+      height="12"
+      viewBox="0 0 576 512"
+      fill="currentColor"
+      aria-hidden="true"
+    >
       <path d="M316.9 18C311.6 7 300.4 0 288 0s-23.6 7-28.9 18L201 135.3 52.4 163.6c-12.1 2.3-21.7 11.6-24.8 23.6s1.5 24.6 11.6 32.1L149.9 313 118.8 459.8c-2.6 12 2.3 24.3 12.5 31.6s23.4 6.8 33.7 .8L288 418.7l123 73.5c10.3 6.1 23.5 6.5 33.7 .8s15.1-19.6 12.5-31.6L426.1 313l110.7-93.7c10.1-7.5 14.7-20.1 11.6-32.1s-12.7-21.3-24.8-23.6L375 135.3 316.9 18z" />
     </svg>
   );
@@ -64,7 +103,14 @@ function FaStar({ className }: { className?: string }) {
 
 function FaRotateLeft({ className }: { className?: string }) {
   return (
-    <svg className={className} width="12" height="12" viewBox="0 0 512 512" fill="currentColor" aria-hidden="true">
+    <svg
+      className={className}
+      width="12"
+      height="12"
+      viewBox="0 0 512 512"
+      fill="currentColor"
+      aria-hidden="true"
+    >
       <path d="M125.7 160l50.3 0c17.7 0 32 14.3 32 32s-14.3 32-32 32L48 224c-17.7 0-32-14.3-32-32L16 64c0-17.7 14.3-32 32-32s32 14.3 32 32l0 51.2L97.6 97.6c87.5-87.5 229.3-87.5 316.8 0s87.5 229.3 0 316.8s-229.3 87.5-316.8 0c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0c62.5 62.5 163.8 62.5 226.3 0s62.5-163.8 0-226.3s-163.8-62.5-226.3 0L125.7 160z" />
     </svg>
   );
@@ -93,7 +139,9 @@ function FormattedPriceInput({
   placeholder: string;
 }) {
   const [displayValue, setDisplayValue] = useState(() => formatPriceDisplay(initialValue));
-  const [rawValue, setRawValue] = useState(() => (initialValue !== null ? String(initialValue) : ''));
+  const [rawValue, setRawValue] = useState(() =>
+    initialValue !== null ? String(initialValue) : '',
+  );
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const rawDigits = e.target.value.replace(/\D/g, '');
@@ -110,7 +158,9 @@ function FormattedPriceInput({
 
   return (
     <div className="shopee-price-input-box">
-      <span className="shopee-price-currency" aria-hidden="true">₫</span>
+      <span className="shopee-price-currency" aria-hidden="true">
+        ₫
+      </span>
       <input type="hidden" name={name} value={rawValue} />
       <input
         aria-label={ariaLabel}
@@ -153,11 +203,14 @@ export function ProductCard({ product }: { product: CatalogProductCard }) {
           <h2>{product.name}</h2>
           <p className="catalog-card__shop">{product.shop.name}</p>
           <div className="catalog-card__price">
-            <strong>₫{formatNumber(product.priceMinor)}</strong>
+            <strong>₫{formatNumber(buyerDisplayProductPriceMinor(product))}</strong>
             {product.compareAtPriceMinor ? (
               <del>₫{formatNumber(product.compareAtPriceMinor)}</del>
             ) : null}
           </div>
+          {product.buyerBestPrice?.merchandiseDiscountMinor ? (
+            <small>Giá tốt nhất dự kiến · Voucher đã áp dụng</small>
+          ) : null}
           {product.scheduledPrice ? (
             <small
               className="shopee-scheduled-deal"
@@ -174,7 +227,8 @@ export function ProductCard({ product }: { product: CatalogProductCard }) {
                 className="shopee-card-rating"
                 aria-label={`${(product.ratingAverageBasisPoints / 100).toFixed(1)} trên 5 sao`}
               >
-                <FaStar className="shopee-star-icon" /> {(product.ratingAverageBasisPoints / 100).toFixed(1)} (
+                <FaStar className="shopee-star-icon" />{' '}
+                {(product.ratingAverageBasisPoints / 100).toFixed(1)} (
                 {formatNumber(product.ratingCount)})
               </span>
             )}
@@ -235,13 +289,22 @@ export function CatalogPagination({
           ‹
         </Link>
       ) : (
-        <span aria-disabled="true" aria-label="Trang trước" className="shopee-pagination-btn disabled">
+        <span
+          aria-disabled="true"
+          aria-label="Trang trước"
+          className="shopee-pagination-btn disabled"
+        >
           ‹
         </span>
       )}
       {pageNumbers(page, totalPages).map((number) =>
         number === page ? (
-          <span key={number} aria-current="page" aria-label={`Trang ${number}`} className="shopee-pagination-page active">
+          <span
+            key={number}
+            aria-current="page"
+            aria-label={`Trang ${number}`}
+            className="shopee-pagination-page active"
+          >
             {number}
           </span>
         ) : (
@@ -264,7 +327,11 @@ export function CatalogPagination({
           ›
         </Link>
       ) : (
-        <span aria-disabled="true" aria-label="Trang sau" className="shopee-pagination-btn disabled">
+        <span
+          aria-disabled="true"
+          aria-label="Trang sau"
+          className="shopee-pagination-btn disabled"
+        >
           ›
         </span>
       )}
@@ -303,8 +370,12 @@ export function ActiveFilters({ context }: { context: CatalogRouteContext }) {
           aria-label={`Bỏ ${filterLabels[key]} ${display}`}
           className="shopee-active-filter-tag"
         >
-          <span>{filterLabels[key]}: <strong>{display}</strong></span>
-          <span className="shopee-filter-remove" aria-hidden="true">✕</span>
+          <span>
+            {filterLabels[key]}: <strong>{display}</strong>
+          </span>
+          <span className="shopee-filter-remove" aria-hidden="true">
+            ✕
+          </span>
         </Link>
       ))}
       <Link className="catalog-clear shopee-active-clear" href="/search">
@@ -418,14 +489,18 @@ export function DiscoveryControls({
               ariaLabel="Giá thấp nhất"
               name="minPrice"
               initialValue={query.minPrice}
-              placeholder={facets.priceRange.min === null ? 'TỪ' : formatPriceDisplay(facets.priceRange.min)}
+              placeholder={
+                facets.priceRange.min === null ? 'TỪ' : formatPriceDisplay(facets.priceRange.min)
+              }
             />
             <span className="shopee-price-dash">–</span>
             <FormattedPriceInput
               ariaLabel="Giá cao nhất"
               name="maxPrice"
               initialValue={query.maxPrice}
-              placeholder={facets.priceRange.max === null ? 'ĐẾN' : formatPriceDisplay(facets.priceRange.max)}
+              placeholder={
+                facets.priceRange.max === null ? 'ĐẾN' : formatPriceDisplay(facets.priceRange.max)
+              }
             />
           </div>
           <button type="submit" className="shopee-btn-apply">
@@ -525,20 +600,75 @@ export function CatalogContent({
   response,
   context,
   pageHrefBuilder,
+  personalizedPath,
 }: {
   response: Pick<CatalogProductsResponse, 'items' | 'pagination'>;
   context?: CatalogRouteContext;
   pageHrefBuilder?: (page: number) => string;
+  personalizedPath?: string;
 }) {
+  const { state: authState, authenticatedFetch } = useAuthSession();
+  const [personalizedResponse, setPersonalizedResponse] = useState<{
+    path: string;
+    response: Pick<CatalogProductsResponse, 'items' | 'pagination'>;
+  } | null>(null);
+  const catalogPath = useMemo(() => {
+    if (personalizedPath) return personalizedPath;
+    if (!context) return null;
+    const params = new URLSearchParams();
+    for (const [key, value] of Object.entries({
+      q: context.q,
+      category: context.category,
+      minPrice: context.minPrice,
+      maxPrice: context.maxPrice,
+      rating: context.rating,
+      location: context.location,
+      availability: context.availability,
+      promotion: context.promotion,
+      sort: context.sort,
+      page: response.pagination.page,
+      pageSize: context.pageSize,
+    })) {
+      if (value !== null && value !== undefined && value !== '') params.set(key, String(value));
+    }
+    return `/api/v1/catalog/products?${params.toString()}`;
+  }, [context, personalizedPath, response.pagination.page]);
+
+  const displayResponse =
+    personalizedResponse?.path === catalogPath ? personalizedResponse.response : response;
+  useEffect(() => {
+    if (authState.status !== 'authenticated' || !catalogPath) return;
+    const controller = new AbortController();
+    const endpoint = new URL(
+      catalogPath,
+      process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:3001',
+    );
+    void authenticatedFetch(endpoint, { cache: 'no-store', signal: controller.signal })
+      .then(async (result) => {
+        if (!result.ok) return;
+        const body: unknown = await result.json();
+        const personalized = isCatalogProductsResponse(body)
+          ? body
+          : parsePublicShopCatalogPage(body);
+        if (personalized) setPersonalizedResponse({ path: catalogPath, response: personalized });
+      })
+      .catch(() => undefined);
+    return () => controller.abort();
+  }, [authState.status, authenticatedFetch, catalogPath]);
+
   return (
-    <FavoriteStateProvider productIds={response.items.map(({ id }) => id)}>
+    <FavoriteStateProvider productIds={displayResponse.items.map(({ id }) => id)}>
       <div className="shopee-catalog-content">
         <div className="catalog-grid" aria-label="Danh sách sản phẩm">
-          {response.items.map((product) => (
+          {displayResponse.items.map((product) => (
             <ProductCard key={product.id} product={product} />
           ))}
         </div>
-        <CatalogPagination response={response} context={context} pageHrefBuilder={pageHrefBuilder} />
+        <CatalogPagination
+          response={displayResponse}
+          context={context}
+          pageHrefBuilder={pageHrefBuilder}
+        />
       </div>
     </FavoriteStateProvider>
   );

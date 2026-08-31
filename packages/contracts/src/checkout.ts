@@ -244,7 +244,8 @@ function normalizedCheckoutInput(value: Record<string, unknown>): CheckoutPrevie
     ...(value.vouchers === undefined ? {} : { vouchers: value.vouchers }),
   });
   const notes = parseNotes(value.notes);
-  if (!pricing || !Array.isArray(pricing.services) || notes === null) return null;
+  if (!pricing?.shippingAddressId || !Array.isArray(pricing.services) || notes === null)
+    return null;
   const services = [...pricing.services].sort((left, right) =>
     left.shopId.localeCompare(right.shopId),
   );

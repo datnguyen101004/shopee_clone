@@ -93,13 +93,17 @@ describe('Shop storefront endpoints', () => {
       .get('/api/v1/shops/demo-shop/products?q=dien%20thoai&page=2&pageSize=24')
       .expect(200);
     expect(products.headers['cache-control']).toBe('no-store');
-    expect(storefront.products).toHaveBeenCalledWith('demo-shop', {
-      q: 'dien thoai',
-      category: null,
-      sort: 'relevance',
-      page: 2,
-      pageSize: 24,
-    });
+    expect(storefront.products).toHaveBeenCalledWith(
+      'demo-shop',
+      {
+        q: 'dien thoai',
+        category: null,
+        sort: 'relevance',
+        page: 2,
+        pageSize: 24,
+      },
+      null,
+    );
     await request(app.getHttpServer())
       .get('/api/v1/shops/demo-shop/products?location=private')
       .expect(400);

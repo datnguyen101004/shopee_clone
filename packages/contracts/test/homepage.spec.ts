@@ -35,4 +35,45 @@ describe('homepage contract', () => {
       parseHomepageResponse({ ...response, modules: [...response.modules, { type: 'future' }] }),
     ).toEqual(response);
   });
+
+  it('requires homepage scheduled pricing to match the displayed price', () => {
+    const product = {
+      id: 'product-1',
+      name: 'Product',
+      shopName: 'Shop',
+      href: '/products/product-1',
+      imageUrl: null,
+      imageAlt: 'Product',
+      priceMinor: 80_000,
+      compareAtPriceMinor: 100_000,
+      scheduledPrice: {
+        basePriceMinor: 100_000,
+        effectivePriceMinor: 80_000,
+        compareAtPriceMinor: 100_000,
+        discountBasisPoints: 2_000,
+        campaignId: 'campaign-1',
+        evaluatedAt: response.evaluatedAt,
+      },
+    };
+    const withProduct = {
+      ...response,
+      modules: [
+        {
+          id: 'module-2',
+          key: 'daily',
+          type: 'daily-recommendations',
+          title: 'Daily',
+          sortOrder: 2,
+          products: [product],
+        },
+      ],
+    };
+    expect(isHomepageResponse(withProduct)).toBe(true);
+    expect(
+      isHomepageResponse({
+        ...withProduct,
+        modules: [{ ...withProduct.modules[0], products: [{ ...product, priceMinor: 79_000 }] }],
+      }),
+    ).toBe(false);
+  });
 });

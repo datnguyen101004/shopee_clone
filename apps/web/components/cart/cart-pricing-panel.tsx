@@ -1,6 +1,10 @@
 'use client';
 
-import { SHIPPING_SERVICES, type CartResponse, type ShippingAddress } from '@shopee-clone/contracts';
+import {
+  SHIPPING_SERVICES,
+  type CartResponse,
+  type ShippingAddress,
+} from '@shopee-clone/contracts';
 import { useState } from 'react';
 
 import type { CartPricingState } from './use-cart-pricing';
@@ -23,12 +27,7 @@ function formatAddressLine(address: ShippingAddress): string {
 }
 
 function formatAddressOption(address: ShippingAddress): string {
-  return [
-    address.label,
-    address.recipientName,
-    address.phoneNumber,
-    formatAddressLine(address),
-  ]
+  return [address.label, address.recipientName, address.phoneNumber, formatAddressLine(address)]
     .filter(Boolean)
     .join(' · ');
 }
@@ -57,8 +56,8 @@ export function CartPricingPanel({
           aria-labelledby="pricing-address-required"
         >
           <div>
-          <h2 id="pricing-address-required">Cần địa chỉ nhận hàng</h2>
-          <p>{pricing.message}</p>
+            <h2 id="pricing-address-required">Cần địa chỉ nhận hàng</h2>
+            <p>{pricing.message}</p>
           </div>
           <button type="button" onClick={() => setAddressDialogOpen(true)}>
             Thêm địa chỉ nhận hàng
@@ -139,7 +138,7 @@ export function CartPricingPanel({
                   ))}
                 </select>
               </label>
-              {quotedShop ? (
+              {quotedShop?.shipping ? (
                 <span>
                   MOCK · {quotedShop.shipping.estimatedDaysMin}–
                   {quotedShop.shipping.estimatedDaysMax} ngày ·{' '}

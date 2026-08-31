@@ -76,6 +76,15 @@ export function ShopCatalog({
       {response.items.length > 0 ? (
         <CatalogContent
           response={response}
+          personalizedPath={`/api/v1/shops/${encodeURIComponent(shopSlug)}/products?${new URLSearchParams(
+            {
+              ...(query.q ? { q: query.q } : {}),
+              ...(query.category ? { category: query.category } : {}),
+              sort: query.sort,
+              page: String(query.page),
+              pageSize: String(query.pageSize),
+            },
+          ).toString()}`}
           pageHrefBuilder={(page) => shopStorefrontHref(shopSlug, { ...baseQuery, page })}
         />
       ) : (

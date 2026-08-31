@@ -1,6 +1,10 @@
 'use client';
 
-import type { ProductDetailResponse } from '@shopee-clone/contracts';
+import {
+  buyerDisplayProductPriceMinor,
+  parseProductDetailResponse,
+  type ProductDetailResponse,
+} from '@shopee-clone/contracts';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
@@ -13,6 +17,8 @@ import { useAuthSession } from '../auth-session-provider';
 import { useCart } from '../cart/cart-provider';
 import { ProductReviews } from './product-reviews';
 import { marketplaceMediaUrl } from '../../lib/marketplace-media-url';
+import { CartApiError } from '../../lib/cart-api';
+import { ProductCard } from '../catalog/catalog';
 
 import {
   activeProductImage,
@@ -28,6 +34,13 @@ function formatCurrency(value: number): string {
   return `₫${new Intl.NumberFormat('vi-VN').format(value)}`;
 }
 
+function isSelfPurchaseError(error: unknown): boolean {
+  return (
+    error instanceof CartApiError &&
+    error.problem?.type === 'https://shopee-clone.local/problems/self-purchase-forbidden'
+  );
+}
+
 function ProductDetailInner({ product }: { product: ProductDetailResponse }) {
   const auth = useAuthSession();
   const cart = useCart();
@@ -35,6 +48,7 @@ function ProductDetailInner({ product }: { product: ProductDetailResponse }) {
   const [selection, setSelection] = useState(() => initialProductDetailSelection(product));
   const [cartMessage, setCartMessage] = useState('');
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [selfPurchaseWarningOpen, setSelfPurchaseWarningOpen] = useState(false);
 
   useEffect(() => {
     if (!toastMessage) return;
@@ -48,6 +62,8 @@ function ProductDetailInner({ product }: { product: ProductDetailResponse }) {
   const image = activeProductImage(product, selection.activeImageId);
   const error = quantityError(selection.quantity, selectedVariant);
   const purchaseReady = canPurchase(selection.quantity, selectedVariant);
+  const ownsShop =
+    auth.state.status === 'authenticated' && auth.state.user.id === product.shop.ownerUserId;
   const liveMessage =
     cartMessage ||
     error ||
@@ -68,6 +84,10 @@ function ProductDetailInner({ product }: { product: ProductDetailResponse }) {
 
   async function handleAddToCart() {
     if (!canMutateCart || !selectedVariant) return;
+    if (ownsShop) {
+      setSelfPurchaseWarningOpen(true);
+      return;
+    }
     setCartMessage('');
     try {
       const result = await cart.addItem(selectedVariant.id, Number(selection.quantity));
@@ -75,7 +95,11 @@ function ProductDetailInner({ product }: { product: ProductDetailResponse }) {
         result.adjustments[0]?.message ?? `Đã thêm ${selection.quantity} sản phẩm vào giỏ hàng.`;
       setCartMessage(message);
       setToastMessage(message);
-    } catch {
+    } catch (caught: unknown) {
+      if (isSelfPurchaseError(caught)) {
+        setSelfPurchaseWarningOpen(true);
+        return;
+      }
       setCartMessage('Không thể thêm vào giỏ hàng. Vui lòng thử lại.');
       setToastMessage('Không thể thêm vào giỏ hàng. Vui lòng thử lại.');
     }
@@ -83,11 +107,19 @@ function ProductDetailInner({ product }: { product: ProductDetailResponse }) {
 
   async function handleBuyNow() {
     if (!canMutateCart || !selectedVariant) return;
+    if (ownsShop) {
+      setSelfPurchaseWarningOpen(true);
+      return;
+    }
     setCartMessage('');
     try {
       await cart.addItem(selectedVariant.id, Number(selection.quantity));
       router.push('/cart');
-    } catch {
+    } catch (caught: unknown) {
+      if (isSelfPurchaseError(caught)) {
+        setSelfPurchaseWarningOpen(true);
+        return;
+      }
       setCartMessage('Không thể mua ngay. Vui lòng thử lại.');
     }
   }
@@ -151,7 +183,9 @@ function ProductDetailInner({ product }: { product: ProductDetailResponse }) {
           </div>
           <div className="product-detail-price" aria-label="Giá sản phẩm">
             <strong>
-              {selectedVariant ? formatCurrency(selectedVariant.priceMinor) : 'Liên hệ shop'}
+              {selectedVariant
+                ? formatCurrency(buyerDisplayProductPriceMinor(selectedVariant))
+                : 'Liên hệ shop'}
             </strong>
             {selectedVariant?.compareAtPriceMinor ? (
               <del>{formatCurrency(selectedVariant.compareAtPriceMinor)}</del>
@@ -166,6 +200,22 @@ function ProductDetailInner({ product }: { product: ProductDetailResponse }) {
                 )} phần trăm`}
               >
                 Đang giảm {Math.floor(selectedVariant.scheduledPrice.discountBasisPoints / 100)}%
+              </small>
+            ) : null}
+            {selectedVariant?.buyerBestPrice?.merchandiseDiscountMinor ? (
+              <small>
+                Giá tốt nhất dự kiến cho 1 sản phẩm · Tiết kiệm{' '}
+                {formatCurrency(selectedVariant.buyerBestPrice.merchandiseDiscountMinor)} bằng
+                voucher
+              </small>
+            ) : null}
+            {selectedVariant?.buyerBestPrice?.shipping ? (
+              <small>
+                Phí giao STANDARD dự kiến:{' '}
+                {formatCurrency(selectedVariant.buyerBestPrice.shipping.shippingPayableMinor)}
+                {selectedVariant.buyerBestPrice.shipping.shippingVoucherDiscountMinor
+                  ? ` (đã giảm ${formatCurrency(selectedVariant.buyerBestPrice.shipping.shippingVoucherDiscountMinor)})`
+                  : ''}
               </small>
             ) : null}
           </div>
@@ -348,6 +398,35 @@ function ProductDetailInner({ product }: { product: ProductDetailResponse }) {
         </div>
       </section>
 
+      {selfPurchaseWarningOpen ? (
+        <div
+          className="self-purchase-warning-backdrop"
+          role="presentation"
+          onKeyDown={(event) => {
+            if (event.key === 'Escape') setSelfPurchaseWarningOpen(false);
+          }}
+        >
+          <section
+            className="self-purchase-warning"
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="self-purchase-warning-title"
+            aria-describedby="self-purchase-warning-description"
+          >
+            <div className="self-purchase-warning__icon" aria-hidden="true">
+              !
+            </div>
+            <h2 id="self-purchase-warning-title">Không thể mua sản phẩm này</h2>
+            <p id="self-purchase-warning-description">
+              Bạn không thể mua sản phẩm từ cửa hàng của chính mình.
+            </p>
+            <button type="button" autoFocus onClick={() => setSelfPurchaseWarningOpen(false)}>
+              Đã hiểu
+            </button>
+          </section>
+        </div>
+      ) : null}
+
       {toastMessage ? (
         <div className="product-detail-toast-overlay" role="status" aria-live="polite">
           <div className="product-detail-toast">
@@ -371,14 +450,50 @@ function ProductDetailInner({ product }: { product: ProductDetailResponse }) {
       ) : null}
 
       <ProductReviews product={product} />
+      {product.relatedProducts.length ? (
+        <section aria-labelledby="related-products-title">
+          <h2 id="related-products-title">Sản phẩm liên quan</h2>
+          <div className="catalog-grid">
+            {product.relatedProducts.map((related) => (
+              <ProductCard key={related.id} product={related} />
+            ))}
+          </div>
+        </section>
+      ) : null}
     </>
   );
 }
 
 export function ProductDetailExperience({ product }: { product: ProductDetailResponse }) {
+  const { state: authState, authenticatedFetch } = useAuthSession();
+  const [personalizedProduct, setPersonalizedProduct] = useState<{
+    source: ProductDetailResponse;
+    product: ProductDetailResponse;
+  } | null>(null);
+  const displayProduct =
+    personalizedProduct?.source === product ? personalizedProduct.product : product;
+  useEffect(() => {
+    if (authState.status !== 'authenticated') return;
+    const controller = new AbortController();
+    const endpoint = new URL(
+      `/api/v1/catalog/products/${encodeURIComponent(product.slug ?? product.id)}`,
+      process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:3001',
+    );
+    void authenticatedFetch(endpoint, { cache: 'no-store', signal: controller.signal })
+      .then(async (result) => {
+        if (!result.ok) return;
+        const parsed = parseProductDetailResponse(await result.json());
+        if (parsed) setPersonalizedProduct({ source: product, product: parsed });
+      })
+      .catch(() => undefined);
+    return () => controller.abort();
+  }, [authState.status, authenticatedFetch, product]);
+
   return (
-    <FavoriteStateProvider productIds={[product.id]}>
-      <ProductDetailInner product={product} />
+    <FavoriteStateProvider
+      productIds={[displayProduct.id, ...displayProduct.relatedProducts.map(({ id }) => id)]}
+    >
+      <ProductDetailInner product={displayProduct} />
     </FavoriteStateProvider>
   );
 }

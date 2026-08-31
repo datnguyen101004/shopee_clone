@@ -42,7 +42,9 @@ function purchaseBlockers(
   cartPending: boolean,
 ): string[] {
   const blockers: string[] = [];
-  const selectedLines = current.groups.flatMap((group) => group.lines).filter((line) => line.selected);
+  const selectedLines = current.groups
+    .flatMap((group) => group.lines)
+    .filter((line) => line.selected);
 
   if (current.summary.selectedValidLineCount === 0) {
     const lineIssueMessages = selectedLines.flatMap((line) =>
@@ -84,14 +86,19 @@ function purchaseBlockers(
       blockers.push('Đang chuẩn bị bảng giá và phí vận chuyển.');
       break;
     case 'ready':
-      if (!pricing.selectedAddressId || !pricing.addresses.some(({ id }) => id === pricing.selectedAddressId)) {
+      if (
+        !pricing.selectedAddressId ||
+        !pricing.addresses.some(({ id }) => id === pricing.selectedAddressId)
+      ) {
         blockers.push('Bạn cần chọn một địa chỉ nhận hàng hợp lệ.');
       }
       if (!pricing.quote) {
         blockers.push('Chưa nhận được bảng giá mới nhất từ máy chủ.');
       } else if (pricing.quote.cartVersion !== current.version) {
         blockers.push('Giỏ hàng đã thay đổi. Hãy chờ bảng giá được cập nhật.');
-      } else if (pricing.quote.summary.selectedLineCount !== current.summary.selectedValidLineCount) {
+      } else if (
+        pricing.quote.summary.selectedLineCount !== current.summary.selectedValidLineCount
+      ) {
         blockers.push('Bảng giá chưa bao gồm đầy đủ sản phẩm đã chọn.');
       }
       blockers.push(...(pricing.quote?.exclusions ?? []).map((exclusion) => exclusion.message));
@@ -496,7 +503,9 @@ export function CartScreen() {
           Chọn tất cả ({current.summary.distinctLineCount})
         </label>
         <div>
-          {canPurchase && pricing.status === 'ready' && pricing.quote?.cartVersion === current.version ? (
+          {canPurchase &&
+          pricing.status === 'ready' &&
+          pricing.quote?.cartVersion === current.version ? (
             <>
               <span>Tổng thanh toán ({pricing.quote.summary.selectedLineCount} sản phẩm)</span>
               <strong>{formatCurrency(pricing.quote.summary.payableTotalMinor)}</strong>
@@ -508,6 +517,27 @@ export function CartScreen() {
                 {formatCurrency(pricing.quote.summary.shippingVoucherDiscountMinor)} · Phí ship{' '}
                 {formatCurrency(pricing.quote.summary.shippingPayableMinor)}
               </small>
+            </>
+          ) : pricing.status === 'missing-address' &&
+            pricing.quote?.cartVersion === current.version ? (
+            <>
+              <span>Tạm tính tiền hàng sau voucher</span>
+              <strong>
+                {formatCurrency(
+                  pricing.quote.summary.merchandiseSubtotalMinor -
+                    pricing.quote.summary.merchandiseVoucherDiscountMinor,
+                )}
+              </strong>
+              <small>
+                Mã shop {formatCurrency(pricing.quote.summary.shopVoucherDiscountMinor)} · Mã Shopee{' '}
+                {formatCurrency(pricing.quote.summary.platformVoucherDiscountMinor)} · Chưa gồm phí
+                và voucher vận chuyển
+              </small>
+              <ul className="cart-summary__blockers" aria-label="Lý do chưa thể mua hàng">
+                {displayedPurchaseBlockers.map((message) => (
+                  <li key={message}>{message}</li>
+                ))}
+              </ul>
             </>
           ) : (
             <>
@@ -525,9 +555,15 @@ export function CartScreen() {
           type="button"
           disabled={!canPurchase}
           onClick={() => {
-            if (!canPurchase || pricing.status !== 'ready' || !pricing.quote || !pricing.selectedAddressId) {
+            if (
+              !canPurchase ||
+              pricing.status !== 'ready' ||
+              !pricing.quote ||
+              !pricing.selectedAddressId
+            ) {
               setCheckoutMessage(
-                displayedPurchaseBlockers[0] ?? 'Hãy chờ máy chủ xác nhận giá trước khi thanh toán.',
+                displayedPurchaseBlockers[0] ??
+                  'Hãy chờ máy chủ xác nhận giá trước khi thanh toán.',
               );
               return;
             }

@@ -20,6 +20,7 @@ import {
   CartConflictError,
   CartItemUnavailableError,
   CartLineNotFoundError,
+  CartSelfPurchaseError,
   CartUnavailableError,
 } from './cart.errors';
 
@@ -116,11 +117,6 @@ export class CartService {
   ): Promise<MutationResult> {
     const now = new Date();
     return this.prisma.$transaction(async (transaction) => {
-      const owner = await this.ensureUserCart(transaction, userId, now);
-      await this.lockCart(transaction, owner.id);
-      const cart = await transaction.cart.findUniqueOrThrow({ where: { id: owner.id } });
-      this.expectVersion(cart.version, expectedVersion);
-
       const variant = await transaction.productVariant.findUnique({
         where: { id: variantId },
         include: {
@@ -130,6 +126,12 @@ export class CartService {
         },
       });
       if (!variant) throw new CartItemUnavailableError();
+      if (variant.product.shop.ownerId === userId) throw new CartSelfPurchaseError();
+
+      const owner = await this.ensureUserCart(transaction, userId, now);
+      await this.lockCart(transaction, owner.id);
+      const cart = await transaction.cart.findUniqueOrThrow({ where: { id: owner.id } });
+      this.expectVersion(cart.version, expectedVersion);
 
       const pseudoLine = {
         id: '',

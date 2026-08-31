@@ -1,4 +1,7 @@
-import type { CatalogProductCard } from './catalog';
+import {
+  isCatalogProductCard as isCatalogProductCardContract,
+  type CatalogProductCard,
+} from './catalog';
 
 export const ENGAGEMENT_DEFAULT_PAGE = 1;
 export const ENGAGEMENT_DEFAULT_PAGE_SIZE = 20;
@@ -122,57 +125,10 @@ function isString(value: unknown): value is string {
 }
 
 function isCatalogProductCard(value: unknown): value is CatalogProductCard {
-  if (
-    !isRecord(value) ||
-    !hasExactKeys(
-      value,
-      [
-        'id',
-        'name',
-        'href',
-        'imageUrl',
-        'imageAlt',
-        'priceMinor',
-        'ratingAverageBasisPoints',
-        'ratingCount',
-        'soldCount',
-        'shop',
-        'category',
-      ],
-      ['compareAtPriceMinor', 'discountPercent'],
-    ) ||
-    !isCanonicalEngagementProductId(value.id) ||
-    !isString(value.name) ||
-    !isString(value.href) ||
-    !value.href.startsWith('/products/') ||
-    !(value.imageUrl === null || isString(value.imageUrl)) ||
-
-    !isString(value.imageAlt) ||
-    !isNonNegativeInteger(value.priceMinor) ||
-    !isNonNegativeInteger(value.ratingAverageBasisPoints) ||
-    value.ratingAverageBasisPoints > 500 ||
-    !isNonNegativeInteger(value.ratingCount) ||
-    !isNonNegativeInteger(value.soldCount) ||
-    !isRecord(value.shop) ||
-    !hasExactKeys(value.shop, ['name', 'location']) ||
-    !isString(value.shop.name) ||
-    !isString(value.shop.location) ||
-    !isRecord(value.category) ||
-    !hasExactKeys(value.category, ['slug', 'name']) ||
-    !isString(value.category.slug) ||
-    !isString(value.category.name)
-  ) {
-    return false;
-  }
-  const hasCompare = value.compareAtPriceMinor !== undefined;
-  const hasDiscount = value.discountPercent !== undefined;
   return (
-    hasCompare === hasDiscount &&
-    (!hasCompare ||
-      (isNonNegativeInteger(value.compareAtPriceMinor) &&
-        value.compareAtPriceMinor > value.priceMinor &&
-        isPositiveInteger(value.discountPercent) &&
-        value.discountPercent <= 100))
+    isCatalogProductCardContract(value) &&
+    isCanonicalEngagementProductId(value.id) &&
+    value.href.startsWith('/products/')
   );
 }
 

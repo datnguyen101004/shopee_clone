@@ -1,16 +1,29 @@
-import { Controller, Get, Header, Inject, Param, Query, UseFilters } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Header,
+  Inject,
+  Param,
+  Query,
+  Req,
+  UseFilters,
+  UseGuards,
+} from '@nestjs/common';
 import type { PublicShopCatalogPage, PublicShopProfile } from '@shopee-clone/contracts';
 import { ApiOkResponse, ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
 
 import { ShopStorefrontExceptionFilter } from './shop-storefront-exception.filter';
 import { parsePublicShopCatalogQuery, parsePublicShopSlug } from './shop-storefront-input';
 import { ShopStorefrontService } from './shop-storefront.service';
+import { OptionalAuthGuard } from '../auth/optional-auth.guard';
+import type { AuthenticatedRequest } from '../auth/auth.guard';
 
 @ApiTags('public shops')
 @ApiResponse({ status: 404, description: 'Shop is unknown, inactive, or deleted' })
 @ApiResponse({ status: 503, description: 'Shop storefront is temporarily unavailable' })
 @Controller('shops')
 @UseFilters(ShopStorefrontExceptionFilter)
+@UseGuards(OptionalAuthGuard)
 export class PublicShopController {
   constructor(@Inject(ShopStorefrontService) private readonly storefront: ShopStorefrontService) {}
 
@@ -42,12 +55,14 @@ export class PublicShopController {
     },
   })
   products(
+    @Req() request: AuthenticatedRequest,
     @Param('shopSlug') shopSlug: string,
     @Query() query: Record<string, unknown>,
   ): Promise<PublicShopCatalogPage> {
     return this.storefront.products(
       parsePublicShopSlug(shopSlug),
       parsePublicShopCatalogQuery(query),
+      request.authUser?.id ?? null,
     );
   }
 

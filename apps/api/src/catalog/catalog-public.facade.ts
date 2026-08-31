@@ -14,7 +14,17 @@ export interface PublicShopCatalogSummary {
 }
 
 export abstract class CatalogPublicFacade {
-  abstract getProducts(query: NormalizedCatalogQuery): Promise<CatalogProductsResponse>;
-  abstract getShopSummary(shopId: string): Promise<PublicShopCatalogSummary>;
-  abstract getShopProducts(shopId: string, query: ShopCatalogQuery): Promise<PublicShopCatalogPage>;
+  abstract getProducts(
+    query: NormalizedCatalogQuery,
+    buyerId?: string | null,
+  ): Promise<CatalogProductsResponse>;
+  abstract getShopSummary(
+    shopId: string,
+    buyerId?: string | null,
+  ): Promise<PublicShopCatalogSummary>;
+  abstract getShopProducts(
+    shopId: string,
+    query: ShopCatalogQuery,
+    buyerId?: string | null,
+  ): Promise<PublicShopCatalogPage>;
 }

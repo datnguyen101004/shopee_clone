@@ -1,5 +1,10 @@
-import type { CatalogProductCard } from './catalog';
-import { isPublicScheduledPriceBreakdown, type PublicScheduledPriceBreakdown } from './pricing';
+import { isCatalogProductCard, type CatalogProductCard } from './catalog';
+import {
+  isBuyerBestPricePreview,
+  isPublicScheduledPriceBreakdown,
+  type BuyerBestPricePreview,
+  type PublicScheduledPriceBreakdown,
+} from './pricing';
 
 export type ProductAvailability = 'in-stock' | 'unavailable';
 
@@ -25,6 +30,7 @@ export interface ProductDetailVariant {
   compareAtPriceMinor?: number;
   discountPercent?: number;
   scheduledPrice?: PublicScheduledPriceBreakdown;
+  buyerBestPrice?: BuyerBestPricePreview;
   availableQuantity: number;
   availability: ProductAvailability;
   preferredImageId: string | null;
@@ -66,7 +72,6 @@ export interface ProductDetailResponse {
   shippingPreview: ProductShippingPreview;
   relatedProducts: CatalogProductCard[];
 }
-
 
 export interface ProductDeletedProblemDetails {
   type: 'https://shopee-clone.local/problems/product-deleted';
@@ -125,11 +130,26 @@ function isVariant(value: unknown, galleryIds: Set<string>): value is ProductDet
       value.preferredImageId === null ||
       (isUuid(value.preferredImageId) && galleryIds.has(value.preferredImageId))
     ) ||
-    !(value.scheduledPrice === undefined || isPublicScheduledPriceBreakdown(value.scheduledPrice))
+    !(
+      value.scheduledPrice === undefined || isPublicScheduledPriceBreakdown(value.scheduledPrice)
+    ) ||
+    !(value.buyerBestPrice === undefined || isBuyerBestPricePreview(value.buyerBestPrice))
   ) {
     return false;
   }
   if (value.availableQuantity > 0 !== (value.availability === 'in-stock')) return false;
+  if (
+    value.scheduledPrice !== undefined &&
+    value.scheduledPrice.effectivePriceMinor !== value.priceMinor
+  ) {
+    return false;
+  }
+  if (
+    value.buyerBestPrice !== undefined &&
+    value.buyerBestPrice.effectivePriceMinor !== value.priceMinor
+  ) {
+    return false;
+  }
   const hasCompare = value.compareAtPriceMinor !== undefined;
   const hasDiscount = value.discountPercent !== undefined;
   return (
@@ -143,39 +163,21 @@ function isVariant(value: unknown, galleryIds: Set<string>): value is ProductDet
 }
 
 function isRelatedCard(value: unknown): value is CatalogProductCard {
-  if (!isRecord(value) || !isUuid(value.id) || !isString(value.href)) return false;
-  if (!value.href.startsWith('/products/')) return false;
-  return (
-    isString(value.name) &&
-    (value.imageUrl === null || isString(value.imageUrl)) &&
-    isString(value.imageAlt) &&
-    isSafeNonNegativeInteger(value.priceMinor) &&
-    isSafeNonNegativeInteger(value.ratingAverageBasisPoints) &&
-    value.ratingAverageBasisPoints <= 500 &&
-    isSafeNonNegativeInteger(value.ratingCount) &&
-    isSafeNonNegativeInteger(value.soldCount) &&
-    isRecord(value.shop) &&
-    isString(value.shop.name) &&
-    isString(value.shop.location) &&
-    isRecord(value.category) &&
-    isString(value.category.slug) &&
-    isString(value.category.name) &&
-    ((value.compareAtPriceMinor === undefined && value.discountPercent === undefined) ||
-      (isSafeNonNegativeInteger(value.compareAtPriceMinor) &&
-        value.compareAtPriceMinor > value.priceMinor &&
-        isPositiveInteger(value.discountPercent) &&
-        value.discountPercent <= 100))
-  );
+  return isCatalogProductCard(value) && isUuid(value.id) && value.href.startsWith('/products/');
 }
 
-export function isProductDeletedProblemDetails(value: unknown): value is ProductDeletedProblemDetails {
-  return isRecord(value) &&
+export function isProductDeletedProblemDetails(
+  value: unknown,
+): value is ProductDeletedProblemDetails {
+  return (
+    isRecord(value) &&
     Object.keys(value).sort().join(',') === 'code,detail,status,title,type' &&
     value.type === 'https://shopee-clone.local/problems/product-deleted' &&
     value.title === 'Product deleted' &&
     value.status === 410 &&
     typeof value.detail === 'string' &&
-    value.code === 'PRODUCT_DELETED';
+    value.code === 'PRODUCT_DELETED'
+  );
 }
 
 export function isProductDetailResponse(value: unknown): value is ProductDetailResponse {
@@ -201,7 +203,11 @@ export function isProductDetailResponse(value: unknown): value is ProductDetailR
     !isString(value.shop.name) ||
     !isString(value.shop.location) ||
     !isSafeNonNegativeInteger(value.shop.activeProductCount) ||
-    !(value.shop.ratingAverageBasisPoints === undefined || (isSafeNonNegativeInteger(value.shop.ratingAverageBasisPoints) && value.shop.ratingAverageBasisPoints <= 500)) ||
+    !(
+      value.shop.ratingAverageBasisPoints === undefined ||
+      (isSafeNonNegativeInteger(value.shop.ratingAverageBasisPoints) &&
+        value.shop.ratingAverageBasisPoints <= 500)
+    ) ||
     !(value.shop.ratingCount === undefined || isSafeNonNegativeInteger(value.shop.ratingCount)) ||
     !isRecord(value.shippingPreview) ||
     !isString(value.shippingPreview.origin) ||

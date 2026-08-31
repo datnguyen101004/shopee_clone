@@ -46,7 +46,7 @@ export interface AuthoritativePricingLine {
 export interface AuthoritativePricingSnapshot {
   cartVersion: number;
   evaluatedAt: Date;
-  address: PricingQuoteAddress;
+  address: PricingQuoteAddress | null;
   lines: readonly AuthoritativePricingLine[];
   exclusions: readonly PricingQuoteExclusion[];
   services: readonly ShopShippingServiceSelection[];
@@ -88,7 +88,9 @@ function pricingLine(input: AuthoritativePricingLine): PricingQuoteLine {
 export class CommercePricingCalculator {
   constructor(
     @Inject(MockShippingCalculator) private readonly shipping: MockShippingCalculator,
-    @Optional() @Inject(DemoCarrierCalculator) private readonly demoShipping?: DemoCarrierCalculator,
+    @Optional()
+    @Inject(DemoCarrierCalculator)
+    private readonly demoShipping?: DemoCarrierCalculator,
   ) {}
 
   calculate(snapshot: AuthoritativePricingSnapshot): PricingQuoteResponse {
@@ -125,55 +127,57 @@ export class CommercePricingCalculator {
         const shipmentWeightGrams = checkedAdd(...lines.map((line) => line.shipmentWeightGrams));
         const service = serviceByShop.get(first.shop.id) ?? 'STANDARD';
         const demoCarrierEnabled = process.env.DEMO_CARRIER_ENABLED === 'true';
-        const shipping = demoCarrierEnabled
-          ? (() => {
-              if (!this.demoShipping) throw new Error('Demo Carrier calculator unavailable.');
-              const quote = this.demoShipping.calculate({
-                shipmentReference: first.shop.id,
-                originProvince: first.shop.pickupProvince ?? first.shop.location,
-                originDistrict: first.shop.pickupDistrict,
+        const shipping = !snapshot.address
+          ? null
+          : demoCarrierEnabled
+            ? (() => {
+                if (!this.demoShipping) throw new Error('Demo Carrier calculator unavailable.');
+                const quote = this.demoShipping.calculate({
+                  shipmentReference: first.shop.id,
+                  originProvince: first.shop.pickupProvince ?? first.shop.location,
+                  originDistrict: first.shop.pickupDistrict,
+                  destinationProvince: snapshot.address.province,
+                  destinationDistrict: snapshot.address.district,
+                  shipmentWeightGrams,
+                  service,
+                  calculatedAt: snapshot.evaluatedAt,
+                });
+                return {
+                  provider: 'DEMO_CARRIER' as const,
+                  version: quote.version,
+                  shopId: first.shop.id,
+                  originProvinceCode: quote.pickup.provinceCode,
+                  originDistrictCode: quote.pickup.districtCode,
+                  originProvince: quote.pickup.provinceName,
+                  originDistrict: quote.pickup.districtName,
+                  destinationProvinceCode: quote.delivery.provinceCode,
+                  destinationDistrictCode: quote.delivery.districtCode,
+                  destinationProvince: quote.delivery.provinceName,
+                  destinationDistrict: quote.delivery.districtName,
+                  shipmentWeightGrams: quote.shipmentWeightGrams,
+                  service: quote.service,
+                  simulation: true as const,
+                  straightLineDistanceKm: quote.straightLineDistanceKm,
+                  estimatedDistanceKm: quote.estimatedDistanceKm,
+                  billableDistanceKm: quote.billableDistanceKm,
+                  estimatedDaysMin: quote.estimatedDaysMin,
+                  estimatedDaysMax: quote.estimatedDaysMax,
+                  baseFeeMinor: quote.baseFeeMinor,
+                  nearDistanceFeeMinor: quote.nearDistanceFeeMinor,
+                  longDistanceFeeMinor: quote.longDistanceFeeMinor,
+                  weightFeeMinor: quote.weightFeeMinor,
+                  shippingFeeMinor: quote.totalFeeMinor,
+                  calculationVersion: quote.calculationVersion,
+                  locationSnapshotVersion: quote.locationSnapshotVersion,
+                } satisfies DemoCarrierShippingBreakdown;
+              })()
+            : this.shipping.calculate({
+                shopId: first.shop.id,
+                originProvince: first.shop.location,
                 destinationProvince: snapshot.address.province,
-                destinationDistrict: snapshot.address.district,
                 shipmentWeightGrams,
                 service,
-                calculatedAt: snapshot.evaluatedAt,
               });
-              return {
-                provider: 'DEMO_CARRIER' as const,
-                version: quote.version,
-                shopId: first.shop.id,
-                originProvinceCode: quote.pickup.provinceCode,
-                originDistrictCode: quote.pickup.districtCode,
-                originProvince: quote.pickup.provinceName,
-                originDistrict: quote.pickup.districtName,
-                destinationProvinceCode: quote.delivery.provinceCode,
-                destinationDistrictCode: quote.delivery.districtCode,
-                destinationProvince: quote.delivery.provinceName,
-                destinationDistrict: quote.delivery.districtName,
-                shipmentWeightGrams: quote.shipmentWeightGrams,
-                service: quote.service,
-                simulation: true as const,
-                straightLineDistanceKm: quote.straightLineDistanceKm,
-                estimatedDistanceKm: quote.estimatedDistanceKm,
-                billableDistanceKm: quote.billableDistanceKm,
-                estimatedDaysMin: quote.estimatedDaysMin,
-                estimatedDaysMax: quote.estimatedDaysMax,
-                baseFeeMinor: quote.baseFeeMinor,
-                nearDistanceFeeMinor: quote.nearDistanceFeeMinor,
-                longDistanceFeeMinor: quote.longDistanceFeeMinor,
-                weightFeeMinor: quote.weightFeeMinor,
-                shippingFeeMinor: quote.totalFeeMinor,
-                calculationVersion: quote.calculationVersion,
-                locationSnapshotVersion: quote.locationSnapshotVersion,
-              } satisfies DemoCarrierShippingBreakdown;
-            })()
-          : this.shipping.calculate({
-              shopId: first.shop.id,
-              originProvince: first.shop.location,
-              destinationProvince: snapshot.address.province,
-              shipmentWeightGrams,
-              service,
-            });
         return {
           shop: {
             id: first.shop.id,
@@ -191,8 +195,8 @@ export class CommercePricingCalculator {
           merchandiseVoucherDiscountMinor: 0,
           shippingVoucherDiscountMinor: 0,
           voucherDiscountMinor: 0,
-          shippingPayableMinor: shipping.shippingFeeMinor,
-          payableTotalMinor: checkedAdd(merchandiseSubtotalMinor, shipping.shippingFeeMinor),
+          shippingPayableMinor: shipping?.shippingFeeMinor ?? 0,
+          payableTotalMinor: checkedAdd(merchandiseSubtotalMinor, shipping?.shippingFeeMinor ?? 0),
         };
       });
 
@@ -200,9 +204,11 @@ export class CommercePricingCalculator {
     return {
       pricingVersion: PRICING_VERSION,
       voucherVersion: VOUCHER_VERSION,
-      shippingVersion: shops.some((shop) => shop.shipping.provider === 'DEMO_CARRIER')
-        ? 'demo-distance-v1'
-        : MOCK_SHIPPING_VERSION,
+      shippingVersion: snapshot.address
+        ? shops.some((shop) => shop.shipping?.provider === 'DEMO_CARRIER')
+          ? 'demo-distance-v1'
+          : MOCK_SHIPPING_VERSION
+        : null,
       currency: PRICING_CURRENCY,
       evaluatedAt: snapshot.evaluatedAt.toISOString(),
       cartVersion: snapshot.cartVersion,
@@ -218,13 +224,17 @@ export class CommercePricingCalculator {
         listSubtotalMinor: checkedAdd(...shops.map((shop) => shop.listSubtotalMinor)),
         productDiscountMinor: checkedAdd(...shops.map((shop) => shop.productDiscountMinor)),
         merchandiseSubtotalMinor: checkedAdd(...shops.map((shop) => shop.merchandiseSubtotalMinor)),
-        shippingTotalMinor: checkedAdd(...shops.map((shop) => shop.shipping.shippingFeeMinor)),
+        shippingTotalMinor: checkedAdd(
+          ...shops.map((shop) => shop.shipping?.shippingFeeMinor ?? 0),
+        ),
         shopVoucherDiscountMinor: 0,
         platformVoucherDiscountMinor: 0,
         merchandiseVoucherDiscountMinor: 0,
         shippingVoucherDiscountMinor: 0,
         voucherDiscountMinor: 0,
-        shippingPayableMinor: checkedAdd(...shops.map((shop) => shop.shipping.shippingFeeMinor)),
+        shippingPayableMinor: checkedAdd(
+          ...shops.map((shop) => shop.shipping?.shippingFeeMinor ?? 0),
+        ),
         payableTotalMinor: checkedAdd(...shops.map((shop) => shop.payableTotalMinor)),
       },
     };

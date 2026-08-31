@@ -71,6 +71,7 @@ export class OrderWriter {
     for (const shop of [...input.preview.shops].sort((left, right) =>
       left.shop.id.localeCompare(right.shop.id),
     )) {
+      if (!shop.shipping) throw new Error('Checkout shipping quote is missing.');
       const orderId = randomUUID();
       orderByShop.set(shop.shop.id, orderId);
       await transaction.shopOrder.create({

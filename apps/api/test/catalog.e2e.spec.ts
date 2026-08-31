@@ -52,6 +52,15 @@ describe('Catalog endpoint', () => {
     expect(response.headers['cache-control']).toBe('no-store');
   });
 
+  it('keeps invalid optional credentials public and non-cacheable', async () => {
+    const response = await request(app.getHttpServer())
+      .get('/api/v1/catalog/products')
+      .set('Authorization', 'Bearer expired-or-invalid')
+      .expect(200);
+    expect(isCatalogProductsResponse(response.body)).toBe(true);
+    expect(response.headers['cache-control']).toBe('no-store');
+  });
+
   it.each([
     '?page=0',
     '?page=1.5',

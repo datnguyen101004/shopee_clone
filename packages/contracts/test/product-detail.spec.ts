@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
-import { isProductDeletedProblemDetails, isProductDetailResponse, parseProductDetailResponse } from '../src';
+import {
+  isProductDeletedProblemDetails,
+  isProductDetailResponse,
+  parseProductDetailResponse,
+} from '../src';
 
 const productId = '00000000-0000-4000-8000-000000000301';
 const variantId = '00000000-0000-4000-8000-000000000401';
@@ -58,21 +62,25 @@ const response = {
 
 describe('product detail contract', () => {
   it('accepts only the minimal deleted-product 410 problem details', () => {
-    expect(isProductDeletedProblemDetails({
-      type: 'https://shopee-clone.local/problems/product-deleted',
-      title: 'Product deleted',
-      status: 410,
-      detail: 'The requested product has been deleted.',
-      code: 'PRODUCT_DELETED',
-    })).toBe(true);
-    expect(isProductDeletedProblemDetails({
-      type: 'https://shopee-clone.local/problems/product-deleted',
-      title: 'Product deleted',
-      status: 410,
-      detail: 'The requested product has been deleted.',
-      code: 'PRODUCT_DELETED',
-      deletedAt: 'secret',
-    })).toBe(false);
+    expect(
+      isProductDeletedProblemDetails({
+        type: 'https://shopee-clone.local/problems/product-deleted',
+        title: 'Product deleted',
+        status: 410,
+        detail: 'The requested product has been deleted.',
+        code: 'PRODUCT_DELETED',
+      }),
+    ).toBe(true);
+    expect(
+      isProductDeletedProblemDetails({
+        type: 'https://shopee-clone.local/problems/product-deleted',
+        title: 'Product deleted',
+        status: 410,
+        detail: 'The requested product has been deleted.',
+        code: 'PRODUCT_DELETED',
+        deletedAt: 'secret',
+      }),
+    ).toBe(false);
   });
 
   it('accepts populated, no-media, unavailable, and empty-related responses', () => {
@@ -104,6 +112,29 @@ describe('product detail contract', () => {
         gallery: [{ ...response.gallery[0], url: 'https://cdn.example.test/product.jpg' }],
       }),
     ).toBe(true);
+  });
+
+  it('requires variant scheduled pricing to match the displayed price', () => {
+    const scheduledPrice = {
+      basePriceMinor: 1_250,
+      effectivePriceMinor: 1_000,
+      compareAtPriceMinor: 1_250,
+      discountBasisPoints: 2_000,
+      campaignId: 'campaign-1',
+      evaluatedAt: '2026-08-31T00:00:00.000Z',
+    };
+    expect(
+      isProductDetailResponse({
+        ...response,
+        variants: [{ ...response.variants[0], scheduledPrice }],
+      }),
+    ).toBe(true);
+    expect(
+      isProductDetailResponse({
+        ...response,
+        variants: [{ ...response.variants[0], priceMinor: 999, scheduledPrice }],
+      }),
+    ).toBe(false);
   });
 
   it('rejects unsafe money, inconsistent availability, invalid media and broken related links', () => {

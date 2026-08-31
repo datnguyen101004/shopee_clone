@@ -7,14 +7,16 @@ import type {
 
 import {
   availableQuantity,
+  applyScheduledPrice,
   mapCatalogProductCard,
   promotionFor,
   safeMinor,
-  publicScheduledPrice,
 } from './catalog-presentation';
 import { CatalogProductDeletedError, CatalogProductNotFoundError } from './catalog-product-id';
 import { CatalogRepository } from './catalog.repository';
 import { ScheduledDiscountService } from '../pricing/scheduled-discount.service';
+import { BuyerBestPriceService } from '../pricing/buyer-best-price.service';
+import { representativeOffer } from './catalog-presentation';
 
 type ProductDetailCandidate = NonNullable<
   Awaited<ReturnType<CatalogRepository['findPublicProduct']>>
@@ -49,7 +51,10 @@ function mapVariants(
   const genericPrimary =
     gallery.find((image) => image.variantId === null)?.id ?? gallery[0]?.id ?? null;
   return product.variants.flatMap((variant) => {
-    const enriched = variant as typeof variant & { scheduledPrice?: ProductDetailVariant['scheduledPrice'] };
+    const enriched = variant as typeof variant & {
+      scheduledPrice?: ProductDetailVariant['scheduledPrice'];
+      buyerBestPrice?: ProductDetailVariant['buyerBestPrice'];
+    };
     const priceMinor = safeMinor(enriched.priceMinor);
     const stock = availableQuantity(enriched.inventory);
     if (priceMinor === null || stock === null) return [];
@@ -63,6 +68,7 @@ function mapVariants(
         priceMinor,
         ...(promotionFor(priceMinor, enriched.compareAtPriceMinor) ?? {}),
         ...(enriched.scheduledPrice ? { scheduledPrice: enriched.scheduledPrice } : {}),
+        ...(enriched.buyerBestPrice ? { buyerBestPrice: enriched.buyerBestPrice } : {}),
         availableQuantity: stock,
         availability: stock > 0 ? 'in-stock' : 'unavailable',
         preferredImageId,
@@ -73,12 +79,22 @@ function mapVariants(
 
 @Injectable()
 export class CatalogProductDetailService {
-  constructor(@Inject(CatalogRepository) private readonly repository: CatalogRepository, @Inject(ScheduledDiscountService) private readonly scheduledDiscounts?: ScheduledDiscountService) {}
+  constructor(
+    @Inject(CatalogRepository) private readonly repository: CatalogRepository,
+    @Inject(ScheduledDiscountService)
+    private readonly scheduledDiscounts?: ScheduledDiscountService,
+    @Inject(BuyerBestPriceService)
+    private readonly buyerPrices?: BuyerBestPriceService,
+  ) {}
 
-  async getProduct(productId: string): Promise<ProductDetailResponse> {
+  async getProduct(
+    productId: string,
+    buyerId: string | null = null,
+  ): Promise<ProductDetailResponse> {
     const product = await this.repository.findPublicProduct(productId);
     if (!product) {
-      if (await this.repository.findDeletedProduct(productId)) throw new CatalogProductDeletedError();
+      if (await this.repository.findDeletedProduct(productId))
+        throw new CatalogProductDeletedError();
       throw new CatalogProductNotFoundError();
     }
 
@@ -86,22 +102,96 @@ export class CatalogProductDetailService {
       this.repository.countPublicProductsForShop(product.shopId),
       this.repository.findRelatedCandidates(product.categoryId, product.id),
     ]);
-    if (this.scheduledDiscounts) {
-      const discounts = await this.scheduledDiscounts.resolveVariants(undefined, product.variants.map((variant) => ({ id: variant.id, productId: product.id, priceMinor: variant.priceMinor, compareAtPriceMinor: variant.compareAtPriceMinor })), new Date());
-      for (const variant of product.variants) {
-        const discount = discounts.get(variant.id);
-        if (discount && discount.effectivePriceMinor !== discount.basePriceMinor) {
-          variant.compareAtPriceMinor = variant.compareAtPriceMinor === null || variant.compareAtPriceMinor < discount.basePriceMinor ? discount.basePriceMinor : variant.compareAtPriceMinor;
-          variant.priceMinor = discount.effectivePriceMinor;
-          (variant as typeof variant & { scheduledPrice?: unknown }).scheduledPrice = publicScheduledPrice(discount);
-        }
-      }
-    }
-    const gallery = mapGallery(product);
-    const variants = mapVariants(product, gallery);
+    const evaluatedAt = new Date();
+    const discounts = this.scheduledDiscounts
+      ? await this.scheduledDiscounts.resolveVariants(
+          undefined,
+          [product, ...relatedCandidates].flatMap((candidate) =>
+            candidate.variants.map((variant) => ({
+              id: variant.id,
+              productId: candidate.id,
+              priceMinor: variant.priceMinor,
+              compareAtPriceMinor: variant.compareAtPriceMinor,
+            })),
+          ),
+          evaluatedAt,
+        )
+      : new Map();
+    const enrichedProduct = {
+      ...product,
+      variants: product.variants.map((variant) =>
+        applyScheduledPrice(variant, discounts.get(variant.id)),
+      ),
+    };
+    const enrichedRelated = relatedCandidates.map((candidate) => ({
+      ...candidate,
+      variants: candidate.variants.map((variant) =>
+        applyScheduledPrice(variant, discounts.get(variant.id)),
+      ),
+    }));
+    const previewSnapshots = [
+      ...enrichedProduct.variants.flatMap((variant) => {
+        const effectivePriceMinor = safeMinor(variant.priceMinor);
+        return effectivePriceMinor === null
+          ? []
+          : [
+              {
+                productId: enrichedProduct.id,
+                variantId: variant.id,
+                effectivePriceMinor,
+                weightGrams: variant.weightGrams,
+                shop: {
+                  id: enrichedProduct.shop.id,
+                  ownerUserId: enrichedProduct.shop.ownerId,
+                  slug: enrichedProduct.shop.slug,
+                  name: enrichedProduct.shop.name,
+                  location: enrichedProduct.shop.location,
+                  pickupProvince: enrichedProduct.shop.pickupProvince,
+                },
+              },
+            ];
+      }),
+      ...enrichedRelated.flatMap((candidate) => {
+        const representative = representativeOffer(candidate.variants);
+        return representative
+          ? [
+              {
+                productId: candidate.id,
+                variantId: representative.offer.id,
+                effectivePriceMinor: representative.priceMinor,
+              weightGrams: representative.offer.weightGrams ?? 0,
+                shop: {
+                  id: candidate.shop.id,
+                  ownerUserId: candidate.shop.ownerId,
+                  slug: candidate.shop.slug,
+                  name: candidate.shop.name,
+                  location: candidate.shop.location,
+                  pickupProvince: candidate.shop.pickupProvince,
+                },
+              },
+            ]
+          : [];
+      }),
+    ];
+    const buyerPreviews = this.buyerPrices
+      ? await this.buyerPrices.previews(buyerId, previewSnapshots, evaluatedAt)
+      : new Map();
+    enrichedProduct.variants = enrichedProduct.variants.map((variant) => {
+      const buyerBestPrice = buyerPreviews.get(variant.id);
+      return buyerBestPrice ? { ...variant, buyerBestPrice } : variant;
+    });
+    const personalizedRelated = enrichedRelated.map((candidate) => ({
+      ...candidate,
+      variants: candidate.variants.map((variant) => {
+        const buyerBestPrice = buyerPreviews.get(variant.id);
+        return buyerBestPrice ? { ...variant, buyerBestPrice } : variant;
+      }),
+    }));
+    const gallery = mapGallery(enrichedProduct);
+    const variants = mapVariants(enrichedProduct, gallery);
     const purchasableVariants = variants.filter((variant) => variant.availability === 'in-stock');
     const initialVariantId = purchasableVariants[0]?.id ?? variants[0]?.id ?? null;
-    const relatedProducts = relatedCandidates
+    const relatedProducts = personalizedRelated
       .map(mapCatalogProductCard)
       .filter((card): card is NonNullable<typeof card> => card !== null)
       .slice(0, 6);

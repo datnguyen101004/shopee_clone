@@ -1,6 +1,7 @@
 import type { CatalogRepository } from './catalog.repository';
 import { CatalogProductDeletedError, CatalogProductNotFoundError } from './catalog-product-id';
 import { CatalogProductDetailService } from './catalog-product-detail.service';
+import type { ScheduledDiscountService } from '../pricing/scheduled-discount.service';
 
 const productId = '00000000-0000-4000-8000-000000000301';
 const variantId = '00000000-0000-4000-8000-000000000401';
@@ -130,5 +131,63 @@ describe('CatalogProductDetailService', () => {
     repository.findPublicProduct.mockResolvedValueOnce(null);
     repository.findDeletedProduct.mockResolvedValueOnce({ id: productId });
     await expect(service.getProduct(productId)).rejects.toBeInstanceOf(CatalogProductDeletedError);
+  });
+
+  it('enriches every variant in one batch and keeps the stored candidate unchanged', async () => {
+    const stored = candidate();
+    repository.findPublicProduct.mockResolvedValueOnce(stored);
+    const scheduledDiscounts = {
+      resolveVariants: jest.fn().mockImplementation(
+        async (_transaction, variants, evaluatedAt) =>
+          new Map(
+            variants.map(
+              (variant: {
+                id: string;
+                productId: string;
+                priceMinor: bigint;
+                compareAtPriceMinor: bigint | null;
+              }) => [
+                variant.id,
+                {
+                  variantId: variant.id,
+                  productId: variant.productId,
+                  basePriceMinor: variant.priceMinor,
+                  effectivePriceMinor: variant.priceMinor - 200n,
+                  compareAtPriceMinor: variant.compareAtPriceMinor,
+                  discountBasisPoints: 2_000,
+                  campaignId: 'campaign-1',
+                  evaluatedAt,
+                },
+              ],
+            ),
+          ),
+      ),
+    };
+    const campaignService = new CatalogProductDetailService(
+      repository as unknown as CatalogRepository,
+      scheduledDiscounts as unknown as ScheduledDiscountService,
+    );
+
+    const response = await campaignService.getProduct(productId);
+    expect(response.variants[0]).toMatchObject({
+      priceMinor: 800,
+      compareAtPriceMinor: 1_200,
+      scheduledPrice: { basePriceMinor: 1_000, effectivePriceMinor: 800 },
+    });
+    expect(scheduledDiscounts.resolveVariants).toHaveBeenCalledTimes(1);
+    expect(scheduledDiscounts.resolveVariants.mock.calls[0]?.[1]).toHaveLength(2);
+    expect(stored.variants[0]?.priceMinor).toBe(1_000n);
+    expect(stored.variants[0]).not.toHaveProperty('scheduledPrice');
+  });
+
+  it('propagates scheduled-price database failures', async () => {
+    const failure = new Error('database unavailable');
+    const campaignService = new CatalogProductDetailService(
+      repository as unknown as CatalogRepository,
+      {
+        resolveVariants: jest.fn().mockRejectedValue(failure),
+      } as unknown as ScheduledDiscountService,
+    );
+    await expect(campaignService.getProduct(productId)).rejects.toBe(failure);
   });
 });

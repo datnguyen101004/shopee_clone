@@ -120,29 +120,40 @@ export class PricingQuoteService {
     @Inject(VoucherPricingCalculator)
     private readonly voucherCalculator: VoucherPricingCalculator,
     @Inject(SystemUtcClock) private readonly clock: SystemUtcClock,
-    @Inject(ScheduledDiscountService) private readonly scheduledDiscounts?: ScheduledDiscountService,
+    @Inject(ScheduledDiscountService)
+    private readonly scheduledDiscounts?: ScheduledDiscountService,
   ) {}
 
   async quote(
     userId: string,
     expectedVersion: number,
-    shippingAddressId: string,
+    shippingAddressId: string | undefined,
     services: readonly ShopShippingServiceSelection[],
     vouchers?: VoucherCodeSelection,
   ): Promise<PricingQuoteResponse> {
     try {
       return await this.prisma.$transaction(
-        async (transaction) =>
-          (
+        async (transaction) => {
+          const evaluatedAt = this.clock.now();
+          if (!shippingAddressId) {
+            return this.calculateWithoutAddressInTransaction(transaction, {
+              userId,
+              expectedVersion,
+              vouchers,
+              evaluatedAt,
+            });
+          }
+          return (
             await this.calculateInTransaction(transaction, {
               userId,
               expectedVersion,
               shippingAddressId,
               services,
               vouchers,
-              evaluatedAt: this.clock.now(),
+              evaluatedAt,
             })
-          ).quote,
+          ).quote;
+        },
         { isolationLevel: 'RepeatableRead' },
       );
     } catch (error) {
@@ -156,6 +167,94 @@ export class PricingQuoteService {
       if (error instanceof UnsafePricingArithmeticError) throw new PricingUnavailableError();
       throw new PricingUnavailableError();
     }
+  }
+
+  private async calculateWithoutAddressInTransaction(
+    transaction: Prisma.TransactionClient,
+    input: {
+      userId: string;
+      expectedVersion: number;
+      vouchers?: VoucherCodeSelection;
+      evaluatedAt: Date;
+    },
+  ): Promise<PricingQuoteResponse> {
+    if (input.vouchers?.freeShippingCode) throw new PricingValidationError(['vouchers']);
+    const cart = await transaction.cart.findUnique({
+      where: { userId: input.userId },
+      select: quoteCartSelect,
+    });
+    const version = cart?.version ?? 0;
+    if (version !== input.expectedVersion) throw new PricingConflictError();
+
+    const facts = this.currentFacts(cart, input.userId);
+    const discounts = this.scheduledDiscounts
+      ? await this.scheduledDiscounts.resolveVariants(
+          transaction,
+          facts.lines.map((line) => ({
+            id: line.variantId,
+            productId: line.productId,
+            priceMinor: line.sellingUnitPriceMinor,
+            compareAtPriceMinor: line.compareAtUnitPriceMinor,
+          })),
+          input.evaluatedAt,
+        )
+      : new Map();
+    const lines = facts.lines.map((line) => {
+      const discount = discounts.get(line.variantId);
+      if (!discount || discount.effectivePriceMinor === discount.basePriceMinor) return line;
+      const listPrice =
+        line.compareAtUnitPriceMinor === null ||
+        line.compareAtUnitPriceMinor < discount.basePriceMinor
+          ? discount.basePriceMinor
+          : line.compareAtUnitPriceMinor;
+      return {
+        ...line,
+        sellingUnitPriceMinor: discount.effectivePriceMinor,
+        compareAtUnitPriceMinor: listPrice,
+      };
+    });
+    const selectedShopIds = new Set(lines.map((line) => line.shop.id));
+    for (const selection of input.vouchers?.shopCodes ?? []) {
+      if (!selectedShopIds.has(selection.shopId)) throw new PricingValidationError(['vouchers']);
+    }
+
+    const baseQuote = this.calculator.calculate({
+      cartVersion: version,
+      evaluatedAt: input.evaluatedAt,
+      address: null,
+      lines,
+      exclusions: facts.exclusions,
+      services: [],
+    });
+    const definitions = await this.loadVoucherDefinitions(
+      transaction,
+      input.userId,
+      input.vouchers,
+      [...selectedShopIds],
+      input.evaluatedAt,
+    );
+    const selectedVouchers = this.bestVoucherSelection(
+      baseQuote,
+      definitions,
+      input.evaluatedAt,
+      input.vouchers,
+    );
+    const calculated = this.voucherCalculator.apply(
+      baseQuote,
+      selectedVouchers,
+      definitions,
+      input.evaluatedAt,
+    );
+    return {
+      ...calculated.quote,
+      availableShopVouchers: listAvailableShopVouchers(baseQuote, definitions, input.evaluatedAt),
+      availablePlatformVouchers: listAvailablePlatformVouchers(
+        baseQuote,
+        definitions,
+        input.evaluatedAt,
+      ),
+      availableShippingVouchers: [],
+    };
   }
 
   async calculateInTransaction(
@@ -191,15 +290,32 @@ export class PricingQuoteService {
     const version = cart?.version ?? 0;
     if (version !== input.expectedVersion) throw new PricingConflictError();
 
-    const facts = this.currentFacts(cart);
+    const facts = this.currentFacts(cart, input.userId);
     const discounts = this.scheduledDiscounts
-      ? await this.scheduledDiscounts.resolveVariants(transaction, facts.lines.map((line) => ({ id: line.variantId, productId: line.productId, priceMinor: line.sellingUnitPriceMinor, compareAtPriceMinor: line.compareAtUnitPriceMinor })), input.evaluatedAt)
+      ? await this.scheduledDiscounts.resolveVariants(
+          transaction,
+          facts.lines.map((line) => ({
+            id: line.variantId,
+            productId: line.productId,
+            priceMinor: line.sellingUnitPriceMinor,
+            compareAtPriceMinor: line.compareAtUnitPriceMinor,
+          })),
+          input.evaluatedAt,
+        )
       : new Map();
     const lines = facts.lines.map((line) => {
       const discount = discounts.get(line.variantId);
       if (!discount || discount.effectivePriceMinor === discount.basePriceMinor) return line;
-      const listPrice = line.compareAtUnitPriceMinor === null || line.compareAtUnitPriceMinor < discount.basePriceMinor ? discount.basePriceMinor : line.compareAtUnitPriceMinor;
-      return { ...line, sellingUnitPriceMinor: discount.effectivePriceMinor, compareAtUnitPriceMinor: listPrice };
+      const listPrice =
+        line.compareAtUnitPriceMinor === null ||
+        line.compareAtUnitPriceMinor < discount.basePriceMinor
+          ? discount.basePriceMinor
+          : line.compareAtUnitPriceMinor;
+      return {
+        ...line,
+        sellingUnitPriceMinor: discount.effectivePriceMinor,
+        compareAtUnitPriceMinor: listPrice,
+      };
     });
     const { exclusions, snapshots } = facts;
     const selectedShopIds = new Set(lines.map((line) => line.shop.id));
@@ -230,8 +346,12 @@ export class PricingQuoteService {
       });
     } catch (error) {
       const code = error instanceof Error ? error.message : '';
-      if (process.env.DEMO_CARRIER_ENABLED === 'true' && /UNRESOLVED_(?:PROVINCE|DISTRICT)|MISSING_PICKUP_DISTRICT|DISTANCE_UNSUPPORTED/.test(code)) {
-        const fields = code === 'MISSING_PICKUP_DISTRICT' ? ['shopPickupAddress'] : ['shippingAddressId'];
+      if (
+        process.env.DEMO_CARRIER_ENABLED === 'true' &&
+        /UNRESOLVED_(?:PROVINCE|DISTRICT)|MISSING_PICKUP_DISTRICT|DISTANCE_UNSUPPORTED/.test(code)
+      ) {
+        const fields =
+          code === 'MISSING_PICKUP_DISTRICT' ? ['shopPickupAddress'] : ['shippingAddressId'];
         throw new PricingValidationError(fields);
       }
       throw error;
@@ -243,9 +363,15 @@ export class PricingQuoteService {
       [...selectedShopIds],
       input.evaluatedAt,
     );
+    const selectedVouchers = this.bestVoucherSelection(
+      baseQuote,
+      definitions,
+      input.evaluatedAt,
+      input.vouchers,
+    );
     const calculated = this.voucherCalculator.apply(
       baseQuote,
-      input.vouchers,
+      selectedVouchers,
       definitions,
       input.evaluatedAt,
     );
@@ -253,11 +379,7 @@ export class PricingQuoteService {
       ...calculated,
       quote: {
         ...calculated.quote,
-        availableShopVouchers: listAvailableShopVouchers(
-          baseQuote,
-          definitions,
-          input.evaluatedAt,
-        ),
+        availableShopVouchers: listAvailableShopVouchers(baseQuote, definitions, input.evaluatedAt),
         availablePlatformVouchers: listAvailablePlatformVouchers(
           baseQuote,
           definitions,
@@ -283,6 +405,103 @@ export class PricingQuoteService {
         lines: snapshots,
       },
     };
+  }
+
+  private bestVoucherSelection(
+    baseQuote: PricingQuoteResponse,
+    definitions: readonly VoucherDefinitionSnapshot[],
+    evaluatedAt: Date,
+    explicit: VoucherCodeSelection | undefined,
+  ): VoucherCodeSelection | undefined {
+    const maximumCandidates = 4;
+    const maximumCombinations = 512;
+    const availableShop = listAvailableShopVouchers(baseQuote, definitions, evaluatedAt);
+    const explicitShop = new Map(
+      (explicit?.shopCodes ?? []).map((selection) => [selection.shopId, selection.code]),
+    );
+    let partials: Array<NonNullable<VoucherCodeSelection['shopCodes']>> = [[]];
+    for (const { shop } of baseQuote.shops) {
+      const constrained = explicitShop.get(shop.id);
+      const options: Array<string | null> = constrained
+        ? [constrained]
+        : [
+            ...availableShop
+              .filter((voucher) => voucher.shopId === shop.id)
+              .slice(0, maximumCandidates)
+              .map((voucher) => voucher.code),
+            null,
+          ];
+      const next: typeof partials = [];
+      for (const partial of partials) {
+        for (const code of options) {
+          if (next.length >= maximumCombinations) break;
+          next.push(code ? [...partial, { shopId: shop.id, code }] : partial);
+        }
+        if (next.length >= maximumCombinations) break;
+      }
+      partials = next;
+    }
+
+    const platformOptions: Array<string | null> = explicit?.platformCode
+      ? [explicit.platformCode]
+      : [
+          ...listAvailablePlatformVouchers(baseQuote, definitions, evaluatedAt)
+            .slice(0, maximumCandidates)
+            .map((voucher) => voucher.code),
+          null,
+        ];
+    const shippingOptions: Array<string | null> = explicit?.freeShippingCode
+      ? [explicit.freeShippingCode]
+      : [
+          ...listAvailableShippingVouchers(baseQuote, definitions, evaluatedAt)
+            .slice(0, maximumCandidates)
+            .map((voucher) => voucher.code),
+          null,
+        ];
+    const selections: VoucherCodeSelection[] = [];
+    outer: for (const shopCodes of partials) {
+      for (const platformCode of platformOptions) {
+        for (const freeShippingCode of shippingOptions) {
+          if (selections.length >= maximumCombinations) break outer;
+          selections.push({
+            ...(shopCodes.length ? { shopCodes } : {}),
+            ...(platformCode ? { platformCode } : {}),
+            ...(freeShippingCode ? { freeShippingCode } : {}),
+          });
+        }
+      }
+    }
+    selections.push(explicit ?? {});
+
+    let winner:
+      { selection: VoucherCodeSelection; quote: PricingQuoteResponse; tuple: string } | undefined;
+    for (const selection of selections) {
+      const quote = this.voucherCalculator.apply(
+        baseQuote,
+        selection,
+        definitions,
+        evaluatedAt,
+      ).quote;
+      const tuple = [
+        ...(selection.shopCodes ?? [])
+          .slice()
+          .sort((left, right) => left.shopId.localeCompare(right.shopId))
+          .map(({ shopId, code }) => `${shopId}:${code}`),
+        selection.platformCode ?? '',
+        selection.freeShippingCode ?? '',
+      ].join('|');
+      if (
+        !winner ||
+        quote.summary.payableTotalMinor < winner.quote.summary.payableTotalMinor ||
+        (quote.summary.payableTotalMinor === winner.quote.summary.payableTotalMinor &&
+          (quote.summary.voucherDiscountMinor > winner.quote.summary.voucherDiscountMinor ||
+            (quote.summary.voucherDiscountMinor === winner.quote.summary.voucherDiscountMinor &&
+              tuple.localeCompare(winner.tuple) < 0)))
+      ) {
+        winner = { selection, quote, tuple };
+      }
+    }
+    return winner?.selection;
   }
 
   private async loadVoucherDefinitions(
@@ -353,7 +572,10 @@ export class PricingQuoteService {
     return [...new Map(mapped.map((definition) => [definition.id, definition])).values()];
   }
 
-  private currentFacts(cart: QuoteCart | null): {
+  private currentFacts(
+    cart: QuoteCart | null,
+    userId: string,
+  ): {
     lines: AuthoritativePricingLine[];
     exclusions: PricingQuoteExclusion[];
     snapshots: PricingCheckoutLineFact[];
@@ -365,6 +587,14 @@ export class PricingQuoteService {
       const { variant } = row;
       const { product } = variant;
       const { shop } = product;
+      if (shop.ownerId === userId) {
+        exclusions.push({
+          lineId: row.id,
+          code: 'unavailable',
+          message: 'Bạn không thể mua sản phẩm từ cửa hàng của chính mình.',
+        });
+        continue;
+      }
       const availableQuantity = Math.max(
         0,
         (variant.inventory?.quantityOnHand ?? 0) - (variant.inventory?.quantityReserved ?? 0),

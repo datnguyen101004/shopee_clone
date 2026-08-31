@@ -23,6 +23,7 @@ import { MarketplaceOwnershipService } from './marketplace-ownership.service';
 import { RolesGuard } from './role-authorization.guard';
 import { RoleAuthorizationService } from './role-authorization.service';
 import { SellerController } from './seller.controller';
+import { OptionalAuthGuard } from './optional-auth.guard';
 
 @Module({
   imports: [JwtModule.register({})],
@@ -42,6 +43,7 @@ import { SellerController } from './seller.controller';
     AuthClock,
     AuthExceptionFilter,
     AuthGuard,
+    OptionalAuthGuard,
     RolesGuard,
     MarketplaceOwnershipService,
     RoleAuthorizationService,
@@ -59,6 +61,7 @@ import { SellerController } from './seller.controller';
   exports: [
     AUTH_CONFIG,
     AuthGuard,
+    OptionalAuthGuard,
     AuthOriginGuard,
     AuthTokenService,
     RolesGuard,

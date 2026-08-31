@@ -1,4 +1,9 @@
-import { isPublicScheduledPriceBreakdown, type PublicScheduledPriceBreakdown } from './pricing';
+import {
+  isBuyerBestPricePreview,
+  isPublicScheduledPriceBreakdown,
+  type BuyerBestPricePreview,
+  type PublicScheduledPriceBreakdown,
+} from './pricing';
 
 export const homepageModuleTypes = [
   'campaign-banner',
@@ -48,6 +53,7 @@ export interface HomepageProductSummary {
   priceMinor: number;
   compareAtPriceMinor?: number;
   scheduledPrice?: PublicScheduledPriceBreakdown;
+  buyerBestPrice?: BuyerBestPricePreview;
   label?: string;
   soldCount?: number;
 }
@@ -110,20 +116,38 @@ const isCategory = (value: unknown): value is HomepageCategoryShortcut =>
   isString(value.icon) &&
   isString(value.href);
 
-const isProduct = (value: unknown): value is HomepageProductSummary =>
-  isRecord(value) &&
-  isString(value.id) &&
-  isString(value.name) &&
-  isString(value.shopName) &&
-  isString(value.href) &&
-  isNullableString(value.imageUrl) &&
-  isString(value.imageAlt) &&
-  isSafeInteger(value.priceMinor) &&
-  value.priceMinor >= 0 &&
-  (value.compareAtPriceMinor === undefined || isSafeInteger(value.compareAtPriceMinor)) &&
-  (value.scheduledPrice === undefined || isPublicScheduledPriceBreakdown(value.scheduledPrice)) &&
-  isOptionalString(value.label) &&
-  (value.soldCount === undefined || isSafeInteger(value.soldCount));
+const isProduct = (value: unknown): value is HomepageProductSummary => {
+  if (
+    !isRecord(value) ||
+    !isString(value.id) ||
+    !isString(value.name) ||
+    !isString(value.shopName) ||
+    !isString(value.href) ||
+    !isNullableString(value.imageUrl) ||
+    !isString(value.imageAlt) ||
+    !isSafeInteger(value.priceMinor) ||
+    value.priceMinor < 0 ||
+    !(
+      value.compareAtPriceMinor === undefined ||
+      (isSafeInteger(value.compareAtPriceMinor) && value.compareAtPriceMinor > value.priceMinor)
+    ) ||
+    !(
+      value.scheduledPrice === undefined || isPublicScheduledPriceBreakdown(value.scheduledPrice)
+    ) ||
+    !(value.buyerBestPrice === undefined || isBuyerBestPricePreview(value.buyerBestPrice)) ||
+    !isOptionalString(value.label) ||
+    !(value.soldCount === undefined || isSafeInteger(value.soldCount))
+  ) {
+    return false;
+  }
+
+  return (
+    (value.scheduledPrice === undefined ||
+      value.scheduledPrice.effectivePriceMinor === value.priceMinor) &&
+    (value.buyerBestPrice === undefined ||
+      value.buyerBestPrice.effectivePriceMinor === value.priceMinor)
+  );
+};
 
 export function isKnownHomepageModule(value: unknown): value is HomepageModule {
   if (!isRecord(value) || !hasBase(value) || !isString(value.type)) return false;

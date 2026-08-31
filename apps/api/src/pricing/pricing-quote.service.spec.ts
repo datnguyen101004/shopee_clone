@@ -18,6 +18,7 @@ import {
   PricingValidationError,
 } from './pricing.errors';
 import { PricingQuoteService } from './pricing-quote.service';
+import { BuyerBestPriceOptimizer } from './buyer-best-price.optimizer';
 
 const userId = '00000000-0000-4000-8000-000000000001';
 const addressId = '00000000-0000-4000-8000-000000000002';
@@ -121,7 +122,7 @@ describe('pricing quote orchestration', () => {
       productDiscountMinor: 20_000,
       shipmentWeightGrams: 600,
     });
-    expect(quote.shops[0]?.shipping.service).toBe('STANDARD');
+    expect(quote.shops[0]?.shipping?.service).toBe('STANDARD');
   });
 
   it('keeps missing address and stale cart outcomes private and typed', async () => {
@@ -203,6 +204,12 @@ describe('pricing quote orchestration', () => {
       productScopes: [],
       userUsages: [],
     };
+    const automatic = await serviceWith({ vouchers: [active] }).quote(userId, 2, addressId, []);
+    expect(automatic.vouchers).toEqual([
+      expect.objectContaining({ code: 'PLATFORM-10', status: 'APPLIED', discountMinor: 18_000 }),
+    ]);
+    expect(automatic.summary.platformVoucherDiscountMinor).toBe(18_000);
+
     const quote = await serviceWith({ vouchers: [active] }).quote(userId, 2, addressId, [], {
       platformCode: 'PLATFORM-10',
       freeShippingCode: 'UNKNOWN-CODE',
@@ -216,5 +223,108 @@ describe('pricing quote orchestration', () => {
       }),
     ]);
     expect(quote.summary.platformVoucherDiscountMinor).toBe(18_000);
+  });
+
+  it('calculates merchandise vouchers without an address and never claims shipping savings', async () => {
+    const common = {
+      startsAt: new Date('2020-01-01T00:00:00.000Z'),
+      endsAt: new Date('2999-01-01T00:00:00.000Z'),
+      isEnabled: true,
+      usageLimit: 100,
+      usedCount: 0,
+      perBuyerLimit: 1,
+      productScopes: [],
+      userUsages: [],
+    };
+    const quote = await serviceWith({
+      vouchers: [
+        {
+          ...common,
+          id: '00000000-0000-4000-8000-000000000030',
+          code: 'PLATFORM-10',
+          name: 'Sàn giảm 10%',
+          issuer: 'PLATFORM',
+          shopId: null,
+          benefitType: 'PERCENTAGE',
+          fixedAmountMinor: null,
+          percentageBasisPoints: 1_000,
+          maximumDiscountMinor: 50_000n,
+          minimumSpendMinor: 100_000n,
+        },
+        {
+          ...common,
+          id: '00000000-0000-4000-8000-000000000031',
+          code: 'FREESHIP-30K',
+          name: 'Miễn phí vận chuyển',
+          issuer: 'PLATFORM',
+          shopId: null,
+          benefitType: 'FREE_SHIPPING',
+          fixedAmountMinor: null,
+          percentageBasisPoints: null,
+          maximumDiscountMinor: 30_000n,
+          minimumSpendMinor: 0n,
+        },
+      ],
+    }).quote(userId, 2, undefined, []);
+
+    expect(isPricingQuoteResponse(quote)).toBe(true);
+    expect(quote.address).toBeNull();
+    expect(quote.shippingVersion).toBeNull();
+    expect(quote.shops[0]?.shipping).toBeNull();
+    expect(quote.summary.platformVoucherDiscountMinor).toBe(18_000);
+    expect(quote.summary.shippingVoucherDiscountMinor).toBe(0);
+    expect(quote.availableShippingVouchers).toEqual([]);
+    expect(quote.vouchers.map(({ slot }) => slot)).toEqual(['PLATFORM']);
+  });
+
+  it('allows a multi-quantity cart to unlock a voucher excluded from quantity-one preview', async () => {
+    const voucher = {
+      id: '00000000-0000-4000-8000-000000000021',
+      code: 'CARTONLY20K',
+      name: 'Cart only 20K',
+      issuer: 'PLATFORM' as const,
+      shopId: null,
+      benefitType: 'FIXED_AMOUNT' as const,
+      fixedAmountMinor: 20_000n,
+      percentageBasisPoints: null,
+      maximumDiscountMinor: null,
+      minimumSpendMinor: 150_000n,
+      startsAt: new Date('2020-01-01T00:00:00.000Z'),
+      endsAt: new Date('2999-01-01T00:00:00.000Z'),
+      isEnabled: true,
+      usageLimit: 100,
+      usedCount: 0,
+      perBuyerLimit: 1,
+      productScopes: [],
+      userUsages: [],
+    };
+    const cartQuote = await serviceWith({ vouchers: [voucher] }).quote(userId, 2, addressId, []);
+    expect(cartQuote.summary.platformVoucherDiscountMinor).toBe(20_000);
+
+    const fixture = fixtureCart().lines[0]!.variant;
+    const productPreview = new BuyerBestPriceOptimizer().optimize({
+      productId: fixture.product.id,
+      variantId: fixture.id,
+      shop: {
+        id: shopId,
+        ownerUserId: fixture.product.shop.ownerId,
+        slug: 'fixture-shop',
+        name: 'Fixture Shop',
+        location: 'Hà Nội',
+      },
+      effectivePriceMinor: 90_000,
+      evaluatedAt: new Date('2026-08-14T05:00:00.000Z'),
+      standardShippingFeeMinor: null,
+      voucherDefinitions: [
+        {
+          ...voucher,
+          fixedAmountMinor: 20_000,
+          minimumSpendMinor: 150_000,
+          buyerUsedCount: 0,
+          productIds: [],
+        },
+      ],
+    });
+    expect(productPreview.merchandiseDiscountMinor).toBe(0);
   });
 });

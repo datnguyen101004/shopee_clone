@@ -19,6 +19,7 @@ export const PRICING_VERSION = 'pricing-v2' as const;
 export const MOCK_SHIPPING_VERSION = 'mock-v1' as const;
 export const DEMO_CARRIER_SHIPPING_VERSION = 'demo-distance-v1' as const;
 export const PRICING_CURRENCY = 'VND' as const;
+export const BUYER_BEST_PRICE_VERSION = 'buyer-best-price-v1' as const;
 export const SHIPPING_SERVICES = ['ECONOMY', 'STANDARD', 'EXPRESS'] as const;
 
 /** Server-authoritative scheduled product price details exposed to storefronts. */
@@ -31,16 +32,184 @@ export interface PublicScheduledPriceBreakdown {
   evaluatedAt: string;
 }
 
-export function isPublicScheduledPriceBreakdown(value: unknown): value is PublicScheduledPriceBreakdown {
+export type BuyerBestPriceVoucherSlot = 'SHOP' | 'PLATFORM' | 'FREE_SHIPPING';
+
+export interface AppliedPreviewVoucher {
+  code: string;
+  name: string;
+  slot: BuyerBestPriceVoucherSlot;
+  discountMinor: number;
+}
+
+export interface BuyerBestPriceShippingPreview {
+  service: 'STANDARD';
+  shippingFeeMinor: number;
+  voucher: AppliedPreviewVoucher | null;
+  shippingVoucherDiscountMinor: number;
+  shippingPayableMinor: number;
+  estimatedPayableMinor: number;
+}
+
+export interface BuyerBestPricePreview {
+  version: typeof BUYER_BEST_PRICE_VERSION;
+  quantity: 1;
+  currency: typeof PRICING_CURRENCY;
+  evaluatedAt: string;
+  effectivePriceMinor: number;
+  shopVoucher: AppliedPreviewVoucher | null;
+  platformVoucher: AppliedPreviewVoucher | null;
+  shopVoucherDiscountMinor: number;
+  platformVoucherDiscountMinor: number;
+  merchandiseDiscountMinor: number;
+  merchandisePayableMinor: number;
+  shipping: BuyerBestPriceShippingPreview | null;
+}
+
+/** Minimal public price shape shared by storefront product surfaces. */
+export interface EffectiveProductPrice {
+  priceMinor: number;
+  scheduledPrice?: PublicScheduledPriceBreakdown;
+  buyerBestPrice?: BuyerBestPricePreview;
+}
+
+/** Selects a server-provided display price without recalculating campaign discounts. */
+export function effectiveProductPriceMinor(value: EffectiveProductPrice): number {
+  return value.scheduledPrice?.effectivePriceMinor ?? value.priceMinor;
+}
+
+/** Selects a validated personalized merchandise price, with safe effective-price fallback. */
+export function buyerDisplayProductPriceMinor(value: EffectiveProductPrice): number {
+  const effectivePriceMinor = effectiveProductPriceMinor(value);
+  return isBuyerBestPricePreview(value.buyerBestPrice) &&
+    value.buyerBestPrice.effectivePriceMinor === effectivePriceMinor
+    ? value.buyerBestPrice.merchandisePayableMinor
+    : effectivePriceMinor;
+}
+
+export function isPublicScheduledPriceBreakdown(
+  value: unknown,
+): value is PublicScheduledPriceBreakdown {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) return false;
   const item = value as Record<string, unknown>;
-  return Number.isSafeInteger(item.basePriceMinor) && (item.basePriceMinor as number) > 0
-    && Number.isSafeInteger(item.effectivePriceMinor) && (item.effectivePriceMinor as number) > 0
-    && (item.compareAtPriceMinor === null || (Number.isSafeInteger(item.compareAtPriceMinor) && (item.compareAtPriceMinor as number) >= (item.effectivePriceMinor as number)))
-    && Number.isInteger(item.discountBasisPoints) && (item.discountBasisPoints as number) >= 1 && (item.discountBasisPoints as number) <= 9000
-    && typeof item.campaignId === 'string' && item.campaignId.length > 0
-    && typeof item.evaluatedAt === 'string' && Number.isFinite(Date.parse(item.evaluatedAt))
-    && (item.effectivePriceMinor as number) < (item.basePriceMinor as number);
+  return (
+    Number.isSafeInteger(item.basePriceMinor) &&
+    (item.basePriceMinor as number) > 0 &&
+    Number.isSafeInteger(item.effectivePriceMinor) &&
+    (item.effectivePriceMinor as number) > 0 &&
+    (item.compareAtPriceMinor === null ||
+      (Number.isSafeInteger(item.compareAtPriceMinor) &&
+        (item.compareAtPriceMinor as number) >= (item.effectivePriceMinor as number))) &&
+    Number.isInteger(item.discountBasisPoints) &&
+    (item.discountBasisPoints as number) >= 1 &&
+    (item.discountBasisPoints as number) <= 9000 &&
+    typeof item.campaignId === 'string' &&
+    item.campaignId.length > 0 &&
+    typeof item.evaluatedAt === 'string' &&
+    Number.isFinite(Date.parse(item.evaluatedAt)) &&
+    (item.effectivePriceMinor as number) < (item.basePriceMinor as number)
+  );
+}
+
+function isAppliedPreviewVoucher(
+  value: unknown,
+  slot: BuyerBestPriceVoucherSlot,
+  discountMinor: number,
+): value is AppliedPreviewVoucher {
+  return (
+    isRecord(value) &&
+    hasExactKeys(value, ['code', 'name', 'slot', 'discountMinor']) &&
+    normalizeVoucherCode(value.code) === value.code &&
+    isText(value.name) &&
+    value.slot === slot &&
+    isPositiveInteger(value.discountMinor) &&
+    value.discountMinor === discountMinor
+  );
+}
+
+export function isBuyerBestPricePreview(value: unknown): value is BuyerBestPricePreview {
+  if (
+    !isRecord(value) ||
+    !hasExactKeys(value, [
+      'version',
+      'quantity',
+      'currency',
+      'evaluatedAt',
+      'effectivePriceMinor',
+      'shopVoucher',
+      'platformVoucher',
+      'shopVoucherDiscountMinor',
+      'platformVoucherDiscountMinor',
+      'merchandiseDiscountMinor',
+      'merchandisePayableMinor',
+      'shipping',
+    ]) ||
+    value.version !== BUYER_BEST_PRICE_VERSION ||
+    value.quantity !== 1 ||
+    value.currency !== PRICING_CURRENCY ||
+    !isIsoInstant(value.evaluatedAt) ||
+    !isMoney(value.effectivePriceMinor) ||
+    !isMoney(value.shopVoucherDiscountMinor) ||
+    !isMoney(value.platformVoucherDiscountMinor) ||
+    !isMoney(value.merchandiseDiscountMinor) ||
+    !isMoney(value.merchandisePayableMinor)
+  ) {
+    return false;
+  }
+
+  const merchandiseDiscount = safeAdd([
+    value.shopVoucherDiscountMinor,
+    value.platformVoucherDiscountMinor,
+  ]);
+  if (
+    merchandiseDiscount !== value.merchandiseDiscountMinor ||
+    value.merchandiseDiscountMinor > value.effectivePriceMinor ||
+    value.merchandisePayableMinor !== value.effectivePriceMinor - value.merchandiseDiscountMinor ||
+    (value.shopVoucherDiscountMinor === 0
+      ? value.shopVoucher !== null
+      : !isAppliedPreviewVoucher(value.shopVoucher, 'SHOP', value.shopVoucherDiscountMinor)) ||
+    (value.platformVoucherDiscountMinor === 0
+      ? value.platformVoucher !== null
+      : !isAppliedPreviewVoucher(
+          value.platformVoucher,
+          'PLATFORM',
+          value.platformVoucherDiscountMinor,
+        ))
+  ) {
+    return false;
+  }
+
+  if (value.shipping === null) return true;
+  if (
+    !isRecord(value.shipping) ||
+    !hasExactKeys(value.shipping, [
+      'service',
+      'shippingFeeMinor',
+      'voucher',
+      'shippingVoucherDiscountMinor',
+      'shippingPayableMinor',
+      'estimatedPayableMinor',
+    ]) ||
+    value.shipping.service !== 'STANDARD' ||
+    !isMoney(value.shipping.shippingFeeMinor) ||
+    !isMoney(value.shipping.shippingVoucherDiscountMinor) ||
+    value.shipping.shippingVoucherDiscountMinor > value.shipping.shippingFeeMinor ||
+    !isMoney(value.shipping.shippingPayableMinor) ||
+    value.shipping.shippingPayableMinor !==
+      value.shipping.shippingFeeMinor - value.shipping.shippingVoucherDiscountMinor ||
+    !isMoney(value.shipping.estimatedPayableMinor) ||
+    safeAdd([value.merchandisePayableMinor, value.shipping.shippingPayableMinor]) !==
+      value.shipping.estimatedPayableMinor ||
+    (value.shipping.shippingVoucherDiscountMinor === 0
+      ? value.shipping.voucher !== null
+      : !isAppliedPreviewVoucher(
+          value.shipping.voucher,
+          'FREE_SHIPPING',
+          value.shipping.shippingVoucherDiscountMinor,
+        ))
+  ) {
+    return false;
+  }
+  return true;
 }
 
 export type ShippingServiceCode = (typeof SHIPPING_SERVICES)[number];
@@ -53,7 +222,7 @@ export interface ShopShippingServiceSelection {
 }
 
 export interface PricingQuoteRequest {
-  shippingAddressId: string;
+  shippingAddressId?: string;
   services?: ShopShippingServiceSelection[];
   vouchers?: VoucherCodeSelection;
 }
@@ -135,7 +304,7 @@ export type ShippingBreakdown = MockShippingBreakdown | DemoCarrierShippingBreak
 export interface PricingQuoteShop {
   shop: { id: string; ownerUserId: string; slug: string; name: string };
   lines: PricingQuoteLine[];
-  shipping: ShippingBreakdown;
+  shipping: ShippingBreakdown | null;
   listSubtotalMinor: number;
   productDiscountMinor: number;
   merchandiseSubtotalMinor: number;
@@ -201,11 +370,11 @@ export interface AvailableShippingVoucher {
 export interface PricingQuoteResponse {
   pricingVersion: typeof PRICING_VERSION;
   voucherVersion: typeof VOUCHER_VERSION;
-  shippingVersion: typeof MOCK_SHIPPING_VERSION | typeof DEMO_CARRIER_SHIPPING_VERSION;
+  shippingVersion: typeof MOCK_SHIPPING_VERSION | typeof DEMO_CARRIER_SHIPPING_VERSION | null;
   currency: typeof PRICING_CURRENCY;
   evaluatedAt: string;
   cartVersion: number;
-  address: PricingQuoteAddress;
+  address: PricingQuoteAddress | null;
   shops: PricingQuoteShop[];
   vouchers: VoucherSelectionResult[];
   availableShopVouchers?: AvailableShopVoucher[];
@@ -328,8 +497,8 @@ function isVoucherCodeSelection(value: unknown): value is VoucherCodeSelection {
 export function isPricingQuoteRequest(value: unknown): value is PricingQuoteRequest {
   if (
     !isRecord(value) ||
-    !hasExactKeys(value, ['shippingAddressId'], ['services', 'vouchers']) ||
-    !isUuid(value.shippingAddressId) ||
+    !hasExactKeys(value, [], ['shippingAddressId', 'services', 'vouchers']) ||
+    !(value.shippingAddressId === undefined || isUuid(value.shippingAddressId)) ||
     !(
       value.services === undefined ||
       (Array.isArray(value.services) &&
@@ -337,6 +506,13 @@ export function isPricingQuoteRequest(value: unknown): value is PricingQuoteRequ
         value.services.every(isSelection))
     ) ||
     !(value.vouchers === undefined || isVoucherCodeSelection(value.vouchers))
+  ) {
+    return false;
+  }
+  if (
+    value.shippingAddressId === undefined &&
+    ((Array.isArray(value.services) && value.services.length > 0) ||
+      (isRecord(value.vouchers) && value.vouchers.freeShippingCode !== undefined))
   ) {
     return false;
   }
@@ -348,7 +524,7 @@ export function parsePricingQuoteRequest(value: unknown): PricingQuoteRequest | 
   if (!isPricingQuoteRequest(value)) return null;
   const vouchers = value.vouchers;
   return {
-    shippingAddressId: value.shippingAddressId,
+    ...(value.shippingAddressId ? { shippingAddressId: value.shippingAddressId } : {}),
     ...(value.services ? { services: value.services.map((selection) => ({ ...selection })) } : {}),
     ...(vouchers
       ? {
@@ -582,9 +758,10 @@ export function isShippingBreakdown(value: unknown): value is ShippingBreakdown 
   const near = safeMultiply(nearBlocks, rule.near);
   const long = safeMultiply(longBlocks, rule.long);
   const weight = safeMultiply(weightBlocks, rule.weight);
-  const total = near === null || long === null || weight === null
-    ? null
-    : safeAdd([rule.base, near, long, weight]);
+  const total =
+    near === null || long === null || weight === null
+      ? null
+      : safeAdd([rule.base, near, long, weight]);
   return (
     value.baseFeeMinor === rule.base &&
     value.nearDistanceFeeMinor === near &&
@@ -624,8 +801,8 @@ function isShop(value: unknown): value is PricingQuoteShop {
     !Array.isArray(value.lines) ||
     value.lines.length === 0 ||
     !value.lines.every(isLine) ||
-    !isShippingBreakdown(value.shipping) ||
-    value.shipping.shopId !== value.shop.id ||
+    !(value.shipping === null || isShippingBreakdown(value.shipping)) ||
+    (value.shipping !== null && value.shipping.shopId !== value.shop.id) ||
     !isMoney(value.listSubtotalMinor) ||
     !isMoney(value.productDiscountMinor) ||
     !isMoney(value.merchandiseSubtotalMinor) ||
@@ -662,10 +839,12 @@ function isShop(value: unknown): value is PricingQuoteShop {
     shopDiscount === value.shopVoucherDiscountMinor &&
     platformDiscount === value.platformVoucherDiscountMinor &&
     merchandiseDiscount === value.merchandiseVoucherDiscountMinor &&
-    weight === value.shipping.shipmentWeightGrams &&
-    value.shippingVoucherDiscountMinor <= value.shipping.shippingFeeMinor &&
-    value.shippingPayableMinor ===
-      value.shipping.shippingFeeMinor - value.shippingVoucherDiscountMinor &&
+    (value.shipping === null
+      ? value.shippingVoucherDiscountMinor === 0 && value.shippingPayableMinor === 0
+      : weight === value.shipping.shipmentWeightGrams &&
+        value.shippingVoucherDiscountMinor <= value.shipping.shippingFeeMinor &&
+        value.shippingPayableMinor ===
+          value.shipping.shippingFeeMinor - value.shippingVoucherDiscountMinor) &&
     voucherDiscount === value.voucherDiscountMinor &&
     payable === value.payableTotalMinor &&
     list !== null &&
@@ -697,7 +876,8 @@ function isAvailableShopVoucher(value: unknown): value is AvailableShopVoucher {
 }
 
 function isAvailableShopVoucherList(value: unknown): value is AvailableShopVoucher[] {
-  if (!Array.isArray(value) || value.length > 100 || !value.every(isAvailableShopVoucher)) return false;
+  if (!Array.isArray(value) || value.length > 100 || !value.every(isAvailableShopVoucher))
+    return false;
   return new Set(value.map((item) => `${item.shopId}:${item.code}`)).size === value.length;
 }
 
@@ -722,7 +902,8 @@ function isAvailablePlatformVoucher(value: unknown): value is AvailablePlatformV
 }
 
 function isAvailablePlatformVoucherList(value: unknown): value is AvailablePlatformVoucher[] {
-  if (!Array.isArray(value) || value.length > 100 || !value.every(isAvailablePlatformVoucher)) return false;
+  if (!Array.isArray(value) || value.length > 100 || !value.every(isAvailablePlatformVoucher))
+    return false;
   return new Set(value.map((item) => item.code)).size === value.length;
 }
 
@@ -747,7 +928,8 @@ function isAvailableShippingVoucher(value: unknown): value is AvailableShippingV
 }
 
 function isAvailableShippingVoucherList(value: unknown): value is AvailableShippingVoucher[] {
-  if (!Array.isArray(value) || value.length > 100 || !value.every(isAvailableShippingVoucher)) return false;
+  if (!Array.isArray(value) || value.length > 100 || !value.every(isAvailableShippingVoucher))
+    return false;
   return new Set(value.map((item) => item.code)).size === value.length;
 }
 
@@ -924,17 +1106,19 @@ export function isPricingQuoteResponse(value: unknown): value is PricingQuoteRes
     ) ||
     value.pricingVersion !== PRICING_VERSION ||
     value.voucherVersion !== VOUCHER_VERSION ||
-    value.shippingVersion !== MOCK_SHIPPING_VERSION &&
-      value.shippingVersion !== DEMO_CARRIER_SHIPPING_VERSION ||
+    (value.shippingVersion !== null &&
+      value.shippingVersion !== MOCK_SHIPPING_VERSION &&
+      value.shippingVersion !== DEMO_CARRIER_SHIPPING_VERSION) ||
     value.currency !== PRICING_CURRENCY ||
     !isIsoInstant(value.evaluatedAt) ||
     !isNonNegativeInteger(value.cartVersion) ||
-    !isAddress(value.address) ||
+    !(value.address === null || isAddress(value.address)) ||
     !Array.isArray(value.shops) ||
     !value.shops.every(isShop) ||
     !Array.isArray(value.vouchers) ||
     !value.vouchers.every(isVoucherResult) ||
-    (value.availableShopVouchers !== undefined && !isAvailableShopVoucherList(value.availableShopVouchers)) ||
+    (value.availableShopVouchers !== undefined &&
+      !isAvailableShopVoucherList(value.availableShopVouchers)) ||
     (value.availablePlatformVouchers !== undefined &&
       !isAvailablePlatformVoucherList(value.availablePlatformVouchers)) ||
     (value.availableShippingVouchers !== undefined &&
@@ -949,6 +1133,16 @@ export function isPricingQuoteResponse(value: unknown): value is PricingQuoteRes
   const lines = shops.flatMap((shop) => shop.lines);
   const vouchers = value.vouchers as VoucherSelectionResult[];
   const availableShopVouchers = (value.availableShopVouchers ?? []) as AvailableShopVoucher[];
+  const hasShipping = value.address !== null;
+  if (
+    (hasShipping && value.shippingVersion === null) ||
+    (!hasShipping && value.shippingVersion !== null) ||
+    shops.some((shop) => (hasShipping ? shop.shipping === null : shop.shipping !== null)) ||
+    (!hasShipping &&
+      ((value.availableShippingVouchers ?? []).length > 0 ||
+        vouchers.some((voucher) => voucher.slot === 'FREE_SHIPPING')))
+  )
+    return false;
   const shopIds = new Set(shops.map((shop) => shop.shop.id));
   if (availableShopVouchers.some((item) => !shopIds.has(item.shopId))) return false;
   const exclusions = value.exclusions as PricingQuoteExclusion[];
@@ -1005,7 +1199,7 @@ export function isPricingQuoteResponse(value: unknown): value is PricingQuoteRes
   const list = safeAdd(shops.map((shop) => shop.listSubtotalMinor));
   const productDiscount = safeAdd(shops.map((shop) => shop.productDiscountMinor));
   const merchandise = safeAdd(shops.map((shop) => shop.merchandiseSubtotalMinor));
-  const shipping = safeAdd(shops.map((shop) => shop.shipping.shippingFeeMinor));
+  const shipping = safeAdd(shops.map((shop) => shop.shipping?.shippingFeeMinor ?? 0));
   const shopVoucher = safeAdd(shops.map((shop) => shop.shopVoucherDiscountMinor));
   const platformVoucher = safeAdd(shops.map((shop) => shop.platformVoucherDiscountMinor));
   const merchandiseVoucher = safeAdd(shops.map((shop) => shop.merchandiseVoucherDiscountMinor));

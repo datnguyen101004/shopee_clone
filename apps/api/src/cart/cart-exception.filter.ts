@@ -16,6 +16,7 @@ import {
   CartConflictError,
   CartItemUnavailableError,
   CartLineNotFoundError,
+  CartSelfPurchaseError,
   CartUnavailableError,
   CartValidationError,
 } from './cart.errors';
@@ -70,6 +71,16 @@ export class CartExceptionFilter implements ExceptionFilter {
         'cart-conflict',
         'Cart changed',
         'Reload the cart and try the operation again.',
+      );
+      return;
+    }
+    if (exception instanceof CartSelfPurchaseError) {
+      this.problem(
+        response,
+        409,
+        'self-purchase-forbidden',
+        'Self-purchase is not allowed',
+        'Sellers cannot purchase products from their own shop.',
       );
       return;
     }

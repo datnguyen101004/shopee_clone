@@ -6,7 +6,6 @@ import { describe, expect, it } from 'vitest';
 import { CatalogContent, CatalogPagination, DiscoveryControls, catalogPageHref } from './catalog';
 import type { CatalogRouteContext } from './catalog';
 import { CatalogEmptyState, CatalogErrorState } from './catalog-states';
-import CatalogLoading from '../../app/(storefront)/search/loading';
 
 const product: CatalogProductCard = {
   id: 'product-1',
@@ -77,6 +76,60 @@ describe('catalog components', () => {
       'href',
       '/products/product-1',
     );
+  });
+
+  it('renders the effective scheduled price and retains base-price fallback', () => {
+    const catalog = response();
+    catalog.items = [
+      {
+        ...product,
+        priceMinor: 319_200,
+        scheduledPrice: {
+          basePriceMinor: 399_000,
+          effectivePriceMinor: 319_200,
+          compareAtPriceMinor: 499_000,
+          discountBasisPoints: 2_000,
+          campaignId: 'campaign-1',
+          evaluatedAt: '2026-08-31T00:00:00.000Z',
+        },
+      },
+      { ...product, id: 'product-2', href: '/products/product-2' },
+    ];
+
+    render(<CatalogContent response={catalog} context={context()} />);
+    expect(screen.getByText('₫319.200')).toBeVisible();
+    expect(screen.getByText('₫399.000')).toBeVisible();
+  });
+
+  it('renders the validated buyer voucher price with preview wording', () => {
+    const catalog = response();
+    catalog.items = [
+      {
+        ...product,
+        buyerBestPrice: {
+          version: 'buyer-best-price-v1',
+          quantity: 1,
+          currency: 'VND',
+          evaluatedAt: '2026-08-31T04:00:00.000Z',
+          effectivePriceMinor: 399_000,
+          shopVoucher: null,
+          platformVoucher: {
+            code: 'SAVE50K',
+            name: 'Giảm 50K',
+            slot: 'PLATFORM',
+            discountMinor: 50_000,
+          },
+          shopVoucherDiscountMinor: 0,
+          platformVoucherDiscountMinor: 50_000,
+          merchandiseDiscountMinor: 50_000,
+          merchandisePayableMinor: 349_000,
+          shipping: null,
+        },
+      },
+    ];
+    render(<CatalogContent response={catalog} context={context()} />);
+    expect(screen.getByText('₫349.000')).toBeVisible();
+    expect(screen.getByText('Giá tốt nhất dự kiến · Voucher đã áp dụng')).toBeVisible();
   });
 
   it('builds allowlisted page links and drops unsupported parameters', () => {
@@ -189,4 +242,3 @@ describe('catalog components', () => {
     expect(maxInput).toHaveValue('5.000.000');
   });
 });
-

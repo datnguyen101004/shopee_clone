@@ -3,8 +3,10 @@ import {
   isPricingProblemDetails,
   isPricingQuoteRequest,
   isPricingQuoteResponse,
+  isPublicScheduledPriceBreakdown,
   normalizeVietnameseAdministrativeName,
   normalizeVoucherCode,
+  effectiveProductPriceMinor,
   parsePricingQuoteRequest,
   resolveLegacyVietnamProvince,
   type PricingQuoteResponse,
@@ -27,7 +29,12 @@ const quote: PricingQuoteResponse = {
   address: { id: addressId, province: 'Thành phố Hồ Chí Minh', district: 'Quận 1' },
   shops: [
     {
-      shop: { id: shopA, ownerUserId: '00000000-0000-4000-8000-000000000601', slug: 'shop-a', name: 'Shop A' },
+      shop: {
+        id: shopA,
+        ownerUserId: '00000000-0000-4000-8000-000000000601',
+        slug: 'shop-a',
+        name: 'Shop A',
+      },
       lines: [
         {
           lineId: lineA,
@@ -75,7 +82,12 @@ const quote: PricingQuoteResponse = {
       payableTotalMinor: 178_714,
     },
     {
-      shop: { id: shopB, ownerUserId: '00000000-0000-4000-8000-000000000602', slug: 'shop-b', name: 'Shop B' },
+      shop: {
+        id: shopB,
+        ownerUserId: '00000000-0000-4000-8000-000000000602',
+        slug: 'shop-b',
+        name: 'Shop B',
+      },
       lines: [
         {
           lineId: lineB,
@@ -192,6 +204,48 @@ const quote: PricingQuoteResponse = {
 };
 
 describe('pricing and voucher contracts', () => {
+  it('selects the server-provided scheduled price and otherwise falls back to priceMinor', () => {
+    expect(effectiveProductPriceMinor({ priceMinor: 120_000 })).toBe(120_000);
+    expect(
+      effectiveProductPriceMinor({
+        priceMinor: 120_000,
+        scheduledPrice: {
+          basePriceMinor: 120_000,
+          effectivePriceMinor: 96_000,
+          compareAtPriceMinor: 120_000,
+          discountBasisPoints: 2_000,
+          campaignId: 'campaign-1',
+          evaluatedAt: '2026-08-31T00:00:00.000Z',
+        },
+      }),
+    ).toBe(96_000);
+  });
+
+  it('rejects unsafe scheduled money, invalid comparison values, and invalid campaign metadata', () => {
+    const scheduledPrice = {
+      basePriceMinor: 120_000,
+      effectivePriceMinor: 96_000,
+      compareAtPriceMinor: 120_000,
+      discountBasisPoints: 2_000,
+      campaignId: 'campaign-1',
+      evaluatedAt: '2026-08-31T00:00:00.000Z',
+    };
+    expect(isPublicScheduledPriceBreakdown(scheduledPrice)).toBe(true);
+    expect(
+      isPublicScheduledPriceBreakdown({
+        ...scheduledPrice,
+        effectivePriceMinor: Number.MAX_SAFE_INTEGER + 1,
+      }),
+    ).toBe(false);
+    expect(
+      isPublicScheduledPriceBreakdown({ ...scheduledPrice, compareAtPriceMinor: 95_000 }),
+    ).toBe(false);
+    expect(isPublicScheduledPriceBreakdown({ ...scheduledPrice, campaignId: '' })).toBe(false);
+    expect(isPublicScheduledPriceBreakdown({ ...scheduledPrice, evaluatedAt: 'not-a-date' })).toBe(
+      false,
+    );
+  });
+
   it('normalizes canonical voucher codes and rejects malformed codes', () => {
     expect(normalizeVoucherCode('  platform-10  ')).toBe('PLATFORM-10');
     expect(normalizeVoucherCode('A--1')).toBe('A--1');
@@ -234,6 +288,40 @@ describe('pricing and voucher contracts', () => {
         },
       }),
     ).toBe(false);
+  });
+
+  it('allows merchandise-only cart quotes without an address but rejects shipping claims', () => {
+    expect(parsePricingQuoteRequest({})).toEqual({});
+    expect(isPricingQuoteRequest({ services: [{ shopId: shopA, service: 'STANDARD' }] })).toBe(
+      false,
+    );
+    expect(isPricingQuoteRequest({ vouchers: { freeShippingCode: 'FREESHIP-20K' } })).toBe(false);
+
+    const merchandiseOnly: PricingQuoteResponse = {
+      ...quote,
+      shippingVersion: null,
+      address: null,
+      shops: quote.shops.map((shop) => ({
+        ...shop,
+        shipping: null,
+        shippingVoucherDiscountMinor: 0,
+        voucherDiscountMinor: shop.merchandiseVoucherDiscountMinor,
+        shippingPayableMinor: 0,
+        payableTotalMinor: shop.merchandiseSubtotalMinor - shop.merchandiseVoucherDiscountMinor,
+      })),
+      vouchers: quote.vouchers.filter((voucher) => voucher.slot !== 'FREE_SHIPPING'),
+      availableShippingVouchers: [],
+      summary: {
+        ...quote.summary,
+        shippingTotalMinor: 0,
+        shippingVoucherDiscountMinor: 0,
+        voucherDiscountMinor: quote.summary.merchandiseVoucherDiscountMinor,
+        shippingPayableMinor: 0,
+        payableTotalMinor:
+          quote.summary.merchandiseSubtotalMinor - quote.summary.merchandiseVoucherDiscountMinor,
+      },
+    };
+    expect(isPricingQuoteResponse(merchandiseOnly)).toBe(true);
   });
 
   it('accepts a fully reconciled promotion-aware multi-shop quote', () => {
@@ -341,8 +429,8 @@ describe('pricing and voucher contracts', () => {
           merchandiseVoucherDiscountMinor: 0,
           shippingVoucherDiscountMinor: 0,
           voucherDiscountMinor: 0,
-          shippingPayableMinor: shop.shipping.shippingFeeMinor,
-          payableTotalMinor: shop.merchandiseSubtotalMinor + shop.shipping.shippingFeeMinor,
+          shippingPayableMinor: shop.shipping!.shippingFeeMinor,
+          payableTotalMinor: shop.merchandiseSubtotalMinor + shop.shipping!.shippingFeeMinor,
         })),
         summary: {
           ...quote.summary,

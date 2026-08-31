@@ -1,6 +1,7 @@
 import { HomepageModuleType, ProductStatus, ShopStatus } from '../generated/prisma/enums';
 import type { HomepageClock } from './homepage.clock';
 import type { HomepageRepository } from './homepage.repository';
+import type { ScheduledDiscountService } from '../pricing/scheduled-discount.service';
 import { HomepageService } from './homepage.service';
 
 const now = new Date('2026-08-12T10:00:00.000Z');
@@ -102,5 +103,60 @@ describe('HomepageService', () => {
       evaluatedAt: now.toISOString(),
       modules: [],
     });
+  });
+
+  it('resolves all module variants once and exposes the matching effective price', async () => {
+    const repository = { findActive: jest.fn().mockResolvedValue([moduleRecord()]) };
+    const scheduledDiscounts = {
+      resolveVariants: jest.fn().mockImplementation(
+        async (_transaction, variants, evaluatedAt) =>
+          new Map(
+            variants.map(
+              (variant: {
+                id: string;
+                productId: string;
+                priceMinor: bigint;
+                compareAtPriceMinor: bigint | null;
+              }) => [
+                variant.id,
+                {
+                  variantId: variant.id,
+                  productId: variant.productId,
+                  basePriceMinor: variant.priceMinor,
+                  effectivePriceMinor: variant.priceMinor - 20_000n,
+                  compareAtPriceMinor: variant.compareAtPriceMinor,
+                  discountBasisPoints: 2_000,
+                  campaignId: 'campaign-1',
+                  evaluatedAt,
+                },
+              ],
+            ),
+          ),
+      ),
+    };
+    const service = new HomepageService(
+      repository as unknown as HomepageRepository,
+      { now: () => now },
+      scheduledDiscounts as unknown as ScheduledDiscountService,
+    );
+
+    const response = await service.getHomepage();
+    expect(response.modules[0]).toMatchObject({
+      products: [
+        {
+          priceMinor: 80_000,
+          compareAtPriceMinor: 120_000,
+          scheduledPrice: {
+            basePriceMinor: 100_000,
+            effectivePriceMinor: 80_000,
+            campaignId: 'campaign-1',
+            evaluatedAt: now.toISOString(),
+          },
+        },
+      ],
+    });
+    expect(scheduledDiscounts.resolveVariants).toHaveBeenCalledTimes(1);
+    expect(scheduledDiscounts.resolveVariants.mock.calls[0]?.[1]).toHaveLength(2);
+    expect(scheduledDiscounts.resolveVariants.mock.calls[0]?.[2]).toBe(now);
   });
 });

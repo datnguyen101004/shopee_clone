@@ -8,13 +8,19 @@ import type {
   PublicShopCategoryFacet,
   ShopCatalogQuery,
 } from '@shopee-clone/contracts';
+import { buyerDisplayProductPriceMinor } from '@shopee-clone/contracts';
 
 import { relevanceScore, normalizeDiscoveryText } from './catalog-discovery';
 import { CatalogPublicFacade, type PublicShopCatalogSummary } from './catalog-public.facade';
 import type { NormalizedCatalogQuery } from './catalog-query';
 import { CatalogRepository } from './catalog.repository';
-import { mapCatalogProductCard, publicScheduledPrice } from './catalog-presentation';
+import {
+  applyScheduledPrice,
+  mapCatalogProductCard,
+  representativeOffer,
+} from './catalog-presentation';
 import { ScheduledDiscountService } from '../pricing/scheduled-discount.service';
+import { BuyerBestPriceService } from '../pricing/buyer-best-price.service';
 
 type CatalogCandidate = Awaited<ReturnType<CatalogRepository['findCandidates']>>[number];
 type ActiveCategory = Awaited<ReturnType<CatalogRepository['findActiveCategories']>>[number];
@@ -83,7 +89,7 @@ function buildFacets(
   const locations = [...new Set(candidates.map((candidate) => candidate.card.shop.location))].sort(
     (left, right) => left.localeCompare(right, 'vi'),
   );
-  const prices = candidates.map((candidate) => candidate.card.priceMinor);
+  const prices = candidates.map((candidate) => buyerDisplayProductPriceMinor(candidate.card));
 
   return {
     categories: categoryFacets,
@@ -103,8 +109,10 @@ function compareCandidates(
   let primary = 0;
   if (query.sort === 'relevance' && query.q) primary = right.relevance - left.relevance;
   else if (query.sort === 'best-selling') primary = right.card.soldCount - left.card.soldCount;
-  else if (query.sort === 'price-asc') primary = left.card.priceMinor - right.card.priceMinor;
-  else if (query.sort === 'price-desc') primary = right.card.priceMinor - left.card.priceMinor;
+  else if (query.sort === 'price-asc')
+    primary = buyerDisplayProductPriceMinor(left.card) - buyerDisplayProductPriceMinor(right.card);
+  else if (query.sort === 'price-desc')
+    primary = buyerDisplayProductPriceMinor(right.card) - buyerDisplayProductPriceMinor(left.card);
   else primary = right.createdAt.getTime() - left.createdAt.getTime();
   if (primary !== 0) return primary;
 
@@ -114,18 +122,83 @@ function compareCandidates(
 
 @Injectable()
 export class CatalogService extends CatalogPublicFacade {
-  constructor(@Inject(CatalogRepository) private readonly repository: CatalogRepository, @Inject(ScheduledDiscountService) private readonly scheduledDiscounts?: ScheduledDiscountService) {
+  constructor(
+    @Inject(CatalogRepository) private readonly repository: CatalogRepository,
+    @Inject(ScheduledDiscountService)
+    private readonly scheduledDiscounts?: ScheduledDiscountService,
+    @Inject(BuyerBestPriceService)
+    private readonly buyerPrices?: BuyerBestPriceService,
+  ) {
     super();
   }
 
-  private async applyScheduledDiscounts(products: CatalogCandidate[], evaluatedAt: Date): Promise<CatalogCandidate[]> {
-    if (!this.scheduledDiscounts || products.length === 0) return products;
-    const variants = products.flatMap((product) => product.variants.map((variant) => ({ id: variant.id, productId: product.id, priceMinor: variant.priceMinor, compareAtPriceMinor: variant.compareAtPriceMinor })));
-    const discounts = await this.scheduledDiscounts.resolveVariants(undefined, variants, evaluatedAt);
-    return products.map((product) => ({ ...product, variants: product.variants.map((variant) => { const discount = discounts.get(variant.id); if (!discount || discount.effectivePriceMinor === discount.basePriceMinor) return variant; const list = variant.compareAtPriceMinor === null || variant.compareAtPriceMinor < discount.basePriceMinor ? discount.basePriceMinor : variant.compareAtPriceMinor; return { ...variant, priceMinor: discount.effectivePriceMinor, compareAtPriceMinor: list, scheduledPrice: publicScheduledPrice(discount) }; }) }));
+  private async applyBuyerPrices(
+    products: CatalogCandidate[],
+    buyerId: string | null,
+    evaluatedAt: Date,
+  ): Promise<CatalogCandidate[]> {
+    if (!this.buyerPrices || !buyerId || products.length === 0) return products;
+    const representatives = products.flatMap((product) => {
+      const representative = representativeOffer(product.variants);
+      return representative ? [{ product, representative }] : [];
+    });
+    const previews = await this.buyerPrices.previews(
+      buyerId,
+      representatives.map(({ product, representative }) => ({
+        productId: product.id,
+        variantId: representative.offer.id,
+        effectivePriceMinor: representative.priceMinor,
+        weightGrams: representative.offer.weightGrams ?? 0,
+        shop: {
+          id: product.shop.id,
+          ownerUserId: product.shop.ownerId,
+          slug: product.shop.slug,
+          name: product.shop.name,
+          location: product.shop.location,
+          pickupProvince: product.shop.pickupProvince,
+        },
+      })),
+      evaluatedAt,
+    );
+    return products.map((product) => ({
+      ...product,
+      variants: product.variants.map((variant) => {
+        const buyerBestPrice = previews.get(variant.id);
+        return buyerBestPrice ? { ...variant, buyerBestPrice } : variant;
+      }),
+    }));
   }
 
-  private async shopSnapshot(shopId: string): Promise<{
+  private async applyScheduledDiscounts(
+    products: CatalogCandidate[],
+    evaluatedAt: Date,
+  ): Promise<CatalogCandidate[]> {
+    if (!this.scheduledDiscounts || products.length === 0) return products;
+    const variants = products.flatMap((product) =>
+      product.variants.map((variant) => ({
+        id: variant.id,
+        productId: product.id,
+        priceMinor: variant.priceMinor,
+        compareAtPriceMinor: variant.compareAtPriceMinor,
+      })),
+    );
+    const discounts = await this.scheduledDiscounts.resolveVariants(
+      undefined,
+      variants,
+      evaluatedAt,
+    );
+    return products.map((product) => ({
+      ...product,
+      variants: product.variants.map((variant) =>
+        applyScheduledPrice(variant, discounts.get(variant.id)),
+      ),
+    }));
+  }
+
+  private async shopSnapshot(
+    shopId: string,
+    buyerId: string | null,
+  ): Promise<{
     categories: ActiveCategory[];
     displayable: DisplayableCatalogCandidate[];
   }> {
@@ -133,7 +206,9 @@ export class CatalogService extends CatalogPublicFacade {
       this.repository.findActiveCategories(),
       this.repository.findCandidatesForShop(shopId),
     ]);
-    const rawCandidates = await this.applyScheduledDiscounts(foundCandidates, new Date());
+    const evaluatedAt = new Date();
+    const scheduledCandidates = await this.applyScheduledDiscounts(foundCandidates, evaluatedAt);
+    const rawCandidates = await this.applyBuyerPrices(scheduledCandidates, buyerId, evaluatedAt);
     return {
       categories,
       displayable: rawCandidates
@@ -174,12 +249,17 @@ export class CatalogService extends CatalogPublicFacade {
     });
   }
 
-  async getProducts(query: NormalizedCatalogQuery): Promise<CatalogProductsResponse> {
+  async getProducts(
+    query: NormalizedCatalogQuery,
+    buyerId: string | null = null,
+  ): Promise<CatalogProductsResponse> {
     const [categories, foundCandidates] = await Promise.all([
       this.repository.findActiveCategories(),
       this.repository.findCandidates(),
     ]);
-    const rawCandidates = await this.applyScheduledDiscounts(foundCandidates, new Date());
+    const evaluatedAt = new Date();
+    const scheduledCandidates = await this.applyScheduledDiscounts(foundCandidates, evaluatedAt);
+    const rawCandidates = await this.applyBuyerPrices(scheduledCandidates, buyerId, evaluatedAt);
     const displayable = rawCandidates
       .map(mapDisplayableCandidate)
       .filter((candidate): candidate is DisplayableCatalogCandidate => candidate !== null);
@@ -209,8 +289,10 @@ export class CatalogService extends CatalogPublicFacade {
       }
       return (
         (categoryIds === null || categoryIds.has(candidate.categoryId)) &&
-        (query.minPrice === null || candidate.card.priceMinor >= query.minPrice) &&
-        (query.maxPrice === null || candidate.card.priceMinor <= query.maxPrice) &&
+        (query.minPrice === null ||
+          buyerDisplayProductPriceMinor(candidate.card) >= query.minPrice) &&
+        (query.maxPrice === null ||
+          buyerDisplayProductPriceMinor(candidate.card) <= query.maxPrice) &&
         (query.rating === null || candidate.card.ratingAverageBasisPoints >= query.rating * 100) &&
         (requestedLocation === null ||
           normalizeDiscoveryText(candidate.card.shop.location) === requestedLocation) &&
@@ -240,16 +322,23 @@ export class CatalogService extends CatalogPublicFacade {
     };
   }
 
-  async getShopSummary(shopId: string): Promise<PublicShopCatalogSummary> {
-    const { categories, displayable } = await this.shopSnapshot(shopId);
+  async getShopSummary(
+    shopId: string,
+    buyerId: string | null = null,
+  ): Promise<PublicShopCatalogSummary> {
+    const { categories, displayable } = await this.shopSnapshot(shopId, buyerId);
     return {
       products: displayable.map((candidate) => candidate.card),
       categories: this.shopCategoryFacets(displayable, categories),
     };
   }
 
-  async getShopProducts(shopId: string, query: ShopCatalogQuery): Promise<PublicShopCatalogPage> {
-    const { categories, displayable } = await this.shopSnapshot(shopId);
+  async getShopProducts(
+    shopId: string,
+    query: ShopCatalogQuery,
+    buyerId: string | null = null,
+  ): Promise<PublicShopCatalogPage> {
+    const { categories, displayable } = await this.shopSnapshot(shopId, buyerId);
     const facets = this.shopCategoryFacets(displayable, categories);
     const categoryIds = descendantIds(categories, query.category);
     const filtered = displayable.filter((candidate) => {

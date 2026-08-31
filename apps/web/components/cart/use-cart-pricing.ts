@@ -38,6 +38,7 @@ export function useCartPricing(
 ): CartPricingState {
   const auth = useAuthSession();
   const [status, setStatus] = useState<CartPricingStatus>('idle');
+  const [addressesLoaded, setAddressesLoaded] = useState(false);
   const [addresses, setAddresses] = useState<ShippingAddress[]>([]);
   const [selectedAddressId, setSelectedAddressId] = useState('');
   const [serviceChoices, setServiceChoices] = useState<Record<string, ShippingServiceCode>>({});
@@ -53,6 +54,7 @@ export function useCartPricing(
       // Logout is an external session transition; private quote state must be erased immediately.
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setAddresses([]);
+      setAddressesLoaded(false);
       setSelectedAddressId('');
       setServiceChoices({});
       setVoucherChoices({});
@@ -69,18 +71,25 @@ export function useCartPricing(
       .then(({ items }) => {
         if (sequence.current !== requestSequence) return;
         setAddresses(items);
+        setAddressesLoaded(true);
         setSelectedAddressId((current) => {
           if (items.some(({ id }) => id === current)) return current;
           return items.find(({ isDefault }) => isDefault)?.id ?? items[0]?.id ?? '';
         });
         if (items.length === 0) {
-          setQuote(null);
+          setVoucherChoices((current) => {
+            if (!current.freeShippingCode) return current;
+            const next = { ...current };
+            delete next.freeShippingCode;
+            return next;
+          });
           setStatus('missing-address');
-          setMessage('Hãy thêm địa chỉ nhận hàng để xem phí vận chuyển và tổng thanh toán.');
+          setMessage('Đã tính giá hàng và voucher. Thêm địa chỉ để tính phí vận chuyển.');
         }
       })
       .catch(() => {
         if (sequence.current !== requestSequence) return;
+        setAddressesLoaded(false);
         setStatus('error');
         setMessage('Không thể tải địa chỉ nhận hàng. Vui lòng thử lại.');
       });
@@ -130,31 +139,53 @@ export function useCartPricing(
     .join('|');
 
   useEffect(() => {
-    if (
-      auth.state.status !== 'authenticated' ||
-      !cartResponse ||
-      !selectedAddressId ||
-      addresses.length === 0
-    ) {
+    if (auth.state.status !== 'authenticated' || !cartResponse || !addressesLoaded) {
       return;
     }
+    const hasShippingAddress = Boolean(selectedAddressId && addresses.length > 0);
+    const quoteVouchers: VoucherCodeSelection = hasShippingAddress
+      ? vouchers
+      : {
+          ...(vouchers.platformCode ? { platformCode: vouchers.platformCode } : {}),
+          ...(vouchers.shopCodes?.length ? { shopCodes: vouchers.shopCodes } : {}),
+        };
+    const quoteVoucherSignature = [
+      quoteVouchers.platformCode ?? '',
+      ...(quoteVouchers.shopCodes ?? []).map(({ shopId, code }) => `${shopId}:${code}`),
+      quoteVouchers.freeShippingCode ?? '',
+    ]
+      .filter(Boolean)
+      .join('|');
     const controller = new AbortController();
     const requestSequence = ++sequence.current;
     // A quote request is the external process synchronized by this effect.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setStatus((current) =>
-      quote ? 'stale' : current === 'loading-addresses' ? current : 'loading',
+      hasShippingAddress
+        ? quote
+          ? 'stale'
+          : current === 'loading-addresses'
+            ? current
+            : 'loading'
+        : 'missing-address',
     );
-    setMessage(quote ? 'Đang cập nhật lại bảng giá…' : 'Đang tính phí vận chuyển…');
+    setMessage(
+      hasShippingAddress
+        ? quote
+          ? 'Đang cập nhật lại bảng giá…'
+          : 'Đang tính phí vận chuyển…'
+        : 'Đang tính giá hàng và voucher…',
+    );
     const serviceSelections = selectedShopIds.map((shopId) => ({
       shopId,
       service: services[shopId] ?? 'STANDARD',
     }));
     void getPricingQuote(
       {
-        shippingAddressId: selectedAddressId,
-        services: serviceSelections,
-        ...(voucherSignature ? { vouchers } : {}),
+        ...(hasShippingAddress
+          ? { shippingAddressId: selectedAddressId, services: serviceSelections }
+          : {}),
+        ...(quoteVoucherSignature ? { vouchers: quoteVouchers } : {}),
       },
       cartResponse.version,
       auth.sessionFetch,
@@ -163,8 +194,12 @@ export function useCartPricing(
       .then((result) => {
         if (sequence.current !== requestSequence) return;
         setQuote(result);
-        setStatus('ready');
-        setMessage('Bảng giá và phí vận chuyển đã được máy chủ xác nhận.');
+        setStatus(hasShippingAddress ? 'ready' : 'missing-address');
+        setMessage(
+          hasShippingAddress
+            ? 'Bảng giá và phí vận chuyển đã được máy chủ xác nhận.'
+            : 'Đã áp dụng voucher hàng hóa tốt nhất. Thêm địa chỉ để tính phí vận chuyển.',
+        );
       })
       .catch(async (error: unknown) => {
         if (sequence.current !== requestSequence) return;
@@ -183,6 +218,7 @@ export function useCartPricing(
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     addresses.length,
+    addressesLoaded,
     auth.sessionFetch,
     auth.state.status,
     cartResponse,
@@ -195,7 +231,7 @@ export function useCartPricing(
   ]);
 
   useEffect(() => {
-    if (status !== 'ready' || !quote) return;
+    if ((status !== 'ready' && status !== 'missing-address') || !quote) return;
     const rejectedShopIds = new Set(
       quote.vouchers
         .filter((item) => item.slot === 'SHOP' && item.status === 'REJECTED' && item.shopId)
@@ -208,7 +244,9 @@ export function useCartPricing(
     // Clearing a rejected shop/shipping code is synchronized with the latest quote result.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setVoucherChoices((current) => {
-      const shopCodes = (current.shopCodes ?? []).filter((item) => !rejectedShopIds.has(item.shopId));
+      const shopCodes = (current.shopCodes ?? []).filter(
+        (item) => !rejectedShopIds.has(item.shopId),
+      );
       const shopUnchanged = shopCodes.length === (current.shopCodes ?? []).length;
       const shippingUnchanged = !shippingRejected || !current.freeShippingCode;
       if (shopUnchanged && shippingUnchanged) return current;
@@ -251,6 +289,7 @@ export function useCartPricing(
       });
     },
     setFreeShippingVoucher(code) {
+      if (!selectedAddressId) return;
       setVoucherChoices((current) => {
         const next = { ...current };
         if (code) next.freeShippingCode = code;

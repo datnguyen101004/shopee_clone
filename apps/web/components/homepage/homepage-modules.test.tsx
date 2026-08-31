@@ -76,6 +76,31 @@ describe('HomepageModules', () => {
     expect(screen.getByRole('heading', { level: 1, name: 'Siêu hội mua sắm' })).toBeInTheDocument();
   });
 
+  it('renders active scheduled and base fallback prices', () => {
+    const productModule = {
+      ...modules[2]!,
+      products: [
+        {
+          ...product,
+          priceMinor: 103200,
+          scheduledPrice: {
+            basePriceMinor: 129000,
+            effectivePriceMinor: 103200,
+            compareAtPriceMinor: 159000,
+            discountBasisPoints: 2000,
+            campaignId: 'campaign-1',
+            evaluatedAt: '2026-08-31T00:00:00.000Z',
+          },
+        },
+        { ...product, id: 'product-2', href: '/products/product-2' },
+      ],
+    } as HomepageModule;
+
+    render(<HomepageModules modules={[productModule]} />);
+    expect(screen.getByText('₫103.200')).toBeVisible();
+    expect(screen.getByText('₫129.000')).toBeVisible();
+  });
+
   it('ignores an unknown module without breaking known siblings', () => {
     render(
       <HomepageModules modules={[modules[1]!, { type: 'future' } as unknown as HomepageModule]} />,

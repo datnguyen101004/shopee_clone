@@ -62,9 +62,10 @@ export class VoucherSelectionDto {
 }
 
 export class PricingQuoteDto {
-  @ApiProperty({ format: 'uuid' })
+  @ApiPropertyOptional({ format: 'uuid' })
+  @IsOptional()
   @IsUUID()
-  shippingAddressId!: string;
+  shippingAddressId?: string;
 
   @ApiPropertyOptional({ type: () => [ShopShippingServiceDto] })
   @IsOptional()

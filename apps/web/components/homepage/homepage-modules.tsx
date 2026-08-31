@@ -1,18 +1,23 @@
-import type {
-  HomepageCampaignModule,
-  HomepageCategoryModule,
-  HomepageModule,
-  HomepageProductModule,
-  HomepageProductSummary,
+'use client';
+
+import {
+  buyerDisplayProductPriceMinor,
+  parseHomepageResponse,
+  type HomepageCampaignModule,
+  type HomepageCategoryModule,
+  type HomepageModule,
+  type HomepageProductModule,
+  type HomepageProductSummary,
 } from '@shopee-clone/contracts';
 import { Badge, Card, Container, RotateCcw, ShieldCheck, Truck } from '@shopee-clone/ui';
 import Image from 'next/image';
 import Link from 'next/link';
-
+import { useEffect, useState } from 'react';
 
 import { MarketplaceProductImage } from '../marketplace-product-image';
 import { FavoriteButton } from '../engagement/favorite-button';
 import { FavoriteStateProvider } from '../engagement/favorite-state-provider';
+import { useAuthSession } from '../auth-session-provider';
 
 function normalizeText(text: string): string {
   return text
@@ -42,7 +47,19 @@ const iconMatcherList: Array<{ keywords: string[]; path: string }> = [
     path: '/media/categories/sport-outdoor.png',
   },
   {
-    keywords: ['thoitrang', 'quanao', 'fashion', 'clothes', 'nam', 'nu', 'aothun', 'vay', 'dam', 'ao', 'quan'],
+    keywords: [
+      'thoitrang',
+      'quanao',
+      'fashion',
+      'clothes',
+      'nam',
+      'nu',
+      'aothun',
+      'vay',
+      'dam',
+      'ao',
+      'quan',
+    ],
     path: '/media/categories/men-clothes.png',
   },
   {
@@ -50,7 +67,17 @@ const iconMatcherList: Array<{ keywords: string[]; path: string }> = [
     path: '/media/categories/consumer-electronics.png',
   },
   {
-    keywords: ['dienthoai', 'phukien', 'gadget', 'smartphone', 'iphone', 'samsung', 'tainghe', 'phone', 'device'],
+    keywords: [
+      'dienthoai',
+      'phukien',
+      'gadget',
+      'smartphone',
+      'iphone',
+      'samsung',
+      'tainghe',
+      'phone',
+      'device',
+    ],
     path: '/media/categories/mobile-gadgets.png',
   },
   {
@@ -177,11 +204,6 @@ function CampaignSection({ module }: { module: HomepageCampaignModule }) {
       ))}
 
       <div className="benefit-strip" aria-label="Quyền lợi mua sắm" tabIndex={0}>
-
-
-
-
-
         <span>
           <Truck aria-hidden="true" /> Miễn phí vận chuyển
         </span>
@@ -192,7 +214,6 @@ function CampaignSection({ module }: { module: HomepageCampaignModule }) {
           <RotateCcw aria-hidden="true" /> Đổi trả dễ dàng
         </span>
       </div>
-
     </section>
   );
 }
@@ -232,8 +253,6 @@ function CategorySection({ module }: { module: HomepageCategoryModule }) {
   );
 }
 
-
-
 function formatMoney(value: number): string {
   return new Intl.NumberFormat('vi-VN').format(value);
 }
@@ -265,12 +284,21 @@ function ProductCard({ product }: { product: HomepageProductSummary }) {
           <h3>{product.name}</h3>
           <p className="product-card__shop">{product.shopName}</p>
           <div className="product-card__price">
-            <strong>₫{formatMoney(product.priceMinor)}</strong>
+            <strong>₫{formatMoney(buyerDisplayProductPriceMinor(product))}</strong>
             {product.compareAtPriceMinor ? (
               <del>₫{formatMoney(product.compareAtPriceMinor)}</del>
             ) : null}
           </div>
-          {product.scheduledPrice ? <small aria-label={`Giảm giá sản phẩm ${Math.floor(product.scheduledPrice.discountBasisPoints / 100)} phần trăm`}>Đang giảm {Math.floor(product.scheduledPrice.discountBasisPoints / 100)}%</small> : null}
+          {product.buyerBestPrice?.merchandiseDiscountMinor ? (
+            <small>Giá tốt nhất dự kiến · Voucher đã áp dụng</small>
+          ) : null}
+          {product.scheduledPrice ? (
+            <small
+              aria-label={`Giảm giá sản phẩm ${Math.floor(product.scheduledPrice.discountBasisPoints / 100)} phần trăm`}
+            >
+              Đang giảm {Math.floor(product.scheduledPrice.discountBasisPoints / 100)}%
+            </small>
+          ) : null}
           {product.soldCount !== undefined ? (
             <span className="product-card__sold">Đã bán {formatMoney(product.soldCount)}</span>
           ) : null}
@@ -305,13 +333,37 @@ function ProductSection({ module }: { module: HomepageProductModule }) {
 }
 
 export function HomepageModules({ modules }: { modules: HomepageModule[] }) {
-  const productIds = modules.flatMap((module) =>
+  const { state: authState, authenticatedFetch } = useAuthSession();
+  const [personalizedModules, setPersonalizedModules] = useState<{
+    source: HomepageModule[];
+    modules: HomepageModule[];
+  } | null>(null);
+  const displayModules =
+    personalizedModules?.source === modules ? personalizedModules.modules : modules;
+  useEffect(() => {
+    if (authState.status !== 'authenticated') return;
+    const controller = new AbortController();
+    const endpoint = new URL(
+      '/api/v1/homepage',
+      process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:3001',
+    );
+    void authenticatedFetch(endpoint, { cache: 'no-store', signal: controller.signal })
+      .then(async (result) => {
+        if (!result.ok) return;
+        const parsed = parseHomepageResponse(await result.json());
+        if (parsed) setPersonalizedModules({ source: modules, modules: parsed.modules });
+      })
+      .catch(() => undefined);
+    return () => controller.abort();
+  }, [authState.status, authenticatedFetch, modules]);
+
+  const productIds = displayModules.flatMap((module) =>
     'products' in module ? module.products.map(({ id }) => id) : [],
   );
   return (
     <FavoriteStateProvider productIds={productIds}>
       <Container className="home-flow">
-        {modules.map((module) => {
+        {displayModules.map((module) => {
           if (module.type === 'campaign-banner')
             return <CampaignSection module={module} key={module.id} />;
           if (module.type === 'category-shortcuts')

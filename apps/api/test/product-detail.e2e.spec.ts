@@ -82,14 +82,14 @@ describe('Product detail endpoint', () => {
       gallery: [],
       relatedProducts: [],
     });
-    expect(detail.getProduct).toHaveBeenCalledWith(productId);
+    expect(detail.getProduct).toHaveBeenCalledWith(productId, null);
   });
   it('returns product detail when looked up by slug', async () => {
     const result = await request(app.getHttpServer())
       .get('/api/v1/catalog/products/ao-thun-nam')
       .expect(200);
     expect(result.headers['cache-control']).toBe('no-store');
-    expect(detail.getProduct).toHaveBeenCalledWith('ao-thun-nam');
+    expect(detail.getProduct).toHaveBeenCalledWith('ao-thun-nam', null);
   });
   it('rejects malformed IDs without loading data', async () => {
     const result = await request(app.getHttpServer())

@@ -1,6 +1,8 @@
 import type { CatalogRepository } from './catalog.repository';
+import type { ScheduledDiscountService } from '../pricing/scheduled-discount.service';
 import type { NormalizedCatalogQuery } from './catalog-query';
 import { CatalogService } from './catalog.service';
+import type { BuyerBestPriceService } from '../pricing/buyer-best-price.service';
 
 type Candidate = Awaited<ReturnType<CatalogRepository['findCandidates']>>[number];
 
@@ -178,6 +180,80 @@ describe('CatalogService', () => {
     expect(response.items[0]).not.toHaveProperty('discountPercent');
   });
 
+  it('uses the buyer merchandise payable for facets, filters, and explicit price sorting', async () => {
+    repository.findActiveCategories.mockResolvedValue(categories);
+    repository.findCandidates.mockResolvedValue([
+      candidate(),
+      candidate({
+        id: 'product-2',
+        slug: 'phone-2',
+        variants: [
+          {
+            ...candidate().variants[0]!,
+            id: 'variant-2',
+            priceMinor: 700n,
+            compareAtPriceMinor: null,
+          },
+        ],
+      }),
+    ]);
+    const preview = (effectivePriceMinor: number, merchandisePayableMinor: number) => ({
+      version: 'buyer-best-price-v1' as const,
+      quantity: 1 as const,
+      currency: 'VND' as const,
+      evaluatedAt: '2026-08-31T04:00:00.000Z',
+      effectivePriceMinor,
+      shopVoucher: null,
+      platformVoucher: {
+        code: 'BUYERPRICE',
+        name: 'Buyer price',
+        slot: 'PLATFORM' as const,
+        discountMinor: effectivePriceMinor - merchandisePayableMinor,
+      },
+      shopVoucherDiscountMinor: 0,
+      platformVoucherDiscountMinor: effectivePriceMinor - merchandisePayableMinor,
+      merchandiseDiscountMinor: effectivePriceMinor - merchandisePayableMinor,
+      merchandisePayableMinor,
+      shipping: null,
+    });
+    const buyerPrices = {
+      previews: jest.fn().mockResolvedValue(
+        new Map([
+          ['variant-1', preview(800, 500)],
+          ['variant-2', preview(700, 600)],
+        ]),
+      ),
+    };
+    const personalized = new CatalogService(
+      repository as unknown as CatalogRepository,
+      undefined,
+      buyerPrices as unknown as BuyerBestPriceService,
+    );
+
+    const sorted = await personalized.getProducts(query({ sort: 'price-asc' }), 'buyer-1');
+    expect(sorted.items.map(({ id }) => id)).toEqual([
+      '00000000-0000-4000-8000-000000000301',
+      'product-2',
+    ]);
+    expect(sorted.facets.priceRange).toEqual({ min: 500, max: 600 });
+
+    const filtered = await personalized.getProducts(query({ minPrice: 550 }), 'buyer-1');
+    expect(filtered.items.map(({ id }) => id)).toEqual(['product-2']);
+
+    repository.findCandidatesForShop.mockResolvedValue(
+      await repository.findCandidates.mock.results.at(-1)?.value,
+    );
+    const shopPage = await personalized.getShopProducts(
+      'shop-1',
+      { q: null, category: null, sort: 'price-desc', page: 1, pageSize: 12 },
+      'buyer-1',
+    );
+    expect(shopPage.items.map(({ id }) => id)).toEqual([
+      'product-2',
+      '00000000-0000-4000-8000-000000000301',
+    ]);
+  });
+
   it('derives unfiltered facets and applies every criterion with AND semantics', async () => {
     repository.findActiveCategories.mockResolvedValue(categories);
     repository.findCandidates.mockResolvedValue([
@@ -295,5 +371,103 @@ describe('CatalogService', () => {
     expect(response.pagination).toEqual({ page: 2, pageSize: 1, totalItems: 2, totalPages: 2 });
     expect(response.items.map((item) => item.id)).toEqual(['older']);
     expect(response.categories).toHaveLength(2);
+  });
+
+  it('batches scheduled pricing before facets, filters, sorts, and public-shop projection', async () => {
+    const discounted = candidate({
+      id: 'product-discounted',
+      variants: [
+        {
+          ...candidate().variants[0]!,
+          id: 'variant-base-low',
+          priceMinor: 600n,
+          compareAtPriceMinor: null,
+        },
+        { ...candidate().variants[0]!, id: 'variant-discounted', priceMinor: 1_000n },
+      ],
+    });
+    const regular = candidate({
+      id: 'product-regular',
+      variants: [
+        {
+          ...candidate().variants[0]!,
+          id: 'variant-regular',
+          priceMinor: 500n,
+          compareAtPriceMinor: null,
+        },
+      ],
+    });
+    repository.findActiveCategories.mockResolvedValue(categories);
+    repository.findCandidates.mockResolvedValue([regular, discounted]);
+    repository.findCandidatesForShop.mockResolvedValue([discounted]);
+    const scheduledDiscounts = {
+      resolveVariants: jest.fn().mockImplementation(
+        async (_transaction, variants, evaluatedAt) =>
+          new Map(
+            variants.map(
+              (variant: {
+                id: string;
+                productId: string;
+                priceMinor: bigint;
+                compareAtPriceMinor: bigint | null;
+              }) => [
+                variant.id,
+                {
+                  variantId: variant.id,
+                  productId: variant.productId,
+                  basePriceMinor: variant.priceMinor,
+                  effectivePriceMinor:
+                    variant.id === 'variant-discounted' ? 400n : variant.priceMinor,
+                  compareAtPriceMinor: variant.compareAtPriceMinor,
+                  discountBasisPoints: variant.id === 'variant-discounted' ? 6_000 : 0,
+                  campaignId: variant.id === 'variant-discounted' ? 'campaign-1' : null,
+                  evaluatedAt,
+                },
+              ],
+            ),
+          ),
+      ),
+    };
+    const campaignService = new CatalogService(
+      repository as unknown as CatalogRepository,
+      scheduledDiscounts as unknown as ScheduledDiscountService,
+    );
+
+    const response = await campaignService.getProducts(query({ sort: 'price-asc', maxPrice: 450 }));
+    expect(response.items.map((item) => item.id)).toEqual(['product-discounted']);
+    expect(response.items[0]).toMatchObject({
+      priceMinor: 400,
+      compareAtPriceMinor: 1_000,
+      scheduledPrice: { effectivePriceMinor: 400, campaignId: 'campaign-1' },
+    });
+    expect(response.facets.priceRange).toEqual({ min: 400, max: 500 });
+    expect(scheduledDiscounts.resolveVariants).toHaveBeenCalledTimes(1);
+    expect(scheduledDiscounts.resolveVariants.mock.calls[0]?.[1]).toHaveLength(3);
+
+    const descending = await campaignService.getProducts(query({ sort: 'price-desc' }));
+    expect(descending.items.map((item) => item.id)).toEqual([
+      'product-regular',
+      'product-discounted',
+    ]);
+
+    const shop = await campaignService.getShopSummary('shop-1');
+    expect(shop.products[0]).toMatchObject({
+      priceMinor: 400,
+      scheduledPrice: { campaignId: 'campaign-1' },
+    });
+  });
+
+  it('propagates scheduled-price database failures instead of guessing a base price', async () => {
+    repository.findActiveCategories.mockResolvedValue(categories);
+    repository.findCandidates.mockResolvedValue([candidate()]);
+    const failure = new Error('database unavailable');
+    const campaignService = new CatalogService(
+      repository as unknown as CatalogRepository,
+      {
+        resolveVariants: jest.fn().mockRejectedValue(failure),
+      } as unknown as ScheduledDiscountService,
+    );
+
+    await expect(campaignService.getProducts(query())).rejects.toBe(failure);
   });
 });

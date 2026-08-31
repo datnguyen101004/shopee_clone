@@ -1,11 +1,18 @@
-import type { CatalogProductCard, PublicScheduledPriceBreakdown } from '@shopee-clone/contracts';
+import type {
+  BuyerBestPricePreview,
+  CatalogProductCard,
+  PublicScheduledPriceBreakdown,
+} from '@shopee-clone/contracts';
+import type { EffectivePriceBreakdown } from '../pricing/scheduled-discount.service';
 
 export interface CatalogueOffer {
   id: string;
   priceMinor: bigint;
   compareAtPriceMinor: bigint | null;
+  weightGrams?: number;
   inventory: { quantityOnHand: number; quantityReserved: number } | null;
   scheduledPrice?: PublicScheduledPriceBreakdown;
+  buyerBestPrice?: BuyerBestPricePreview;
 }
 
 export interface CatalogueCandidate {
@@ -61,10 +68,15 @@ export function publicScheduledPrice(discount: {
   campaignId: string | null;
   evaluatedAt: Date;
 }): PublicScheduledPriceBreakdown | undefined {
-  if (discount.campaignId === null || discount.effectivePriceMinor >= discount.basePriceMinor) return undefined;
+  if (discount.campaignId === null || discount.effectivePriceMinor >= discount.basePriceMinor)
+    return undefined;
   const base = safeMinor(discount.basePriceMinor);
   const effective = safeMinor(discount.effectivePriceMinor);
-  const compare = discount.compareAtPriceMinor === null ? null : safeMinor(discount.compareAtPriceMinor);
+  const effectiveCompareAt =
+    discount.compareAtPriceMinor === null || discount.compareAtPriceMinor < discount.basePriceMinor
+      ? discount.basePriceMinor
+      : discount.compareAtPriceMinor;
+  const compare = safeMinor(effectiveCompareAt);
   if (base === null || effective === null || effective <= 0 || effective >= base) return undefined;
   return {
     basePriceMinor: base,
@@ -76,18 +88,53 @@ export function publicScheduledPrice(discount: {
   };
 }
 
+export function applyScheduledPrice<
+  T extends { priceMinor: bigint; compareAtPriceMinor: bigint | null },
+>(
+  offer: T,
+  discount: EffectivePriceBreakdown | undefined,
+): T & {
+  scheduledPrice?: PublicScheduledPriceBreakdown;
+} {
+  if (!discount) return offer;
+  const scheduledPrice = publicScheduledPrice(discount);
+  if (!scheduledPrice) return offer;
+  const compareAtPriceMinor =
+    offer.compareAtPriceMinor === null || offer.compareAtPriceMinor < discount.basePriceMinor
+      ? discount.basePriceMinor
+      : offer.compareAtPriceMinor;
+  return {
+    ...offer,
+    priceMinor: discount.effectivePriceMinor,
+    compareAtPriceMinor,
+    scheduledPrice,
+  };
+}
+
 export function representativeOffer(variants: CatalogueOffer[]): {
   offer: CatalogueOffer;
   priceMinor: number;
   availableQuantity: number;
 } | null {
+  let representative: {
+    offer: CatalogueOffer;
+    priceMinor: number;
+    availableQuantity: number;
+  } | null = null;
   for (const offer of variants) {
     const priceMinor = safeMinor(offer.priceMinor);
     const stock = availableQuantity(offer.inventory);
-    if (priceMinor !== null && stock !== null && stock > 0)
-      return { offer, priceMinor, availableQuantity: stock };
+    if (priceMinor === null || stock === null || stock <= 0) continue;
+    if (
+      representative === null ||
+      priceMinor < representative.priceMinor ||
+      (priceMinor === representative.priceMinor &&
+        offer.id.localeCompare(representative.offer.id) < 0)
+    ) {
+      representative = { offer, priceMinor, availableQuantity: stock };
+    }
   }
-  return null;
+  return representative;
 }
 
 export function mapCatalogProductCard(product: CatalogueCandidate): CatalogProductCard | null {
@@ -107,7 +154,12 @@ export function mapCatalogProductCard(product: CatalogueCandidate): CatalogProdu
     imageAlt: image?.altText ?? product.name,
     priceMinor: representative.priceMinor,
     ...(promotion ?? {}),
-    ...(representative.offer.scheduledPrice ? { scheduledPrice: representative.offer.scheduledPrice } : {}),
+    ...(representative.offer.scheduledPrice
+      ? { scheduledPrice: representative.offer.scheduledPrice }
+      : {}),
+    ...(representative.offer.buyerBestPrice
+      ? { buyerBestPrice: representative.offer.buyerBestPrice }
+      : {}),
     ratingAverageBasisPoints: product.ratingAverageBasisPoints,
     ratingCount: product.ratingCount,
     soldCount: product.soldCount,

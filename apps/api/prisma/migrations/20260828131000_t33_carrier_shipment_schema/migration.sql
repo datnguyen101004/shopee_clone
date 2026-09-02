@@ -41,19 +41,13 @@ ALTER TABLE "seller_order_shipment_events"
   ALTER COLUMN "shipment_version" SET NOT NULL,
   ADD COLUMN IF NOT EXISTS "external_event_id" VARCHAR(120),
   ADD COLUMN IF NOT EXISTS "public_reason" VARCHAR(120),
-  ADD COLUMN IF NOT EXISTS "carrier_occurred_at" TIMESTAMPTZ(3),
-  ADD COLUMN IF NOT EXISTS "command_id" UUID,
-  ADD COLUMN IF NOT EXISTS "command_digest" CHAR(64);
+  ADD COLUMN IF NOT EXISTS "carrier_occurred_at" TIMESTAMPTZ(3);
 CREATE UNIQUE INDEX IF NOT EXISTS "seller_order_shipment_events_shipment_id_shipment_version_key"
   ON "seller_order_shipment_events" ("shipment_id", "shipment_version");
 CREATE UNIQUE INDEX IF NOT EXISTS "seller_order_shipment_events_external_event_id_key"
   ON "seller_order_shipment_events" ("external_event_id");
 CREATE INDEX IF NOT EXISTS "seller_order_shipment_events_external_event_id_idx"
   ON "seller_order_shipment_events" ("external_event_id");
-CREATE UNIQUE INDEX IF NOT EXISTS "seller_order_shipment_events_command_id_key"
-  ON "seller_order_shipment_events" ("command_id");
-CREATE INDEX IF NOT EXISTS "seller_order_shipment_events_command_id_idx"
-  ON "seller_order_shipment_events" ("command_id");
 
 CREATE TABLE IF NOT EXISTS "carrier_dispatch_outbox" (
   "id" UUID NOT NULL DEFAULT gen_random_uuid(),
@@ -86,8 +80,6 @@ CREATE TABLE IF NOT EXISTS "carrier_callback_receipts" (
   "payload_digest" CHAR(64) NOT NULL,
   "shipment_id" UUID,
   "outcome" VARCHAR(40) NOT NULL,
-  "result_status" "seller_order_shipment_status",
-  "result_version" INTEGER,
   "received_at" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT "carrier_callback_receipts_pkey" PRIMARY KEY ("id"),
   CONSTRAINT "carrier_callback_receipts_provider_external_event_id_key" UNIQUE ("provider", "external_event_id"),

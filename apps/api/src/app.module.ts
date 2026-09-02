@@ -31,10 +31,12 @@ import { SellerIdentityModule } from './seller-identity/seller-identity.module';
 import { ChatModule } from './chat/chat.module';
 import { CarrierModule } from './carrier/carrier.module';
 import { PaymentsModule } from './payments/payments.module';
+import { SearchModule } from './search/search.module';
 
 @Module({
   imports: [
     PrismaModule,
+    SearchModule,
     HealthModule,
     HomepageModule,
     CatalogModule,

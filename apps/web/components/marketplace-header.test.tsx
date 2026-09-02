@@ -4,6 +4,11 @@ import userEvent from '@testing-library/user-event';
 import { StorefrontShell } from './storefront-shell';
 import { MarketplaceHeader } from './marketplace-header';
 import { marketplaceCategories } from './marketplace-navigation';
+import { fetchCatalogSuggestions } from '../lib/catalog-suggestions-api';
+
+vi.mock('../lib/catalog-suggestions-api', () => ({
+  fetchCatalogSuggestions: vi.fn(),
+}));
 
 function renderShell() {
   return render(
@@ -73,6 +78,69 @@ describe('StorefrontShell', () => {
       });
       expect(screen.queryByText('Vui lòng nhập từ khoá cần tìm.')).not.toBeInTheDocument();
     } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('loads search suggestions after 500ms of idle typing', async () => {
+    vi.useFakeTimers();
+    const fetchSuggestions = vi.mocked(fetchCatalogSuggestions);
+    fetchSuggestions.mockResolvedValue([{ text: 'Quần Jean Nam' }]);
+    try {
+      renderShell();
+      const input = screen.getByRole('searchbox', { name: 'Tìm kiếm sản phẩm' });
+      fireEvent.input(input, { target: { value: 'quần jea' } });
+
+      expect(fetchSuggestions).not.toHaveBeenCalled();
+      await act(async () => {
+        vi.advanceTimersByTime(499);
+      });
+      expect(fetchSuggestions).not.toHaveBeenCalled();
+      await act(async () => {
+        vi.advanceTimersByTime(1);
+        await Promise.resolve();
+      });
+
+      expect(fetchSuggestions).toHaveBeenCalledWith(
+        'quần jea',
+        fetch,
+        undefined,
+        undefined,
+        expect.any(AbortSignal),
+      );
+      expect(screen.getByRole('option')).toHaveTextContent('Quần Jean Nam');
+      expect(screen.getByRole('link', { name: /Quần Jean Nam/ })).toHaveAttribute(
+        'href',
+        '/search?q=Qu%E1%BA%A7n%20Jean%20Nam',
+      );
+    } finally {
+      fetchSuggestions.mockReset();
+      vi.useRealTimers();
+    }
+  });
+
+  it('requests suggestions after the first character when typing pauses', async () => {
+    vi.useFakeTimers();
+    const fetchSuggestions = vi.mocked(fetchCatalogSuggestions);
+    fetchSuggestions.mockResolvedValue([{ text: 'Quần' }]);
+    try {
+      renderShell();
+      const input = screen.getByRole('searchbox', { name: 'Tìm kiếm sản phẩm' });
+      fireEvent.input(input, { target: { value: 'q' } });
+      await act(async () => {
+        vi.advanceTimersByTime(500);
+        await Promise.resolve();
+      });
+      expect(fetchSuggestions).toHaveBeenCalledWith(
+        'q',
+        fetch,
+        undefined,
+        undefined,
+        expect.any(AbortSignal),
+      );
+      expect(screen.getByRole('option')).toHaveTextContent('Quần');
+    } finally {
+      fetchSuggestions.mockReset();
       vi.useRealTimers();
     }
   });

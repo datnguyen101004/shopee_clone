@@ -8,6 +8,8 @@ import {
 export const CATALOG_DEFAULT_PAGE = 1;
 export const CATALOG_DEFAULT_PAGE_SIZE = 12;
 export const CATALOG_MAX_PAGE_SIZE = 48;
+export const CATALOG_DEFAULT_SUGGESTION_LIMIT = 6;
+export const CATALOG_MAX_SUGGESTION_LIMIT = 8;
 
 export const catalogSortValues = [
   'relevance',
@@ -89,6 +91,14 @@ export interface CatalogProductsResponse {
   pagination: CatalogPagination;
   facets: CatalogFacets;
   items: CatalogProductCard[];
+}
+
+export interface CatalogSearchSuggestion {
+  text: string;
+}
+
+export interface CatalogSearchSuggestionsResponse {
+  suggestions: CatalogSearchSuggestion[];
 }
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -224,4 +234,25 @@ export function isCatalogProductsResponse(value: unknown): value is CatalogProdu
 
 export function parseCatalogProductsResponse(value: unknown): CatalogProductsResponse | null {
   return isCatalogProductsResponse(value) ? value : null;
+}
+
+export function isCatalogSearchSuggestionsResponse(
+  value: unknown,
+): value is CatalogSearchSuggestionsResponse {
+  if (!isRecord(value) || !Array.isArray(value.suggestions)) return false;
+  const seen = new Set<string>();
+  return value.suggestions.every((suggestion) => {
+    if (!isRecord(suggestion) || !isString(suggestion.text)) return false;
+    const text = suggestion.text.trim();
+    const normalized = text.toLocaleLowerCase('vi');
+    if (!text || text.length > 160 || seen.has(normalized)) return false;
+    seen.add(normalized);
+    return true;
+  });
+}
+
+export function parseCatalogSearchSuggestionsResponse(
+  value: unknown,
+): CatalogSearchSuggestionsResponse | null {
+  return isCatalogSearchSuggestionsResponse(value) ? value : null;
 }

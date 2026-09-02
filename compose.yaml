@@ -23,6 +23,33 @@ services:
       com.shopee-clone.component: postgres
       com.shopee-clone.scope: ${SHOPEE_COMPOSE_SCOPE:-development}
 
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.17.0
+    profiles: ['search']
+    restart: unless-stopped
+    environment:
+      discovery.type: single-node
+      xpack.security.enabled: 'false'
+      ES_JAVA_OPTS: -Xms512m -Xmx512m
+    mem_limit: 1g
+    ports:
+      - '127.0.0.1:${ELASTICSEARCH_PORT:-9200}:9200'
+    volumes:
+      - elasticsearch-data:/usr/share/elasticsearch/data
+    healthcheck:
+      test:
+        [
+          'CMD-SHELL',
+          'curl --silent --fail http://localhost:9200/_cluster/health?wait_for_status=yellow&timeout=1s >/dev/null',
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 30s
+    labels:
+      com.shopee-clone.component: elasticsearch
+      com.shopee-clone.scope: ${SHOPEE_COMPOSE_SCOPE:-development}
+
   api:
     image: datnguyen10102004/shopee-clone-api:${IMAGE_TAG:-0.1.0}
     pull_policy: always
@@ -38,6 +65,7 @@ services:
       # Host publish port can still be 80 via PORT / API_HOST_PORT in .env.
       PORT: '3001'
       DATABASE_URL: ${DATABASE_CONTAINER_URL:-postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}}
+      ELASTICSEARCH_URL: ${ELASTICSEARCH_CONTAINER_URL:-http://elasticsearch:9200}
     ports:
       - '${API_HOST_PORT:-3001}:3001'
     labels:
@@ -92,6 +120,10 @@ volumes:
   postgres-data:
     labels:
       com.shopee-clone.component: postgres-data
+      com.shopee-clone.scope: ${SHOPEE_COMPOSE_SCOPE:-development}
+  elasticsearch-data:
+    labels:
+      com.shopee-clone.component: elasticsearch-data
       com.shopee-clone.scope: ${SHOPEE_COMPOSE_SCOPE:-development}
   demo-carrier-postgres-data:
     labels:

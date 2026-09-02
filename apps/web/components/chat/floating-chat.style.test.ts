@@ -41,7 +41,7 @@ describe('floating chat accessibility style contract', () => {
     expect(mainRowRule).toContain('display: inline-flex');
 
     const replyOverlapRule = css.slice(
-      css.indexOf('.floating-chat__reply-quote~.floating-chat__message-main-row {'),
+      css.indexOf('.floating-chat__reply-quote ~ .floating-chat__message-main-row {'),
       css.indexOf('.floating-chat__message-line .floating-chat__message-actions'),
     );
     expect(replyOverlapRule).toContain('margin-top: -0.65rem');

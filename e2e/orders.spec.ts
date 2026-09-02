@@ -15,61 +15,93 @@ const ids = {
   cancelledEvent: '20000000-0000-4000-8000-000000000010',
 };
 
+const pendingShop = {
+  orderReference: ids.order,
+  purchaseReference: ids.purchase,
+  status: 'PENDING_CONFIRMATION',
+  paymentStatus: 'UNPAID',
+  version: 0,
+  createdAt: '2026-08-14T06:00:00.000Z',
+  updatedAt: '2026-08-14T06:00:00.000Z',
+  shop: { id: ids.shop, slug: 'space-t', name: 'Space T' },
+  note: '',
+  lines: [
+    {
+      lineId: ids.line,
+      productId: ids.product,
+      variantId: ids.variant,
+      quantity: 1,
+      unitWeightGrams: 500,
+      shipmentWeightGrams: 500,
+      listUnitPriceMinor: 1_000_000,
+      sellingUnitPriceMinor: 900_000,
+      listSubtotalMinor: 1_000_000,
+      productDiscountMinor: 100_000,
+      merchandiseSubtotalMinor: 900_000,
+      shopVoucherDiscountMinor: 0,
+      platformVoucherDiscountMinor: 0,
+      merchandiseVoucherDiscountMinor: 0,
+      payableMerchandiseMinor: 900_000,
+      productName: 'Ghế công thái học Space T',
+      productImageUrl: null,
+      variantName: 'Đen',
+      variantSku: 'SPACE-T-BLACK',
+      productAvailable: true,
+    },
+  ],
+  shipping: {
+    provider: 'MOCK',
+    version: 'mock-v1',
+    shopId: ids.shop,
+    originProvince: 'Hà Nội',
+    destinationProvince: 'Thành phố Hồ Chí Minh',
+    zone: 'CROSS_REGION',
+    shipmentWeightGrams: 500,
+    service: 'STANDARD',
+    estimatedDaysMin: 2,
+    estimatedDaysMax: 4,
+    baseFeeMinor: 30_000,
+    zoneSurchargeMinor: 10_000,
+    weightSurchargeMinor: 0,
+    shippingFeeMinor: 40_000,
+  },
+  listSubtotalMinor: 1_000_000,
+  productDiscountMinor: 100_000,
+  merchandiseSubtotalMinor: 900_000,
+  shopVoucherDiscountMinor: 0,
+  platformVoucherDiscountMinor: 0,
+  merchandiseVoucherDiscountMinor: 0,
+  shippingVoucherDiscountMinor: 0,
+  voucherDiscountMinor: 0,
+  shippingPayableMinor: 40_000,
+  payableTotalMinor: 940_000,
+  cancellation: {
+    allowed: true,
+    reasonCodes: [
+      'CHANGE_ADDRESS',
+      'CHANGE_PRODUCT',
+      'FOUND_BETTER_PRICE',
+      'NO_LONGER_NEEDED',
+      'OTHER',
+    ],
+  },
+} as const;
+
 const pending: BuyerOrderDetailResponse = {
   orderHistoryVersion: 'order-history-v1',
   currency: 'VND',
   order: {
-    orderReference: ids.order,
     purchaseReference: ids.purchase,
     status: 'PENDING_CONFIRMATION',
     paymentStatus: 'UNPAID',
     version: 0,
     createdAt: '2026-08-14T06:00:00.000Z',
     updatedAt: '2026-08-14T06:00:00.000Z',
-    shop: { id: ids.shop, slug: 'space-t', name: 'Space T' },
-    note: '',
-    lines: [
-      {
-        lineId: ids.line,
-        productId: ids.product,
-        variantId: ids.variant,
-        quantity: 1,
-        unitWeightGrams: 500,
-        shipmentWeightGrams: 500,
-        listUnitPriceMinor: 1_000_000,
-        sellingUnitPriceMinor: 900_000,
-        listSubtotalMinor: 1_000_000,
-        productDiscountMinor: 100_000,
-        merchandiseSubtotalMinor: 900_000,
-        shopVoucherDiscountMinor: 0,
-        platformVoucherDiscountMinor: 0,
-        merchandiseVoucherDiscountMinor: 0,
-        payableMerchandiseMinor: 900_000,
-        productName: 'Ghế công thái học Space T',
-        productImageUrl: null,
-        variantName: 'Đen',
-        variantSku: 'SPACE-T-BLACK',
-      },
-    ],
-    shipping: {
-      provider: 'MOCK',
-      version: 'mock-v1',
-      shopId: ids.shop,
-      originProvince: 'Hà Nội',
-      destinationProvince: 'Thành phố Hồ Chí Minh',
-      zone: 'CROSS_REGION',
-      shipmentWeightGrams: 500,
-      service: 'STANDARD',
-      estimatedDaysMin: 2,
-      estimatedDaysMax: 4,
-      baseFeeMinor: 30_000,
-      zoneSurchargeMinor: 10_000,
-      weightSurchargeMinor: 0,
-      shippingFeeMinor: 40_000,
-    },
+    shops: [pendingShop],
     listSubtotalMinor: 1_000_000,
     productDiscountMinor: 100_000,
     merchandiseSubtotalMinor: 900_000,
+    shippingTotalMinor: 40_000,
     shopVoucherDiscountMinor: 0,
     platformVoucherDiscountMinor: 0,
     merchandiseVoucherDiscountMinor: 0,
@@ -101,15 +133,20 @@ const pending: BuyerOrderDetailResponse = {
   vouchers: [],
   timeline: [
     {
-      id: ids.createdEvent,
-      previousStatus: null,
-      status: 'PENDING_CONFIRMATION',
-      orderVersion: 0,
-      actorType: 'SYSTEM',
-      actorUserId: null,
-      reasonCode: 'ORDER_CREATED',
-      reasonNote: null,
-      occurredAt: '2026-08-14T06:00:00.000Z',
+      orderReference: ids.order,
+      events: [
+        {
+          id: ids.createdEvent,
+          previousStatus: null,
+          status: 'PENDING_CONFIRMATION',
+          orderVersion: 0,
+          actorType: 'SYSTEM',
+          actorUserId: null,
+          reasonCode: 'ORDER_CREATED',
+          reasonNote: null,
+          occurredAt: '2026-08-14T06:00:00.000Z',
+        },
+      ],
     },
   ],
 };
@@ -121,20 +158,34 @@ const cancelled: BuyerOrderDetailResponse = {
     status: 'CANCELLED',
     version: 1,
     updatedAt: '2026-08-14T06:01:00.000Z',
+    shops: [
+      {
+        ...pendingShop,
+        status: 'CANCELLED',
+        version: 1,
+        updatedAt: '2026-08-14T06:01:00.000Z',
+        cancellation: { allowed: false, reasonCodes: [] },
+      },
+    ],
     cancellation: { allowed: false, reasonCodes: [] },
   },
   timeline: [
-    ...pending.timeline,
     {
-      id: ids.cancelledEvent,
-      previousStatus: 'PENDING_CONFIRMATION',
-      status: 'CANCELLED',
-      orderVersion: 1,
-      actorType: 'BUYER',
-      actorUserId: ids.buyer,
-      reasonCode: 'CHANGE_ADDRESS',
-      reasonNote: null,
-      occurredAt: '2026-08-14T06:01:00.000Z',
+      orderReference: ids.order,
+      events: [
+        ...pending.timeline[0]!.events,
+        {
+          id: ids.cancelledEvent,
+          previousStatus: 'PENDING_CONFIRMATION',
+          status: 'CANCELLED',
+          orderVersion: 1,
+          actorType: 'BUYER',
+          actorUserId: ids.buyer,
+          reasonCode: 'CHANGE_ADDRESS',
+          reasonNote: null,
+          occurredAt: '2026-08-14T06:01:00.000Z',
+        },
+      ],
     },
   ],
 };
@@ -181,7 +232,9 @@ async function installOrders(page: Page) {
       });
     } else if (
       request.method() === 'GET' &&
-      url.pathname === `/api/v1/account/orders/${ids.order}`
+      [ids.order, ids.purchase].some(
+        (reference) => url.pathname === `/api/v1/account/orders/${reference}`,
+      )
     ) {
       await json(route, current, 200, { ETag: `"order-${current.order.version}"` });
     } else if (
@@ -208,9 +261,9 @@ test.describe('buyer order lifecycle', () => {
     await expect(page.getByRole('heading', { name: 'Đơn mua' })).toBeVisible();
     await expect(page.getByText('Ghế công thái học Space T')).toBeVisible();
     await page.getByRole('link', { name: 'Xem chi tiết' }).click();
-    await expect(page).toHaveURL(`/account/orders/${ids.order}`);
-    await expect(page.getByRole('heading', { name: 'Hành trình đơn hàng' })).toBeVisible();
-    await page.getByRole('button', { name: 'Hủy đơn hàng' }).click();
+    await expect(page).toHaveURL(`/account/orders/${ids.purchase}`);
+    await expect(page.getByRole('heading', { name: 'Hành trình · Space T' })).toBeVisible();
+    await page.getByRole('button', { name: 'Hủy nhóm hàng của shop này' }).click();
     const confirm = page.getByRole('button', { name: 'Xác nhận hủy' });
     await confirm.dblclick();
     await expect(page.getByText('Đơn hàng đã được hủy.')).toBeVisible();
@@ -218,7 +271,7 @@ test.describe('buyer order lifecycle', () => {
     expect(calls.cancellations()).toBe(1);
     await page.reload();
     await expect(page.getByText('Đã hủy').first()).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Hủy đơn hàng' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Hủy nhóm hàng của shop này' })).toHaveCount(0);
     const dimensions = await page.evaluate(() => ({
       width: document.documentElement.clientWidth,
       scrollWidth: document.documentElement.scrollWidth,

@@ -285,6 +285,22 @@ describe('buyer order-history screens', () => {
     expect(screen.getByText('Thanh toán: Đã thanh toán')).toBeInTheDocument();
   });
 
+  it('places the cancellation action beside the link back to buyer orders', async () => {
+    vi.mocked(getBuyerOrderDetail).mockResolvedValue(detail);
+
+    const rendered = render(<BuyerOrderDetailScreen orderReference={order.orderReference} />);
+
+    expect(await screen.findByText('Hành trình đơn hàng')).toBeInTheDocument();
+    const actions = rendered.container.querySelector('.buyer-order-detail__actions');
+    const backLink = screen.getByRole('link', { name: 'Về đơn mua' });
+    const cancelButton = screen.getByRole('button', { name: 'Hủy đơn hàng' });
+
+    expect(actions).not.toBeNull();
+    expect(actions).toContainElement(backLink);
+    expect(actions).toContainElement(cancelButton);
+    expect(cancelButton.parentElement).toBe(actions);
+  });
+
   it('hides the internal confirmation anchor for a cancelled VNPAY order', async () => {
     vi.mocked(getBuyerOrderDetail).mockResolvedValue({
       ...detail,

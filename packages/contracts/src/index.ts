@@ -73,10 +73,14 @@ export {
   CATALOG_DEFAULT_PAGE,
   CATALOG_DEFAULT_PAGE_SIZE,
   CATALOG_MAX_PAGE_SIZE,
+  CATALOG_DEFAULT_SUGGESTION_LIMIT,
+  CATALOG_MAX_SUGGESTION_LIMIT,
   catalogSortValues,
   isCatalogProductCard,
   isCatalogProductsResponse,
+  isCatalogSearchSuggestionsResponse,
   parseCatalogProductsResponse,
+  parseCatalogSearchSuggestionsResponse,
 } from './catalog';
 export {
   FOLLOWED_SHOPS_DEFAULT_PAGE,
@@ -325,6 +329,8 @@ export type {
   CatalogPagination,
   CatalogProductCard,
   CatalogProductsResponse,
+  CatalogSearchSuggestion,
+  CatalogSearchSuggestionsResponse,
   CatalogQueryContext,
   CatalogPriceRangeFacet,
   CatalogPromotion,

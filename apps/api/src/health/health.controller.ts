@@ -9,6 +9,10 @@ import { HealthService } from './health.service';
 import { InventoryReservationQueueService } from '../inventory/inventory-reservation-queue.service';
 import { ProductRetentionCleanupService } from '../product-retention/product-retention-cleanup.service';
 import { ChatOutboxDispatcher } from '../chat/chat.realtime';
+import {
+  SearchElasticsearchAdapter,
+  type ElasticsearchHealthResponse,
+} from '../search/search-elasticsearch.adapter';
 
 @Controller('health')
 export class HealthController {
@@ -19,6 +23,8 @@ export class HealthController {
     @Inject(ProductRetentionCleanupService)
     private readonly productRetention: ProductRetentionCleanupService,
     @Inject(ChatOutboxDispatcher) private readonly chatOutbox: ChatOutboxDispatcher,
+    @Inject(SearchElasticsearchAdapter)
+    private readonly searchElasticsearch: SearchElasticsearchAdapter,
   ) {}
 
   @Get()
@@ -46,5 +52,10 @@ export class HealthController {
   @Get('chat-outbox')
   async getChatOutboxReadiness(): Promise<ChatOutboxHealthResponse> {
     return this.chatOutbox.readiness();
+  }
+
+  @Get('elasticsearch')
+  async getElasticsearchHealth(): Promise<ElasticsearchHealthResponse> {
+    return this.searchElasticsearch.getHealth();
   }
 }

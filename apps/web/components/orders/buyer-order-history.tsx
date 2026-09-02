@@ -797,11 +797,6 @@ export function BuyerOrderDetailScreen({ orderReference }: { orderReference: str
               {detail.order.returnCapability?.allowed ? (
                 <BuyerReturnForm order={detail.order} />
               ) : null}
-              {detail.order.cancellation.allowed ? (
-                <button type="button" onClick={() => setCancelOpen(true)}>
-                  Hủy đơn hàng
-                </button>
-              ) : null}
             </Card>
             <Card className="buyer-order-detail__card">
               <h2>Hành trình đơn hàng</h2>
@@ -822,6 +817,11 @@ export function BuyerOrderDetailScreen({ orderReference }: { orderReference: str
             </Card>
             <div className="buyer-order-detail__actions">
               <Link href="/account/orders">Về đơn mua</Link>
+              {detail.order.cancellation.allowed ? (
+                <button type="button" onClick={() => setCancelOpen(true)}>
+                  Hủy đơn hàng
+                </button>
+              ) : null}
             </div>
           </div>
         ) : null}

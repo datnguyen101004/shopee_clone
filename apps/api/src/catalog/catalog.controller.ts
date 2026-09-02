@@ -10,6 +10,11 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import type { CatalogProductsResponse, ProductDetailResponse } from '@shopee-clone/contracts';
+import {
+  CATALOG_DEFAULT_SUGGESTION_LIMIT,
+  CATALOG_MAX_SUGGESTION_LIMIT,
+  type CatalogSearchSuggestionsResponse,
+} from '@shopee-clone/contracts';
 
 import { CatalogExceptionFilter } from './catalog-exception.filter';
 import { parseCatalogQuery } from './catalog-query';
@@ -37,6 +42,22 @@ export class CatalogController {
     @Query() query: Record<string, unknown>,
   ): Promise<CatalogProductsResponse> {
     return this.service.getProducts(parseCatalogQuery(query), request.authUser?.id ?? null);
+  }
+
+  /** Public, bounded product-name suggestions for the storefront search box. */
+  @Get('suggestions')
+  @Header('Cache-Control', 'no-store')
+  getSearchSuggestions(
+    @Query() query: Record<string, unknown>,
+  ): Promise<CatalogSearchSuggestionsResponse> {
+    const rawQuery = typeof query.q === 'string' ? query.q.trim().replace(/\s+/g, ' ') : '';
+    if (!rawQuery) return Promise.resolve({ suggestions: [] });
+    if (rawQuery.length > 120) return Promise.resolve({ suggestions: [] });
+
+    const rawLimit = typeof query.limit === 'string' ? query.limit : '';
+    const parsedLimit = /^[1-8]$/.test(rawLimit) ? Number(rawLimit) : CATALOG_DEFAULT_SUGGESTION_LIMIT;
+    const limit = Math.min(parsedLimit, CATALOG_MAX_SUGGESTION_LIMIT);
+    return this.service.getSearchSuggestions(rawQuery, limit);
   }
 
   /** Public, server-authoritative product detail for the storefront route. */

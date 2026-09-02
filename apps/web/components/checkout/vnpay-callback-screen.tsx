@@ -89,7 +89,11 @@ export function VnpayCallbackScreen({
 
   useEffect(() => {
     if (auth.state.status === 'authenticated' && transactionReference && window.location.search) {
-      window.history.replaceState(null, '', '/payment/callback');
+      window.history.replaceState(
+        null,
+        '',
+        `/payment/callback?vnp_TxnRef=${encodeURIComponent(transactionReference)}`,
+      );
     }
   }, [auth.state.status, transactionReference]);
 

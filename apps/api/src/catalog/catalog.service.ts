@@ -1,16 +1,21 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import type {
   CatalogCategoryFacet,
   CatalogFacets,
   CatalogProductCard,
   CatalogProductsResponse,
+  CatalogSearchSuggestionsResponse,
   PublicShopCatalogPage,
   PublicShopCategoryFacet,
   ShopCatalogQuery,
 } from '@shopee-clone/contracts';
 import { buyerDisplayProductPriceMinor } from '@shopee-clone/contracts';
 
-import { relevanceScore, normalizeDiscoveryText } from './catalog-discovery';
+import {
+  relevanceScore,
+  normalizeDiscoveryText,
+  rankSearchSuggestions,
+} from './catalog-discovery';
 import { CatalogPublicFacade, type PublicShopCatalogSummary } from './catalog-public.facade';
 import type { NormalizedCatalogQuery } from './catalog-query';
 import { CatalogRepository } from './catalog.repository';
@@ -21,6 +26,11 @@ import {
 } from './catalog-presentation';
 import { ScheduledDiscountService } from '../pricing/scheduled-discount.service';
 import { BuyerBestPriceService } from '../pricing/buyer-best-price.service';
+import {
+  ProductSearchQueryService,
+  type ProductSearchFacetSnapshot,
+  ProductSearchQueryUnavailableError,
+} from '../search/product-search-query.service';
 
 type CatalogCandidate = Awaited<ReturnType<CatalogRepository['findCandidates']>>[number];
 type ActiveCategory = Awaited<ReturnType<CatalogRepository['findActiveCategories']>>[number];
@@ -101,6 +111,33 @@ function buildFacets(
   };
 }
 
+function buildFacetsFromSearch(
+  snapshot: ProductSearchFacetSnapshot,
+  categories: ActiveCategory[],
+): CatalogFacets {
+  const categoryById = new Map(categories.map((category) => [category.id, category]));
+  const categoryFacets: CatalogCategoryFacet[] = categories
+    .filter((category) => snapshot.categorySlugs.includes(category.slug))
+    .map((category) => ({
+      slug: category.slug,
+      name: category.name,
+      parentSlug: category.parentId ? (categoryById.get(category.parentId)?.slug ?? null) : null,
+    }));
+  const locations = [...new Set(snapshot.locations)].sort((left, right) =>
+    left.localeCompare(right, 'vi'),
+  );
+  const min = snapshot.priceRange.min;
+  const max = snapshot.priceRange.max;
+  return {
+    categories: categoryFacets,
+    locations,
+    priceRange: {
+      min: min !== null && Number.isSafeInteger(min) ? min : null,
+      max: max !== null && Number.isSafeInteger(max) ? max : null,
+    },
+  };
+}
+
 function compareCandidates(
   left: DisplayableCatalogCandidate,
   right: DisplayableCatalogCandidate,
@@ -122,12 +159,17 @@ function compareCandidates(
 
 @Injectable()
 export class CatalogService extends CatalogPublicFacade {
+  private readonly logger = new Logger(CatalogService.name);
+
   constructor(
     @Inject(CatalogRepository) private readonly repository: CatalogRepository,
     @Inject(ScheduledDiscountService)
     private readonly scheduledDiscounts?: ScheduledDiscountService,
     @Inject(BuyerBestPriceService)
     private readonly buyerPrices?: BuyerBestPriceService,
+    @Optional()
+    @Inject(ProductSearchQueryService)
+    private readonly productSearch?: ProductSearchQueryService,
   ) {
     super();
   }
@@ -249,7 +291,7 @@ export class CatalogService extends CatalogPublicFacade {
     });
   }
 
-  async getProducts(
+  private async getProductsFromPostgres(
     query: NormalizedCatalogQuery,
     buyerId: string | null = null,
   ): Promise<CatalogProductsResponse> {
@@ -319,6 +361,147 @@ export class CatalogService extends CatalogPublicFacade {
       pagination: { page: query.page, pageSize: query.pageSize, totalItems, totalPages },
       facets,
       items: filtered.slice(start, start + query.pageSize).map((candidate) => candidate.card),
+    };
+  }
+
+  private async getProductsFromElasticsearch(
+    query: NormalizedCatalogQuery,
+    buyerId: string | null,
+  ): Promise<CatalogProductsResponse> {
+    if (!this.productSearch) {
+      throw new ProductSearchQueryUnavailableError('not-configured');
+    }
+
+    const categories = await this.repository.findActiveCategories();
+    const start = (query.page - 1) * query.pageSize;
+    const fetchSize = Math.min(Math.max(query.pageSize * 2, query.pageSize), 96);
+    const candidateIds: string[] = [];
+    const seenIds = new Set<string>();
+    let nextFrom = start;
+    let totalItems = 0;
+    let facetSnapshot: ProductSearchFacetSnapshot = {
+      categorySlugs: [],
+      locations: [],
+      priceRange: { min: null, max: null },
+    };
+    let attempts = 0;
+
+    while (attempts < 3) {
+      const result = await this.productSearch.search(query, nextFrom, fetchSize);
+      totalItems = result.totalItems;
+      facetSnapshot = result.facets;
+      for (const id of result.ids) {
+        if (!seenIds.has(id)) {
+          seenIds.add(id);
+          candidateIds.push(id);
+        }
+      }
+      attempts += 1;
+      if (candidateIds.length >= query.pageSize || nextFrom + fetchSize >= totalItems) break;
+      nextFrom += fetchSize;
+    }
+
+    const hydrated = await this.repository.findCandidatesByIds(candidateIds);
+    const evaluatedAt = new Date();
+    const scheduledCandidates = await this.applyScheduledDiscounts(hydrated, evaluatedAt);
+    const rawCandidates = await this.applyBuyerPrices(scheduledCandidates, buyerId, evaluatedAt);
+    const displayable = rawCandidates
+      .map(mapDisplayableCandidate)
+      .filter((candidate): candidate is DisplayableCatalogCandidate => candidate !== null);
+    if (displayable.length === 0 && candidateIds.length > 0 && totalItems > 0) {
+      throw new ProductSearchQueryUnavailableError('stale-hits');
+    }
+    const byId = new Map(displayable.map((candidate) => [candidate.card.id, candidate]));
+    const staleHits = candidateIds.filter((id) => !byId.has(id)).length;
+
+    const categoryIds = descendantIds(categories, query.category);
+    const facets = buildFacetsFromSearch(facetSnapshot, categories);
+    const canonicalLocation = query.location
+      ? (facets.locations.find(
+          (location) =>
+            normalizeDiscoveryText(location) === normalizeDiscoveryText(query.location!),
+        ) ?? query.location)
+      : null;
+    const requestedLocation = canonicalLocation ? normalizeDiscoveryText(canonicalLocation) : null;
+    const filtered = candidateIds
+      .map((id) => byId.get(id))
+      .filter((candidate): candidate is DisplayableCatalogCandidate => candidate !== undefined)
+      .filter((candidate) => {
+        const price = buyerDisplayProductPriceMinor(candidate.card);
+        return (
+          (categoryIds === null || categoryIds.has(candidate.categoryId)) &&
+          (query.minPrice === null || price >= query.minPrice) &&
+          (query.maxPrice === null || price <= query.maxPrice) &&
+          (query.rating === null || candidate.card.ratingAverageBasisPoints >= query.rating * 100) &&
+          (requestedLocation === null ||
+            normalizeDiscoveryText(candidate.card.shop.location) === requestedLocation) &&
+          (query.availability === null || query.availability === 'in-stock') &&
+          (query.promotion === null || candidate.card.compareAtPriceMinor !== undefined)
+        );
+      });
+
+    const safeTotalItems = Math.max(0, totalItems - staleHits);
+    const totalPages = Math.ceil(safeTotalItems / query.pageSize);
+    return {
+      query: {
+        q: query.q,
+        category: query.category,
+        minPrice: query.minPrice,
+        maxPrice: query.maxPrice,
+        rating: query.rating,
+        location: canonicalLocation,
+        availability: query.availability,
+        promotion: query.promotion,
+        sort: query.sort,
+      },
+      pagination: {
+        page: query.page,
+        pageSize: query.pageSize,
+        totalItems: safeTotalItems,
+        totalPages,
+      },
+      facets,
+      items: filtered.slice(0, query.pageSize).map((candidate) => candidate.card),
+    };
+  }
+
+  async getProducts(
+    query: NormalizedCatalogQuery,
+    buyerId: string | null = null,
+  ): Promise<CatalogProductsResponse> {
+    if (this.productSearch?.isEnabled()) {
+      try {
+        return await this.getProductsFromElasticsearch(query, buyerId);
+      } catch (error) {
+        const reason =
+          error instanceof ProductSearchQueryUnavailableError
+            ? error.reason
+            : 'connection-failure';
+        this.logger.warn(`Catalogue search fallback reason=${reason}`);
+      }
+    }
+    return this.getProductsFromPostgres(query, buyerId);
+  }
+
+  async getSearchSuggestions(
+    query: string,
+    limit: number,
+  ): Promise<CatalogSearchSuggestionsResponse> {
+    if (this.productSearch?.isEnabled()) {
+      try {
+        return { suggestions: await this.productSearch.suggest(query, limit) };
+      } catch (error) {
+        const reason =
+          error instanceof ProductSearchQueryUnavailableError
+            ? error.reason
+            : 'connection-failure';
+        this.logger.warn(`Catalogue suggestions fallback reason=${reason}`);
+      }
+    }
+
+    const candidates = await this.repository.findSearchSuggestionCandidates();
+    return {
+      suggestions: rankSearchSuggestions(candidates, query, limit).map((text) => ({ text })),
     };
   }
 

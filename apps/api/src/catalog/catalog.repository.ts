@@ -40,6 +40,45 @@ export class CatalogRepository {
     });
   }
 
+  /** Hydrates an ordered set of product identifiers in one bounded PostgreSQL query. */
+  findCandidatesByIds(ids: readonly string[]) {
+    const uniqueIds = [...new Set(ids)];
+    if (uniqueIds.length === 0) return Promise.resolve([]);
+    return this.prisma.product.findMany({
+      where: {
+        id: { in: uniqueIds },
+        ...sellableProductWhere,
+        shop: sellableShopWhere,
+        category: { isActive: true, deletedAt: null },
+      },
+      include: {
+        shop: true,
+        category: true,
+        images: { orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }] },
+        variants: {
+          where: { status: VariantStatus.ACTIVE, deletedAt: null },
+          include: { inventory: true },
+          orderBy: [{ priceMinor: 'asc' }, { id: 'asc' }],
+        },
+      },
+      orderBy: [{ id: 'asc' }],
+    });
+  }
+
+  /** Small public projection used for graceful search-suggestion fallback. */
+  findSearchSuggestionCandidates() {
+    return this.prisma.product.findMany({
+      where: {
+        ...sellableProductWhere,
+        shop: sellableShopWhere,
+        category: { isActive: true, deletedAt: null },
+      },
+      select: { name: true, soldCount: true, createdAt: true },
+      orderBy: [{ soldCount: 'desc' }, { createdAt: 'desc' }],
+      take: 2_000,
+    });
+  }
+
   findCandidatesForShop(shopId: string) {
     return this.findCandidates(undefined, shopId);
   }

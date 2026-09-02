@@ -6,6 +6,7 @@ import request from 'supertest';
 import { AppModule } from '../src/app.module';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { ChatOutboxDispatcher } from '../src/chat/chat.realtime';
+import { SearchElasticsearchAdapter } from '../src/search/search-elasticsearch.adapter';
 
 describe('Health endpoint', () => {
   let app: INestApplication;
@@ -33,6 +34,20 @@ describe('Health endpoint', () => {
           polls: 2,
           lastPollAt: '2026-08-27T00:00:00.000Z',
           lastErrorAt: null,
+        }),
+      })
+      .overrideProvider(SearchElasticsearchAdapter)
+      .useValue({
+        getHealth: jest.fn().mockResolvedValue({
+          required: false,
+          enabled: true,
+          configured: true,
+          available: true,
+          status: 'available',
+          clusterStatus: 'yellow',
+          checkedAt: '2026-08-31T00:00:00.000Z',
+          latencyMs: 3,
+          reason: null,
         }),
       })
       .compile();
@@ -70,5 +85,23 @@ describe('Health endpoint', () => {
         'rawError',
       ]),
     );
+  });
+
+  it('GET /api/v1/health/elasticsearch reports optional dependency availability', async () => {
+    const response = await request(app.getHttpServer())
+      .get('/api/v1/health/elasticsearch')
+      .expect(200);
+
+    expect(response.body).toEqual({
+      required: false,
+      enabled: true,
+      configured: true,
+      available: true,
+      status: 'available',
+      clusterStatus: 'yellow',
+      checkedAt: '2026-08-31T00:00:00.000Z',
+      latencyMs: 3,
+      reason: null,
+    });
   });
 });

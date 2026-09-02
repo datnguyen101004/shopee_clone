@@ -64,6 +64,29 @@ describe('VnpayCallbackScreen', () => {
 
   afterEach(() => {
     vi.useRealTimers();
+    vi.restoreAllMocks();
+    window.history.replaceState(null, '', '/');
+  });
+
+  it('keeps only the opaque transaction reference when sanitizing the callback URL', async () => {
+    window.history.pushState(
+      null,
+      '',
+      `/payment/callback?vnp_TxnRef=${transactionReference}&vnp_ResponseCode=00&vnp_SecureHash=${'a'.repeat(128)}`,
+    );
+    const replaceState = vi.spyOn(window.history, 'replaceState');
+    vi.mocked(getPaymentStatus).mockResolvedValue(payment('PAID'));
+
+    render(<VnpayCallbackScreen transactionReference={transactionReference} />);
+
+    await waitFor(() =>
+      expect(replaceState).toHaveBeenCalledWith(
+        null,
+        '',
+        `/payment/callback?vnp_TxnRef=${transactionReference}`,
+      ),
+    );
+    expect(window.location.search).toBe(`?vnp_TxnRef=${transactionReference}`);
   });
 
   it('polls until IPN-backed PAID status and redirects to the buyer order detail', async () => {

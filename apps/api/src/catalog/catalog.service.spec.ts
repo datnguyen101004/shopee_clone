@@ -105,7 +105,8 @@ describe('CatalogService', () => {
   const repository = {
     findActiveCategories: jest.fn(),
     findCandidates: jest.fn(),
-    findCandidatesForShop: jest.fn(),
+  findCandidatesForShop: jest.fn(),
+  findCandidatesByIds: jest.fn(),
   };
   const service = new CatalogService(repository as unknown as CatalogRepository);
 
@@ -469,5 +470,95 @@ describe('CatalogService', () => {
     );
 
     await expect(campaignService.getProducts(query())).rejects.toBe(failure);
+  });
+
+  it('hydrates Elasticsearch IDs in order while preserving the catalogue response contract', async () => {
+    repository.findActiveCategories.mockResolvedValue(categories);
+    repository.findCandidatesByIds.mockResolvedValue([
+      candidate({ id: 'product-2', name: 'Điện thoại B' }),
+      candidate({ id: 'product-1', name: 'Điện thoại A' }),
+    ]);
+    const search = {
+      isEnabled: jest.fn().mockReturnValue(true),
+      search: jest.fn().mockResolvedValue({
+        ids: ['product-1', 'product-2'],
+        totalItems: 2,
+        indexVersion: 'products-search-v1-1',
+        tookMs: 4,
+        facets: {
+          categorySlugs: ['electronics', 'phones'],
+          locations: ['Hà Nội'],
+          priceRange: { min: 800, max: 800 },
+        },
+      }),
+    };
+    const elastic = new CatalogService(
+      repository as unknown as CatalogRepository,
+      undefined,
+      undefined,
+      search as never,
+    );
+
+    const response = await elastic.getProducts(query({ pageSize: 2, sort: 'relevance' }));
+    expect(search.search).toHaveBeenCalledWith(expect.objectContaining({ sort: 'relevance' }), 0, 4);
+    expect(repository.findCandidatesByIds).toHaveBeenCalledWith(['product-1', 'product-2']);
+    expect(response.items.map((item) => item.id)).toEqual(['product-1', 'product-2']);
+    expect(response.pagination).toEqual({ page: 1, pageSize: 2, totalItems: 2, totalPages: 1 });
+    expect(response.facets.locations).toEqual(['Hà Nội']);
+  });
+
+  it('refills stale Elasticsearch hits and falls back to PostgreSQL on search failure', async () => {
+    repository.findActiveCategories.mockResolvedValue(categories);
+    repository.findCandidatesByIds.mockResolvedValue([candidate({ id: 'product-2' })]);
+    const search = {
+      isEnabled: jest.fn().mockReturnValue(true),
+      search: jest
+        .fn()
+        .mockResolvedValueOnce({
+          ids: ['deleted-product', 'product-2'],
+          totalItems: 2,
+          facets: { categorySlugs: ['phones'], locations: ['Hà Nội'], priceRange: { min: 800, max: 800 } },
+        })
+        .mockRejectedValueOnce(new Error('connection failed')),
+    };
+    const elastic = new CatalogService(
+      repository as unknown as CatalogRepository,
+      undefined,
+      undefined,
+      search as never,
+    );
+
+    const stale = await elastic.getProducts(query({ q: null, pageSize: 2 }));
+    expect(stale.items.map((item) => item.id)).toEqual(['product-2']);
+    expect(stale.pagination.totalItems).toBe(1);
+
+    repository.findCandidates.mockResolvedValue([candidate({ id: 'postgres-product' })]);
+    const fallback = await elastic.getProducts(query({ q: null }));
+    expect(repository.findCandidates).toHaveBeenCalled();
+    expect(fallback.items.map((item) => item.id)).toEqual(['postgres-product']);
+  });
+
+  it('falls back to PostgreSQL when every over-fetched Elasticsearch hit is stale', async () => {
+    repository.findActiveCategories.mockResolvedValue(categories);
+    repository.findCandidatesByIds.mockResolvedValue([]);
+    repository.findCandidates.mockResolvedValue([candidate({ id: 'postgres-product' })]);
+    const search = {
+      isEnabled: jest.fn().mockReturnValue(true),
+      search: jest.fn().mockResolvedValue({
+        ids: ['deleted-product'],
+        totalItems: 1,
+        facets: { categorySlugs: [], locations: [], priceRange: { min: null, max: null } },
+      }),
+    };
+    const elastic = new CatalogService(
+      repository as unknown as CatalogRepository,
+      undefined,
+      undefined,
+      search as never,
+    );
+
+    const response = await elastic.getProducts(query({ q: null }));
+    expect(response.items.map((item) => item.id)).toEqual(['postgres-product']);
+    expect(repository.findCandidates).toHaveBeenCalledTimes(1);
   });
 });

@@ -7,9 +7,10 @@ import { CatalogService } from './catalog.service';
 import { CatalogProductDetailService } from './catalog-product-detail.service';
 import { PricingModule } from '../pricing/pricing.module';
 import { AuthModule } from '../auth/auth.module';
+import { SearchModule } from '../search/search.module';
 
 @Module({
-  imports: [PricingModule, AuthModule],
+  imports: [PricingModule, AuthModule, SearchModule],
   controllers: [CatalogController],
   providers: [
     CatalogRepository,

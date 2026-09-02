@@ -831,6 +831,20 @@ model Category {
   @@map("categories")
 }
 
+model ProductSearchIndexCheckpoint {
+  scope             String    @id @default("products") @db.VarChar(64)
+  projectionVersion Int       @map("projection_version")
+  analyzerVersion   Int       @map("analyzer_version")
+  lastCompletedAt   DateTime? @map("last_completed_at") @db.Timestamptz(3)
+  lastRunAt         DateTime? @map("last_run_at") @db.Timestamptz(3)
+  activeIndex       String?   @map("active_index") @db.VarChar(255)
+  lastError         String?   @map("last_error") @db.VarChar(120)
+  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt         DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@map("product_search_index_checkpoints")
+}
+
 model Product {
   id                       String                    @id @default(uuid()) @db.Uuid
   shopId                   String                    @map("shop_id") @db.Uuid

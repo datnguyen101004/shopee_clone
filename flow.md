@@ -1,6 +1,6 @@
 # Flow các tính năng đã triển khai
 
-Tài liệu này mô tả trạng thái hiện tại của Shopee Clone sau TS01 và các task đến T20. Các sơ đồ tập trung vào luồng đang hoạt động trong code; checkout COD, order history và hủy đơn đã có, còn thanh toán online, chat và vận chuyển thật chưa được triển khai.
+Tài liệu này mô tả trạng thái hiện tại của Shopee Clone. Các sơ đồ tập trung vào luồng đang hoạt động trong code, gồm checkout COD, thanh toán sandbox MoMo, order history và hủy đơn; production payment onboarding và vận chuyển thật vẫn ngoài phạm vi.
 
 ## 1. Tổng quan phạm vi
 
@@ -489,7 +489,7 @@ Importer chạy local, không crawl mạng, không dùng dữ liệu ngẫu nhi�
 
 - Báo giá giỏ hàng dùng phí vận chuyển mô phỏng và preview voucher; không giữ tồn kho, giữ lượt voucher, cam kết cước cuối cùng hoặc tạo đơn.
 - Purchase intent ở trang sản phẩm chưa báo checkout thành công.
-- Đã có checkout COD, order history theo shop, timeline và hủy đơn chờ xác nhận; chưa có thanh toán online, shipment thật, seller fulfillment, return/refund workflow, review body, chat hoặc notification realtime.
+- Đã có checkout COD và thanh toán sandbox MoMo theo Purchase đa shop, cùng order history, timeline và hủy đơn; production payment onboarding và shipment thật vẫn chưa thuộc phạm vi.
 - Seller mới có role/ownership boundary và safe shop projection, chưa có bộ công cụ quản lý gian hàng hoàn chỉnh.
 - Admin hiện tập trung vào role assignment/revocation và role audit, chưa phải dashboard vận hành marketplace đầy đủ.
 
@@ -1081,7 +1081,7 @@ sequenceDiagram
     Svc->>DB: COMMIT Transaction
     DB-->>API: Success
     API-->>UI: 201 Created (AdminUserSummary)
-    
+
     Note over Buyer,API: Khi Buyer gửi request tiếp theo:
     Buyer->>API: GET /api/v1/account/profile (Bearer token cũ)
     API->>DB: findAuthenticatedSession(userId, sessionId)
@@ -1094,13 +1094,13 @@ sequenceDiagram
 ```mermaid
 flowchart TD
     admin["Admin /admin/categories"] --> action{"Thao tác Danh mục"}
-    
+
     action -->|Tạo mới| create["Kiểm tra slug kebab-case\nKiểm tra độ sâu <= 3 cấp\nCommit + Audit CREATE"]
-    
+
     action -->|Cập nhật parentId| cycleCheck{"Kiểm tra vòng lặp\n(Cycle Detection)"}
     cycleCheck -->|parentId là chính nó hoặc con cháu| cycleErr["409 CategoryCycleConflictError\n(Problem Details)"]
     cycleCheck -->|Hợp lệ| updateCat["Cập nhật parentId\nCommit + Audit UPDATE"]
-    
+
     action -->|Xóa danh mục| deleteCheck{"Kiểm tra ràng buộc toàn vẹn"}
     deleteCheck -->|Còn sản phẩm liên kết (products > 0)| delErr1["409 CategoryIntegrityConflictError\n'Category contains active products'"]
     deleteCheck -->|Còn danh mục con (children > 0)| delErr2["409 CategoryIntegrityConflictError\n'Category has subcategories'"]
@@ -1140,6 +1140,7 @@ sequenceDiagram
 ```
 
 Các endpoint chính:
+
 - `GET /api/v1/admin/dashboard` - Thống kê realtime toàn hệ thống.
 - `GET /api/v1/admin/users`, `POST /api/v1/admin/users/:userId/actions` - Tra cứu, khóa/mở khóa user.
 - `GET /api/v1/admin/shops`, `POST /api/v1/admin/shops/:shopId/actions` - Tra cứu, khóa/mở khóa shop.
@@ -1148,5 +1149,3 @@ Các endpoint chính:
 - `GET /api/v1/admin/homepage/banners`, `POST`, `PATCH :id`, `DELETE :id`, `POST reorder` - Banner chiến dịch.
 - `GET /api/v1/admin/homepage/modules`, `PATCH :id` - Cấu hình hiển thị modules trang chủ.
 - `GET /api/v1/admin/audit` - Nhật ký kiểm toán thao tác đặc quyền (Append-only).
-
-

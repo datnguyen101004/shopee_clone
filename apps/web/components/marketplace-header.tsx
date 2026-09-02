@@ -6,6 +6,8 @@ import Link from 'next/link';
 import { useEffect, useRef, useState, type FormEvent, type RefObject } from 'react';
 
 import type { AuthSessionState } from './auth-session-provider';
+import { fetchCatalogSuggestions } from '../lib/catalog-suggestions-api';
+import type { CatalogSearchSuggestion } from '@shopee-clone/contracts';
 import { marketplaceCategories } from './marketplace-navigation';
 import { NotificationBell } from './notifications/notification-bell';
 
@@ -29,7 +31,11 @@ export function MarketplaceHeader({
   menuButtonRef,
 }: MarketplaceHeaderProps) {
   const [searchError, setSearchError] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [suggestions, setSuggestions] = useState<CatalogSearchSuggestion[]>([]);
+  const [suggestionsOpen, setSuggestionsOpen] = useState(false);
   const userMenuId = 'marketplace-user-menu';
+  const suggestionsId = 'market-search-suggestions';
 
   useEffect(() => {
     if (!searchError) return;
@@ -38,6 +44,31 @@ export function MarketplaceHeader({
     }, 3000);
     return () => clearTimeout(timer);
   }, [searchError]);
+
+  useEffect(() => {
+    const query = searchQuery.trim();
+    if (!query) return;
+
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => {
+      void fetchCatalogSuggestions(query, fetch, undefined, undefined, controller.signal)
+        .then((nextSuggestions) => {
+          if (controller.signal.aborted) return;
+          setSuggestions(nextSuggestions);
+          setSuggestionsOpen(nextSuggestions.length > 0);
+        })
+        .catch(() => {
+          if (controller.signal.aborted) return;
+          setSuggestions([]);
+          setSuggestionsOpen(false);
+        });
+    }, 500);
+
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
+  }, [searchQuery]);
 
   function handleSearchSubmit(event: FormEvent<HTMLFormElement>) {
     const form = event.currentTarget;
@@ -51,6 +82,8 @@ export function MarketplaceHeader({
       return;
     }
     input.value = query;
+    setSearchQuery(query);
+    setSuggestionsOpen(false);
     setSearchError('');
   }
 
@@ -93,11 +126,29 @@ export function MarketplaceHeader({
             id="site-search"
             name="q"
             type="search"
+            value={searchQuery}
             placeholder="Tìm sản phẩm, thương hiệu và tên shop"
+            autoComplete="off"
+            aria-autocomplete="list"
+            aria-controls={suggestionsId}
             aria-invalid={Boolean(searchError) || undefined}
             aria-describedby={searchError ? 'site-search-error' : undefined}
-            onInput={() => {
+            onInput={(event) => {
+              const nextValue = event.currentTarget.value;
+              setSearchQuery(nextValue);
+              if (!nextValue.trim()) {
+                setSuggestions([]);
+                setSuggestionsOpen(false);
+              } else {
+                setSuggestionsOpen(true);
+              }
               if (searchError) setSearchError('');
+            }}
+            onFocus={() => {
+              if (suggestions.length) setSuggestionsOpen(true);
+            }}
+            onKeyDown={(event) => {
+              if (event.key === 'Escape') setSuggestionsOpen(false);
             }}
           />
           <button aria-label="Tìm kiếm" type="submit">
@@ -107,6 +158,18 @@ export function MarketplaceHeader({
             <span className="market-search__error" id="site-search-error" role="alert">
               {searchError}
             </span>
+          ) : null}
+          {suggestionsOpen && suggestions.length ? (
+            <ul className="market-search__suggestions" id={suggestionsId} role="listbox">
+              {suggestions.map((suggestion) => (
+                <li key={suggestion.text} role="option" aria-selected="false">
+                  <Link href={`/search?q=${encodeURIComponent(suggestion.text)}`} onClick={() => setSuggestionsOpen(false)}>
+                    <Search aria-hidden="true" size={16} />
+                    <span>{suggestion.text}</span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
           ) : null}
         </form>
         <div className="market-actions">

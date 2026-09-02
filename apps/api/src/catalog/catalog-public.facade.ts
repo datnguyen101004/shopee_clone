@@ -1,6 +1,7 @@
 import type {
   CatalogProductCard,
   CatalogProductsResponse,
+  CatalogSearchSuggestionsResponse,
   PublicShopCatalogPage,
   PublicShopCategoryFacet,
   ShopCatalogQuery,
@@ -18,6 +19,10 @@ export abstract class CatalogPublicFacade {
     query: NormalizedCatalogQuery,
     buyerId?: string | null,
   ): Promise<CatalogProductsResponse>;
+  abstract getSearchSuggestions(
+    query: string,
+    limit: number,
+  ): Promise<CatalogSearchSuggestionsResponse>;
   abstract getShopSummary(
     shopId: string,
     buyerId?: string | null,

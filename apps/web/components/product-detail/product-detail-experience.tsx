@@ -18,7 +18,6 @@ import { useCart } from '../cart/cart-provider';
 import { ProductReviews } from './product-reviews';
 import { marketplaceMediaUrl } from '../../lib/marketplace-media-url';
 import { CartApiError } from '../../lib/cart-api';
-import { ProductCard } from '../catalog/catalog';
 
 import {
   activeProductImage,
@@ -450,16 +449,6 @@ function ProductDetailInner({ product }: { product: ProductDetailResponse }) {
       ) : null}
 
       <ProductReviews product={product} />
-      {product.relatedProducts.length ? (
-        <section aria-labelledby="related-products-title">
-          <h2 id="related-products-title">Sản phẩm liên quan</h2>
-          <div className="catalog-grid">
-            {product.relatedProducts.map((related) => (
-              <ProductCard key={related.id} product={related} />
-            ))}
-          </div>
-        </section>
-      ) : null}
     </>
   );
 }

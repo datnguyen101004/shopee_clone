@@ -1,6 +1,6 @@
 import { createHash, randomUUID } from 'node:crypto';
 
-import type { PurchasePaymentStatus } from '@shopee-clone/contracts';
+import type { PurchasePaymentStatus, ShopOrderStatus } from '@shopee-clone/contracts';
 import { Inject, Injectable } from '@nestjs/common';
 
 import { Prisma } from '../generated/prisma/client';
@@ -8,11 +8,16 @@ import { InventoryService } from '../inventory/inventory.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { VoucherConsumptionService } from '../vouchers/voucher-consumption.service';
 import { classifyMomoResultCode, MomoResultCodeMetrics } from './momo-result-code';
-import type { NotificationFieldValue, ProviderOperationResult } from './payment-provider.port';
+import { classifyVnpayResultCode, VnpayResultCodeMetrics } from './vnpay-result-code';
+import type {
+  NotificationFieldValue,
+  PaymentProviderName,
+  ProviderOperationResult,
+} from './payment-provider.port';
 import { classifyPaymentResult } from './payment-result';
 import { decidePaymentTransition } from './payment-state';
 
-export type ProviderObservationSource = 'IPN' | 'QUERY';
+export type ProviderObservationSource = 'IPN' | 'QUERY' | 'RETURN';
 
 export interface ApplyProviderObservationInput {
   source: ProviderObservationSource;
@@ -67,11 +72,31 @@ function targetStatus(resultClass: string): PurchasePaymentStatus {
   }
 }
 
+export function fulfillmentStatusAfterPaymentObservation(
+  provider: PaymentProviderName,
+  paymentStatus: PurchasePaymentStatus,
+  terminalFailure: boolean,
+  currentStatus: ShopOrderStatus,
+): ShopOrderStatus {
+  if (paymentStatus === 'PAID' && currentStatus === 'PENDING_PAYMENT') {
+    return 'PENDING_CONFIRMATION';
+  }
+  if (
+    terminalFailure &&
+    ((provider === 'VNPAY' && currentStatus === 'PENDING_PAYMENT') ||
+      (provider === 'MOMO' && currentStatus === 'PENDING_CONFIRMATION'))
+  ) {
+    return 'CANCELLED';
+  }
+  return currentStatus;
+}
+
 @Injectable()
 export class PaymentObservationService {
   constructor(
     @Inject(PrismaService) private readonly prisma: PrismaService,
     @Inject(MomoResultCodeMetrics) private readonly metrics: MomoResultCodeMetrics,
+    @Inject(VnpayResultCodeMetrics) private readonly vnpayMetrics: VnpayResultCodeMetrics,
     @Inject(InventoryService) private readonly inventory: InventoryService,
     @Inject(VoucherConsumptionService)
     private readonly voucherConsumption: VoucherConsumptionService,
@@ -100,6 +125,12 @@ export class PaymentObservationService {
         WHERE "id" = ${candidate.id}::uuid
         FOR UPDATE
       `);
+      await transaction.$queryRaw(Prisma.sql`
+        SELECT "id"
+        FROM "purchases"
+        WHERE "id" = ${candidate.purchaseId}::uuid
+        FOR UPDATE
+      `);
       const attempt = await transaction.paymentAttempt.findUniqueOrThrow({
         where: { id: candidate.id },
       });
@@ -115,17 +146,21 @@ export class PaymentObservationService {
         };
       }
 
-      const classification = classifyMomoResultCode(
-        input.observation.resultCode,
-        'PAYMENT_OBSERVATION',
-        this.metrics,
-      );
+      const classification =
+        input.observation.provider === 'VNPAY'
+          ? classifyVnpayResultCode(input.observation.resultCode, 'OBSERVATION', this.vnpayMetrics)
+          : classifyMomoResultCode(
+              input.observation.resultCode,
+              'PAYMENT_OBSERVATION',
+              this.metrics,
+            );
       const observedStatus = targetStatus(classification.resultClass);
       const correlationMatches =
         attempt.provider === input.observation.provider &&
         attempt.environment === input.observation.environment &&
         attempt.orderId === input.observation.orderId &&
-        attempt.requestId === input.observation.requestId &&
+        (input.observation.provider === 'VNPAY' ||
+          attempt.requestId === input.observation.requestId) &&
         attempt.amountMinor === input.observation.amountMinor &&
         attempt.currency === input.observation.currency &&
         (attempt.providerTransactionId === null ||
@@ -144,13 +179,15 @@ export class PaymentObservationService {
         : correlationMatches
           ? observedStatus
           : 'PENDING_RECONCILIATION';
-      const transition = decidePaymentTransition(attempt.status, desiredStatus);
-      const decision = !correlationMatches
+      let effectiveStatus: PurchasePaymentStatus = desiredStatus;
+      let effectiveLateSuccess = lateSuccess;
+      let transition = decidePaymentTransition(attempt.status, effectiveStatus);
+      let decision: AppliedProviderObservation['decision'] = !correlationMatches
         ? 'MISMATCH'
         : transition === 'APPLY'
           ? 'APPLIED'
           : 'IGNORED';
-      const shouldApply = transition === 'APPLY';
+      let shouldApply = transition === 'APPLY';
       const now = new Date();
 
       if (shouldApply) {
@@ -164,16 +201,49 @@ export class PaymentObservationService {
                 id: true,
                 status: true,
                 version: true,
+                lines: {
+                  select: { variantId: true, quantity: true, sellingUnitPriceMinor: true },
+                },
                 fulfillment: { select: { state: true, version: true } },
               },
             },
           },
         });
+        // A distinct attempt can report success after another attempt already
+        // paid or after the hold was released. Keep the payment evidence, but
+        // never consume resources or regress the settled Purchase.
+        if (
+          effectiveStatus === 'PAID' &&
+          (purchase.paymentStatus === 'PAID' || purchase.inventoryReservation?.status !== 'ACTIVE')
+        ) {
+          effectiveStatus = 'REFUND_PENDING';
+          effectiveLateSuccess = true;
+          transition = decidePaymentTransition(attempt.status, effectiveStatus);
+          shouldApply = transition === 'APPLY';
+          decision = shouldApply ? 'APPLIED' : 'IGNORED';
+        }
+        if (effectiveStatus === 'PAID' && input.observation.providerTransactionId !== null) {
+          const duplicateTransaction = await transaction.paymentAttempt.findFirst({
+            where: {
+              provider: input.observation.provider,
+              providerTransactionId: input.observation.providerTransactionId,
+              id: { not: attempt.id },
+            },
+            select: { id: true },
+          });
+          if (duplicateTransaction) {
+            effectiveStatus = 'REFUND_PENDING';
+            effectiveLateSuccess = true;
+            transition = decidePaymentTransition(attempt.status, effectiveStatus);
+            shouldApply = transition === 'APPLY';
+            decision = shouldApply ? 'APPLIED' : 'IGNORED';
+          }
+        }
         const terminalFailure =
-          desiredStatus === 'FAILED' ||
-          desiredStatus === 'CANCELLED' ||
-          desiredStatus === 'EXPIRED';
-        if (desiredStatus === 'PAID') {
+          effectiveStatus === 'FAILED' ||
+          effectiveStatus === 'CANCELLED' ||
+          effectiveStatus === 'EXPIRED';
+        if (effectiveStatus === 'PAID') {
           if (!purchase.inventoryReservation) {
             throw new ProviderObservationValidationError('Payment inventory hold is missing.');
           }
@@ -211,64 +281,75 @@ export class PaymentObservationService {
           await this.inventory.releaseInTransaction(
             transaction,
             purchase.inventoryReservation.id,
-            desiredStatus === 'EXPIRED' ? 'expired' : 'payment-failed',
+            effectiveStatus === 'EXPIRED' ? 'expired' : 'payment-failed',
             attempt.id,
           );
         }
         await transaction.paymentAttempt.update({
           where: { id: attempt.id },
           data: {
-            status: desiredStatus,
+            status: effectiveStatus,
             lastResultCode: input.observation.resultCode,
             lastResultClass: result.resultClass,
             providerTransactionId:
               input.observation.providerTransactionId ?? attempt.providerTransactionId,
             lastObservedAt: input.observation.observedAt,
             nextReconcileAt:
-              desiredStatus === 'UNKNOWN' || desiredStatus === 'PENDING_RECONCILIATION'
+              effectiveStatus === 'UNKNOWN' || effectiveStatus === 'PENDING_RECONCILIATION'
                 ? now
                 : null,
             version: { increment: 1 },
           },
         });
+        const purchaseStatus =
+          effectiveStatus === 'REFUND_PENDING' && purchase.paymentStatus === 'PAID'
+            ? 'PAID'
+            : effectiveStatus;
         await transaction.purchase.update({
           where: { id: attempt.purchaseId },
-          data: { paymentStatus: desiredStatus },
+          data: { paymentStatus: purchaseStatus },
         });
         for (const order of purchase.orders) {
+          const fulfillmentStatus = fulfillmentStatusAfterPaymentObservation(
+            input.observation.provider,
+            effectiveStatus,
+            terminalFailure,
+            order.status,
+          );
+          const orderPaymentStatus =
+            effectiveStatus === 'REFUND_PENDING' && purchase.paymentStatus === 'PAID'
+              ? 'PAID'
+              : effectiveStatus;
           await transaction.shopOrder.update({
             where: { id: order.id },
             data: {
-              paymentStatus: desiredStatus,
-              ...(desiredStatus === 'PAID' || terminalFailure
+              paymentStatus: orderPaymentStatus,
+              ...(effectiveStatus === 'PAID' || terminalFailure
                 ? { version: { increment: 1 } }
                 : {}),
-              ...(terminalFailure ? { status: 'CANCELLED' } : {}),
+              ...(fulfillmentStatus !== order.status ? { status: fulfillmentStatus } : {}),
             },
           });
-          if (desiredStatus === 'PAID' || terminalFailure) {
+          if (effectiveStatus === 'PAID' || terminalFailure) {
             await transaction.orderTimelineEvent.create({
               data: {
                 id: randomUUID(),
                 orderId: order.id,
                 previousStatus: order.status,
-                status: terminalFailure ? 'CANCELLED' : order.status,
+                status: fulfillmentStatus,
                 orderVersion: order.version + 1,
                 actorType: 'SYSTEM',
                 actorUserId: null,
                 reasonCode: terminalFailure
-                  ? `MOMO_PAYMENT_${desiredStatus}`
-                  : 'MOMO_PAYMENT_CONFIRMED',
+                  ? `${input.observation.provider}_PAYMENT_${effectiveStatus}`
+                  : `${input.observation.provider}_PAYMENT_CONFIRMED`,
                 reasonNote: null,
                 idempotencyKey: attempt.id,
                 requestDigest: fingerprint,
               },
             });
           }
-          if (
-            terminalFailure &&
-            order.fulfillment?.state === 'PENDING_CONFIRMATION'
-          ) {
+          if (terminalFailure && order.fulfillment?.state === 'PENDING_CONFIRMATION') {
             await transaction.sellerOrderFulfillment.update({
               where: { orderId: order.id },
               data: {
@@ -287,7 +368,7 @@ export class PaymentObservationService {
                 actorType: 'SYSTEM',
                 actorUserId: null,
                 action: 'PAYMENT_TERMINATED',
-                reasonCode: `MOMO_PAYMENT_${desiredStatus}`,
+                reasonCode: `${input.observation.provider}_PAYMENT_${effectiveStatus}`,
                 reasonNote: null,
                 late: false,
                 idempotencyKey: attempt.id,
@@ -296,13 +377,51 @@ export class PaymentObservationService {
             });
           }
         }
-        if (lateSuccess) {
+        if (terminalFailure && input.observation.provider === 'VNPAY') {
+          const cart = await transaction.cart.findUnique({
+            where: { userId: purchase.buyerId },
+            select: { id: true, consumedAt: true },
+          });
+          if (cart && !cart.consumedAt) {
+            const restore = new Map<string, { quantity: number; price: bigint }>();
+            for (const order of purchase.orders) {
+              for (const line of order.lines) {
+                const prior = restore.get(line.variantId);
+                restore.set(line.variantId, {
+                  quantity: (prior?.quantity ?? 0) + line.quantity,
+                  price: prior?.price ?? line.sellingUnitPriceMinor,
+                });
+              }
+            }
+            for (const [variantId, line] of restore) {
+              await transaction.cartLine.upsert({
+                where: { cartId_variantId: { cartId: cart.id, variantId } },
+                update: { quantity: { increment: line.quantity }, isSelected: true },
+                create: {
+                  id: randomUUID(),
+                  cartId: cart.id,
+                  variantId,
+                  quantity: line.quantity,
+                  isSelected: true,
+                  lastObservedUnitPriceMinor: line.price,
+                },
+              });
+            }
+            if (restore.size > 0) {
+              await transaction.cart.update({
+                where: { id: cart.id },
+                data: { version: { increment: 1 } },
+              });
+            }
+          }
+        }
+        if (effectiveLateSuccess) {
           const compactAttemptId = attempt.id.replaceAll('-', '');
           await transaction.paymentRefund.create({
             data: {
               id: randomUUID(),
               attemptId: attempt.id,
-              provider: 'MOMO',
+              provider: input.observation.provider,
               orderId: `refund_${compactAttemptId}`,
               requestId: `rreq_${compactAttemptId}`,
               amountMinor: attempt.amountMinor,
@@ -312,14 +431,14 @@ export class PaymentObservationService {
             },
           });
         }
-        if (desiredStatus === 'PAID') {
+        if (effectiveStatus === 'PAID') {
           const notification = await transaction.notification.create({
             data: {
               id: randomUUID(),
               recipientId: purchase.buyerId,
               category: 'SYSTEM',
               type: 'SYSTEM_NOTICE',
-              title: 'Thanh toán MoMo thành công',
+              title: `Thanh toán ${input.observation.provider} thành công`,
               body: `Thanh toán cho đơn #${purchase.id.slice(0, 8)} đã được xác nhận.`,
               metadata: {
                 targetUrl: `/checkout/payment/${attempt.publicReference}`,
@@ -366,7 +485,7 @@ export class PaymentObservationService {
         attemptId: attempt.id,
         eventId,
         decision,
-        status: shouldApply ? desiredStatus : attempt.status,
+        status: shouldApply ? effectiveStatus : attempt.status,
         duplicate: false,
       };
     });

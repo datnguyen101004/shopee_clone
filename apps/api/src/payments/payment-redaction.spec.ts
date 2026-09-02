@@ -75,4 +75,29 @@ describe('payment telemetry redaction', () => {
     const serialized = JSON.stringify(safe);
     for (const sentinel of sentinels) expect(serialized).not.toContain(sentinel);
   });
+
+  it('redacts VNPAY credentials, hashes, signed URLs, bank data, and raw callbacks', () => {
+    const vnpaySecrets = [
+      'YAGTIIYEMTPOWJFCHDZZTUPETFOBHLMP',
+      'abcdef0123456789'.repeat(8),
+      'https://sandbox.vnpayment.vn/paymentv2/vpcpay.html?vnp_SecureHash=secret',
+      'vnp_BankTranNo=bank-secret&vnp_CardType=ATM',
+      'buyer@example.test',
+    ];
+    const telemetry = sanitizePaymentTelemetry({
+      provider: 'VNPAY',
+      environment: 'SANDBOX',
+      operation: 'IPN',
+      orderId: 'opaque-vnpay-order',
+      requestId: 'opaque-vnpay-request',
+      rawQuery: vnpaySecrets[3],
+      hashSecret: vnpaySecrets[0],
+      vnpSecureHash: vnpaySecrets[1],
+      payUrl: vnpaySecrets[2],
+      email: vnpaySecrets[4],
+    });
+    const serialized = JSON.stringify(telemetry);
+    for (const secret of vnpaySecrets) expect(serialized).not.toContain(secret);
+    expect(telemetry).toMatchObject({ provider: 'VNPAY', operation: 'IPN', hasPayUrl: true });
+  });
 });

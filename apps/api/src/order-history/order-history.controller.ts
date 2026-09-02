@@ -60,11 +60,13 @@ export class OrderHistoryController {
 
   @Get()
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'List authenticated buyer shop orders' })
+  @ApiOperation({ summary: 'List authenticated buyer orders, one shop per order' })
   @ApiQuery({ name: 'filter', required: false })
   @ApiQuery({ name: 'limit', required: false, example: 20 })
   @ApiQuery({ name: 'cursor', required: false })
-  @ApiOkResponse({ description: 'Cursor-paginated snapshot order cards' })
+  @ApiOkResponse({
+    description: 'Cursor-paginated shop-order cards with all products for each shop',
+  })
   async list(
     @Req() request: AuthenticatedRequest,
     @Query() input: Record<string, unknown>,
@@ -79,9 +81,9 @@ export class OrderHistoryController {
 
   @Get(':orderReference')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Get one owner-scoped order snapshot and timeline' })
+  @ApiOperation({ summary: 'Get one owner-scoped shop order snapshot with its timeline' })
   @ApiParam({ name: 'orderReference', format: 'uuid' })
-  @ApiOkResponse({ description: 'Immutable order detail and complete timeline' })
+  @ApiOkResponse({ description: 'Immutable one-shop order detail and timeline' })
   async detail(
     @Req() request: AuthenticatedRequest,
     @Param('orderReference') rawReference: string,

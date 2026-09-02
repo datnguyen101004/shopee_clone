@@ -50,9 +50,9 @@ const order: BuyerOrderSummary = {
       platformVoucherDiscountMinor: 0,
       merchandiseVoucherDiscountMinor: 0,
       payableMerchandiseMinor: 100_000,
-    productName: 'Ghế công thái học',
-    productImageUrl: null,
-    productAvailable: true,
+      productName: 'Ghế công thái học',
+      productImageUrl: null,
+      productAvailable: true,
       variantName: 'Đen',
       variantSku: 'CHAIR-BLACK',
     },
@@ -125,6 +125,29 @@ const detail: BuyerOrderDetailResponse = {
   ],
 };
 
+function orderWith(overrides: Partial<BuyerOrderSummary>): BuyerOrderSummary {
+  return { ...order, ...overrides };
+}
+
+const secondOrder: BuyerOrderSummary = {
+  ...order,
+  orderReference: id('20'),
+  shop: { id: id('21'), slug: 'space-u', name: 'Space U' },
+  lines: [{ ...order.lines[0]!, lineId: id('22'), productName: 'Bàn làm việc' }],
+  shipping: { ...order.shipping, shopId: id('21') },
+};
+const multiProductOrder: BuyerOrderSummary = {
+  ...order,
+  lines: [
+    ...order.lines,
+    {
+      ...order.lines[0]!,
+      lineId: id('23'),
+      productId: id('24'),
+      productName: 'Đèn bàn',
+    },
+  ],
+};
 describe('buyer order-history screens', () => {
   const authenticatedFetch = vi.fn();
   beforeEach(() => {
@@ -169,19 +192,161 @@ describe('buyer order-history screens', () => {
     );
   });
 
+  it('renders one buyer card per shop order while keeping each shop products together', async () => {
+    vi.mocked(getBuyerOrders).mockResolvedValue({
+      orderHistoryVersion: 'order-history-v1',
+      items: [multiProductOrder, secondOrder],
+      page: { limit: 20, nextCursor: null },
+    });
+
+    const rendered = render(<BuyerOrderListScreen filter="ALL" />);
+
+    expect(await screen.findByText('Ghế công thái học')).toBeInTheDocument();
+    expect(screen.getByText('Đèn bàn')).toBeInTheDocument();
+    expect(screen.getByText('Bàn làm việc')).toBeInTheDocument();
+    expect(rendered.container.querySelectorAll('.buyer-order-card')).toHaveLength(2);
+    expect(screen.getAllByRole('link', { name: 'Xem chi tiết' })[0]).toHaveAttribute(
+      'href',
+      `/account/orders/${order.orderReference}`,
+    );
+    expect(screen.getAllByRole('link', { name: 'Xem chi tiết' })[1]).toHaveAttribute(
+      'href',
+      `/account/orders/${secondOrder.orderReference}`,
+    );
+  });
+
+  it('shows the payment state instead of fulfillment for an unsettled online order', async () => {
+    vi.mocked(getBuyerOrders).mockResolvedValue({
+      orderHistoryVersion: 'order-history-v1',
+      items: [orderWith({ status: 'PENDING_PAYMENT', paymentStatus: 'PENDING_RECONCILIATION' })],
+      page: { limit: 20, nextCursor: null },
+    });
+
+    const rendered = render(<BuyerOrderListScreen filter="PENDING_PAYMENT" />);
+
+    expect(await screen.findByText('Ghế công thái học')).toBeInTheDocument();
+    expect(rendered.container.querySelector('.buyer-order-status')).toHaveTextContent(
+      'Chờ thanh toán',
+    );
+    expect(screen.getByText('Thanh toán: Đang xác minh thanh toán')).toBeInTheDocument();
+    expect(screen.queryByText('Thanh toán: Chờ xác nhận')).not.toBeInTheDocument();
+  });
+
+  it('shows cancelled and failed online payments in the cancelled tab with granular labels', async () => {
+    vi.mocked(getBuyerOrders).mockResolvedValue({
+      orderHistoryVersion: 'order-history-v1',
+      items: [
+        orderWith({ status: 'CANCELLED', paymentStatus: 'CANCELLED' }),
+        orderWith({
+          orderReference: id('12'),
+          purchaseReference: id('13'),
+          status: 'CANCELLED',
+          paymentStatus: 'FAILED',
+        }),
+      ],
+      page: { limit: 20, nextCursor: null },
+    });
+
+    render(<BuyerOrderListScreen filter="CANCELLED" />);
+
+    expect(await screen.findByText('Thanh toán: Đã hủy thanh toán')).toBeInTheDocument();
+    expect(screen.getByText('Thanh toán: Thanh toán thất bại')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Đã hủy' })).toHaveAttribute('aria-current', 'page');
+  });
+
+  it('keeps payment and fulfillment labels separate after online payment succeeds', async () => {
+    vi.mocked(getBuyerOrderDetail).mockResolvedValue({
+      ...detail,
+      order: orderWith({ paymentStatus: 'PAID', version: 1 }),
+      timeline: [
+        detail.timeline[0]!,
+        {
+          id: id('11'),
+          previousStatus: 'PENDING_CONFIRMATION',
+          status: 'PENDING_CONFIRMATION',
+          orderVersion: 1,
+          actorType: 'SYSTEM',
+          actorUserId: null,
+          reasonCode: 'VNPAY_PAYMENT_CONFIRMED',
+          reasonNote: null,
+          occurredAt: '2026-08-14T00:00:10.000Z',
+        },
+      ],
+    });
+
+    render(<BuyerOrderDetailScreen orderReference={order.orderReference} />);
+
+    expect(await screen.findByText('Hành trình đơn hàng')).toBeInTheDocument();
+    const journey = screen.getByText('Hành trình đơn hàng').parentElement!;
+    const milestones = Array.from(journey.querySelectorAll('ol strong')).map(
+      (element) => element.textContent,
+    );
+    expect(milestones).toEqual(['Chờ thanh toán', 'Chờ xác nhận']);
+    expect(screen.getByText('Thanh toán: Đã thanh toán')).toBeInTheDocument();
+  });
+
+  it('hides the internal confirmation anchor for a cancelled VNPAY order', async () => {
+    vi.mocked(getBuyerOrderDetail).mockResolvedValue({
+      ...detail,
+      order: orderWith({
+        status: 'CANCELLED',
+        paymentStatus: 'CANCELLED',
+        version: 2,
+        cancellation: { allowed: false, reasonCodes: [] },
+      }),
+      timeline: [
+        detail.timeline[0]!,
+        {
+          id: id('13'),
+          previousStatus: 'PENDING_CONFIRMATION',
+          status: 'PENDING_PAYMENT',
+          orderVersion: 1,
+          actorType: 'SYSTEM',
+          actorUserId: null,
+          reasonCode: 'VNPAY_PAYMENT_PENDING',
+          reasonNote: null,
+          occurredAt: '2026-08-14T00:00:01.000Z',
+        },
+        {
+          id: id('14'),
+          previousStatus: 'PENDING_PAYMENT',
+          status: 'CANCELLED',
+          orderVersion: 2,
+          actorType: 'SYSTEM',
+          actorUserId: null,
+          reasonCode: 'VNPAY_PAYMENT_CANCELLED',
+          reasonNote: null,
+          occurredAt: '2026-08-14T00:00:02.000Z',
+        },
+      ],
+    });
+
+    render(<BuyerOrderDetailScreen orderReference={order.orderReference} />);
+
+    expect(await screen.findByText('Hành trình đơn hàng')).toBeInTheDocument();
+    const journey = screen.getByText('Hành trình đơn hàng').parentElement!;
+    const milestones = Array.from(journey.querySelectorAll('ol strong')).map(
+      (element) => element.textContent,
+    );
+    expect(milestones).toEqual(['Chờ thanh toán', 'Đã hủy']);
+  });
+
   it('keeps a deleted historical product link and explains that the product is unavailable', async () => {
     vi.mocked(getBuyerOrders).mockResolvedValue({
       orderHistoryVersion: 'order-history-v1',
-      items: [{
-        ...order,
-        lines: [{ ...order.lines[0]!, productAvailable: false }],
-      }],
+      items: [
+        orderWith({
+          lines: [{ ...order.lines[0]!, productAvailable: false }],
+        }),
+      ],
       page: { limit: 20, nextCursor: null },
     });
 
     render(<BuyerOrderListScreen filter="PENDING_CONFIRMATION" />);
 
-    const productLink = await screen.findByRole('link', { name: 'Ghế công thái học (sản phẩm đã bị xóa)' });
+    const productLink = await screen.findByRole('link', {
+      name: 'Ghế công thái học (sản phẩm đã bị xóa)',
+    });
     expect(productLink).toHaveAttribute('href', `/products/${order.lines[0]!.productId}`);
     expect(screen.getByText(/Sản phẩm đã bị xóa/)).toBeInTheDocument();
   });
@@ -204,12 +369,11 @@ describe('buyer order-history screens', () => {
     expect(screen.getByRole('button', { name: 'Đang hủy…' })).toBeDisabled();
     resolveCancel({
       ...detail,
-      order: {
-        ...order,
+      order: orderWith({
         status: 'CANCELLED',
         version: 1,
         cancellation: { allowed: false, reasonCodes: [] },
-      },
+      }),
       timeline: [
         ...detail.timeline,
         {
@@ -232,16 +396,26 @@ describe('buyer order-history screens', () => {
   it('only exposes a review action for an eligible delivered line and preserves a stable create flow', async () => {
     const delivered = {
       ...detail,
-      order: {
-        ...order,
+      order: orderWith({
         status: 'DELIVERED' as const,
         cancellation: { allowed: false, reasonCodes: [] },
         lines: [{ ...order.lines[0]!, review: { state: 'ELIGIBLE' as const, reviewId: null } }],
-      },
+      }),
     };
     vi.mocked(getBuyerOrderDetail).mockResolvedValue(delivered);
     vi.mocked(createProductReview).mockResolvedValue({
-      review: { id: id('11'), orderLineId: id('4'), rating: 5, text: 'Tốt', authorName: 'Buyer', verifiedPurchase: true, media: [], updatedAt: '2026-08-15T00:00:00.000Z', visibility: 'VISIBLE', version: 0 },
+      review: {
+        id: id('11'),
+        orderLineId: id('4'),
+        rating: 5,
+        text: 'Tốt',
+        authorName: 'Buyer',
+        verifiedPurchase: true,
+        media: [],
+        updatedAt: '2026-08-15T00:00:00.000Z',
+        visibility: 'VISIBLE',
+        version: 0,
+      },
       etag: '"review-0"',
     });
     const user = userEvent.setup();
@@ -253,6 +427,8 @@ describe('buyer order-history screens', () => {
     expect(screen.getByText('3/1000')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Hoàn thành' }));
     await waitFor(() => expect(createProductReview).toHaveBeenCalledTimes(1));
-    expect(screen.getByText('Đánh giá đã được lưu. Tải lại chi tiết đơn để xem trạng thái mới.')).toBeInTheDocument();
+    expect(
+      screen.getByText('Đánh giá đã được lưu. Tải lại chi tiết đơn để xem trạng thái mới.'),
+    ).toBeInTheDocument();
   });
 });

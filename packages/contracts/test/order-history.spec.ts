@@ -10,76 +10,82 @@ import {
   parseOrderIdempotencyKey,
   parseOrderVersionEtag,
   type BuyerOrderDetailResponse,
+  type BuyerOrderSummary,
 } from '../src';
 
 const id = (suffix: string) => `00000000-0000-4000-8000-${suffix.padStart(12, '0')}`;
 
+function shopOrder(): BuyerOrderSummary {
+  return {
+    orderReference: id('1'),
+    purchaseReference: id('2'),
+    status: 'PENDING_CONFIRMATION',
+    paymentStatus: 'UNPAID',
+    version: 0,
+    createdAt: '2026-08-14T00:00:00.000Z',
+    updatedAt: '2026-08-14T00:00:00.000Z',
+    shop: { id: id('3'), slug: 'space-t', name: 'Space T' },
+    note: '',
+    lines: [
+      {
+        lineId: id('4'),
+        productId: id('5'),
+        variantId: id('6'),
+        quantity: 2,
+        unitWeightGrams: 100,
+        shipmentWeightGrams: 200,
+        listUnitPriceMinor: 120_000,
+        sellingUnitPriceMinor: 100_000,
+        listSubtotalMinor: 240_000,
+        productDiscountMinor: 40_000,
+        merchandiseSubtotalMinor: 200_000,
+        shopVoucherDiscountMinor: 10_000,
+        platformVoucherDiscountMinor: 5_000,
+        merchandiseVoucherDiscountMinor: 15_000,
+        payableMerchandiseMinor: 185_000,
+        productName: 'Sản phẩm',
+        productImageUrl: null,
+        productAvailable: true,
+        variantName: 'Mặc định',
+        variantSku: 'SKU-1',
+      },
+    ],
+    shipping: {
+      provider: 'MOCK',
+      version: 'mock-v1',
+      shopId: id('3'),
+      originProvince: 'Hà Nội',
+      destinationProvince: 'Thành phố Hồ Chí Minh',
+      zone: 'CROSS_REGION',
+      shipmentWeightGrams: 200,
+      service: 'STANDARD',
+      estimatedDaysMin: 2,
+      estimatedDaysMax: 4,
+      baseFeeMinor: 20_000,
+      zoneSurchargeMinor: 10_000,
+      weightSurchargeMinor: 0,
+      shippingFeeMinor: 30_000,
+    },
+    listSubtotalMinor: 240_000,
+    productDiscountMinor: 40_000,
+    merchandiseSubtotalMinor: 200_000,
+    shopVoucherDiscountMinor: 10_000,
+    platformVoucherDiscountMinor: 5_000,
+    merchandiseVoucherDiscountMinor: 15_000,
+    shippingVoucherDiscountMinor: 5_000,
+    voucherDiscountMinor: 20_000,
+    shippingPayableMinor: 25_000,
+    payableTotalMinor: 210_000,
+    cancellation: { allowed: true, reasonCodes: [...ORDER_CANCELLATION_REASON_CODES] },
+  };
+}
+
 function detail(): BuyerOrderDetailResponse {
+  const shop = shopOrder();
   return {
     orderHistoryVersion: 'order-history-v1',
     currency: 'VND',
-    order: {
-      orderReference: id('1'),
-      purchaseReference: id('2'),
-      status: 'PENDING_CONFIRMATION',
-      paymentStatus: 'UNPAID',
-      version: 0,
-      createdAt: '2026-08-14T00:00:00.000Z',
-      updatedAt: '2026-08-14T00:00:00.000Z',
-      shop: { id: id('3'), slug: 'space-t', name: 'Space T' },
-      note: '',
-      lines: [
-        {
-          lineId: id('4'),
-          productId: id('5'),
-          variantId: id('6'),
-          quantity: 2,
-          unitWeightGrams: 100,
-          shipmentWeightGrams: 200,
-          listUnitPriceMinor: 120_000,
-          sellingUnitPriceMinor: 100_000,
-          listSubtotalMinor: 240_000,
-          productDiscountMinor: 40_000,
-          merchandiseSubtotalMinor: 200_000,
-          shopVoucherDiscountMinor: 10_000,
-          platformVoucherDiscountMinor: 5_000,
-          merchandiseVoucherDiscountMinor: 15_000,
-          payableMerchandiseMinor: 185_000,
-          productName: 'Sản phẩm',
-          productImageUrl: null,
-          productAvailable: true,
-          variantName: 'Mặc định',
-          variantSku: 'SKU-1',
-        },
-      ],
-      shipping: {
-        provider: 'MOCK',
-        version: 'mock-v1',
-        shopId: id('3'),
-        originProvince: 'Hà Nội',
-        destinationProvince: 'Thành phố Hồ Chí Minh',
-        zone: 'CROSS_REGION',
-        shipmentWeightGrams: 200,
-        service: 'STANDARD',
-        estimatedDaysMin: 2,
-        estimatedDaysMax: 4,
-        baseFeeMinor: 20_000,
-        zoneSurchargeMinor: 10_000,
-        weightSurchargeMinor: 0,
-        shippingFeeMinor: 30_000,
-      },
-      listSubtotalMinor: 240_000,
-      productDiscountMinor: 40_000,
-      merchandiseSubtotalMinor: 200_000,
-      shopVoucherDiscountMinor: 10_000,
-      platformVoucherDiscountMinor: 5_000,
-      merchandiseVoucherDiscountMinor: 15_000,
-      shippingVoucherDiscountMinor: 5_000,
-      voucherDiscountMinor: 20_000,
-      shippingPayableMinor: 25_000,
-      payableTotalMinor: 210_000,
-      cancellation: { allowed: true, reasonCodes: [...ORDER_CANCELLATION_REASON_CODES] },
-    },
+    order: shop,
     address: {
       id: id('7'),
       recipientName: 'Nguyễn Văn A',
@@ -149,9 +155,18 @@ describe('buyer order-history contracts', () => {
     expect(parseOrderIdempotencyKey('not-a-uuid')).toBeNull();
   });
 
-  it('validates exact list/detail snapshots and timeline continuity', () => {
+  it('validates a one-shop buyer order snapshot and timeline continuity', () => {
     const valid = detail();
     expect(isBuyerOrderDetailResponse(valid)).toBe(true);
+    expect(
+      isBuyerOrderDetailResponse({
+        ...valid,
+        order: { ...valid.order, paymentStatus: 'PENDING_RECONCILIATION' },
+      }),
+    ).toBe(true);
+    expect(
+      isBuyerOrderDetailResponse({ ...valid, order: { ...valid.order, paymentStatus: 'PAID' } }),
+    ).toBe(true);
     expect(
       isBuyerOrderListResponse({
         orderHistoryVersion: 'order-history-v1',
@@ -159,6 +174,24 @@ describe('buyer order-history contracts', () => {
         page: { limit: 20, nextCursor: null },
       }),
     ).toBe(true);
+    const pendingToConfirmed = {
+      ...valid,
+      order: { ...valid.order, version: 1 },
+      timeline: [
+        {
+          ...valid.timeline[0]!,
+          status: 'PENDING_PAYMENT' as const,
+        },
+        {
+          ...valid.timeline[0]!,
+          id: id('9'),
+          previousStatus: 'PENDING_PAYMENT' as const,
+          status: 'PENDING_CONFIRMATION' as const,
+          orderVersion: 1,
+        },
+      ],
+    };
+    expect(isBuyerOrderDetailResponse(pendingToConfirmed)).toBe(true);
     expect(isBuyerOrderDetailResponse({ ...valid, extra: true })).toBe(false);
     expect(
       isBuyerOrderDetailResponse({ ...valid, order: { ...valid.order, payableTotalMinor: 0 } }),
@@ -174,14 +207,25 @@ describe('buyer order-history contracts', () => {
         ...valid,
         order: {
           ...valid.order,
-          inventoryHold: { status: 'EXPIRED', expiresAt: '2026-08-14T00:15:00.000Z', terminalReason: 'expired' },
+          inventoryHold: {
+            status: 'EXPIRED',
+            expiresAt: '2026-08-14T00:15:00.000Z',
+            terminalReason: 'expired',
+          },
         },
       }),
     ).toBe(true);
     expect(
       isBuyerOrderDetailResponse({
         ...valid,
-        order: { ...valid.order, inventoryHold: { status: 'ACTIVE', expiresAt: 'not-an-instant', terminalReason: null } },
+        order: {
+          ...valid.order,
+          inventoryHold: {
+            status: 'ACTIVE',
+            expiresAt: 'not-an-instant',
+            terminalReason: null,
+          },
+        },
       }),
     ).toBe(false);
   });

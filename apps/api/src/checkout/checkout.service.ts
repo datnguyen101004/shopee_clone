@@ -48,10 +48,10 @@ const MAX_SERIALIZABLE_ATTEMPTS = 3;
 
 const onlinePurchaseInclude = {
   ...purchaseInclude,
-  paymentAttempt: true,
+  paymentAttempts: { orderBy: { createdAt: 'desc' as const }, take: 1 },
 } satisfies Prisma.PurchaseInclude;
 
-export interface MomoPendingIntent {
+export interface OnlinePendingIntent {
   replayed: boolean;
   purchase: PurchaseResult;
   attempt: {
@@ -61,11 +61,15 @@ export interface MomoPendingIntent {
     requestId: string;
     amountMinor: bigint;
     expiresAt: Date;
+    createdAt: Date;
+    providerCreatedAt: Date | null;
   };
 }
 
-function momoRequestDigest(baseDigest: string): string {
-  return createHash('sha256').update(`MOMO:${baseDigest}`).digest('hex');
+export type MomoPendingIntent = OnlinePendingIntent;
+
+function onlineRequestDigest(baseDigest: string, provider: 'MOMO' | 'VNPAY'): string {
+  return createHash('sha256').update(`${provider}:${baseDigest}`).digest('hex');
 }
 
 function isRetryableTransactionError(error: unknown): boolean {
@@ -227,15 +231,17 @@ export class CheckoutService {
     throw new CheckoutUnavailableError();
   }
 
-  async createMomoPendingIntent(
+  async createOnlinePendingIntent(
     userId: string,
     expectedVersion: number,
     idempotencyKey: string,
     input: CheckoutConfirmationRequest,
+    provider: 'MOMO' | 'VNPAY',
     paymentTtlSeconds: number,
-  ): Promise<MomoPendingIntent> {
-    const requestDigest = momoRequestDigest(
+  ): Promise<OnlinePendingIntent> {
+    const requestDigest = onlineRequestDigest(
       confirmationRequestDigest(userId, expectedVersion, input),
+      provider,
     );
     for (let attempt = 1; attempt <= MAX_SERIALIZABLE_ATTEMPTS; attempt += 1) {
       try {
@@ -252,15 +258,15 @@ export class CheckoutService {
             if (existing) {
               if (
                 existing.requestDigest !== requestDigest ||
-                existing.paymentMethod !== 'MOMO' ||
-                !existing.paymentAttempt
+                existing.paymentMethod !== provider ||
+                !existing.paymentAttempts[0]
               ) {
                 throw new CheckoutIdempotencyConflictError();
               }
               return {
                 replayed: true,
                 purchase: this.projector.project(existing),
-                attempt: existing.paymentAttempt,
+                attempt: existing.paymentAttempts[0],
               };
             }
 
@@ -283,7 +289,7 @@ export class CheckoutService {
               idempotencyKey,
               requestDigest,
               confirmation: input,
-              paymentMethod: 'MOMO',
+              paymentMethod: provider,
               paymentStatus: 'PENDING',
             });
             const settlement = await transaction.purchase.findUniqueOrThrow({
@@ -297,10 +303,12 @@ export class CheckoutService {
               (total, order) => total + order.payableTotalMinor,
               0n,
             );
+            const minimumOnlineAmount = provider === 'VNPAY' ? 5_000n : 1_000n;
+            const maximumOnlineAmount = provider === 'VNPAY' ? 500_000_000n : 50_000_000n;
             if (
               shopPayableTotalMinor !== settlement.payableTotalMinor ||
-              settlement.payableTotalMinor < 1_000n ||
-              settlement.payableTotalMinor > 50_000_000n
+              settlement.payableTotalMinor < minimumOnlineAmount ||
+              settlement.payableTotalMinor > maximumOnlineAmount
             ) {
               throw new CheckoutNotReadyError();
             }
@@ -324,14 +332,17 @@ export class CheckoutService {
                 id: paymentAttemptId,
                 publicReference: randomUUID(),
                 purchaseId: built.purchaseId,
-                provider: 'MOMO',
+                provider,
                 environment: 'SANDBOX',
-                orderId: `momo_${built.purchaseId.replaceAll('-', '')}`,
-                requestId: `req_${paymentAttemptId.replaceAll('-', '')}`,
+                orderId: `${provider.toLowerCase()}${paymentAttemptId.replaceAll('-', '')}`,
+                requestId: `req${paymentAttemptId.replaceAll('-', '')}`,
                 amountMinor: settlement.payableTotalMinor,
                 currency: 'VND',
                 status: 'PENDING',
                 lastResultClass: 'PENDING',
+                providerCreatedAt: now,
+                idempotencyKey,
+                requestDigest,
                 expiresAt,
               },
             });
@@ -393,6 +404,40 @@ export class CheckoutService {
       }
     }
     throw new CheckoutUnavailableError();
+  }
+
+  async createMomoPendingIntent(
+    userId: string,
+    expectedVersion: number,
+    idempotencyKey: string,
+    input: CheckoutConfirmationRequest,
+    paymentTtlSeconds: number,
+  ): Promise<MomoPendingIntent> {
+    return this.createOnlinePendingIntent(
+      userId,
+      expectedVersion,
+      idempotencyKey,
+      input,
+      'MOMO',
+      paymentTtlSeconds,
+    );
+  }
+
+  async createVnpayPendingIntent(
+    userId: string,
+    expectedVersion: number,
+    idempotencyKey: string,
+    input: CheckoutConfirmationRequest,
+    paymentTtlSeconds: number,
+  ): Promise<OnlinePendingIntent> {
+    return this.createOnlinePendingIntent(
+      userId,
+      expectedVersion,
+      idempotencyKey,
+      input,
+      'VNPAY',
+      paymentTtlSeconds,
+    );
   }
 
   async getPurchase(userId: string, purchaseReference: string): Promise<PurchaseResult> {
@@ -466,7 +511,7 @@ export class CheckoutService {
       },
     });
     if (!purchase) throw new CheckoutPurchaseNotFoundError();
-    if (purchase.paymentMethod === 'MOMO') return { released: false };
+    if (purchase.paymentMethod !== 'COD') return { released: false };
     const reservation = purchase.inventoryReservation;
     if (!reservation || reservation.status !== 'ACTIVE') return { released: false };
     await this.inventory.release(reservation.id, 'payment-failed', purchaseReference);

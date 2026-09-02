@@ -36,6 +36,7 @@
     "reviews:media:cleanup": "tsx scripts/cleanup-review-media.ts",
     "seller-products:media:cleanup": "tsx scripts/cleanup-seller-product-media.ts",
     "reviews:aggregates:repair": "tsx scripts/repair-review-aggregates.ts",
+    "orders:repair:vnpay-timeline": "tsx prisma/repair-vnpay-order-timelines.ts",
     "seller-analytics:benchmark": "tsx scripts/benchmark-seller-analytics.ts",
     "reporting:rate-limit:cleanup": "tsx scripts/cleanup-report-rate-limits.ts",
     "chat:safety:cleanup": "tsx scripts/cleanup-chat-safety.ts",

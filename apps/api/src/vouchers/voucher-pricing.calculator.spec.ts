@@ -39,7 +39,13 @@ const snapshot: AuthoritativePricingSnapshot = {
       unitWeightGrams: 300,
       sellingUnitPriceMinor: 100_000n,
       compareAtUnitPriceMinor: 120_000n,
-      shop: { id: shopA, ownerUserId: '00000000-0000-4000-8000-000000000501', slug: 'shop-a', name: 'Shop A', location: 'TP. Hồ Chí Minh' },
+      shop: {
+        id: shopA,
+        ownerUserId: '00000000-0000-4000-8000-000000000501',
+        slug: 'shop-a',
+        name: 'Shop A',
+        location: 'TP. Hồ Chí Minh',
+      },
     },
     {
       lineId: lineB,
@@ -49,7 +55,13 @@ const snapshot: AuthoritativePricingSnapshot = {
       unitWeightGrams: 1_200,
       sellingUnitPriceMinor: 50_000n,
       compareAtUnitPriceMinor: null,
-      shop: { id: shopB, ownerUserId: '00000000-0000-4000-8000-000000000502', slug: 'shop-b', name: 'Shop B', location: 'Hà Nội' },
+      shop: {
+        id: shopB,
+        ownerUserId: '00000000-0000-4000-8000-000000000502',
+        slug: 'shop-b',
+        name: 'Shop B',
+        location: 'Hà Nội',
+      },
     },
   ],
   exclusions: [],
@@ -194,6 +206,28 @@ describe('voucher pricing calculator', () => {
         estimatedDiscountMinor: 20_000,
         remainingCount: 1,
       },
+    ]);
+  });
+
+  it('treats active voucher holds as consumed capacity', () => {
+    const quote = baseCalculator.calculate(snapshot);
+    const held = definition({
+      id: '00000000-0000-4000-8000-000000000605',
+      code: 'PLATFORM-HELD',
+      fixedAmountMinor: 25_000,
+      usageLimit: 1,
+      heldCount: 1,
+      buyerHeldCount: 1,
+    });
+
+    expect(listAvailablePlatformVouchers(quote, [held], evaluatedAt)).toEqual([]);
+    const result = calculator.apply(quote, { platformCode: held.code }, [held], evaluatedAt);
+    expect(result.quote.vouchers).toEqual([
+      expect.objectContaining({
+        code: held.code,
+        status: 'REJECTED',
+        rejectionReason: 'GLOBAL_LIMIT_REACHED',
+      }),
     ]);
   });
 

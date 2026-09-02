@@ -38,6 +38,41 @@ describe('FakePaymentProvider', () => {
     expect(provider.createCalls).toEqual([createCommand]);
   });
 
+  it('supports provider-neutral VNPAY redirect fixtures without MoMo deeplinks', async () => {
+    const provider = new FakePaymentProvider();
+    const vnpay: CreatePaymentCommand = {
+      provider: 'VNPAY',
+      environment: 'SANDBOX',
+      orderId: 'vnpay_attempt_1',
+      requestId: 'vnpay_request_1',
+      amountMinor: 10_000n,
+      currency: 'VND',
+      orderInfo: 'Sandbox order',
+      redirectUrl: 'http://localhost:3000/payment/callback',
+      ipnUrl: 'https://example.ngrok-free.app/api/v1/payment-providers/vnpay/ipn',
+      expiresAt: new Date('2026-08-29T00:00:00.000Z'),
+    };
+    const result = await provider.createPayment(vnpay);
+    expect(result.instructions).toMatchObject({
+      payUrl: 'https://sandbox.vnpayment.vn/paymentv2/vpcpay.html?fake=vnpay_attempt_1',
+      deeplink: null,
+      qrCodeUrl: null,
+    });
+    expect(
+      provider.verifyNotification({
+        fields: {
+          vnp_Amount: '1000000',
+          vnp_ResponseCode: '00',
+          vnp_TransactionNo: '7000001',
+          vnp_TransactionStatus: '00',
+          vnp_TxnRef: vnpay.orderId,
+        },
+        signature: FAKE_NOTIFICATION_SIGNATURE,
+        receivedAt: new Date(),
+      }),
+    ).toMatchObject({ valid: true });
+  });
+
   it.each([
     ['FAILURE', 99],
     ['CANCELLED', 1017],
@@ -157,9 +192,7 @@ describe('FakePaymentProvider', () => {
   it('preserves an explicitly configured provider transaction id', async () => {
     const provider = new FakePaymentProvider({
       create: { outcome: 'SUCCESS', providerTransactionId: 42n },
-      notifications: [
-        { outcome: 'SUCCESS', deliverAfterMs: 0, providerTransactionId: 42n },
-      ],
+      notifications: [{ outcome: 'SUCCESS', deliverAfterMs: 0, providerTransactionId: 42n }],
     });
 
     await expect(provider.createPayment(createCommand)).resolves.toMatchObject({

@@ -344,6 +344,27 @@ describe('checkout screens', () => {
     );
   });
 
+  it('uses VNPAY branding when the payment status belongs to VNPAY', async () => {
+    vi.mocked(getPaymentStatus).mockResolvedValue({
+      paymentReference: purchaseReference,
+      purchaseReference,
+      provider: 'VNPAY',
+      paymentMethod: 'VNPAY',
+      status: 'PAID',
+      amountMinor: 122_000,
+      currency: 'VND',
+      expiresAt: new Date(Date.now() + 60_000).toISOString(),
+      nextAction: 'DONE',
+      instructions: null,
+    });
+
+    render(<MomoPaymentScreen paymentReference={purchaseReference} />);
+
+    expect(await screen.findByRole('heading', { name: 'Thanh toán VNPAY thành công' })).toBeVisible();
+    expect(screen.getByText('VNPAY SANDBOX')).toBeVisible();
+    expect(screen.queryByText('MOMO SANDBOX')).not.toBeInTheDocument();
+  });
+
   it('reloads and displays immutable child-order snapshots on success', async () => {
     vi.mocked(getCheckoutPurchase).mockResolvedValue(purchase);
     render(<PurchaseSuccessScreen purchaseReference={purchaseReference} />);

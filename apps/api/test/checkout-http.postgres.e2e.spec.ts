@@ -33,7 +33,8 @@ import {
   FakePaymentProvider,
 } from '../src/payments/fake-payment-provider';
 import { OnlinePaymentService } from '../src/payments/online-payment.service';
-import { PAYMENT_PROVIDER } from '../src/payments/payment-provider.port';
+import { PAYMENT_PROVIDER, VNPAY_PROVIDER } from '../src/payments/payment-provider.port';
+import { VNPAY_CONFIG } from '../src/payments/vnpay.config';
 import { ProviderTimeoutError } from '../src/payments/payment-result';
 import { PaymentObservationService } from '../src/payments/payment-observation.service';
 import { PaymentReconciliationService } from '../src/payments/payment-reconciliation.service';
@@ -190,6 +191,21 @@ databaseTest('authenticated COD checkout HTTP with PostgreSQL', () => {
       })
       .overrideProvider(PAYMENT_PROVIDER)
       .useValue(fakePaymentProvider)
+      .overrideProvider(VNPAY_CONFIG)
+      .useValue({
+        enabled: true,
+        environment: 'SANDBOX',
+        tmnCode: 'TEST_TMN',
+        hashSecret: 'test-secret',
+        payUrl: 'https://sandbox.vnpayment.vn/paymentv2/vpcpay.html',
+        returnUrl: 'http://localhost:3000/payment/callback',
+        ipnUrl: 'https://payments.example.test/api/v1/payment-providers/vnpay/ipn',
+        apiUrl: 'https://sandbox.vnpayment.vn/merchant_webapi/api/transaction',
+        paymentTtlSeconds: 900,
+        httpTimeoutMs: 30_000,
+      })
+      .overrideProvider(VNPAY_PROVIDER)
+      .useValue(fakePaymentProvider)
       .compile();
     app = moduleRef.createNestApplication();
     configureApplication(app, loadAuthConfig({ NODE_ENV: 'test' }));
@@ -313,7 +329,9 @@ databaseTest('authenticated COD checkout HTTP with PostgreSQL', () => {
       await cleanupPurchases();
       await prisma.cartLine.deleteMany({ where: { cartId } });
       await prisma.cart.deleteMany({ where: { id: cartId } });
-      await prisma.voucherUserUsage.deleteMany({ where: { voucherId } });
+      await prisma.voucherUserUsage.deleteMany({
+        where: { userId: { in: [buyerId, foreignBuyerId] } },
+      });
       await prisma.voucher.deleteMany({ where: { id: voucherId } });
       await prisma.shippingAddress.deleteMany({
         where: { id: { in: [addressId, foreignAddressId] } },
@@ -321,7 +339,7 @@ databaseTest('authenticated COD checkout HTTP with PostgreSQL', () => {
       await prisma.user.deleteMany({ where: { id: { in: [buyerId, foreignBuyerId] } } });
     }
     await app?.close();
-  });
+  }, 30_000);
 
   function previewBody() {
     return {
@@ -385,7 +403,11 @@ databaseTest('authenticated COD checkout HTTP with PostgreSQL', () => {
     expect(replayed.body).toMatchObject({ replayed: true });
     expect(replayed.body.purchase.purchaseReference).toBe(created.body.purchase.purchaseReference);
     expect(await prisma.purchase.count({ where: { buyerId } })).toBe(1);
-    expect(await prisma.voucherRedemption.count({ where: { userId: buyerId } })).toBe(1);
+    expect(await prisma.voucherRedemption.count({ where: { userId: buyerId } })).toBe(
+      created.body.purchase.vouchers.filter(
+        (voucher: { status: string }) => voucher.status === 'APPLIED',
+      ).length,
+    );
     const linkedVoucher = await prisma.purchaseVoucher.findFirstOrThrow({
       where: { purchaseId: created.body.purchase.purchaseReference },
       include: { redemption: true, allocations: true },
@@ -444,12 +466,12 @@ databaseTest('authenticated COD checkout HTTP with PostgreSQL', () => {
     ).toBe(1);
     const paymentGraph = await prisma.purchase.findUniqueOrThrow({
       where: { id: created.purchase.purchaseReference },
-      include: { paymentAttempt: true, orders: true },
+      include: { paymentAttempts: true, orders: true },
     });
-    expect(paymentGraph.paymentAttempt?.amountMinor).toBe(paymentGraph.payableTotalMinor);
-    expect(
-      paymentGraph.orders.reduce((total, order) => total + order.payableTotalMinor, 0n),
-    ).toBe(paymentGraph.payableTotalMinor);
+    expect(paymentGraph.paymentAttempts[0]?.amountMinor).toBe(paymentGraph.payableTotalMinor);
+    expect(paymentGraph.orders.reduce((total, order) => total + order.payableTotalMinor, 0n)).toBe(
+      paymentGraph.payableTotalMinor,
+    );
     expect(await prisma.voucherConsumption.count({ where: { userId: buyerId } })).toBe(0);
     expect(await prisma.voucherRedemption.count({ where: { userId: buyerId } })).toBe(0);
     expect((await prisma.voucher.findUniqueOrThrow({ where: { id: voucherId } })).usedCount).toBe(
@@ -511,24 +533,20 @@ databaseTest('authenticated COD checkout HTTP with PostgreSQL', () => {
     if (!confirmation) throw new Error('Expected a valid normalized confirmation');
 
     const originalCreate = fakePaymentProvider.createPayment.bind(fakePaymentProvider);
-    jest
-      .spyOn(fakePaymentProvider, 'createPayment')
-      .mockImplementationOnce(async (command) => {
-        expect(await prisma.purchase.count({ where: { buyerId } })).toBe(1);
-        expect(
-          await prisma.paymentAttempt.count({
-            where: { orderId: command.orderId, status: 'PENDING' },
-          }),
-        ).toBe(1);
-        return originalCreate(command);
-      });
+    jest.spyOn(fakePaymentProvider, 'createPayment').mockImplementationOnce(async (command) => {
+      expect(await prisma.purchase.count({ where: { buyerId } })).toBe(1);
+      expect(
+        await prisma.paymentAttempt.count({
+          where: { orderId: command.orderId, status: 'PENDING' },
+        }),
+      ).toBe(1);
+      return originalCreate(command);
+    });
 
-    const result = await onlinePaymentService.checkoutWithMomo(
-      buyerId,
-      2,
-      idempotencyKey,
-      { ...confirmation, provider: 'MOMO' },
-    );
+    const result = await onlinePaymentService.checkoutWithMomo(buyerId, 2, idempotencyKey, {
+      ...confirmation,
+      provider: 'MOMO',
+    });
 
     expect(result).toMatchObject({
       replayed: false,
@@ -544,7 +562,7 @@ databaseTest('authenticated COD checkout HTTP with PostgreSQL', () => {
       },
     });
     expect(fakePaymentProvider.createCalls).toHaveLength(1);
-    const attempt = await prisma.paymentAttempt.findUniqueOrThrow({
+    const attempt = await prisma.paymentAttempt.findFirstOrThrow({
       where: { purchaseId: result.purchase.purchaseReference },
     });
     expect(attempt.createRequestedAt).not.toBeNull();
@@ -569,12 +587,10 @@ databaseTest('authenticated COD checkout HTTP with PostgreSQL', () => {
       .spyOn(fakePaymentProvider, 'createPayment')
       .mockRejectedValueOnce(new ProviderTimeoutError('forced timeout'));
 
-    const result = await onlinePaymentService.checkoutWithMomo(
-      buyerId,
-      2,
-      idempotencyKey,
-      { ...confirmation, provider: 'MOMO' },
-    );
+    const result = await onlinePaymentService.checkoutWithMomo(buyerId, 2, idempotencyKey, {
+      ...confirmation,
+      provider: 'MOMO',
+    });
 
     expect(result).toMatchObject({
       purchase: { paymentStatus: 'PENDING_RECONCILIATION' },
@@ -584,7 +600,7 @@ databaseTest('authenticated COD checkout HTTP with PostgreSQL', () => {
         instructions: null,
       },
     });
-    const attempt = await prisma.paymentAttempt.findUniqueOrThrow({
+    const attempt = await prisma.paymentAttempt.findFirstOrThrow({
       where: { purchaseId: result.purchase.purchaseReference },
     });
     expect(attempt).toMatchObject({
@@ -601,7 +617,6 @@ databaseTest('authenticated COD checkout HTTP with PostgreSQL', () => {
         },
       }),
     ).toBe(2);
-
   });
 
   it('does not let a late create response downgrade an already paid purchase', async () => {
@@ -618,41 +633,37 @@ databaseTest('authenticated COD checkout HTTP with PostgreSQL', () => {
     });
     if (!confirmation) throw new Error('Expected a valid normalized confirmation');
     const originalCreate = fakePaymentProvider.createPayment.bind(fakePaymentProvider);
-    jest
-      .spyOn(fakePaymentProvider, 'createPayment')
-      .mockImplementationOnce(async (command) => {
-        const attempt = await prisma.paymentAttempt.findUniqueOrThrow({
-          where: { provider_orderId: { provider: 'MOMO', orderId: command.orderId } },
-        });
-        await prisma.$transaction([
-          prisma.paymentAttempt.update({
-            where: { id: attempt.id },
-            data: { status: 'PAID', version: { increment: 1 } },
-          }),
-          prisma.purchase.update({
-            where: { id: attempt.purchaseId },
-            data: { paymentStatus: 'PAID' },
-          }),
-          prisma.shopOrder.updateMany({
-            where: { purchaseId: attempt.purchaseId },
-            data: { paymentStatus: 'PAID' },
-          }),
-        ]);
-        return originalCreate(command);
+    jest.spyOn(fakePaymentProvider, 'createPayment').mockImplementationOnce(async (command) => {
+      const attempt = await prisma.paymentAttempt.findUniqueOrThrow({
+        where: { provider_orderId: { provider: 'MOMO', orderId: command.orderId } },
       });
+      await prisma.$transaction([
+        prisma.paymentAttempt.update({
+          where: { id: attempt.id },
+          data: { status: 'PAID', version: { increment: 1 } },
+        }),
+        prisma.purchase.update({
+          where: { id: attempt.purchaseId },
+          data: { paymentStatus: 'PAID' },
+        }),
+        prisma.shopOrder.updateMany({
+          where: { purchaseId: attempt.purchaseId },
+          data: { paymentStatus: 'PAID' },
+        }),
+      ]);
+      return originalCreate(command);
+    });
 
-    const result = await onlinePaymentService.checkoutWithMomo(
-      buyerId,
-      2,
-      idempotencyKey,
-      { ...confirmation, provider: 'MOMO' },
-    );
+    const result = await onlinePaymentService.checkoutWithMomo(buyerId, 2, idempotencyKey, {
+      ...confirmation,
+      provider: 'MOMO',
+    });
 
     expect(result).toMatchObject({
       purchase: { paymentStatus: 'PAID' },
       payment: { status: 'PAID', nextAction: 'DONE', instructions: null },
     });
-    const attempt = await prisma.paymentAttempt.findUniqueOrThrow({
+    const attempt = await prisma.paymentAttempt.findFirstOrThrow({
       where: { purchaseId: result.purchase.purchaseReference },
     });
     expect(attempt.status).toBe('PAID');
@@ -687,9 +698,9 @@ databaseTest('authenticated COD checkout HTTP with PostgreSQL', () => {
     expect(fakePaymentProvider.createCalls).toHaveLength(2);
     expect(new Set(fakePaymentProvider.createCalls.map(({ orderId }) => orderId)).size).toBe(1);
     expect(new Set(fakePaymentProvider.createCalls.map(({ requestId }) => requestId)).size).toBe(1);
-    expect(new Set(fakePaymentProvider.createCalls.map(({ amountMinor }) => amountMinor)).size).toBe(
-      1,
-    );
+    expect(
+      new Set(fakePaymentProvider.createCalls.map(({ amountMinor }) => amountMinor)).size,
+    ).toBe(1);
   });
 
   it('applies, deduplicates, and prevents regression for provider observations', async () => {
@@ -747,9 +758,7 @@ databaseTest('authenticated COD checkout HTTP with PostgreSQL', () => {
       observation: { ...paidObservation, resultCode: 1000, observedAt: new Date() },
     });
     expect(stale).toMatchObject({ decision: 'IGNORED', status: 'PAID' });
-    expect(
-      await prisma.paymentEvent.count({ where: { attemptId: intent.attempt.id } }),
-    ).toBe(2);
+    expect(await prisma.paymentEvent.count({ where: { attemptId: intent.attempt.id } })).toBe(2);
     expect(
       await prisma.shopOrder.count({
         where: { purchaseId: intent.purchase.purchaseReference, paymentStatus: 'PAID' },
@@ -764,9 +773,11 @@ databaseTest('authenticated COD checkout HTTP with PostgreSQL', () => {
       terminalReason: 'checkout-completed',
       terminalIdempotencyKey: intent.attempt.id,
     });
-    expect(await prisma.voucherConsumption.count({
-      where: { purchaseReference: intent.purchase.purchaseReference },
-    })).toBe(1);
+    expect(
+      await prisma.voucherConsumption.count({
+        where: { purchaseReference: intent.purchase.purchaseReference },
+      }),
+    ).toBe(1);
     expect((await prisma.voucher.findUniqueOrThrow({ where: { id: voucherId } })).usedCount).toBe(
       1,
     );
@@ -927,9 +938,11 @@ databaseTest('authenticated COD checkout HTTP with PostgreSQL', () => {
         },
       }),
     ).toBe(2);
-    expect(await prisma.voucherConsumption.count({
-      where: { purchaseReference: intent.purchase.purchaseReference },
-    })).toBe(0);
+    expect(
+      await prisma.voucherConsumption.count({
+        where: { purchaseReference: intent.purchase.purchaseReference },
+      }),
+    ).toBe(0);
     expect((await prisma.voucher.findUniqueOrThrow({ where: { id: voucherId } })).usedCount).toBe(
       0,
     );
@@ -1180,14 +1193,15 @@ databaseTest('authenticated COD checkout HTTP with PostgreSQL', () => {
       checkoutFingerprint: previewResponse.body.checkoutFingerprint as string,
     });
     if (!confirmation) throw new Error('Expected a valid normalized confirmation');
-    const checkout = await onlinePaymentService.checkoutWithMomo(
-      buyerId,
-      2,
-      idempotencyKey,
-      { ...confirmation, provider: 'MOMO' },
-    );
-    await prisma.paymentAttempt.update({
+    const checkout = await onlinePaymentService.checkoutWithMomo(buyerId, 2, idempotencyKey, {
+      ...confirmation,
+      provider: 'MOMO',
+    });
+    const attemptForReconcile = await prisma.paymentAttempt.findFirstOrThrow({
       where: { purchaseId: checkout.purchase.purchaseReference },
+    });
+    await prisma.paymentAttempt.update({
+      where: { id: attemptForReconcile.id },
       data: { nextReconcileAt: new Date(0) },
     });
 
@@ -1199,7 +1213,7 @@ databaseTest('authenticated COD checkout HTTP with PostgreSQL', () => {
     expect(claimed.reduce((total, value) => total + value, 0)).toBe(1);
     expect(fakePaymentProvider.queryCalls).toHaveLength(1);
     expect(
-      await prisma.paymentAttempt.findUniqueOrThrow({
+      await prisma.paymentAttempt.findFirstOrThrow({
         where: { purchaseId: checkout.purchase.purchaseReference },
       }),
     ).toMatchObject({
@@ -1256,6 +1270,125 @@ databaseTest('authenticated COD checkout HTTP with PostgreSQL', () => {
         select: { status: true },
       }),
     ).toEqual({ status: 'ACTIVE' });
+  });
+
+  it('creates VNPAY orders with a contract-valid pending-payment timeline', async () => {
+    const previewResponse = await request(app.getHttpServer())
+      .post('/api/v1/checkout/preview')
+      .set('Authorization', buyerBearer)
+      .set('Origin', 'http://localhost:3000')
+      .set('If-Match', '"cart-2"')
+      .send(previewBody())
+      .expect(200);
+
+    const created = await request(app.getHttpServer())
+      .post('/api/v1/checkout/online-payments')
+      .set('Authorization', buyerBearer)
+      .set('Origin', 'http://localhost:3000')
+      .set('If-Match', '"cart-2"')
+      .set('Idempotency-Key', idempotencyKey)
+      .send({
+        ...previewBody(),
+        checkoutFingerprint: previewResponse.body.checkoutFingerprint,
+        provider: 'VNPAY',
+      })
+      .expect(201);
+
+    expect(isOnlinePaymentCheckoutResponse(created.body)).toBe(true);
+    expect(created.body.payment).toMatchObject({
+      provider: 'VNPAY',
+      status: 'PENDING',
+      nextAction: 'OPEN_VNPAY',
+    });
+
+    const orders = await prisma.shopOrder.findMany({
+      where: { purchaseId: created.body.purchase.purchaseReference },
+      orderBy: { id: 'asc' },
+      include: { timelineEvents: { orderBy: { orderVersion: 'asc' } } },
+    });
+    expect(orders).toHaveLength(2);
+    for (const order of orders) {
+      expect(order.status).toBe('PENDING_PAYMENT');
+      expect(order.version).toBe(1);
+      expect(order.timelineEvents.map((event) => [event.orderVersion, event.status])).toEqual([
+        [0, 'PENDING_CONFIRMATION'],
+        [1, 'PENDING_PAYMENT'],
+      ]);
+      expect(order.timelineEvents[1]).toMatchObject({
+        previousStatus: 'PENDING_CONFIRMATION',
+        reasonCode: 'VNPAY_PAYMENT_PENDING',
+      });
+    }
+  });
+
+  it('cancels every VNPAY shop order immediately after a signed cancellation IPN', async () => {
+    const previewResponse = await request(app.getHttpServer())
+      .post('/api/v1/checkout/preview')
+      .set('Authorization', buyerBearer)
+      .set('Origin', 'http://localhost:3000')
+      .set('If-Match', '"cart-2"')
+      .send(previewBody())
+      .expect(200);
+    const created = await request(app.getHttpServer())
+      .post('/api/v1/checkout/online-payments')
+      .set('Authorization', buyerBearer)
+      .set('Origin', 'http://localhost:3000')
+      .set('If-Match', '"cart-2"')
+      .set('Idempotency-Key', idempotencyKey)
+      .send({
+        ...previewBody(),
+        checkoutFingerprint: previewResponse.body.checkoutFingerprint,
+        provider: 'VNPAY',
+      })
+      .expect(201);
+    const createCall = fakePaymentProvider.createCalls.at(-1);
+    if (!createCall) throw new Error('Expected a VNPAY create call.');
+    const attempt = await prisma.paymentAttempt.findFirstOrThrow({
+      where: { purchaseId: created.body.purchase.purchaseReference },
+      select: { providerTransactionId: true },
+    });
+
+    const startedAt = Date.now();
+    const ipnFields = {
+      vnp_TmnCode: 'TEST_TMN',
+      vnp_TxnRef: createCall.orderId,
+      vnp_Amount: String(createCall.amountMinor * 100n),
+      vnp_ResponseCode: '24',
+      vnp_TransactionStatus: '02',
+      vnp_TransactionNo: String(attempt.providerTransactionId ?? 123456n),
+      vnp_SecureHash: FAKE_NOTIFICATION_SIGNATURE,
+    };
+    const ipn = await request(app.getHttpServer())
+      .get('/api/v1/payment-providers/vnpay/ipn')
+      .query(ipnFields)
+      .expect(200);
+    const elapsedMs = Date.now() - startedAt;
+    console.log(`VNPAY cancellation IPN finalized in ${elapsedMs} ms`);
+    expect(elapsedMs).toBeLessThan(2_000);
+    expect(ipn.body).toEqual({ RspCode: '00', Message: 'Confirm Success' });
+
+    const orders = await prisma.shopOrder.findMany({
+      where: { purchaseId: created.body.purchase.purchaseReference },
+      select: { status: true, paymentStatus: true, version: true },
+    });
+    expect(orders).toHaveLength(2);
+    expect(orders).toEqual([
+      { status: 'CANCELLED', paymentStatus: 'CANCELLED', version: 2 },
+      { status: 'CANCELLED', paymentStatus: 'CANCELLED', version: 2 },
+    ]);
+
+    const paymentStatus = await request(app.getHttpServer())
+      .get(`/api/v1/payments/${created.body.payment.paymentReference}`)
+      .set('Authorization', buyerBearer)
+      .expect(200);
+    expect(paymentStatus.body).toMatchObject({
+      status: 'CANCELLED',
+      navigation: { kind: 'ORDERS', orderReference: null },
+      orderStatuses: [
+        { status: 'CANCELLED', paymentStatus: 'CANCELLED' },
+        { status: 'CANCELLED', paymentStatus: 'CANCELLED' },
+      ],
+    });
   });
 
   it('rejects auth, Origin, foreign address, stale cart, and different idempotent intent', async () => {
@@ -1454,7 +1587,11 @@ databaseTest('authenticated COD checkout HTTP with PostgreSQL', () => {
     expect(await prisma.shopOrder.count({ where: { purchase: { buyerId } } })).toBe(2);
     expect(await prisma.orderLine.count({ where: { order: { purchase: { buyerId } } } })).toBe(2);
     expect(await prisma.voucherConsumption.count({ where: { userId: buyerId } })).toBe(1);
-    expect(await prisma.voucherRedemption.count({ where: { userId: buyerId } })).toBe(1);
+    expect(await prisma.voucherRedemption.count({ where: { userId: buyerId } })).toBe(
+      responses[0].body.purchase.vouchers.filter(
+        (voucher: { status: string }) => voucher.status === 'APPLIED',
+      ).length,
+    );
     expect(await prisma.cartLine.count({ where: { cartId } })).toBe(0);
   });
 });

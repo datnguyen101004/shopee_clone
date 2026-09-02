@@ -25,6 +25,7 @@
     "ci:validate": "node scripts/validate-ci.mjs",
     "auth:google:preflight": "node --env-file=.env scripts/google-oauth-preflight.mjs",
     "momo:sandbox:preflight": "node --env-file=.env scripts/momo-sandbox-preflight.mjs",
+    "vnpay:sandbox:preflight": "node --env-file=.env scripts/vnpay-sandbox-preflight.mjs",
     "auth:roles:bootstrap-admin": "pnpm --filter @shopee-clone/api auth:roles:bootstrap-admin",
     "reviews:media:cleanup": "pnpm --filter @shopee-clone/api reviews:media:cleanup",
     "reviews:aggregates:repair": "pnpm --filter @shopee-clone/api reviews:aggregates:repair",

@@ -18,9 +18,24 @@ export const PAYMENT_STATE_PRECEDENCE: Readonly<Record<PurchasePaymentStatus, nu
 
 const transitions: Readonly<Record<PurchasePaymentStatus, ReadonlySet<PurchasePaymentStatus>>> = {
   UNPAID: new Set(['PENDING']),
-  PENDING: new Set(['UNKNOWN', 'PENDING_RECONCILIATION', 'PAID', 'FAILED', 'CANCELLED', 'EXPIRED']),
-  UNKNOWN: new Set(['PENDING_RECONCILIATION', 'PAID', 'FAILED', 'CANCELLED', 'EXPIRED']),
-  PENDING_RECONCILIATION: new Set(['PAID', 'FAILED', 'CANCELLED', 'EXPIRED']),
+  PENDING: new Set([
+    'UNKNOWN',
+    'PENDING_RECONCILIATION',
+    'PAID',
+    'FAILED',
+    'CANCELLED',
+    'EXPIRED',
+    'REFUND_PENDING',
+  ]),
+  UNKNOWN: new Set([
+    'PENDING_RECONCILIATION',
+    'PAID',
+    'FAILED',
+    'CANCELLED',
+    'EXPIRED',
+    'REFUND_PENDING',
+  ]),
+  PENDING_RECONCILIATION: new Set(['PAID', 'FAILED', 'CANCELLED', 'EXPIRED', 'REFUND_PENDING']),
   PAID: new Set(['REFUND_PENDING', 'PARTIALLY_REFUNDED', 'REFUNDED']),
   FAILED: new Set(['REFUND_PENDING']),
   CANCELLED: new Set(['REFUND_PENDING']),

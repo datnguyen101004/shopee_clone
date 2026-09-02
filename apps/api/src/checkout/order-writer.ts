@@ -37,6 +37,15 @@ export class OrderWriter {
     input: WritePurchaseInput,
   ): Promise<WrittenPurchaseVouchers> {
     const { summary } = input.preview;
+    const initialOrderStatus =
+      input.paymentMethod === 'VNPAY'
+        ? ('PENDING_PAYMENT' as const)
+        : ('PENDING_CONFIRMATION' as const);
+    // The database timeline contract reserves version 0 for ORDER_CREATED /
+    // PENDING_CONFIRMATION. A VNPAY order is payment-gated immediately, so
+    // record that gate as the first explicit transition (version 1) while
+    // keeping the canonical order status at PENDING_PAYMENT.
+    const startsPendingPayment = initialOrderStatus === 'PENDING_PAYMENT';
     const clock = await transaction.$queryRaw<Array<{ now: Date }>>(
       Prisma.sql`SELECT clock_timestamp() AS "now"`,
     );
@@ -79,6 +88,7 @@ export class OrderWriter {
           id: orderId,
           purchaseId: input.purchaseId,
           shopId: shop.shop.id,
+          status: initialOrderStatus,
           paymentStatus: input.paymentStatus,
           shopSnapshot: json(shop.shop),
           note: shop.note,
@@ -93,6 +103,7 @@ export class OrderWriter {
           voucherDiscountMinor: money(shop.voucherDiscountMinor),
           shippingPayableMinor: money(shop.shippingPayableMinor),
           payableTotalMinor: money(shop.payableTotalMinor),
+          version: startsPendingPayment ? 1 : 0,
           createdAt,
           updatedAt: createdAt,
         },
@@ -110,6 +121,21 @@ export class OrderWriter {
           reasonNote: null,
         },
       });
+      if (startsPendingPayment) {
+        await transaction.orderTimelineEvent.create({
+          data: {
+            id: randomUUID(),
+            orderId,
+            previousStatus: 'PENDING_CONFIRMATION',
+            status: 'PENDING_PAYMENT',
+            orderVersion: 1,
+            actorType: 'SYSTEM',
+            actorUserId: null,
+            reasonCode: 'VNPAY_PAYMENT_PENDING',
+            reasonNote: null,
+          },
+        });
+      }
       await transaction.sellerOrderFulfillment.create({
         data: {
           orderId,

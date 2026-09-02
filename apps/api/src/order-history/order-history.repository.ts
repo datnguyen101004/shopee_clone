@@ -5,13 +5,7 @@ import type { Prisma, ShopOrderStatus } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import type { OrderCursorPosition } from './order-canonical';
 
-export const buyerOrderSummaryInclude = {
-  purchase: {
-    select: {
-      id: true,
-      inventoryReservation: { select: { status: true, expiresAt: true, terminalReason: true } },
-    },
-  },
+const buyerShopOrderRelations = {
   lines: {
     orderBy: [{ sourceCartLineId: 'asc' as const }, { id: 'asc' as const }],
     include: { review: { select: { id: true } }, product: { select: { deletedAt: true } } },
@@ -26,24 +20,19 @@ export const buyerOrderSummaryInclude = {
   },
 } satisfies Prisma.ShopOrderInclude;
 
-export const buyerOrderDetailInclude = {
+export const buyerOrderSummaryInclude = {
   purchase: {
     select: {
       id: true,
-      addressSnapshot: true,
-      currency: true,
       inventoryReservation: { select: { status: true, expiresAt: true, terminalReason: true } },
     },
   },
-  lines: {
-    orderBy: [{ sourceCartLineId: 'asc' as const }, { id: 'asc' as const }],
-    include: { review: { select: { id: true } }, product: { select: { deletedAt: true } } },
-  },
+  ...buyerShopOrderRelations,
+} satisfies Prisma.ShopOrderInclude;
+
+const buyerShopOrderDetailRelations = {
+  ...buyerShopOrderRelations,
   timelineEvents: { orderBy: [{ orderVersion: 'asc' as const }, { id: 'asc' as const }] },
-  shipment: {
-    include: { events: { orderBy: [{ shipmentVersion: 'asc' as const }, { id: 'asc' as const }] } },
-  },
-  returnRequest: { select: { id: true } },
   voucherAllocations: {
     orderBy: [
       { purchaseVoucherId: 'asc' as const },
@@ -57,18 +46,34 @@ export const buyerOrderDetailInclude = {
   },
 } satisfies Prisma.ShopOrderInclude;
 
+export const buyerOrderDetailInclude = {
+  purchase: {
+    select: {
+      id: true,
+      addressSnapshot: true,
+      currency: true,
+      inventoryReservation: { select: { status: true, expiresAt: true, terminalReason: true } },
+    },
+  },
+  ...buyerShopOrderDetailRelations,
+} satisfies Prisma.ShopOrderInclude;
+
 export type BuyerOrderSummaryGraph = Prisma.ShopOrderGetPayload<{
   include: typeof buyerOrderSummaryInclude;
 }>;
 export type BuyerOrderDetailGraph = Prisma.ShopOrderGetPayload<{
   include: typeof buyerOrderDetailInclude;
 }>;
-type OrderReader = Pick<Prisma.TransactionClient, 'shopOrder'>;
 
-function statusesFor(filter: BuyerOrderListFilter): ShopOrderStatus[] | null {
+export function statusesFor(filter: BuyerOrderListFilter): ShopOrderStatus[] | null {
   if (filter === 'ALL') return null;
   if (filter === 'RETURN_REFUND') return ['RETURN_REQUESTED', 'RETURNED', 'REFUNDED'];
+  if (filter === 'SHIPPING') return ['AWAITING_PICKUP', 'SHIPPING'];
   return [filter];
+}
+
+export function requiresConfirmedPaymentOrCod(filter: BuyerOrderListFilter): boolean {
+  return filter === 'PENDING_CONFIRMATION';
 }
 
 @Injectable()
@@ -81,32 +86,42 @@ export class OrderHistoryRepository {
     cursor: OrderCursorPosition | null,
   ): Promise<BuyerOrderSummaryGraph[]> {
     const statuses = statusesFor(query.filter);
-    return this.prisma.shopOrder.findMany({
-      where: {
-        purchase: { buyerId: userId },
-        ...(statuses ? { status: { in: statuses } } : {}),
-        ...(cursor
-          ? {
-              OR: [
-                { createdAt: { lt: cursor.createdAt } },
-                { createdAt: cursor.createdAt, id: { lt: cursor.id } },
-              ],
-            }
-          : {}),
-      },
-      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
-      take: query.limit + 1,
-      include: buyerOrderSummaryInclude,
-    });
+    return this.prisma.shopOrder
+      .findMany({
+        where: {
+          purchase: {
+            buyerId: userId,
+            ...(requiresConfirmedPaymentOrCod(query.filter)
+              ? { OR: [{ paymentMethod: 'COD' }, { paymentStatus: 'PAID' }] }
+              : {}),
+          },
+          ...(statuses ? { status: { in: statuses } } : {}),
+          ...(cursor
+            ? {
+                OR: [
+                  { createdAt: { lt: cursor.createdAt } },
+                  { createdAt: cursor.createdAt, id: { lt: cursor.id } },
+                ],
+              }
+            : {}),
+        },
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+        take: query.limit + 1,
+        include: buyerOrderSummaryInclude,
+      })
+      .then((rows) => rows as unknown as BuyerOrderSummaryGraph[]);
   }
 
   detail(
     userId: string,
     orderReference: string,
-    reader: OrderReader = this.prisma,
+    reader: Pick<Prisma.TransactionClient, 'shopOrder'> = this.prisma,
   ): Promise<BuyerOrderDetailGraph | null> {
     return reader.shopOrder.findFirst({
-      where: { id: orderReference, purchase: { buyerId: userId } },
+      where: {
+        id: orderReference,
+        purchase: { buyerId: userId },
+      },
       include: buyerOrderDetailInclude,
     });
   }

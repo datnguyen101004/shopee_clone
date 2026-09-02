@@ -72,6 +72,13 @@ function dateRange(query: SellerOrderQueueQuery): Prisma.ShopOrderWhereInput {
   return Object.keys(createdAt).length > 0 ? { createdAt } : {};
 }
 
+const sellerPaymentGate: Prisma.ShopOrderWhereInput = {
+  AND: [
+    { NOT: { status: 'PENDING_PAYMENT' } },
+    { NOT: { status: 'CANCELLED', purchase: { paymentMethod: 'VNPAY' } } },
+  ],
+};
+
 @Injectable()
 export class SellerOrderRepository {
   constructor(@Inject(PrismaService) private readonly prisma: PrismaService) {}
@@ -93,6 +100,7 @@ export class SellerOrderRepository {
     return this.prisma.shopOrder.findMany({
       where: {
         ...this.ownership(userId),
+        ...sellerPaymentGate,
         ...(statuses ? { status: { in: statuses } } : {}),
         ...(fulfillmentState ? { fulfillment: { is: { state: fulfillmentState } } } : {}),
         ...(query.orderReference ? { id: query.orderReference } : {}),
@@ -118,7 +126,7 @@ export class SellerOrderRepository {
     reader: Pick<Prisma.TransactionClient, 'shopOrder'> = this.prisma,
   ): Promise<SellerOrderGraph | null> {
     return reader.shopOrder.findFirst({
-      where: { id: orderReference, ...this.ownership(userId) },
+      where: { id: orderReference, ...this.ownership(userId), ...sellerPaymentGate },
       include: sellerOrderInclude,
     });
   }
@@ -129,7 +137,7 @@ export class SellerOrderRepository {
     tx: Prisma.TransactionClient,
   ): Promise<SellerOrderGraph | null> {
     const result = await tx.shopOrder.findFirst({
-      where: { id: orderReference, ...this.ownership(userId) },
+      where: { id: orderReference, ...this.ownership(userId), ...sellerPaymentGate },
       include: sellerOrderInclude,
     });
     return result;

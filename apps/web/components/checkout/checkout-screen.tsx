@@ -6,7 +6,12 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useRef, useState } from 'react';
 
-import { CheckoutApiError, confirmCodCheckout, confirmMomoCheckout } from '../../lib/checkout-api';
+import {
+  CheckoutApiError,
+  confirmCodCheckout,
+  confirmMomoCheckout,
+  confirmVnpayCheckout,
+} from '../../lib/checkout-api';
 import { clearCheckoutDraft } from '../../lib/checkout-draft';
 import { CheckoutSubmitIntent } from '../../lib/checkout-intent';
 import { AddressCreationDialog } from '../address-creation-dialog';
@@ -36,7 +41,7 @@ export function CheckoutScreen() {
   const [submitting, setSubmitting] = useState(false);
   const [submitMessage, setSubmitMessage] = useState('');
   const [addressDialogOpen, setAddressDialogOpen] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState<'COD' | 'MOMO'>('COD');
+  const [paymentMethod, setPaymentMethod] = useState<'COD' | 'MOMO' | 'VNPAY'>('COD');
 
   if (auth.state.status === 'guest' || cart.state.status === 'unauthenticated') {
     return (
@@ -87,7 +92,11 @@ export function CheckoutScreen() {
     submitLock.current = true;
     setSubmitting(true);
     setSubmitMessage(
-      paymentMethod === 'MOMO' ? 'Đang tạo giao dịch MoMo sandbox…' : 'Đang tạo đơn hàng COD…',
+      paymentMethod === 'MOMO'
+        ? 'Đang tạo giao dịch MoMo sandbox…'
+        : paymentMethod === 'VNPAY'
+          ? 'Đang tạo giao dịch VNPAY sandbox…'
+          : 'Đang tạo đơn hàng COD…',
     );
     const request = { ...checkout.request, checkoutFingerprint: preview.checkoutFingerprint };
     const signature = JSON.stringify({ cartVersion: currentCart!.version, request, paymentMethod });
@@ -110,6 +119,19 @@ export function CheckoutScreen() {
           );
         }
         router.replace(`/checkout/payment/${result.payment.paymentReference}`);
+      } else if (paymentMethod === 'VNPAY') {
+        const result = await confirmVnpayCheckout(
+          { ...request, provider: 'VNPAY' },
+          currentCart!.version,
+          idempotencyKey,
+          auth.authenticatedFetch,
+        );
+        clearCheckoutDraft(window.sessionStorage);
+        intent.current.clear();
+        await cart.refresh();
+        const payUrl = result.payment.instructions?.payUrl;
+        if (!payUrl) throw new Error('VNPAY payment URL was not returned');
+        window.location.assign(payUrl);
       } else {
         const result = await confirmCodCheckout(
           request,
@@ -130,7 +152,9 @@ export function CheckoutScreen() {
         setSubmitMessage(
           error.problem?.type.endsWith('/checkout-preview-changed')
             ? 'Giá hoặc ưu đãi đã thay đổi. Hãy xem lại tổng mới rồi đặt hàng lại.'
-            : 'Giỏ hàng hoặc thông tin thanh toán đã thay đổi. Đang xác nhận lại…',
+            : error.problem?.type.endsWith('/checkout-not-ready')
+              ? 'Ưu đãi hoặc điều kiện thanh toán vừa thay đổi. Hãy kiểm tra lại tổng tiền rồi thử lại.'
+              : 'Giỏ hàng hoặc thông tin thanh toán đã thay đổi. Đang xác nhận lại…',
         );
         checkout.retry();
       } else if (error instanceof CheckoutApiError && error.kind === 'transport') {
@@ -328,8 +352,20 @@ export function CheckoutScreen() {
           />{' '}
           Ví MoMo (sandbox)
         </label>
+        <label>
+          <input
+            type="radio"
+            name="payment-method"
+            checked={paymentMethod === 'VNPAY'}
+            onChange={() => setPaymentMethod('VNPAY')}
+          />{' '}
+          VNPAY (sandbox)
+        </label>
         {paymentMethod === 'MOMO' ? (
           <p>Bạn sẽ dùng QR hoặc ứng dụng MoMo Test để thanh toán tổng tiền đã xác nhận.</p>
+        ) : null}
+        {paymentMethod === 'VNPAY' ? (
+          <p>Bạn sẽ được chuyển tới VNPAY sandbox để chọn QR hoặc thẻ ngân hàng.</p>
         ) : null}
       </section>
 
@@ -368,7 +404,13 @@ export function CheckoutScreen() {
           <b>{preview ? money(preview.summary.payableTotalMinor) : 'Đang tính…'}</b>
         </div>
         <button type="button" disabled={!canSubmit || submitting} onClick={() => void submit()}>
-          {submitting ? 'Đang đặt hàng…' : 'Đặt hàng'}
+          {submitting
+            ? paymentMethod === 'VNPAY'
+              ? 'Đang kết nối VNPAY…'
+              : 'Đang đặt hàng…'
+            : paymentMethod === 'VNPAY'
+              ? 'Thanh toán với VNPAY'
+              : 'Đặt hàng'}
         </button>
       </aside>
     </Container>

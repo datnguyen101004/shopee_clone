@@ -12,6 +12,12 @@ function money(value: number): string {
   return `${new Intl.NumberFormat('vi-VN').format(value)}₫`;
 }
 
+function paymentMethodLabel(method: PurchaseResult['paymentMethod']): string {
+  if (method === 'VNPAY') return 'Thanh toán qua VNPAY';
+  if (method === 'MOMO') return 'Thanh toán qua MoMo';
+  return 'Thanh toán khi nhận hàng (COD)';
+}
+
 export function PurchaseSuccessScreen({ purchaseReference }: { purchaseReference: string }) {
   const auth = useAuthSession();
   const [purchase, setPurchase] = useState<PurchaseResult | null>(null);
@@ -99,6 +105,7 @@ export function PurchaseSuccessScreen({ purchaseReference }: { purchaseReference
             <em>Chờ xác nhận</em>
           </header>
           <small>Mã đơn shop: {order.orderReference}</small>
+          <small>Phương thức: {paymentMethodLabel(purchase.paymentMethod)}</small>
           {order.lines.map((line) => (
             <article key={line.lineId}>
               {line.productImageUrl ? <img src={line.productImageUrl} alt="" /> : null}
@@ -112,13 +119,13 @@ export function PurchaseSuccessScreen({ purchaseReference }: { purchaseReference
             </article>
           ))}
           <footer>
-            <span>COD khi nhận hàng</span>
+            <span>{paymentMethodLabel(purchase.paymentMethod)}</span>
             <strong>{money(order.payableTotalMinor)}</strong>
           </footer>
         </section>
       ))}
       <section className="checkout-card purchase-success__total">
-        <span>Tổng COD</span>
+        <span>Tổng thanh toán</span>
         <strong>{money(purchase.summary.payableTotalMinor)}</strong>
       </section>
       <div className="purchase-success__actions">

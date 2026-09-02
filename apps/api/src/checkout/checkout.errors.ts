@@ -25,6 +25,16 @@ export class CheckoutPreviewChangedError extends Error {
 }
 
 export class CheckoutIdempotencyConflictError extends Error {}
-export class CheckoutInventoryConflictError extends Error { constructor(public readonly availableQuantity: number) { super('Inventory is insufficient'); } }
+export class CheckoutInventoryConflictError extends Error {
+  constructor(public readonly availableQuantity: number) {
+    super('Inventory is insufficient');
+  }
+}
 export class CheckoutPurchaseNotFoundError extends Error {}
 export class CheckoutUnavailableError extends Error {}
+
+/** The selected attempt cannot be retried without changing payment state. */
+export class PaymentRetryNotAllowedError extends Error {}
+
+/** A retry was requested while another attempt is already active. */
+export class PaymentRetryActiveError extends Error {}

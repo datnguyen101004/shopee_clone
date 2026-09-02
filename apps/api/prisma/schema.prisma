@@ -273,8 +273,9 @@ enum SellerPromotionResource {
 }
 
 enum PurchasePaymentMethod {
-  COD  @map("cod")
-  MOMO @map("momo")
+  COD   @map("cod")
+  MOMO  @map("momo")
+  VNPAY @map("vnpay")
 
   @@map("purchase_payment_method")
 }
@@ -296,7 +297,8 @@ enum PurchasePaymentStatus {
 }
 
 enum PaymentProvider {
-  MOMO @map("momo")
+  MOMO  @map("momo")
+  VNPAY @map("vnpay")
 
   @@map("payment_provider")
 }
@@ -311,6 +313,7 @@ enum PaymentEventSource {
   CREATE @map("create")
   IPN    @map("ipn")
   QUERY  @map("query")
+  RETURN @map("return")
   REFUND @map("refund")
 
   @@map("payment_event_source")
@@ -336,6 +339,7 @@ enum PaymentRefundStatus {
 }
 
 enum ShopOrderStatus {
+  PENDING_PAYMENT      @map("pending_payment")
   PENDING_CONFIRMATION @map("pending_confirmation")
   AWAITING_PICKUP      @map("awaiting_pickup")
   SHIPPING             @map("shipping")
@@ -1241,7 +1245,7 @@ model Purchase {
   vouchers                        PurchaseVoucher[]
   voucherConsumption              VoucherConsumption?
   inventoryReservation            InventoryReservation?
-  paymentAttempt                  PaymentAttempt?
+  paymentAttempts                 PaymentAttempt[]
 
   @@unique([buyerId, idempotencyKey])
   @@index([buyerId, createdAt(sort: Desc), id])
@@ -1252,7 +1256,7 @@ model Purchase {
 model PaymentAttempt {
   id                    String                @id @default(uuid()) @db.Uuid
   publicReference       String                @unique @default(uuid()) @map("public_reference") @db.Uuid
-  purchaseId            String                @unique @map("purchase_id") @db.Uuid
+  purchaseId            String                @map("purchase_id") @db.Uuid
   provider              PaymentProvider       @default(MOMO)
   environment           PaymentEnvironment    @default(SANDBOX)
   orderId               String                @map("order_id") @db.VarChar(64)
@@ -1268,6 +1272,15 @@ model PaymentAttempt {
   instructionsIssuedAt  DateTime?             @map("instructions_issued_at") @db.Timestamptz(3)
   lastObservedAt        DateTime?             @map("last_observed_at") @db.Timestamptz(3)
   nextReconcileAt       DateTime?             @map("next_reconcile_at") @db.Timestamptz(3)
+  /**
+   * Immutable provider create timestamp used to reproduce a signed redirect.
+   */
+  providerCreatedAt     DateTime?             @map("provider_created_at") @db.Timestamptz(3)
+  /**
+   * Retry mutation key and canonical digest; nullable for legacy attempts.
+   */
+  idempotencyKey        String?               @map("idempotency_key") @db.Uuid
+  requestDigest         String?               @map("request_digest") @db.Char(64)
   reconcileAttempts     Int                   @default(0) @map("reconcile_attempts")
   leaseExpiresAt        DateTime?             @map("lease_expires_at") @db.Timestamptz(3)
   version               Int                   @default(0)

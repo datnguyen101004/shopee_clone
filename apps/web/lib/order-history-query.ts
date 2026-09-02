@@ -5,6 +5,7 @@ export function pickBuyerOrderFilter(
 ): BuyerOrderListFilter | null {
   if (Object.keys(searchParams).some((key) => key !== 'filter')) return null;
   const raw = searchParams.filter ?? 'ALL';
+  if (raw === 'AWAITING_PICKUP') return 'SHIPPING';
   if (Array.isArray(raw) || !ORDER_LIST_FILTERS.includes(raw as BuyerOrderListFilter)) return null;
   return raw as BuyerOrderListFilter;
 }

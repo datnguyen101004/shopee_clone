@@ -6,6 +6,7 @@ import {
   type BuyerOrderDetailResponse,
   type BuyerOrderListFilter,
   type BuyerOrderSummary,
+  type BuyerOrderTimelineEvent,
   type OrderCancellationReasonCode,
   type ShopOrderStatus,
 } from '@shopee-clone/contracts';
@@ -36,6 +37,7 @@ import {
 import { BuyerReturnForm } from '../returns/buyer-return-form';
 
 const statusLabels: Record<ShopOrderStatus, string> = {
+  PENDING_PAYMENT: 'Chờ thanh toán',
   PENDING_CONFIRMATION: 'Chờ xác nhận',
   AWAITING_PICKUP: 'Chờ lấy hàng',
   SHIPPING: 'Đang giao',
@@ -48,13 +50,74 @@ const statusLabels: Record<ShopOrderStatus, string> = {
 
 const filterLabels: Record<BuyerOrderListFilter, string> = {
   ALL: 'Tất cả',
+  PENDING_PAYMENT: 'Chờ thanh toán',
   PENDING_CONFIRMATION: 'Chờ xác nhận',
-  AWAITING_PICKUP: 'Chờ lấy hàng',
-  SHIPPING: 'Đang giao',
+  SHIPPING: 'Vận chuyển',
   DELIVERED: 'Đã giao',
   CANCELLED: 'Đã hủy',
   RETURN_REFUND: 'Trả hàng / Hoàn tiền',
 };
+
+const paymentStatusLabels: Record<BuyerOrderSummary['paymentStatus'], string> = {
+  UNPAID: 'Chưa thanh toán',
+  PENDING: 'Chờ thanh toán',
+  PENDING_RECONCILIATION: 'Đang xác minh thanh toán',
+  UNKNOWN: 'Đang xác minh thanh toán',
+  PAID: 'Đã thanh toán',
+  FAILED: 'Thanh toán thất bại',
+  CANCELLED: 'Đã hủy thanh toán',
+  EXPIRED: 'Phiên thanh toán hết hạn',
+  REFUND_PENDING: 'Đang xử lý hoàn tiền',
+  PARTIALLY_REFUNDED: 'Hoàn tiền một phần',
+  REFUNDED: 'Đã hoàn tiền',
+};
+
+function buyerOrderStatusLabel(order: Pick<BuyerOrderSummary, 'status' | 'paymentStatus'>) {
+  if (order.status === 'PENDING_PAYMENT' || order.status === 'CANCELLED') {
+    return statusLabels[order.status];
+  }
+  const paymentIsUnsettled = !['UNPAID', 'PAID'].includes(order.paymentStatus);
+  return paymentIsUnsettled ? paymentStatusLabels[order.paymentStatus] : statusLabels[order.status];
+}
+
+function buyerTimelineEventLabel(
+  event: BuyerOrderTimelineEvent,
+  timeline: BuyerOrderTimelineEvent[],
+): string {
+  const onlinePaymentWasConfirmed = timeline.some(
+    (item) => item.reasonCode === 'VNPAY_PAYMENT_CONFIRMED',
+  );
+  const hasExplicitVnpayPendingStep = timeline.some(
+    (item) => item.reasonCode === 'VNPAY_PAYMENT_PENDING' || item.status === 'PENDING_PAYMENT',
+  );
+  if (
+    onlinePaymentWasConfirmed &&
+    !hasExplicitVnpayPendingStep &&
+    event.reasonCode === 'ORDER_CREATED' &&
+    event.status === 'PENDING_CONFIRMATION'
+  ) {
+    return 'Chờ thanh toán';
+  }
+  return statusLabels[event.status];
+}
+
+function buyerVisibleTimeline(timeline: BuyerOrderTimelineEvent[]): BuyerOrderTimelineEvent[] {
+  const first = timeline[0];
+  const hasExplicitVnpayPendingStep = timeline.some(
+    (event) => event.reasonCode === 'VNPAY_PAYMENT_PENDING' || event.status === 'PENDING_PAYMENT',
+  );
+  // The API keeps version 0 as PENDING_CONFIRMATION to satisfy the immutable
+  // timeline contract. For VNPAY, that event is an internal contract anchor;
+  // buyers should see the real payment-gated journey instead.
+  if (
+    hasExplicitVnpayPendingStep &&
+    first?.reasonCode === 'ORDER_CREATED' &&
+    first.status === 'PENDING_CONFIRMATION'
+  ) {
+    return timeline.slice(1);
+  }
+  return timeline;
+}
 
 const reasonLabels: Record<OrderCancellationReasonCode, string> = {
   CHANGE_ADDRESS: 'Muốn thay đổi địa chỉ nhận hàng',
@@ -83,8 +146,11 @@ function OrderCard({ order }: { order: BuyerOrderSummary }) {
       <header>
         <Link href={`/shops/${order.shop.slug}`}>{order.shop.name}</Link>
         <strong className={`buyer-order-status is-${order.status.toLowerCase()}`}>
-          {statusLabels[order.status]}
+          {buyerOrderStatusLabel(order)}
         </strong>
+        <span aria-label="Trạng thái thanh toán">
+          Thanh toán: {paymentStatusLabels[order.paymentStatus]}
+        </span>
       </header>
       <div className="buyer-order-card__lines">
         {order.lines.map((line) => (
@@ -656,8 +722,11 @@ export function BuyerOrderDetailScreen({ orderReference }: { orderReference: str
                 <small>Mã giao dịch {detail.order.purchaseReference}</small>
               </div>
               <strong className={`buyer-order-status is-${detail.order.status.toLowerCase()}`}>
-                {statusLabels[detail.order.status]}
+                {buyerOrderStatusLabel(detail.order)}
               </strong>
+              <span aria-label="Trạng thái thanh toán">
+                Thanh toán: {paymentStatusLabels[detail.order.paymentStatus]}
+              </span>
             </header>
             <Card className="buyer-order-detail__card">
               <h2>Địa chỉ nhận hàng</h2>
@@ -671,6 +740,9 @@ export function BuyerOrderDetailScreen({ orderReference }: { orderReference: str
             </Card>
             <Card className="buyer-order-detail__card">
               <h2>{detail.order.shop.name}</h2>
+              <strong className={`buyer-order-status is-${detail.order.status.toLowerCase()}`}>
+                {buyerOrderStatusLabel(detail.order)}
+              </strong>
               {detail.order.lines.map((line) => (
                 <article className="buyer-order-detail__line" key={line.lineId}>
                   <Link
@@ -715,15 +787,30 @@ export function BuyerOrderDetailScreen({ orderReference }: { orderReference: str
                   <dd>{money(detail.order.payableTotalMinor)}</dd>
                 </div>
               </dl>
+              {detail.order.returnCapability?.returnReference ? (
+                <p className="buyer-order-notice">
+                  <Link href={`/account/returns/${detail.order.returnCapability.returnReference}`}>
+                    Xem yêu cầu trả hàng / hoàn tiền
+                  </Link>
+                </p>
+              ) : null}
+              {detail.order.returnCapability?.allowed ? (
+                <BuyerReturnForm order={detail.order} />
+              ) : null}
+              {detail.order.cancellation.allowed ? (
+                <button type="button" onClick={() => setCancelOpen(true)}>
+                  Hủy đơn hàng
+                </button>
+              ) : null}
             </Card>
             <Card className="buyer-order-detail__card">
               <h2>Hành trình đơn hàng</h2>
               <ol className="buyer-order-timeline">
-                {detail.timeline.map((event) => (
+                {buyerVisibleTimeline(detail.timeline).map((event) => (
                   <li key={event.id}>
                     <span aria-hidden="true" />
                     <div>
-                      <strong>{statusLabels[event.status]}</strong>
+                      <strong>{buyerTimelineEventLabel(event, detail.timeline)}</strong>
                       <small>
                         {actorLabels[event.actorType]} · {dateTime(event.occurredAt)}
                       </small>
@@ -733,23 +820,8 @@ export function BuyerOrderDetailScreen({ orderReference }: { orderReference: str
                 ))}
               </ol>
             </Card>
-            {detail.order.returnCapability?.returnReference ? (
-              <p className="buyer-order-notice">
-                <Link href={`/account/returns/${detail.order.returnCapability.returnReference}`}>
-                  Xem yêu cầu trả hàng / hoàn tiền
-                </Link>
-              </p>
-            ) : null}
-            {detail.order.returnCapability?.allowed ? (
-              <BuyerReturnForm order={detail.order} />
-            ) : null}
             <div className="buyer-order-detail__actions">
               <Link href="/account/orders">Về đơn mua</Link>
-              {detail.order.cancellation.allowed ? (
-                <button type="button" onClick={() => setCancelOpen(true)}>
-                  Hủy đơn hàng
-                </button>
-              ) : null}
             </div>
           </div>
         ) : null}

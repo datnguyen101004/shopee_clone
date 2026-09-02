@@ -57,6 +57,13 @@ export class RefundReconciliationService {
       if (lease.count !== 1) continue;
       claimed += 1;
       try {
+        if (refund.provider === 'VNPAY') {
+          // VNPAY refund calls are deliberately out of scope for the sandbox
+          // change. Retain a redacted manual-resolution backlog and never send
+          // a VNPAY row through the MoMo adapter.
+          await this.markManual(refund.id, leaseExpiresAt);
+          continue;
+        }
         if (refund.attempt.providerTransactionId === null) throw new Error('Missing transaction');
         const result = refund.requestedAt
           ? await this.provider.queryRefund({
@@ -79,13 +86,31 @@ export class RefundReconciliationService {
         if (classification.resultClass === 'SUCCESS') {
           await this.complete(refund.id, result.resultCode, result.providerTransactionId);
         } else {
-          await this.reschedule(refund.id, leaseExpiresAt, result.resultCode, classification.resultClass);
+          await this.reschedule(
+            refund.id,
+            leaseExpiresAt,
+            result.resultCode,
+            classification.resultClass,
+          );
         }
       } catch {
         await this.reschedule(refund.id, leaseExpiresAt, null, 'UNKNOWN');
       }
     }
     return claimed;
+  }
+
+  private async markManual(refundId: string, leaseExpiresAt: Date): Promise<void> {
+    await this.prisma.paymentRefund.updateMany({
+      where: { id: refundId, leaseExpiresAt },
+      data: {
+        status: 'FAILED',
+        lastResultClass: 'MANUAL_REQUIRED',
+        nextReconcileAt: null,
+        leaseExpiresAt: null,
+        version: { increment: 1 },
+      },
+    });
   }
 
   async backlogSnapshot(): Promise<{ pending: number; oldestCreatedAt: string | null }> {

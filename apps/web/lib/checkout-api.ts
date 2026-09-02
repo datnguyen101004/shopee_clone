@@ -9,6 +9,7 @@ import {
   parseOnlinePaymentCheckoutRequest,
   parseOnlinePaymentCheckoutResponse,
   parsePaymentStatusResponse,
+  parseVnpayPaymentResolution,
   type CheckoutConfirmationRequest,
   type CheckoutConfirmationResponse,
   type CheckoutPreviewRequest,
@@ -167,6 +168,85 @@ export async function confirmMomoCheckout(
   return parsed;
 }
 
+export async function confirmVnpayCheckout(
+  input: OnlinePaymentCheckoutRequest,
+  cartVersion: number,
+  idempotencyKey: string,
+  authenticatedFetch: AuthenticatedFetch,
+): Promise<OnlinePaymentCheckoutResponse> {
+  const parsedInput = parseOnlinePaymentCheckoutRequest(input);
+  if (
+    !parsedInput ||
+    parsedInput.provider !== 'VNPAY' ||
+    !Number.isSafeInteger(cartVersion) ||
+    cartVersion < 0 ||
+    !CHECKOUT_IDEMPOTENCY_KEY_PATTERN.test(idempotencyKey)
+  ) {
+    throw new CheckoutApiError('input');
+  }
+  const response = await checkoutRequest(
+    '/api/v1/checkout/online-payments',
+    {
+      method: 'POST',
+      headers: {
+        'If-Match': `"cart-${cartVersion}"`,
+        'Idempotency-Key': idempotencyKey,
+      },
+      body: JSON.stringify(parsedInput),
+    },
+    authenticatedFetch,
+  );
+  const parsed = parseOnlinePaymentCheckoutResponse(await response.json());
+  if (!parsed || parsed.purchase.sourceCartVersion !== cartVersion) {
+    throw new CheckoutApiError('contract', response.status);
+  }
+  return parsed;
+}
+
+export async function resolveVnpayPayment(
+  transactionReference: string,
+  authenticatedFetch: AuthenticatedFetch,
+  signal?: AbortSignal,
+): Promise<{ paymentReference: string; purchaseReference: string }> {
+  if (!/^[A-Za-z0-9_-]{1,100}$/.test(transactionReference)) throw new CheckoutApiError('input');
+  const response = await checkoutRequest(
+    `/api/v1/payments/vnpay/resolve?vnp_TxnRef=${encodeURIComponent(transactionReference)}`,
+    { method: 'GET' },
+    authenticatedFetch,
+    signal,
+  );
+  const body: unknown = await response.json();
+  const parsed = parseVnpayPaymentResolution(body);
+  if (!parsed) throw new CheckoutApiError('contract', response.status);
+  return parsed;
+}
+
+export async function settleVnpayReturn(
+  fields: Readonly<Record<string, string>>,
+  authenticatedFetch: AuthenticatedFetch,
+  signal?: AbortSignal,
+): Promise<PaymentStatusResponse> {
+  const entries = Object.entries(fields);
+  if (
+    entries.length === 0 ||
+    entries.some(([key, value]) => !/^vnp_[A-Za-z0-9_]{1,64}$/.test(key) || value.length > 512)
+  ) {
+    throw new CheckoutApiError('input');
+  }
+  const response = await checkoutRequest(
+    '/api/v1/payments/vnpay/return',
+    {
+      method: 'POST',
+      body: JSON.stringify({ fields }),
+    },
+    authenticatedFetch,
+    signal,
+  );
+  const parsed = parsePaymentStatusResponse(await response.json());
+  if (!parsed) throw new CheckoutApiError('contract', response.status);
+  return parsed;
+}
+
 export async function getPaymentStatus(
   paymentReference: string,
   authenticatedFetch: AuthenticatedFetch,
@@ -183,6 +263,35 @@ export async function getPaymentStatus(
   );
   const parsed = parsePaymentStatusResponse(await response.json());
   if (!parsed || parsed.paymentReference !== paymentReference) {
+    throw new CheckoutApiError('contract', response.status);
+  }
+  return parsed;
+}
+
+export async function retryPayment(
+  paymentReference: string,
+  provider: 'MOMO' | 'VNPAY',
+  idempotencyKey: string,
+  authenticatedFetch: AuthenticatedFetch,
+): Promise<OnlinePaymentCheckoutResponse> {
+  if (
+    !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(paymentReference) ||
+    !CHECKOUT_IDEMPOTENCY_KEY_PATTERN.test(idempotencyKey) ||
+    (provider !== 'MOMO' && provider !== 'VNPAY')
+  ) {
+    throw new CheckoutApiError('input');
+  }
+  const response = await checkoutRequest(
+    `/api/v1/payments/${encodeURIComponent(paymentReference)}/retry`,
+    {
+      method: 'POST',
+      headers: { 'Idempotency-Key': idempotencyKey },
+      body: JSON.stringify({ provider }),
+    },
+    authenticatedFetch,
+  );
+  const parsed = parseOnlinePaymentCheckoutResponse(await response.json());
+  if (!parsed || parsed.payment.provider !== provider) {
     throw new CheckoutApiError('contract', response.status);
   }
   return parsed;

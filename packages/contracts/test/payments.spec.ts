@@ -5,6 +5,8 @@ import {
   isPaymentStatusResponse,
   isPurchaseResult,
   parseOnlinePaymentCheckoutRequest,
+  parsePaymentRetryRequest,
+  parseVnpayPaymentResolution,
   type OnlinePaymentCheckoutResponse,
   type PurchaseResult,
 } from '../src';
@@ -123,6 +125,15 @@ describe('payment contracts', () => {
     expect(parseOnlinePaymentCheckoutRequest({ ...request, provider: 'OTHER' })).toBeNull();
   });
 
+  it('strictly parses retry and callback-resolution payloads', () => {
+    expect(parsePaymentRetryRequest({ provider: 'VNPAY' })).toEqual({ provider: 'VNPAY' });
+    expect(parsePaymentRetryRequest({ provider: 'VNPAY', extra: true })).toBeNull();
+    expect(
+      parseVnpayPaymentResolution({ paymentReference: id('9'), purchaseReference: id('1') }),
+    ).toEqual({ paymentReference: id('9'), purchaseReference: id('1') });
+    expect(parseVnpayPaymentResolution({ paymentReference: 'not-a-uuid' })).toBeNull();
+  });
+
   it('validates safe payment instructions and state-specific next actions', () => {
     const pending = {
       paymentReference: id('9'),
@@ -175,6 +186,39 @@ describe('payment contracts', () => {
       isOnlinePaymentCheckoutResponse({
         ...response,
         payment: { ...response.payment, amountMinor: 1 },
+      }),
+    ).toBe(false);
+  });
+
+  it('accepts granular child order states for a multi-shop Purchase', () => {
+    const child = id('10');
+    const response = {
+      paymentReference: id('11'),
+      purchaseReference: id('12'),
+      provider: 'VNPAY' as const,
+      paymentMethod: 'VNPAY' as const,
+      status: 'PENDING' as const,
+      amountMinor: 5_000,
+      currency: 'VND' as const,
+      expiresAt: '2026-08-28T12:10:00.000Z',
+      nextAction: 'WAIT' as const,
+      instructions: null,
+      orderStatus: null,
+      orderStatuses: [
+        {
+          orderReference: child,
+          status: 'PENDING_PAYMENT' as const,
+          paymentStatus: 'PENDING' as const,
+        },
+      ],
+      retryable: false,
+      navigation: { kind: 'ORDER' as const, orderReference: id('12') },
+    };
+    expect(isPaymentStatusResponse(response)).toBe(true);
+    expect(
+      isPaymentStatusResponse({
+        ...response,
+        orderStatuses: [{ ...response.orderStatuses[0]!, orderReference: 'not-a-uuid' }],
       }),
     ).toBe(false);
   });

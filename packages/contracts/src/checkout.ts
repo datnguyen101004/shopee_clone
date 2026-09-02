@@ -27,7 +27,7 @@ export const CHECKOUT_BLOCKER_CODES = [
   'VOUCHER_REJECTED',
   'MISSING_SHIPPING_SERVICE',
 ] as const;
-export const PURCHASE_PAYMENT_METHODS = ['COD', 'MOMO'] as const;
+export const PURCHASE_PAYMENT_METHODS = ['COD', 'MOMO', 'VNPAY'] as const;
 export const PURCHASE_PAYMENT_STATUSES = [
   'UNPAID',
   'PENDING',
@@ -42,6 +42,7 @@ export const PURCHASE_PAYMENT_STATUSES = [
   'REFUNDED',
 ] as const;
 export const SHOP_ORDER_STATUSES = [
+  'PENDING_PAYMENT',
   'PENDING_CONFIRMATION',
   'AWAITING_PICKUP',
   'SHIPPING',

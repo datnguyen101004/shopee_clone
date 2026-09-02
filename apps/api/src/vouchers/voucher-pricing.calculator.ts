@@ -33,8 +33,12 @@ export interface VoucherDefinitionSnapshot {
   isEnabled: boolean;
   usageLimit: number;
   usedCount: number;
+  /** Number of active purchases currently holding this voucher. */
+  heldCount?: number;
   perBuyerLimit: number;
   buyerUsedCount: number;
+  /** Number of active purchases for this buyer currently holding this voucher. */
+  buyerHeldCount?: number;
   productIds: readonly string[];
 }
 
@@ -157,11 +161,13 @@ function rejected(
 }
 
 function remainingUses(definition: VoucherDefinitionSnapshot): number {
+  const heldCount = definition.heldCount ?? 0;
+  const buyerHeldCount = definition.buyerHeldCount ?? 0;
   return Math.max(
     0,
     Math.min(
-      definition.usageLimit - definition.usedCount,
-      definition.perBuyerLimit - definition.buyerUsedCount,
+      definition.usageLimit - definition.usedCount - heldCount,
+      definition.perBuyerLimit - definition.buyerUsedCount - buyerHeldCount,
     ),
   );
 }
@@ -363,8 +369,12 @@ function baseRejection(
   if (!definition.isEnabled) return 'DISABLED';
   if (evaluatedAt < definition.startsAt) return 'NOT_STARTED';
   if (evaluatedAt >= definition.endsAt) return 'EXPIRED';
-  if (definition.usedCount >= definition.usageLimit) return 'GLOBAL_LIMIT_REACHED';
-  if (definition.buyerUsedCount >= definition.perBuyerLimit) return 'BUYER_LIMIT_REACHED';
+  if (definition.usedCount + (definition.heldCount ?? 0) >= definition.usageLimit) {
+    return 'GLOBAL_LIMIT_REACHED';
+  }
+  if (definition.buyerUsedCount + (definition.buyerHeldCount ?? 0) >= definition.perBuyerLimit) {
+    return 'BUYER_LIMIT_REACHED';
+  }
   if (
     (request.slot === 'FREE_SHIPPING' &&
       (definition.issuer !== 'PLATFORM' || definition.benefitType !== 'FREE_SHIPPING')) ||

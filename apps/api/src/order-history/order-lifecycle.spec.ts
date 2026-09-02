@@ -6,6 +6,8 @@ import { canTransitionOrder, ORDER_TRANSITIONS } from './order-lifecycle';
 describe('order lifecycle primitives', () => {
   it('allows exactly the documented transition matrix', () => {
     const expected = new Set([
+      'PENDING_PAYMENT>PENDING_CONFIRMATION',
+      'PENDING_PAYMENT>CANCELLED',
       'PENDING_CONFIRMATION>AWAITING_PICKUP',
       'PENDING_CONFIRMATION>CANCELLED',
       'AWAITING_PICKUP>SHIPPING',

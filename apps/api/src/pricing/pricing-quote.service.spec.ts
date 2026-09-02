@@ -68,7 +68,12 @@ function fixtureCart() {
   };
 }
 
-function serviceWith(options?: { address?: unknown; cart?: unknown; vouchers?: unknown[] }) {
+function serviceWith(options?: {
+  address?: unknown;
+  cart?: unknown;
+  vouchers?: unknown[];
+  voucherHolds?: unknown[];
+}) {
   const transaction = {
     shippingAddress: {
       findFirst: jest.fn().mockResolvedValue(
@@ -92,6 +97,7 @@ function serviceWith(options?: { address?: unknown; cart?: unknown; vouchers?: u
         .mockResolvedValue(options && 'cart' in options ? options.cart : fixtureCart()),
     },
     voucher: { findMany: jest.fn().mockResolvedValue(options?.vouchers ?? []) },
+    $queryRaw: jest.fn().mockResolvedValue(options?.voucherHolds ?? []),
   };
   const prisma = {
     $transaction: jest.fn(async (work: (client: typeof transaction) => unknown) =>
@@ -223,6 +229,36 @@ describe('pricing quote orchestration', () => {
       }),
     ]);
     expect(quote.summary.platformVoucherDiscountMinor).toBe(18_000);
+  });
+
+  it('does not auto-select a voucher held by an active online payment', async () => {
+    const active = {
+      id: '00000000-0000-4000-8000-000000000022',
+      code: 'PLATFORM-HELD',
+      name: 'Sàn đang được giữ',
+      issuer: 'PLATFORM',
+      shopId: null,
+      benefitType: 'FIXED_AMOUNT',
+      fixedAmountMinor: 50_000n,
+      percentageBasisPoints: null,
+      maximumDiscountMinor: null,
+      minimumSpendMinor: 0n,
+      startsAt: new Date('2020-01-01T00:00:00.000Z'),
+      endsAt: new Date('2999-01-01T00:00:00.000Z'),
+      isEnabled: true,
+      usageLimit: 100,
+      usedCount: 0,
+      perBuyerLimit: 1,
+      productScopes: [],
+      userUsages: [],
+    };
+    const quote = await serviceWith({
+      vouchers: [active],
+      voucherHolds: [{ voucherId: active.id, heldCount: 1n, buyerHeldCount: 1n }],
+    }).quote(userId, 2, addressId, []);
+
+    expect(quote.vouchers).toEqual([]);
+    expect(quote.summary.platformVoucherDiscountMinor).toBe(0);
   });
 
   it('calculates merchandise vouchers without an address and never claims shipping savings', async () => {

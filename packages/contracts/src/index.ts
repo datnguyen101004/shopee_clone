@@ -473,12 +473,17 @@ export type {
 export {
   PAYMENT_NEXT_ACTIONS,
   PAYMENT_PROVIDERS,
+  PAYMENT_REFERENCE_PATTERN,
+  VNPAY_TRANSACTION_REFERENCE_PATTERN,
   isOnlinePaymentCheckoutResponse,
   isPaymentInstructions,
   isPaymentStatusResponse,
+  isVnpayPaymentResolution,
   parseOnlinePaymentCheckoutRequest,
   parseOnlinePaymentCheckoutResponse,
+  parsePaymentRetryRequest,
   parsePaymentStatusResponse,
+  parseVnpayPaymentResolution,
 } from './payments';
 export type {
   OnlinePaymentCheckoutRequest,
@@ -486,7 +491,10 @@ export type {
   PaymentInstructions,
   PaymentNextAction,
   PaymentProvider,
+  PaymentRetryRequest,
+  PaymentOrderStatus,
   PaymentStatusResponse,
+  VnpayPaymentResolution,
 } from './payments';
 export {
   ORDER_CANCELLATION_NOTE_MAX_LENGTH,

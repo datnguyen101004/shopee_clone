@@ -8,22 +8,38 @@ import {
   Inject,
   Param,
   Post,
+  Query,
   Req,
   Res,
   UseFilters,
   UseGuards,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiBody, ApiHeader, ApiOperation, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiBody,
+  ApiHeader,
+  ApiOperation,
+  ApiQuery,
+  ApiTags,
+} from '@nestjs/swagger';
 import type { OnlinePaymentCheckoutResponse, PaymentStatusResponse } from '@shopee-clone/contracts';
-import { CHECKOUT_IDEMPOTENCY_KEY_PATTERN, parseOnlinePaymentCheckoutRequest } from '@shopee-clone/contracts';
+import {
+  CHECKOUT_IDEMPOTENCY_KEY_PATTERN,
+  parseOnlinePaymentCheckoutRequest,
+  parsePaymentRetryRequest,
+} from '@shopee-clone/contracts';
 import type { Response } from 'express';
 
 import { AuthenticationFailedError } from '../auth/auth.errors';
 import { AuthGuard, type AuthenticatedRequest } from '../auth/auth.guard';
 import { CheckoutExceptionFilter } from '../checkout/checkout-exception.filter';
-import { CheckoutCartConflictError, CheckoutValidationError } from '../checkout/checkout.errors';
+import {
+  CheckoutCartConflictError,
+  CheckoutValidationError,
+  PaymentRetryNotAllowedError,
+} from '../checkout/checkout.errors';
 import { OnlinePaymentService } from './online-payment.service';
-import { OnlinePaymentCheckoutDto } from './payments.dto';
+import { OnlinePaymentCheckoutDto, PaymentRetryDto, VnpayReturnDto } from './payments.dto';
 
 function expectedVersion(value: string | undefined): number {
   const match = /^"cart-(0|[1-9][0-9]*)"$/.exec(value ?? '');
@@ -42,7 +58,7 @@ export class PaymentsController {
 
   @Post('checkout/online-payments')
   @ApiBody({ type: OnlinePaymentCheckoutDto })
-  @ApiOperation({ summary: 'Create or replay a MoMo sandbox checkout' })
+  @ApiOperation({ summary: 'Create or replay an online sandbox checkout' })
   @ApiHeader({ name: 'If-Match', required: true, example: '"cart-7"' })
   @ApiHeader({ name: 'Idempotency-Key', required: true })
   async checkout(
@@ -58,11 +74,81 @@ export class PaymentsController {
     }
     const parsed = parseOnlinePaymentCheckoutRequest(body);
     if (!parsed) throw new CheckoutValidationError(['request']);
-    const result = await this.payments.checkoutWithMomo(
+    const result =
+      parsed.provider === 'VNPAY'
+        ? await this.payments.checkoutWithVnpay(
+            request.authUser.id,
+            expectedVersion(ifMatch),
+            idempotencyKey,
+            parsed,
+            request.ip,
+          )
+        : await this.payments.checkoutWithMomo(
+            request.authUser.id,
+            expectedVersion(ifMatch),
+            idempotencyKey,
+            parsed,
+            request.ip,
+          );
+    response.status(result.replayed ? HttpStatus.OK : HttpStatus.CREATED);
+    response.setHeader('Cache-Control', 'private, no-store');
+    return result;
+  }
+
+  @Get('payments/vnpay/resolve')
+  @HttpCode(HttpStatus.OK)
+  @ApiQuery({ name: 'vnp_TxnRef', required: true, pattern: '^[A-Za-z0-9_-]{1,100}$' })
+  @ApiOperation({ summary: 'Resolve an owner-scoped VNPAY transaction reference' })
+  async resolveVnpay(
+    @Req() request: AuthenticatedRequest,
+    @Query('vnp_TxnRef') transactionReference: string | undefined,
+  ): Promise<{ paymentReference: string; purchaseReference: string }> {
+    if (!request.authUser) throw new AuthenticationFailedError();
+    if (!transactionReference || !/^[A-Za-z0-9_-]{1,100}$/.test(transactionReference)) {
+      throw new CheckoutValidationError(['vnp_TxnRef']);
+    }
+    return this.payments.resolveVnpayPayment(request.authUser.id, transactionReference);
+  }
+
+  @Post('payments/vnpay/return')
+  @HttpCode(HttpStatus.OK)
+  @ApiBody({ type: VnpayReturnDto })
+  @ApiOperation({ summary: 'Apply a signed terminal VNPAY ReturnUrl failure or cancellation' })
+  async applyVnpayReturn(
+    @Req() request: AuthenticatedRequest,
+    @Body() input: VnpayReturnDto,
+  ): Promise<PaymentStatusResponse> {
+    if (!request.authUser) throw new AuthenticationFailedError();
+    return this.payments.applyVnpayReturn(request.authUser.id, input.fields);
+  }
+
+  @Post('payments/:paymentReference/retry')
+  @HttpCode(HttpStatus.CREATED)
+  @ApiBody({ type: PaymentRetryDto })
+  @ApiHeader({ name: 'Idempotency-Key', required: true })
+  @ApiOperation({ summary: 'Create a new attempt for an unpaid online payment' })
+  async retry(
+    @Req() request: AuthenticatedRequest,
+    @Param('paymentReference') paymentReference: string,
+    @Headers('idempotency-key') idempotencyKey: string | undefined,
+    @Body() body: PaymentRetryDto,
+    @Res({ passthrough: true }) response: Response,
+  ): Promise<OnlinePaymentCheckoutResponse> {
+    if (!request.authUser) throw new AuthenticationFailedError();
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(paymentReference)) {
+      throw new CheckoutValidationError(['paymentReference']);
+    }
+    if (!idempotencyKey || !CHECKOUT_IDEMPOTENCY_KEY_PATTERN.test(idempotencyKey)) {
+      throw new CheckoutValidationError(['idempotencyKey']);
+    }
+    const parsed = parsePaymentRetryRequest(body);
+    if (!parsed) throw new CheckoutValidationError(['request']);
+    if (parsed.provider !== 'VNPAY') throw new PaymentRetryNotAllowedError();
+    const result = await this.payments.retryVnpayPayment(
       request.authUser.id,
-      expectedVersion(ifMatch),
+      paymentReference,
       idempotencyKey,
-      parsed,
+      request.ip,
     );
     response.status(result.replayed ? HttpStatus.OK : HttpStatus.CREATED);
     response.setHeader('Cache-Control', 'private, no-store');

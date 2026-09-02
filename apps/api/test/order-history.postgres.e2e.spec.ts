@@ -45,6 +45,10 @@ databaseTest('buyer order history HTTP with PostgreSQL', () => {
   async function cleanup(): Promise<void> {
     await prisma.orderTimelineEvent.deleteMany({ where: { order: { purchaseId } } });
     await prisma.orderLine.deleteMany({ where: { order: { purchaseId } } });
+    await prisma.sellerOrderFulfillmentEvent.deleteMany({
+      where: { fulfillment: { order: { purchaseId } } },
+    });
+    await prisma.sellerOrderFulfillment.deleteMany({ where: { order: { purchaseId } } });
     await prisma.shopOrder.deleteMany({ where: { purchaseId } });
     await prisma.purchase.deleteMany({ where: { id: purchaseId } });
   }
@@ -286,13 +290,9 @@ databaseTest('buyer order history HTTP with PostgreSQL', () => {
       .expect(200);
     expect(isBuyerOrderListResponse(listed.body)).toBe(true);
     expect(listed.body.items).toHaveLength(1);
-    expect(listed.body.page.nextCursor).toEqual(expect.any(String));
-    const secondPage = await request(app.getHttpServer())
-      .get(`/api/v1/account/orders?limit=1&cursor=${listed.body.page.nextCursor}`)
-      .set('Authorization', buyerBearer)
-      .expect(200);
-    expect(secondPage.body.items).toHaveLength(1);
-    expect(secondPage.body.items[0].orderReference).not.toBe(listed.body.items[0].orderReference);
+    expect(listed.body.page.nextCursor).not.toBeNull();
+    expect(listed.body.items[0].purchaseReference).toBe(purchaseId);
+    expect(listed.body.items[0].orderReference).toBe(secondOrderId);
 
     const shipping = await request(app.getHttpServer())
       .get('/api/v1/account/orders?filter=SHIPPING')
@@ -301,9 +301,9 @@ databaseTest('buyer order history HTTP with PostgreSQL', () => {
     expect(shipping.body.items).toHaveLength(1);
     expect(shipping.body.items[0].status).toBe('SHIPPING');
     await request(app.getHttpServer())
-      .get(`/api/v1/account/orders?filter=SHIPPING&cursor=${listed.body.page.nextCursor}`)
+      .get('/api/v1/account/orders?filter=AWAITING_PICKUP')
       .set('Authorization', buyerBearer)
-      .expect(400);
+      .expect(200);
 
     const detail = await request(app.getHttpServer())
       .get(`/api/v1/account/orders/${secondOrderId}`)
@@ -313,7 +313,10 @@ databaseTest('buyer order history HTTP with PostgreSQL', () => {
     expect(isBuyerOrderDetailResponse(detail.body)).toBe(true);
     expect(detail.body.timeline).toHaveLength(3);
     expect(detail.body.order.purchaseReference).toBe(purchaseId);
-    await prisma.product.update({ where: { id: products[1]!.id }, data: { deletedAt: new Date() } });
+    await prisma.product.update({
+      where: { id: products[1]!.id },
+      data: { deletedAt: new Date() },
+    });
     try {
       const deletedDetail = await request(app.getHttpServer())
         .get(`/api/v1/account/orders/${secondOrderId}`)

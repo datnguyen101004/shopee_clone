@@ -5,7 +5,10 @@ import { Interval } from '@nestjs/schedule';
 
 import { PrismaService } from '../prisma/prisma.service';
 import { PaymentObservationService } from './payment-observation.service';
-import { PAYMENT_PROVIDER, type PaymentProvider } from './payment-provider.port';
+import {
+  PAYMENT_PROVIDER_REGISTRY,
+  type PaymentProviderRegistry,
+} from './payment-provider.registry';
 
 const RECONCILIATION_INTERVAL_MS = 30_000;
 const RECONCILIATION_LEASE_MS = 120_000;
@@ -24,7 +27,7 @@ export class PaymentReconciliationService {
 
   constructor(
     @Inject(PrismaService) private readonly prisma: PrismaService,
-    @Inject(PAYMENT_PROVIDER) private readonly provider: PaymentProvider,
+    @Inject(PAYMENT_PROVIDER_REGISTRY) private readonly providers: PaymentProviderRegistry,
     @Inject(PaymentObservationService)
     private readonly observations: PaymentObservationService,
   ) {}
@@ -47,6 +50,7 @@ export class PaymentReconciliationService {
     const staleCreate = new Date(now.getTime() - RECONCILIATION_INTERVAL_MS);
     const candidates = await this.prisma.paymentAttempt.findMany({
       where: {
+        provider: { in: ['MOMO', 'VNPAY'] },
         status: { in: ['PENDING', 'UNKNOWN', 'PENDING_RECONCILIATION'] },
         AND: [
           {
@@ -77,11 +81,36 @@ export class PaymentReconciliationService {
       if (lease.count !== 1) continue;
       claimed += 1;
       try {
-        const observation = await this.provider.queryPayment({
-          provider: 'MOMO',
+        if (candidate.provider === 'VNPAY' && candidate.expiresAt <= now) {
+          await this.observations.applyProviderObservation({
+            source: 'QUERY',
+            observation: {
+              provider: 'VNPAY',
+              environment: 'SANDBOX',
+              orderId: candidate.orderId,
+              requestId: candidate.requestId,
+              amountMinor: candidate.amountMinor,
+              currency: 'VND',
+              resultCode: 11,
+              message: 'Payment window expired',
+              providerTransactionId: null,
+              observedAt: now,
+            },
+          });
+          await this.prisma.paymentAttempt.updateMany({
+            where: { id: candidate.id, leaseExpiresAt },
+            data: { leaseExpiresAt: null },
+          });
+          continue;
+        }
+        const provider = this.providers.resolve(candidate.provider);
+        const observation = await provider.queryPayment({
+          provider: candidate.provider,
           environment: 'SANDBOX',
           orderId: candidate.orderId,
           requestId: candidate.requestId,
+          transactionDate: candidate.providerCreatedAt ?? candidate.createdAt,
+          queryRequestedAt: now,
         });
         await this.observations.applyProviderObservation({ source: 'QUERY', observation });
         await this.prisma.paymentAttempt.updateMany({

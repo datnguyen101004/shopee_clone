@@ -8,7 +8,7 @@ import {
 } from '@shopee-clone/contracts';
 import { Inject, Injectable } from '@nestjs/common';
 
-import type { Prisma } from '../generated/prisma/client';
+import { Prisma } from '../generated/prisma/client';
 import { VariantStatus } from '../generated/prisma/enums';
 import { isSellableProduct } from '../catalog/sellable-product';
 import { isSellableShop } from '../catalog/sellable-shop';
@@ -34,6 +34,20 @@ import {
   PricingValidationError,
 } from './pricing.errors';
 import { ScheduledDiscountService } from './scheduled-discount.service';
+
+interface VoucherHoldCountRow {
+  voucherId: string;
+  heldCount: bigint | number;
+  buyerHeldCount: bigint | number;
+}
+
+function safeVoucherHoldCount(value: bigint | number): number {
+  const count = Number(value);
+  if (!Number.isSafeInteger(count) || count < 0) {
+    throw new Error('Voucher hold count is outside safe numeric bounds.');
+  }
+  return count;
+}
 
 const quoteCartSelect = {
   id: true,
@@ -543,6 +557,47 @@ export class PricingQuoteService {
         userUsages: { where: { userId }, select: { usedCount: true } },
       },
     });
+
+    // A quote can be generated while another pending online payment is still
+    // holding a voucher. Include those holds in the snapshot so automatic
+    // selection never chooses a voucher that the checkout transaction cannot
+    // acquire moments later. Unit-test transaction doubles may not expose
+    // $queryRaw, so they retain the legacy zero-hold behavior.
+    const holdRows: VoucherHoldCountRow[] =
+      definitions.length > 0 && typeof transaction.$queryRaw === 'function'
+        ? await transaction.$queryRaw<VoucherHoldCountRow[]>(Prisma.sql`
+            SELECT
+              held_voucher."voucher_id" AS "voucherId",
+              COUNT(*)::bigint AS "heldCount",
+              COUNT(*) FILTER (
+                WHERE held_purchase."buyer_id" = ${userId}::uuid
+              )::bigint AS "buyerHeldCount"
+            FROM "purchase_vouchers" held_voucher
+            INNER JOIN "purchases" held_purchase
+              ON held_purchase."id" = held_voucher."purchase_id"
+            INNER JOIN "payment_attempts" attempt
+              ON attempt."purchase_id" = held_purchase."id"
+            WHERE held_voucher."voucher_id" IN (${Prisma.join(
+              definitions.map(({ id }) => Prisma.sql`${id}::uuid`),
+            )})
+              AND attempt."status" IN (
+                'pending'::"purchase_payment_status",
+                'unknown'::"purchase_payment_status",
+                'pending_reconciliation'::"purchase_payment_status"
+              )
+              AND attempt."expires_at" > ${evaluatedAt}
+            GROUP BY held_voucher."voucher_id"
+          `)
+        : [];
+    const holdsByVoucherId = new Map(
+      holdRows.map((row) => [
+        row.voucherId,
+        {
+          heldCount: safeVoucherHoldCount(row.heldCount),
+          buyerHeldCount: safeVoucherHoldCount(row.buyerHeldCount),
+        },
+      ]),
+    );
     const mapped = definitions.map((definition) => ({
       id: definition.id,
       code: definition.code,
@@ -565,8 +620,10 @@ export class PricingQuoteService {
       isEnabled: definition.isEnabled,
       usageLimit: definition.usageLimit,
       usedCount: definition.usedCount,
+      heldCount: holdsByVoucherId.get(definition.id)?.heldCount ?? 0,
       perBuyerLimit: definition.perBuyerLimit,
       buyerUsedCount: definition.userUsages[0]?.usedCount ?? 0,
+      buyerHeldCount: holdsByVoucherId.get(definition.id)?.buyerHeldCount ?? 0,
       productIds: definition.productScopes.map(({ productId }) => productId),
     }));
     return [...new Map(mapped.map((definition) => [definition.id, definition])).values()];

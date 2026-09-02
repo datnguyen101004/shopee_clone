@@ -1,5 +1,6 @@
 import {
   CHECKOUT_IDEMPOTENCY_KEY_PATTERN,
+  PURCHASE_PAYMENT_STATUSES,
   SHOP_ORDER_STATUSES,
   type CheckoutAddressSnapshot,
   type CheckoutPreviewLine,
@@ -15,8 +16,8 @@ export const ORDER_LIST_DEFAULT_LIMIT = 20;
 export const ORDER_LIST_MAX_LIMIT = 50;
 export const ORDER_LIST_FILTERS = [
   'ALL',
+  'PENDING_PAYMENT',
   'PENDING_CONFIRMATION',
-  'AWAITING_PICKUP',
   'SHIPPING',
   'DELIVERED',
   'CANCELLED',
@@ -181,6 +182,7 @@ const slug = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const cursorPattern = /^[A-Za-z0-9_-]{1,2048}$/;
 const problemType = /^https:\/\/shopee-clone\.local\/problems\/[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const statuses = new Set<string>(SHOP_ORDER_STATUSES);
+const paymentStatuses = new Set<string>(PURCHASE_PAYMENT_STATUSES);
 const filters = new Set<string>(ORDER_LIST_FILTERS);
 const actors = new Set<string>(ORDER_TIMELINE_ACTORS);
 const cancellationReasons = new Set<string>(ORDER_CANCELLATION_REASON_CODES);
@@ -229,7 +231,8 @@ export function normalizeOrderCancellationNote(value: unknown): string | null | 
 
 export function parseBuyerOrderListQuery(value: unknown): BuyerOrderListQuery | null {
   if (!isRecord(value) || !exact(value, [], ['filter', 'limit', 'cursor'])) return null;
-  const filter = value.filter === undefined ? 'ALL' : value.filter;
+  const rawFilter = value.filter === undefined ? 'ALL' : value.filter;
+  const filter = rawFilter === 'AWAITING_PICKUP' ? 'SHIPPING' : rawFilter;
   const rawLimit = value.limit === undefined ? `${ORDER_LIST_DEFAULT_LIMIT}` : value.limit;
   if (
     typeof filter !== 'string' ||
@@ -405,9 +408,20 @@ function isOrderHistoryShipping(value: unknown): value is ShippingBreakdown {
   if (value.provider !== 'MOCK') return isShippingBreakdown(value);
   if (
     !exact(value, [
-      'provider', 'version', 'shopId', 'originProvince', 'destinationProvince', 'zone',
-      'shipmentWeightGrams', 'service', 'estimatedDaysMin', 'estimatedDaysMax',
-      'baseFeeMinor', 'zoneSurchargeMinor', 'weightSurchargeMinor', 'shippingFeeMinor',
+      'provider',
+      'version',
+      'shopId',
+      'originProvince',
+      'destinationProvince',
+      'zone',
+      'shipmentWeightGrams',
+      'service',
+      'estimatedDaysMin',
+      'estimatedDaysMax',
+      'baseFeeMinor',
+      'zoneSurchargeMinor',
+      'weightSurchargeMinor',
+      'shippingFeeMinor',
     ]) ||
     value.version !== 'mock-v1' ||
     !isUuid(value.shopId) ||
@@ -423,14 +437,30 @@ function isOrderHistoryShipping(value: unknown): value is ShippingBreakdown {
     !isMoney(value.zoneSurchargeMinor) ||
     !isMoney(value.weightSurchargeMinor) ||
     !isMoney(value.shippingFeeMinor)
-  ) return false;
-  return value.shippingFeeMinor === value.baseFeeMinor + value.zoneSurchargeMinor + value.weightSurchargeMinor;
+  )
+    return false;
+  return (
+    value.shippingFeeMinor ===
+    value.baseFeeMinor + value.zoneSurchargeMinor + value.weightSurchargeMinor
+  );
 }
 
 function isShipment(value: unknown): value is BuyerOrderShipment {
   if (
     !isRecord(value) ||
-    !exact(value, ['provider', 'version', 'trackingCode', 'status', 'service', 'handedOffAt', 'registeredAt', 'deliveredAt', 'returnedAt', 'lastUpdatedAt', 'events']) ||
+    !exact(value, [
+      'provider',
+      'version',
+      'trackingCode',
+      'status',
+      'service',
+      'handedOffAt',
+      'registeredAt',
+      'deliveredAt',
+      'returnedAt',
+      'lastUpdatedAt',
+      'events',
+    ]) ||
     !['MOCK', 'DEMO_CARRIER'].includes(String(value.provider)) ||
     !(value.version === null || isText(value.version, 80)) ||
     !isText(value.trackingCode, 120) ||
@@ -442,17 +472,27 @@ function isShipment(value: unknown): value is BuyerOrderShipment {
     !(value.returnedAt === null || isInstant(value.returnedAt)) ||
     !(value.lastUpdatedAt === null || isInstant(value.lastUpdatedAt)) ||
     !Array.isArray(value.events)
-  ) return false;
-  return value.events.every((event) =>
-    isRecord(event) &&
-    exact(event, ['status', 'previousStatus', 'shipmentVersion', 'externalEventId', 'publicReason', 'carrierOccurredAt', 'occurredAt']) &&
-    isText(event.status, 60) &&
-    (event.previousStatus === null || isText(event.previousStatus, 60)) &&
-    isMoney(event.shipmentVersion) &&
-    (event.externalEventId === null || isText(event.externalEventId, 120)) &&
-    (event.publicReason === null || isText(event.publicReason, 120)) &&
-    (event.carrierOccurredAt === null || isInstant(event.carrierOccurredAt)) &&
-    isInstant(event.occurredAt),
+  )
+    return false;
+  return value.events.every(
+    (event) =>
+      isRecord(event) &&
+      exact(event, [
+        'status',
+        'previousStatus',
+        'shipmentVersion',
+        'externalEventId',
+        'publicReason',
+        'carrierOccurredAt',
+        'occurredAt',
+      ]) &&
+      isText(event.status, 60) &&
+      (event.previousStatus === null || isText(event.previousStatus, 60)) &&
+      isMoney(event.shipmentVersion) &&
+      (event.externalEventId === null || isText(event.externalEventId, 120)) &&
+      (event.publicReason === null || isText(event.publicReason, 120)) &&
+      (event.carrierOccurredAt === null || isInstant(event.carrierOccurredAt)) &&
+      isInstant(event.occurredAt),
   );
 }
 
@@ -499,7 +539,7 @@ export function isBuyerOrderSummary(value: unknown): value is BuyerOrderSummary 
     !isUuid(order.orderReference) ||
     !isUuid(order.purchaseReference) ||
     !statuses.has(order.status) ||
-    order.paymentStatus !== 'UNPAID' ||
+    !paymentStatuses.has(order.paymentStatus) ||
     !isMoney(order.version) ||
     !isInstant(order.createdAt) ||
     !isInstant(order.updatedAt) ||
@@ -701,7 +741,7 @@ export function isBuyerOrderDetailResponse(value: unknown): value is BuyerOrderD
     if (index === 0) {
       if (
         event.previousStatus !== null ||
-        event.status !== 'PENDING_CONFIRMATION' ||
+        (event.status !== 'PENDING_CONFIRMATION' && event.status !== 'PENDING_PAYMENT') ||
         event.actorType !== 'SYSTEM'
       )
         return false;

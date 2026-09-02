@@ -66,6 +66,16 @@ const resultCodes: Readonly<Record<Exclude<FakePaymentOutcome, 'TIMEOUT' | 'MALF
     EXPIRED: 1005,
   };
 
+const vnpayResultCodes: Readonly<
+  Record<Exclude<FakePaymentOutcome, 'TIMEOUT' | 'MALFORMED'>, number>
+> = {
+  SUCCESS: 0,
+  PENDING: 99,
+  FAILURE: 99,
+  CANCELLED: 24,
+  EXPIRED: 11,
+};
+
 function validDelay(value: number | undefined): number {
   if (value === undefined) return 0;
   if (!Number.isSafeInteger(value) || value < 0 || value > 60_000) {
@@ -134,9 +144,15 @@ export class FakePaymentProvider implements PaymentProvider {
           ? 'PENDING'
           : 'PENDING_RECONCILIATION',
       instructions: {
-        payUrl: `https://test-payment.momo.vn/fake/${command.orderId}`,
-        deeplink: `momo://fake/${command.orderId}`,
-        qrCodeUrl: `https://test-payment.momo.vn/fake/qr/${command.orderId}`,
+        payUrl:
+          command.provider === 'VNPAY'
+            ? `https://sandbox.vnpayment.vn/paymentv2/vpcpay.html?fake=${command.orderId}`
+            : `https://test-payment.momo.vn/fake/${command.orderId}`,
+        deeplink: command.provider === 'VNPAY' ? null : `momo://fake/${command.orderId}`,
+        qrCodeUrl:
+          command.provider === 'VNPAY'
+            ? null
+            : `https://test-payment.momo.vn/fake/qr/${command.orderId}`,
       },
     };
   }
@@ -172,6 +188,44 @@ export class FakePaymentProvider implements PaymentProvider {
   verifyNotification(envelope: ProviderNotificationEnvelope): NotificationVerificationResult {
     if (envelope.signature !== FAKE_NOTIFICATION_SIGNATURE) {
       return { valid: false, reason: 'INVALID_SIGNATURE' };
+    }
+
+    const vnpayReference = envelope.fields.vnp_TxnRef;
+    if (typeof vnpayReference === 'string') {
+      const rawAmount = bigintField(envelope.fields.vnp_Amount);
+      const rawResponseCode = envelope.fields.vnp_ResponseCode;
+      const responseCode =
+        typeof rawResponseCode === 'string' && /^\d{2}$/.test(rawResponseCode)
+          ? Number(rawResponseCode)
+          : integerField(rawResponseCode);
+      const transaction = bigintField(envelope.fields.vnp_TransactionNo);
+      if (rawAmount === null || rawAmount % 100n !== 0n || responseCode === null) {
+        return { valid: false, reason: 'INVALID_AMOUNT' };
+      }
+      const resultCode =
+        responseCode === 0 && envelope.fields.vnp_TransactionStatus === '00' ? 0 : responseCode;
+      return {
+        valid: true,
+        observation: {
+          provider: 'VNPAY',
+          environment: 'SANDBOX',
+          orderId: vnpayReference,
+          requestId: vnpayReference,
+          amountMinor: rawAmount / 100n,
+          currency: 'VND',
+          resultCode,
+          message: null,
+          providerTransactionId: transaction,
+          observedAt: envelope.receivedAt,
+        },
+        fingerprint: createHash('sha256')
+          .update(JSON.stringify(Object.entries(envelope.fields).sort()))
+          .digest('hex'),
+        sanitizedMetadata: {
+          responseCode,
+          transactionStatus: envelope.fields.vnp_TransactionStatus ?? null,
+        },
+      };
     }
 
     const orderId = envelope.fields.orderId;
@@ -254,7 +308,11 @@ export class FakePaymentProvider implements PaymentProvider {
     }
     return {
       ...correlation,
-      resultCode: behavior.resultCode ?? resultCodes[behavior.outcome],
+      resultCode:
+        behavior.resultCode ??
+        (correlation.provider === 'VNPAY'
+          ? vnpayResultCodes[behavior.outcome]
+          : resultCodes[behavior.outcome]),
       message: `fake:${behavior.outcome.toLowerCase()}`,
       providerTransactionId:
         behavior.providerTransactionId ?? stableProviderTransactionId(correlation),
@@ -266,6 +324,27 @@ export class FakePaymentProvider implements PaymentProvider {
     correlation: PaymentCorrelation,
     plan: FakeNotificationPlan,
   ): ProviderNotificationEnvelope {
+    if (correlation.provider === 'VNPAY') {
+      return {
+        fields: {
+          vnp_Amount: (correlation.amountMinor * 100n).toString(),
+          vnp_Command: 'pay',
+          vnp_CurrCode: 'VND',
+          vnp_ResponseCode: String(plan.resultCode ?? vnpayResultCodes[plan.outcome]).padStart(
+            2,
+            '0',
+          ),
+          vnp_TmnCode: 'FAKE_VNPAY',
+          vnp_TransactionNo: (
+            plan.providerTransactionId ?? stableProviderTransactionId(correlation)
+          ).toString(),
+          vnp_TransactionStatus: plan.outcome === 'SUCCESS' ? '00' : '02',
+          vnp_TxnRef: correlation.orderId,
+        },
+        signature: FAKE_NOTIFICATION_SIGNATURE,
+        receivedAt: new Date(),
+      };
+    }
     return {
       fields: {
         orderId: correlation.orderId,

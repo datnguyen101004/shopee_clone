@@ -1,6 +1,7 @@
 import type { ShopOrderStatus } from '@shopee-clone/contracts';
 
 export const ORDER_TRANSITIONS: Readonly<Record<ShopOrderStatus, readonly ShopOrderStatus[]>> = {
+  PENDING_PAYMENT: ['PENDING_CONFIRMATION', 'CANCELLED'],
   PENDING_CONFIRMATION: ['AWAITING_PICKUP', 'CANCELLED'],
   AWAITING_PICKUP: ['SHIPPING', 'CANCELLED'],
   SHIPPING: ['DELIVERED'],

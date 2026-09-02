@@ -1,6 +1,7 @@
 export const PAYMENT_PROVIDER = Symbol('PAYMENT_PROVIDER');
+export const VNPAY_PROVIDER = Symbol('VNPAY_PROVIDER');
 
-export type PaymentProviderName = 'MOMO';
+export type PaymentProviderName = 'MOMO' | 'VNPAY';
 export type PaymentProviderEnvironment = 'SANDBOX';
 
 export interface PaymentCorrelation {
@@ -17,6 +18,10 @@ export interface CreatePaymentCommand extends PaymentCorrelation {
   redirectUrl: string;
   ipnUrl: string;
   expiresAt: Date;
+  /** Immutable attempt creation time used for deterministic redirect replay. */
+  createdAt?: Date;
+  /** Express-resolved client address, already subject to the app trusted-proxy policy. */
+  clientIp?: string;
 }
 
 export interface QueryPaymentCommand {
@@ -24,6 +29,11 @@ export interface QueryPaymentCommand {
   environment: PaymentProviderEnvironment;
   orderId: string;
   requestId: string;
+  /** Original provider create time required by providers such as VNPAY QueryDR. */
+  transactionDate?: Date;
+  /** Time of this query request, injectable for deterministic signing tests. */
+  queryRequestedAt?: Date;
+  clientIp?: string;
 }
 
 export interface RefundPaymentCommand extends PaymentCorrelation {
@@ -68,7 +78,7 @@ export interface ProviderNotificationEnvelope {
 }
 
 export type NotificationVerificationFailure =
-  'MALFORMED' | 'INVALID_SIGNATURE' | 'UNSUPPORTED_PROVIDER';
+  'MALFORMED' | 'INVALID_AMOUNT' | 'INVALID_SIGNATURE' | 'UNSUPPORTED_PROVIDER';
 
 export type NotificationVerificationResult =
   | {

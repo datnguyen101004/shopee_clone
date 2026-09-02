@@ -25,6 +25,8 @@ import {
   CheckoutPurchaseNotFoundError,
   CheckoutUnavailableError,
   CheckoutValidationError,
+  PaymentRetryActiveError,
+  PaymentRetryNotAllowedError,
 } from './checkout.errors';
 
 @Catch()
@@ -87,6 +89,26 @@ export class CheckoutExceptionFilter implements ExceptionFilter {
       );
       return;
     }
+    if (exception instanceof PaymentRetryActiveError) {
+      this.problem(
+        response,
+        409,
+        'payment-retry-active',
+        'Payment retry already in progress',
+        'An active payment attempt already exists for this purchase.',
+      );
+      return;
+    }
+    if (exception instanceof PaymentRetryNotAllowedError) {
+      this.problem(
+        response,
+        409,
+        'payment-retry-not-allowed',
+        'Payment retry unavailable',
+        'This payment cannot be retried because its hold window has ended or it is already settled.',
+      );
+      return;
+    }
     if (
       exception instanceof CheckoutCartConflictError ||
       exception instanceof PricingConflictError
@@ -141,7 +163,14 @@ export class CheckoutExceptionFilter implements ExceptionFilter {
       return;
     }
     if (exception instanceof CheckoutInventoryConflictError) {
-      this.problem(response, 409, 'checkout-inventory-conflict', 'Inventory changed', 'Some selected items no longer have enough available stock. Refresh the checkout preview and try again.', { code: 'INVENTORY_INSUFFICIENT', availableQuantity: exception.availableQuantity });
+      this.problem(
+        response,
+        409,
+        'checkout-inventory-conflict',
+        'Inventory changed',
+        'Some selected items no longer have enough available stock. Refresh the checkout preview and try again.',
+        { code: 'INVENTORY_INSUFFICIENT', availableQuantity: exception.availableQuantity },
+      );
       return;
     }
     if (exception instanceof CheckoutUnavailableError) {

@@ -1,0 +1,581 @@
+{
+  "capturedAt": "2026-09-03T12:32:35.202Z",
+  "source": "Local Next.js + NestJS + PostgreSQL, authenticated accounts, no API mocks",
+  "captures": [
+    {
+      "role": "buyer",
+      "file": "buyer-home.png",
+      "route": "/",
+      "capturedAt": "2026-09-03T12:29:57.531Z",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "image": {
+        "width": 1440,
+        "height": 3078
+      }
+    },
+    {
+      "role": "buyer",
+      "file": "buyer-catalog.png",
+      "route": "/search?q=iphone",
+      "capturedAt": "2026-09-03T12:29:59.305Z",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "image": {
+        "width": 1440,
+        "height": 1000
+      }
+    },
+    {
+      "role": "buyer",
+      "file": "buyer-product.png",
+      "route": "/products/iphone-12-lock-2f9a733188fd",
+      "capturedAt": "2026-09-03T12:30:01.368Z",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "image": {
+        "width": 1440,
+        "height": 2220
+      }
+    },
+    {
+      "role": "buyer",
+      "file": "buyer-shop.png",
+      "route": "/shops/dien-thoai-hay-dataset",
+      "capturedAt": "2026-09-03T12:30:03.313Z",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "image": {
+        "width": 1440,
+        "height": 1000
+      }
+    },
+    {
+      "role": "buyer",
+      "file": "buyer-orders.png",
+      "route": "/account/orders",
+      "capturedAt": "2026-09-03T12:30:06.240Z",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "image": {
+        "width": 1440,
+        "height": 1000
+      }
+    },
+    {
+      "role": "buyer",
+      "file": "buyer-order-detail.png",
+      "route": "/account/orders/769b710a-701b-41d6-8715-9b53728cd5a2",
+      "capturedAt": "2026-09-03T12:30:07.812Z",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "image": {
+        "width": 1440,
+        "height": 1482
+      }
+    },
+    {
+      "role": "buyer",
+      "file": "buyer-returns.png",
+      "route": "/account/returns",
+      "capturedAt": "2026-09-03T12:30:09.251Z",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "image": {
+        "width": 1440,
+        "height": 1000
+      }
+    },
+    {
+      "role": "buyer",
+      "file": "buyer-favorites.png",
+      "route": "/account/favorites",
+      "capturedAt": "2026-09-03T12:30:10.661Z",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "image": {
+        "width": 1440,
+        "height": 1000
+      }
+    },
+    {
+      "role": "buyer",
+      "file": "buyer-recently-viewed.png",
+      "route": "/account/recently-viewed",
+      "capturedAt": "2026-09-03T12:30:12.314Z",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "image": {
+        "width": 1440,
+        "height": 1000
+      }
+    },
+    {
+      "role": "buyer",
+      "file": "buyer-followed-shops.png",
+      "route": "/account/followed-shops",
+      "capturedAt": "2026-09-03T12:30:13.858Z",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "image": {
+        "width": 1440,
+        "height": 1000
+      }
+    },
+    {
+      "role": "buyer",
+      "file": "buyer-profile.png",
+      "route": "/account/profile",
+      "capturedAt": "2026-09-03T12:30:15.261Z",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "image": {
+        "width": 1440,
+        "height": 1000
+      }
+    },
+    {
+      "role": "buyer",
+      "file": "buyer-addresses.png",
+      "route": "/account/addresses",
+      "capturedAt": "2026-09-03T12:30:16.678Z",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "image": {
+        "width": 1440,
+        "height": 1000
+      }
+    },
+    {
+      "role": "buyer",
+      "file": "buyer-notifications.png",
+      "route": "/account/notifications",
+      "capturedAt": "2026-09-03T12:30:18.162Z",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "image": {
+        "width": 1440,
+        "height": 1000
+      }
+    },
+    {
+      "role": "buyer",
+      "file": "buyer-reports.png",
+      "route": "/account/reports",
+      "capturedAt": "2026-09-03T12:30:19.527Z",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "image": {
+        "width": 1440,
+        "height": 1000
+      }
+    },
+    {
+      "role": "seller",
+      "file": "seller-dashboard.png",
+      "route": "/seller",
+      "capturedAt": "2026-09-03T12:30:31.610Z",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "image": {
+        "width": 1440,
+        "height": 1000
+      }
+    },
+    {
+      "role": "seller",
+      "file": "seller-products.png",
+      "route": "/seller/products",
+      "capturedAt": "2026-09-03T12:30:33.442Z",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "image": {
+        "width": 1440,
+        "height": 1000
+      }
+    },
+    {
+      "role": "seller",
+      "file": "seller-product-edit.png",
+      "route": "/seller/products/ffd38b51-10f9-49dd-bd92-df79b9bcfcdc/edit",
+      "capturedAt": "2026-09-03T12:30:35.552Z",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "image": {
+        "width": 1440,
+        "height": 2200
+      }
+    },
+    {
+      "role": "seller",
+      "file": "seller-product-new.png",
+      "route": "/seller/products/new",
+      "capturedAt": "2026-09-03T12:30:37.103Z",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "image": {
+        "width": 1440,
+        "height": 1915
+      }
+    },
+    {
+      "role": "seller",
+      "file": "seller-inventory.png",
+      "route": "/seller/inventory",
+      "capturedAt": "2026-09-03T12:30:38.474Z",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "image": {
+        "width": 1440,
+        "height": 1000
+      }
+    },
+    {
+      "role": "seller",
+      "file": "seller-orders.png",
+      "route": "/seller/orders",
+      "capturedAt": "2026-09-03T12:30:39.898Z",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "image": {
+        "width": 1440,
+        "height": 1000
+      }
+    },
+    {
+      "role": "seller",
+      "file": "seller-promotions.png",
+      "route": "/seller/promotions",
+      "capturedAt": "2026-09-03T12:30:41.444Z",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "image": {
+        "width": 1440,
+        "height": 1752
+      }
+    },
+    {
+      "role": "seller",
+      "file": "seller-reviews.png",
+      "route": "/seller/reviews",
+      "capturedAt": "2026-09-03T12:30:42.816Z",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "image": {
+        "width": 1440,
+        "height": 1000
+      }
+    },
+    {
+      "role": "seller",
+      "file": "seller-returns.png",
+      "route": "/seller/returns",
+      "capturedAt": "2026-09-03T12:30:44.225Z",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "image": {
+        "width": 1440,
+        "height": 1000
+      }
+    },
+    {
+      "role": "seller",
+      "file": "seller-shop.png",
+      "route": "/seller/shop",
+      "capturedAt": "2026-09-03T12:30:45.620Z",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "image": {
+        "width": 1440,
+        "height": 1000
+      }
+    },
+    {
+      "role": "seller",
+      "file": "seller-moderation.png",
+      "route": "/seller/moderation",
+      "capturedAt": "2026-09-03T12:30:47.003Z",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "image": {
+        "width": 1440,
+        "height": 1000
+      }
+    },
+    {
+      "role": "admin",
+      "file": "admin-dashboard.png",
+      "route": "/admin",
+      "capturedAt": "2026-09-03T12:30:52.668Z",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "image": {
+        "width": 1440,
+        "height": 1000
+      }
+    },
+    {
+      "role": "admin",
+      "file": "admin-users.png",
+      "route": "/admin/users",
+      "capturedAt": "2026-09-03T12:30:53.830Z",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "image": {
+        "width": 1440,
+        "height": 1000
+      }
+    },
+    {
+      "role": "admin",
+      "file": "admin-shops.png",
+      "route": "/admin/shops",
+      "capturedAt": "2026-09-03T12:30:55.025Z",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "image": {
+        "width": 1440,
+        "height": 1000
+      }
+    },
+    {
+      "role": "admin",
+      "file": "admin-products.png",
+      "route": "/admin/products",
+      "capturedAt": "2026-09-03T12:30:56.742Z",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "image": {
+        "width": 1440,
+        "height": 1150
+      }
+    },
+    {
+      "role": "admin",
+      "file": "admin-categories.png",
+      "route": "/admin/categories",
+      "capturedAt": "2026-09-03T12:30:58.119Z",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "image": {
+        "width": 1440,
+        "height": 1000
+      }
+    },
+    {
+      "role": "admin",
+      "file": "admin-homepage.png",
+      "route": "/admin/homepage",
+      "capturedAt": "2026-09-03T12:30:59.472Z",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "image": {
+        "width": 1440,
+        "height": 1000
+      }
+    },
+    {
+      "role": "admin",
+      "file": "admin-moderation.png",
+      "route": "/admin/moderation",
+      "capturedAt": "2026-09-03T12:31:01.146Z",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "image": {
+        "width": 1440,
+        "height": 1150
+      }
+    },
+    {
+      "role": "admin",
+      "file": "admin-returns.png",
+      "route": "/admin/returns",
+      "capturedAt": "2026-09-03T12:31:02.578Z",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "image": {
+        "width": 1440,
+        "height": 1000
+      }
+    },
+    {
+      "role": "admin",
+      "file": "admin-audit.png",
+      "route": "/admin/audit",
+      "capturedAt": "2026-09-03T12:31:03.992Z",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "image": {
+        "width": 1440,
+        "height": 1000
+      }
+    },
+    {
+      "role": "public",
+      "file": "login.png",
+      "route": "/login",
+      "capturedAt": "2026-09-03T12:32:17.445Z",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "image": {
+        "width": 1440,
+        "height": 1000
+      }
+    },
+    {
+      "role": "buyer",
+      "file": "buyer-cart.png",
+      "route": "/cart",
+      "capturedAt": "2026-09-03T12:32:19.698Z",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "image": {
+        "width": 1440,
+        "height": 2632
+      }
+    },
+    {
+      "role": "buyer",
+      "file": "buyer-checkout.png",
+      "route": "/checkout",
+      "capturedAt": "2026-09-03T12:32:20.104Z",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "image": {
+        "width": 1440,
+        "height": 2044
+      }
+    },
+    {
+      "role": "buyer",
+      "file": "buyer-notification-settings.png",
+      "route": "/account/profile/notifications",
+      "capturedAt": "2026-09-03T12:32:23.505Z",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "image": {
+        "width": 1440,
+        "height": 1000
+      }
+    },
+    {
+      "role": "buyer",
+      "file": "buyer-chat.png",
+      "route": "/products/iphone-12-lock-2f9a733188fd",
+      "capturedAt": "2026-09-03T12:32:25.528Z",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "image": {
+        "width": 1440,
+        "height": 1000
+      }
+    },
+    {
+      "role": "seller",
+      "file": "seller-chat.png",
+      "route": "/seller",
+      "capturedAt": "2026-09-03T12:32:29.623Z",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "image": {
+        "width": 1440,
+        "height": 1000
+      }
+    },
+    {
+      "role": "admin",
+      "file": "admin-return-detail.png",
+      "route": "/admin/returns/7b168290-24fa-467a-a4d7-240fb79e70f6",
+      "capturedAt": "2026-09-03T12:32:35.076Z",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "image": {
+        "width": 1440,
+        "height": 1794
+      }
+    }
+  ],
+  "failures": []
+}

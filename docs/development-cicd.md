@@ -2,7 +2,7 @@
 
 The `Development CICD` workflow is started manually from the GitHub Actions **Run workflow** button.
 It publishes immutable API and migrator images to Docker Hub, applies pending Prisma migrations to
-Aurora from the EC2 host, starts the production Elasticsearch service, and recreates the API
+Amazon RDS for PostgreSQL from the EC2 host, starts the production Elasticsearch service, and recreates the API
 container. Pushes to `development` do not start a deployment automatically. E2E and seed commands
 are deliberately excluded from this demo pipeline.
 
@@ -116,7 +116,7 @@ Attach this minimum deployment policy, replacing `AWS_ACCOUNT_ID` if the instanc
   uses `ELASTICSEARCH_CONTAINER_URL` when provided, otherwise `http://elasticsearch:9200`.
 - The EC2 instance has enough memory for Elasticsearch (the default heap/container limit is 512 MiB /
   1 GiB) and has Docker permission to create its volume.
-- The EC2 security group can reach Aurora, and the instance role has any application permissions
+- The EC2 security group can reach RDS PostgreSQL, and the instance role has any application permissions
   needed for S3 or other AWS services.
 - If either Docker Hub repository is private, perform `docker login` once on EC2 with a read-only
   token. Public repositories need no EC2 registry credentials.

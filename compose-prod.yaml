@@ -3,7 +3,7 @@ name: shopee-clone-production
 x-api-environment: &api-environment
   NODE_ENV: production
   PORT: '3001'
-  DATABASE_URL: ${DATABASE_URL:?Production Aurora DATABASE_URL is required}
+  DATABASE_URL: ${DATABASE_URL:?Production RDS PostgreSQL DATABASE_URL is required}
   # The production stack owns Elasticsearch, so the API resolves it over the
   # Compose network instead of trying to reach localhost inside its container.
   ELASTICSEARCH_URL: ${ELASTICSEARCH_CONTAINER_URL:-http://elasticsearch:9200}

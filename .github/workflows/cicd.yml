@@ -146,7 +146,7 @@ jobs:
           cache-to: type=gha,mode=max,scope=api-migrator
 
   deploy:
-    name: Migrate Aurora and deploy EC2
+    name: Migrate RDS PostgreSQL and deploy EC2
     needs: publish-images
     if: github.ref == 'refs/heads/development'
     runs-on: ubuntu-latest

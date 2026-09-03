@@ -129,17 +129,23 @@ export function relevanceScore(
       score += 80;
       tokenMatched = true;
     }
-    if (category.includes(token)) {
-      score += 50;
-      tokenMatched = true;
-    }
-    if (shop.includes(token)) {
-      score += 30;
-      tokenMatched = true;
-    }
-    if (description.includes(token)) {
-      score += 10;
-      tokenMatched = true;
+    // Very short Vietnamese tokens are ambiguous after accent folding
+    // (for example, "tu" matches both "tủ" and "tử"). Keep the fallback
+    // aligned with Elasticsearch by requiring a product-name match before
+    // considering broad category/shop/description fields for those tokens.
+    if (token.length > 2) {
+      if (category.includes(token)) {
+        score += 50;
+        tokenMatched = true;
+      }
+      if (shop.includes(token)) {
+        score += 30;
+        tokenMatched = true;
+      }
+      if (description.includes(token)) {
+        score += 10;
+        tokenMatched = true;
+      }
     }
     if (tokenMatched) matchedTokens += 1;
   }

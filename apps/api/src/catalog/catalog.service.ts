@@ -31,6 +31,8 @@ import {
 type CatalogCandidate = Awaited<ReturnType<CatalogRepository['findCandidates']>>[number];
 type ActiveCategory = Awaited<ReturnType<CatalogRepository['findActiveCategories']>>[number];
 
+const MINIMUM_SEARCH_CANDIDATES = 24;
+
 interface DisplayableCatalogCandidate {
   card: CatalogProductCard;
   categoryId: string;
@@ -379,7 +381,10 @@ export class CatalogService extends CatalogPublicFacade {
 
     const categories = await this.repository.findActiveCategories();
     const start = (query.page - 1) * query.pageSize;
-    const fetchSize = Math.min(Math.max(query.pageSize * 2, query.pageSize), 96);
+    const fetchSize = Math.min(
+      Math.max(query.pageSize * 2, query.pageSize, MINIMUM_SEARCH_CANDIDATES),
+      96,
+    );
     const candidateIds: string[] = [];
     const seenIds = new Set<string>();
     let nextFrom = start;

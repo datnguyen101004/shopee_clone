@@ -28,6 +28,9 @@ const moduleTypeMap = {
   [HomepageModuleType.DAILY_RECOMMENDATIONS]: 'daily-recommendations',
 } as const;
 
+const DAILY_RECOMMENDATION_LIMIT = 12;
+const DAILY_RECOMMENDATION_CANDIDATE_LIMIT = 48;
+
 function safePath(path: string): boolean {
   return path === '/' || path.startsWith('/search?') || /^\/products\/[A-Za-z0-9%_-]+$/.test(path);
 }
@@ -43,7 +46,7 @@ function diversityKey(value: string): string {
 
 function diversifyRecommendations(
   products: readonly CatalogProductCard[],
-  maximum = 24,
+  maximum = DAILY_RECOMMENDATION_LIMIT,
 ): CatalogProductCard[] {
   const selected: CatalogProductCard[] = [];
   const seen = new Set<string>();
@@ -61,6 +64,22 @@ function diversifyRecommendations(
     selected.push(product);
     shopCounts.set(shopKey, (shopCounts.get(shopKey) ?? 0) + 1);
     categoryCounts.set(categoryKey, (categoryCounts.get(categoryKey) ?? 0) + 1);
+  }
+  return selected;
+}
+
+function fillRecommendations(
+  primary: readonly CatalogProductCard[],
+  fallback: readonly CatalogProductCard[],
+  maximum = DAILY_RECOMMENDATION_LIMIT,
+): CatalogProductCard[] {
+  const selected = diversifyRecommendations(primary, maximum);
+  const seen = new Set(selected.map((product) => product.id));
+  for (const product of fallback) {
+    if (selected.length >= maximum) break;
+    if (seen.has(product.id)) continue;
+    seen.add(product.id);
+    selected.push(product);
   }
   return selected;
 }
@@ -116,12 +135,35 @@ export class HomepageService {
       promotion: null,
       sort: buyerId ? 'relevance' : 'best-selling',
       page: 1,
-      pageSize: 48,
+      pageSize: DAILY_RECOMMENDATION_CANDIDATE_LIMIT,
       recommendationSurface: 'daily-recommendations',
     };
+    const guestFallbackQuery: NormalizedCatalogQuery = {
+      ...query,
+      sort: 'best-selling',
+    };
+
+    let primaryItems: CatalogProductCard[] = [];
     try {
-      const response = await this.catalog.getProducts(query, buyerId);
-      const selected = diversifyRecommendations(response.items);
+      primaryItems = (await this.catalog.getProducts(query, buyerId)).items;
+    } catch {
+      // A buyer-specific recommendation failure can still be filled from the
+      // same high-score guest baseline used for anonymous visitors.
+    }
+
+    try {
+      let fallbackItems: readonly CatalogProductCard[] = [];
+      const primarySelection = diversifyRecommendations(primaryItems);
+      if (primarySelection.length < DAILY_RECOMMENDATION_LIMIT) {
+        if (buyerId) {
+          fallbackItems = (await this.catalog.getProducts(guestFallbackQuery, null)).items;
+        } else {
+          // Guest results are already sorted by the baseline score; reuse the
+          // same response to relax diversity caps without another request.
+          fallbackItems = primaryItems;
+        }
+      }
+      const selected = fillRecommendations(primaryItems, fallbackItems);
       return selected.length ? selected.map(homepageProductFromCatalog) : null;
     } catch {
       return null;

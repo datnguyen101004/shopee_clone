@@ -95,10 +95,19 @@ const fuzzySearchFields = [
   'description',
 ] as const;
 
+const strictSearchFields = ['name', 'category_path_names', 'shop_name', 'attributes'] as const;
+
+type LexicalSearchMode = 'strict' | 'combined';
+
 // Keep the ranking hierarchy explicit: exact phrase > exact term > fuzzy fallback.
 const EXACT_PHRASE_BOOST = 10;
 const EXACT_TERM_BOOST = 5;
 const FUZZY_BOOST = 1;
+const MINIMUM_SEARCH_RESULTS = 24;
+// Personalization is a tie-breaker only. The stored script returns a bounded
+// score around 0..1,001,000, so this weight keeps its contribution below a
+// practical lexical-score precision while preserving deterministic ties.
+const PERSONALIZATION_TIE_BREAK_WEIGHT = 1e-9;
 const PRODUCT_NAME_COMPLETION_SUGGESTER = 'product_name_completion';
 const PRODUCT_NAME_TERM_SUGGESTER = 'product_name_term';
 const PRODUCT_NAME_PHRASE_SUGGESTER = 'product_name_phrase';
@@ -160,31 +169,34 @@ function correctionSuggestionRequest(query: string, limit: number): Record<strin
   };
 }
 
-function fuzzyLexicalClauses(query: string): unknown[] {
+function fuzzyLexicalClauses(query: string, operator: 'and' | 'or' = 'and'): unknown[] {
   const fields = fuzzySearchFields.map((field) => field.split('^')[0]!);
   const tokens = normalizeProductSearchText(query).split(' ').filter(Boolean);
   if (tokens.length === 0) return [];
+  const tokenClauses = tokens.map((token) => ({
+    bool: {
+      should: fields.flatMap((field) => [
+        {
+          match: {
+            [field]: {
+              query: token,
+              operator: 'and',
+              fuzziness: 'AUTO',
+              prefix_length: 1,
+              max_expansions: 50,
+            },
+          },
+        },
+        { match_bool_prefix: { [field]: { query: token, operator: 'and' } } },
+      ]),
+      minimum_should_match: 1,
+    },
+  }));
   const tokenAwareCrossField = {
     bool: {
-      must: tokens.map((token) => ({
-        bool: {
-          should: fields.flatMap((field) => [
-            {
-              match: {
-                [field]: {
-                  query: token,
-                  operator: 'and',
-                  fuzziness: 'AUTO',
-                  prefix_length: 1,
-                  max_expansions: 50,
-                },
-              },
-            },
-            { match_bool_prefix: { [field]: { query: token, operator: 'and' } } },
-          ]),
-          minimum_should_match: 1,
-        },
-      })),
+      ...(operator === 'and'
+        ? { must: tokenClauses }
+        : { should: tokenClauses, minimum_should_match: 1 }),
       boost: FUZZY_BOOST,
     },
   };
@@ -196,7 +208,7 @@ function fuzzyLexicalClauses(query: string): unknown[] {
         query,
         type: 'best_fields',
         fields: fuzzySearchFields,
-        operator: 'and',
+        operator,
         fuzziness: 'AUTO',
         prefix_length: 1,
         max_expansions: 50,
@@ -207,7 +219,7 @@ function fuzzyLexicalClauses(query: string): unknown[] {
       match_bool_prefix: {
         [field.split('^')[0]!]: {
           query,
-          operator: 'and',
+          operator,
           boost: FUZZY_BOOST,
         },
       },
@@ -215,55 +227,89 @@ function fuzzyLexicalClauses(query: string): unknown[] {
   ];
 }
 
-function lexicalQuery(query: NormalizedCatalogQuery): unknown {
+function strictLexicalClauses(query: string): unknown[] {
+  const normalized = normalizeProductSearchText(query);
+  const tokens = normalized.split(' ').filter(Boolean);
+  const includeCategory = !(tokens.length === 1 && tokens[0]!.length <= 2);
+  const fields = includeCategory
+    ? strictSearchFields
+    : strictSearchFields.filter((field) => field !== 'category_path_names');
+  return [
+    { term: { 'name.normalized': { value: normalized, boost: EXACT_TERM_BOOST } } },
+    { term: { 'name.exact': { value: query, boost: EXACT_TERM_BOOST } } },
+    {
+      constant_score: {
+        filter: { term: { shop_name_normalized: normalized } },
+        boost: EXACT_TERM_BOOST,
+      },
+    },
+    {
+      constant_score: {
+        filter: { term: { 'shop_name.exact': query } },
+        boost: EXACT_TERM_BOOST,
+      },
+    },
+    {
+      multi_match: {
+        query,
+        type: 'cross_fields',
+        fields,
+        operator: 'and',
+        boost: EXACT_TERM_BOOST,
+      },
+    },
+    { match_phrase: { name: { query, boost: EXACT_PHRASE_BOOST } } },
+    { match_phrase: { shop_name: { query, boost: EXACT_PHRASE_BOOST } } },
+    { match: { name: { query, operator: 'and', boost: EXACT_TERM_BOOST } } },
+    ...(includeCategory
+      ? [
+          {
+            match: {
+              category_path_names: { query, operator: 'and', boost: EXACT_TERM_BOOST },
+            },
+          },
+        ]
+      : []),
+    { match: { shop_name: { query, operator: 'and', boost: EXACT_TERM_BOOST } } },
+    { match: { attributes: { query, operator: 'and', boost: EXACT_TERM_BOOST } } },
+  ];
+}
+
+function lexicalQuery(
+  query: NormalizedCatalogQuery,
+  mode: LexicalSearchMode = 'combined',
+): unknown {
   const filters = filtersFor(query);
   if (!query.q) return { bool: { filter: filters } };
 
-  const normalized = normalizeProductSearchText(query.q);
+  const strictClauses = strictLexicalClauses(query.q);
+  const clauses =
+    mode === 'strict'
+      ? strictClauses
+      : [
+          ...strictClauses.slice(0, 4),
+          {
+            multi_match: {
+              query: query.q,
+              type: 'cross_fields',
+              fields: strictSearchFields,
+              operator: 'or',
+              minimum_should_match: 1,
+              boost: EXACT_TERM_BOOST,
+            },
+          },
+          ...strictClauses.slice(5),
+          {
+            match: { description: { query: query.q, operator: 'or', boost: FUZZY_BOOST } },
+          },
+          ...fuzzyLexicalClauses(query.q, 'or'),
+        ];
   return {
     function_score: {
       query: {
         bool: {
           filter: filters,
-          should: [
-            { term: { 'name.normalized': { value: normalized, boost: EXACT_TERM_BOOST } } },
-            { term: { 'name.exact': { value: query.q, boost: EXACT_TERM_BOOST } } },
-            {
-              constant_score: {
-                filter: { term: { shop_name_normalized: normalized } },
-                boost: EXACT_TERM_BOOST,
-              },
-            },
-            {
-              constant_score: {
-                filter: { term: { 'shop_name.exact': query.q } },
-                boost: EXACT_TERM_BOOST,
-              },
-            },
-            {
-              multi_match: {
-                query: query.q,
-                type: 'cross_fields',
-                fields: fuzzySearchFields,
-                operator: 'and',
-                boost: EXACT_TERM_BOOST,
-              },
-            },
-            { match_phrase: { name: { query: query.q, boost: EXACT_PHRASE_BOOST } } },
-            { match_phrase: { shop_name: { query: query.q, boost: EXACT_PHRASE_BOOST } } },
-            { match: { name: { query: query.q, operator: 'and', boost: EXACT_TERM_BOOST } } },
-            {
-              match: {
-                category_path_names: { query: query.q, operator: 'and', boost: EXACT_TERM_BOOST },
-              },
-            },
-            { match: { shop_name: { query: query.q, operator: 'and', boost: EXACT_TERM_BOOST } } },
-            { match: { attributes: { query: query.q, operator: 'and', boost: EXACT_TERM_BOOST } } },
-            {
-              match: { description: { query: query.q, operator: 'and', boost: EXACT_TERM_BOOST } },
-            },
-            ...fuzzyLexicalClauses(query.q),
-          ],
+          should: clauses,
           minimum_should_match: 1,
         },
       },
@@ -677,19 +723,29 @@ function activeRankingModel(value: unknown): ActiveRankingModel | null {
 function personalizedLexicalQuery(
   query: NormalizedCatalogQuery,
   context: PersonalizedSearchContext,
+  mode: LexicalSearchMode = 'combined',
 ): unknown {
   return {
-    script_score: {
-      query: lexicalQuery(query),
-      script: {
-        id: PERSONALIZED_RANKING_SCRIPT_ID,
-        params: {
-          intercept: context.model.intercept,
-          weights: context.model.featureWeights,
-          profile: context.profile,
-          nowMillis: Date.now(),
+    function_score: {
+      query: lexicalQuery(query, mode),
+      functions: [
+        {
+          script_score: {
+            script: {
+              id: PERSONALIZED_RANKING_SCRIPT_ID,
+              params: {
+                intercept: context.model.intercept,
+                weights: context.model.featureWeights,
+                profile: context.profile,
+                nowMillis: Date.now(),
+              },
+            },
+          },
+          weight: PERSONALIZATION_TIE_BREAK_WEIGHT,
         },
-      },
+      ],
+      score_mode: 'sum',
+      boost_mode: 'sum',
     },
   };
 }
@@ -739,7 +795,7 @@ export class ProductSearchQueryService {
 
     if (context) {
       try {
-        return await this.executeSearch(query, from, size, context);
+        return await this.executeSearchWithLexicalFallback(query, from, size, context);
       } catch (error) {
         this.logger.warn(
           `Catalogue search personalization fallback reason=script-failure model=${context.model.modelVersion} index=${this.config.elasticsearch.productIndexAlias}`,
@@ -748,7 +804,19 @@ export class ProductSearchQueryService {
         void error;
       }
     }
-    return this.executeSearch(query, from, size);
+    return this.executeSearchWithLexicalFallback(query, from, size);
+  }
+
+  private async executeSearchWithLexicalFallback(
+    query: NormalizedCatalogQuery,
+    from: number,
+    size: number,
+    context?: PersonalizedSearchContext,
+  ): Promise<ProductSearchQueryResult> {
+    const effectiveSize = Math.max(size, MINIMUM_SEARCH_RESULTS);
+    const strictResult = await this.executeSearch(query, from, effectiveSize, context, 'strict');
+    if (!query.q || strictResult.totalItems >= MINIMUM_SEARCH_RESULTS) return strictResult;
+    return this.executeSearch(query, from, effectiveSize, context, 'combined');
   }
 
   private async resolvePersonalizedContext(
@@ -783,6 +851,7 @@ export class ProductSearchQueryService {
     from: number,
     size: number,
     context?: PersonalizedSearchContext,
+    mode: LexicalSearchMode = 'combined',
   ): Promise<ProductSearchQueryResult> {
     const startedAt = Date.now();
     try {
@@ -791,7 +860,9 @@ export class ProductSearchQueryService {
           from,
           size,
           track_total_hits: true,
-          query: context ? personalizedLexicalQuery(query, context) : lexicalQuery(query),
+          query: context
+            ? personalizedLexicalQuery(query, context, mode)
+            : lexicalQuery(query, mode),
           sort: sortFor(query),
           aggs: {
             global_catalogue: {
@@ -817,7 +888,7 @@ export class ProductSearchQueryService {
       const tookMs = Date.now() - startedAt;
       const indexVersion = parsed.indexVersion ?? this.config.elasticsearch.productIndexAlias;
       this.logger.debug(
-        `Catalogue search outcome=elasticsearch${context ? '-personalized' : ''} latencyMs=${tookMs} index=${indexVersion}`,
+        `Catalogue search outcome=elasticsearch${context ? '-personalized' : ''} mode=${mode} latencyMs=${tookMs} index=${indexVersion}`,
       );
       return { ...parsed, indexVersion, tookMs };
     } catch (error) {
@@ -916,4 +987,5 @@ export {
   parseSearchResponse,
   parseSuggestionResponse,
   fuzzyLexicalClauses,
+  personalizedLexicalQuery,
 };

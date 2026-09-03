@@ -254,7 +254,16 @@ describe('Personalized catalogue search (E2E)', () => {
     );
     expect(search).toHaveBeenCalledWith(
       expect.objectContaining({
-        query: expect.objectContaining({ script_score: expect.anything() }),
+        query: expect.objectContaining({
+          function_score: expect.objectContaining({
+            query: expect.objectContaining({ function_score: expect.anything() }),
+            functions: expect.arrayContaining([
+              expect.objectContaining({ script_score: expect.anything(), weight: 1e-9 }),
+            ]),
+            score_mode: 'sum',
+            boost_mode: 'sum',
+          }),
+        }),
       }),
     );
     expect(resolveProfile).toHaveBeenCalledWith('buyer-a', expect.any(Date));

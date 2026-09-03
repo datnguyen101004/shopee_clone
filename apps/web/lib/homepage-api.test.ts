@@ -43,6 +43,16 @@ describe('fetchHomepage', () => {
     await expect(fetchHomepage(fetcher)).rejects.toMatchObject({ kind });
   });
 
+  it('retries transient transport failures during local startup', async () => {
+    const fetcher = vi
+      .fn()
+      .mockRejectedValueOnce(new TypeError('connect refused'))
+      .mockResolvedValueOnce(new Response(JSON.stringify(valid), { status: 200 }));
+
+    await expect(fetchHomepage(fetcher)).resolves.toEqual(valid);
+    expect(fetcher).toHaveBeenCalledTimes(2);
+  });
+
   it('aborts a timed-out request', async () => {
     const fetcher = vi.fn(
       (_url: string, init?: RequestInit) =>

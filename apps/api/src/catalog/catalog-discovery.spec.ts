@@ -35,6 +35,19 @@ describe('catalog discovery scoring', () => {
     expect(relevanceScore(jean, 'quần xyz')).toBeNull();
   });
 
+  it('does not use accent-folded category matches for ambiguous short tokens', () => {
+    const electronics = {
+      name: 'iPhone 13',
+      description: 'Điện thoại chính hãng',
+      shopName: 'Điện Thoại Hay',
+      categoryName: 'Thiết bị điện tử',
+    };
+    const cabinet = { ...electronics, name: 'Tủ bếp gỗ' };
+
+    expect(relevanceScore(electronics, 'tu')).toBeNull();
+    expect(relevanceScore(cabinet, 'tu')).not.toBeNull();
+  });
+
   it('ranks typo-tolerant suggestions deterministically and removes duplicates', () => {
     const createdAt = new Date('2026-01-01T00:00:00.000Z');
     expect(

@@ -3,6 +3,7 @@ import { Be_Vietnam_Pro } from 'next/font/google';
 import type { ReactNode } from 'react';
 import { ToastProvider } from '@shopee-clone/ui';
 
+import { ScrollToTop } from '../components/scroll-to-top';
 import '@shopee-clone/ui/styles.css';
 import './globals.css';
 
@@ -22,6 +23,7 @@ export default function RootLayout({ children }: Readonly<{ children: ReactNode 
   return (
     <html lang="vi" className={beVietnamPro.variable}>
       <body className={beVietnamPro.className}>
+        <ScrollToTop />
         <ToastProvider>{children}</ToastProvider>
       </body>
     </html>

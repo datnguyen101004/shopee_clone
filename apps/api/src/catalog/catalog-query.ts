@@ -120,6 +120,11 @@ function optionalEnum<T extends string>(
 export function parseCatalogQuery(query: Record<string, unknown>): NormalizedCatalogQuery {
   const issues: InvalidCatalogParameter[] = [];
   const page = positiveInteger('page', query.page, CATALOG_DEFAULT_PAGE, issues);
+
+  const rawQ = rawString('q', query.q, issues);
+  const q = rawQ === undefined ? null : rawQ.trim().replace(/\s+/g, ' ') || null;
+  if (q && q.length > 120) issues.push({ name: 'q', reason: 'must not exceed 120 characters' });
+
   const pageSize = positiveInteger(
     'pageSize',
     query.pageSize,
@@ -127,10 +132,6 @@ export function parseCatalogQuery(query: Record<string, unknown>): NormalizedCat
     issues,
     CATALOG_MAX_PAGE_SIZE,
   );
-
-  const rawQ = rawString('q', query.q, issues);
-  const q = rawQ === undefined ? null : rawQ.trim().replace(/\s+/g, ' ') || null;
-  if (q && q.length > 120) issues.push({ name: 'q', reason: 'must not exceed 120 characters' });
 
   const rawCategory = rawString('category', query.category, issues);
   const category = rawCategory === undefined ? null : rawCategory.trim() || null;

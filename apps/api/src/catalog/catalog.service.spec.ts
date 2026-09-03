@@ -525,7 +525,7 @@ describe('CatalogService', () => {
     expect(search.search).toHaveBeenCalledWith(
       expect.objectContaining({ sort: 'relevance' }),
       0,
-      4,
+      24,
       null,
     );
     expect(repository.findCandidatesByIds).toHaveBeenCalledWith(['product-1', 'product-2']);

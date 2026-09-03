@@ -4,6 +4,7 @@ import {
   ProductSearchQueryUnavailableError,
   filtersFor,
   lexicalQuery,
+  personalizedLexicalQuery,
   parseSearchResponse,
   parseSuggestionResponse,
   sortFor,
@@ -93,14 +94,14 @@ describe('product-search-query', () => {
           'category_path_names',
           'shop_name',
           'attributes',
-          'description',
         ],
-        operator: 'and',
+        operator: 'or',
+        minimum_should_match: 1,
         boost: 5,
       },
     });
     expect(body.function_score.query.bool.should).toContainEqual({
-      match: { description: { query: 'Điện thoại', operator: 'and', boost: 5 } },
+      match: { description: { query: 'Điện thoại', operator: 'or', boost: 1 } },
     });
     expect(body.function_score.query.bool.should).toContainEqual({
       multi_match: {
@@ -113,13 +114,130 @@ describe('product-search-query', () => {
           'attributes',
           'description',
         ],
-        operator: 'and',
+        operator: 'or',
         fuzziness: 'AUTO',
         prefix_length: 1,
         max_expansions: 50,
         boost: 1,
       },
     });
+  });
+
+  it('uses fuzzy search only after the strict product fields return no hits', async () => {
+    const search = jest
+      .fn()
+      .mockResolvedValueOnce({
+        body: { timed_out: false, hits: { total: { value: 0 }, hits: [] }, aggregations: {} },
+      })
+      .mockResolvedValueOnce({
+        body: {
+          timed_out: false,
+          hits: { total: { value: 1 }, hits: [{ _id: 'p-1', _index: 'products-search-v1-1' }] },
+          aggregations: {},
+        },
+      });
+    const service = new ProductSearchQueryService(config(), {
+      search,
+    } as unknown as SearchElasticsearchAdapter);
+
+    await expect(service.search(query({ q: 'android' }), 0, 12)).resolves.toMatchObject({
+      ids: ['p-1'],
+    });
+    expect(search).toHaveBeenCalledTimes(2);
+
+    const strictRequest = search.mock.calls[0]?.[0] as {
+      query: { function_score: { query: { bool: { should: unknown[] } } } };
+    };
+    expect(strictRequest.query.function_score.query.bool.should).not.toContainEqual(
+      expect.objectContaining({ match: { description: expect.anything() } }),
+    );
+
+    const fuzzyRequest = search.mock.calls[1]?.[0] as {
+      query: { function_score: { query: { bool: { should: unknown[] } } } };
+    };
+    expect(fuzzyRequest.query.function_score.query.bool.should).toContainEqual(
+      expect.objectContaining({ match: { description: expect.anything() } }),
+    );
+  });
+
+  it('does not issue the fuzzy phase when strict search already has results', async () => {
+    const search = jest.fn().mockResolvedValue({
+      body: {
+        timed_out: false,
+        hits: { total: { value: 24 }, hits: [{ _id: 'p-1' }] },
+        aggregations: {},
+      },
+    });
+    const service = new ProductSearchQueryService(config(), {
+      search,
+    } as unknown as SearchElasticsearchAdapter);
+
+    await expect(service.search(query({ q: 'giá' }), 0, 12)).resolves.toMatchObject({
+      ids: ['p-1'],
+    });
+    expect(search).toHaveBeenCalledTimes(1);
+  });
+
+  it('fills the minimum search pool from the combined term and fuzzy phase', async () => {
+    const search = jest
+      .fn()
+      .mockResolvedValueOnce({
+        body: { timed_out: false, hits: { total: { value: 8 }, hits: [] }, aggregations: {} },
+      })
+      .mockResolvedValueOnce({
+        body: {
+          timed_out: false,
+          hits: {
+            total: { value: 30 },
+            hits: [{ _id: 'p-1' }, { _id: 'p-2' }],
+          },
+          aggregations: {},
+        },
+      });
+    const service = new ProductSearchQueryService(config(), {
+      search,
+    } as unknown as SearchElasticsearchAdapter);
+
+    await expect(service.search(query({ q: 'iphone 17' }), 0, 12)).resolves.toMatchObject({
+      ids: ['p-1', 'p-2'],
+      totalItems: 30,
+    });
+    expect(search).toHaveBeenCalledTimes(2);
+    expect(search.mock.calls[0]?.[0]?.size).toBe(24);
+    expect(search.mock.calls[1]?.[0]?.size).toBe(24);
+  });
+
+  it('keeps lexical relevance primary and uses personalization as a tie-breaker', () => {
+    const body = personalizedLexicalQuery(query(), {
+      model: {
+        modelVersion: 1,
+        productProjectionVersion: 1,
+        featureSchemaVersion: 1,
+        storedScriptVersion: 1,
+        intercept: 0,
+        featureWeights: [1],
+      },
+      profile: { userId: 'buyer-1' },
+    }) as {
+      function_score: {
+        query: { function_score: unknown };
+        functions: Array<{ weight?: number; script_score?: unknown }>;
+        score_mode: string;
+        boost_mode: string;
+      };
+    };
+
+    expect(body.function_score.query).toEqual(
+      expect.objectContaining({ function_score: expect.anything() }),
+    );
+    expect(body.function_score.functions[0]).toEqual(
+      expect.objectContaining({
+        weight: 1e-9,
+        script_score: expect.objectContaining({ script: expect.anything() }),
+      }),
+    );
+    expect(body.function_score.score_mode).toBe('sum');
+    expect(body.function_score.boost_mode).toBe('sum');
   });
 
   it.each([

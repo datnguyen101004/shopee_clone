@@ -233,9 +233,10 @@ describe('HomepageService', () => {
     });
     await service.getHomepage(null);
     expect(catalog.getProducts.mock.calls[1]?.[0]).toMatchObject({ sort: 'best-selling' });
+    expect(catalog.getProducts.mock.calls[1]?.[1]).toBeNull();
   });
 
-  it('limits daily recommendations to 24 unique products with shop/category caps', async () => {
+  it('limits daily recommendations to 12 unique products with shop/category caps', async () => {
     const daily = {
       ...moduleRecord(HomepageModuleType.DAILY_RECOMMENDATIONS),
       products: [],
@@ -264,10 +265,53 @@ describe('HomepageService', () => {
     const response = await service.getHomepage('buyer-1');
     const products = (response.modules[0] as { products: Array<{ id: string; shopName: string }> })
       .products;
-    expect(products).toHaveLength(24);
-    expect(new Set(products.map((product) => product.id)).size).toBe(24);
+    expect(products).toHaveLength(12);
+    expect(new Set(products.map((product) => product.id)).size).toBe(12);
     expect(products.filter((product) => product.shopName === 'Same Shop')).toHaveLength(3);
     expect(response.modules[0]).toMatchObject({ type: 'daily-recommendations' });
+  });
+
+  it('fills an under-sized personalized set from the guest high-score baseline', async () => {
+    const daily = {
+      ...moduleRecord(HomepageModuleType.DAILY_RECOMMENDATIONS),
+      products: [],
+    };
+    const personalized = [
+      recommendationCard('personalized-1', 'Personal Shop', 'Personal Category'),
+      recommendationCard('personalized-2', 'Personal Shop', 'Personal Category'),
+    ];
+    const guestBaseline = Array.from({ length: 12 }, (_, index) =>
+      recommendationCard(`baseline-${index}`, `Shop ${index}`, `Category ${index}`),
+    );
+    const repository = { findActive: jest.fn().mockResolvedValue([daily]) };
+    const catalog = {
+      getProducts: jest
+        .fn()
+        .mockResolvedValueOnce({ items: personalized })
+        .mockResolvedValueOnce({ items: guestBaseline }),
+    };
+    const service = new HomepageService(
+      repository as unknown as HomepageRepository,
+      { now: () => now },
+      undefined,
+      undefined,
+      catalog as unknown as CatalogPublicFacade,
+      searchConfig(),
+    );
+
+    const response = await service.getHomepage('buyer-1');
+    const products = (response.modules[0] as { products: Array<{ id: string }> }).products;
+    expect(products).toHaveLength(12);
+    expect(products.slice(0, 2).map((product) => product.id)).toEqual([
+      'personalized-1',
+      'personalized-2',
+    ]);
+    expect(new Set(products.map((product) => product.id)).size).toBe(12);
+    expect(catalog.getProducts).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ sort: 'best-selling', pageSize: 48 }),
+      null,
+    );
   });
 
   it('falls back to configured daily products and preserves unrelated modules', async () => {

@@ -74,12 +74,14 @@ function endpoint(
     url.hostname === 'localhost' &&
     url.port === '3000' &&
     url.pathname === '/payment/callback';
+  const publicReturn =
+    key === 'VNPAY_RETURN_URL' && url.protocol === 'https:' && url.pathname === '/payment/callback';
   const publicIpn =
     key === 'VNPAY_IPN_URL' &&
     url.protocol === 'https:' &&
     (url.pathname === '/api/v1/payment-providers/vnpay/ipn' ||
       url.pathname === '/api/v1/callback/payment-callback');
-  if ((!localReturn && !publicIpn) || url.username || url.password || url.hash || url.search) {
+  if ((!localReturn && !publicReturn && !publicIpn) || url.username || url.password || url.hash || url.search) {
     throw new Error(`Invalid VNPAY configuration: ${key}.`);
   }
   return url.toString();
@@ -130,9 +132,9 @@ export function loadVnpayConfig(environment: NodeJS.ProcessEnv = process.env): V
       httpTimeoutMs,
     };
   }
-  if (environment.NODE_ENV === 'production') {
-    throw new Error('VNPAY sandbox cannot be enabled in production.');
-  }
+  // This project intentionally runs the VNPAY sandbox on a production-like
+  // demo host. The payment environment remains fixed to sandbox URLs above;
+  // production still requires public HTTPS callback endpoints.
   return {
     enabled,
     environment: 'sandbox',

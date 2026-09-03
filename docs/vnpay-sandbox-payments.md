@@ -59,8 +59,10 @@ provider payload.
 - Return before IPN, reload/new tab, unknown owner reference, and tunnel outage all
   retain a backend-driven waiting/support state. Keep only redacted evidence.
 
-Production enablement is intentionally blocked: this change does not implement the
-VNPAY refund API, settlement operations, or production merchant onboarding.
+The sandbox may be enabled on a production-like host for this personal demo. Keep
+`VNPAY_ENV=sandbox`, use only sandbox merchant credentials and fixed sandbox URLs, and
+configure public HTTPS Return/IPN endpoints. This does not implement the VNPAY refund API,
+settlement operations, or production merchant onboarding.
 
 ## Regression baseline captured during apply
 

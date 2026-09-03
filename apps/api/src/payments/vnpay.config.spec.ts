@@ -54,7 +54,7 @@ describe('VNPAY sandbox configuration', () => {
     },
   );
 
-  it('rejects non-allowlisted URLs, invalid TTL and production sandbox enablement', () => {
+  it('rejects non-allowlisted URLs and invalid TTL', () => {
     expect(() =>
       loadVnpayConfig({ ...enabledEnvironment, VNPAY_PAY_URL: 'https://example.test/pay' }),
     ).toThrow('VNPAY_PAY_URL');
@@ -67,8 +67,21 @@ describe('VNPAY sandbox configuration', () => {
         VNPAY_PAYMENT_TTL_SECONDS: String(INVENTORY_RESERVATION_TTL_MS / 1_000 + 1),
       }),
     ).toThrow('VNPAY_PAYMENT_TTL_SECONDS');
-    expect(() => loadVnpayConfig({ ...enabledEnvironment, NODE_ENV: 'production' })).toThrow(
-      'cannot be enabled in production',
-    );
+  });
+
+  it('allows the sandbox provider on a production-like demo host with public callbacks', () => {
+    expect(
+      loadVnpayConfig({
+        ...enabledEnvironment,
+        NODE_ENV: 'production',
+        VNPAY_RETURN_URL: 'https://demo.example.test/payment/callback',
+        VNPAY_IPN_URL: 'https://api.demo.example.test/api/v1/payment-providers/vnpay/ipn',
+      }),
+    ).toMatchObject({
+      enabled: true,
+      environment: 'sandbox',
+      returnUrl: 'https://demo.example.test/payment/callback',
+      ipnUrl: 'https://api.demo.example.test/api/v1/payment-providers/vnpay/ipn',
+    });
   });
 });

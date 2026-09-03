@@ -1,0 +1,260 @@
+import type { CatalogProductCard, CatalogProductsResponse } from '@shopee-clone/contracts';
+import { fireEvent, render, screen, within } from '@testing-library/react';
+
+import { describe, expect, it } from 'vitest';
+
+import { CatalogContent, CatalogPagination, DiscoveryControls, catalogPageHref } from './catalog';
+import type { CatalogRouteContext } from './catalog';
+import { CatalogEmptyState, CatalogErrorState } from './catalog-states';
+
+const product: CatalogProductCard = {
+  id: 'product-1',
+  name: 'Tai nghe không dây',
+  href: '/products/product-1',
+  imageUrl: '/media/products/wireless-earbuds.svg',
+  imageAlt: 'Tai nghe không dây màu trắng',
+  priceMinor: 399_000,
+  compareAtPriceMinor: 499_000,
+  discountPercent: 20,
+  ratingAverageBasisPoints: 490,
+  ratingCount: 128,
+  soldCount: 941,
+  shop: { name: 'Tech Zone', location: 'TP. Hồ Chí Minh' },
+  category: { slug: 'mobile-accessories', name: 'Điện thoại & Phụ kiện' },
+};
+
+function response(page = 1, totalPages = 3): CatalogProductsResponse {
+  return {
+    query: context(),
+    pagination: { page, pageSize: 2, totalItems: totalPages * 2, totalPages },
+    facets: { categories: [], locations: [], priceRange: { min: 399_000, max: 399_000 } },
+    items: [
+      product,
+      {
+        ...product,
+        id: 'product-2',
+        name: 'Sạc dự phòng',
+        href: '/products/product-2',
+        imageUrl: null,
+        imageAlt: 'Sạc dự phòng',
+        compareAtPriceMinor: undefined,
+        discountPercent: undefined,
+      },
+    ],
+  };
+}
+
+function context(overrides: Partial<CatalogRouteContext> = {}): CatalogRouteContext {
+  return {
+    q: null,
+    category: null,
+    minPrice: null,
+    maxPrice: null,
+    rating: null,
+    location: null,
+    availability: null,
+    promotion: null,
+    sort: 'newest',
+    pageSize: 2,
+    ...overrides,
+  };
+}
+
+describe('catalog components', () => {
+  it('renders products in response order with complete metadata and media fallback', () => {
+    render(<CatalogContent response={response()} context={context({ q: 'tai nghe' })} />);
+    const cards = screen.getAllByTestId('catalog-card');
+    expect(within(cards[0]!).getByRole('heading', { name: 'Tai nghe không dây' })).toBeVisible();
+    expect(within(cards[1]!).getByRole('heading', { name: 'Sạc dự phòng' })).toBeVisible();
+    expect(screen.getByText('-20%')).toBeVisible();
+    expect(screen.getAllByText('₫399.000')).toHaveLength(2);
+    expect(screen.getAllByText('Đã bán 941')).toHaveLength(2);
+    expect(screen.getAllByText('TP. Hồ Chí Minh')).toHaveLength(2);
+    expect(screen.getByRole('img', { name: 'Tai nghe không dây màu trắng' })).toBeVisible();
+    expect(screen.getByRole('img', { name: 'Sạc dự phòng' })).toBeVisible();
+    expect(screen.getByRole('link', { name: 'Xem Tai nghe không dây' })).toHaveAttribute(
+      'href',
+      '/products/product-1',
+    );
+  });
+
+  it('renders the effective scheduled price and retains base-price fallback', () => {
+    const catalog = response();
+    catalog.items = [
+      {
+        ...product,
+        priceMinor: 319_200,
+        scheduledPrice: {
+          basePriceMinor: 399_000,
+          effectivePriceMinor: 319_200,
+          compareAtPriceMinor: 499_000,
+          discountBasisPoints: 2_000,
+          campaignId: 'campaign-1',
+          evaluatedAt: '2026-08-31T00:00:00.000Z',
+        },
+      },
+      { ...product, id: 'product-2', href: '/products/product-2' },
+    ];
+
+    render(<CatalogContent response={catalog} context={context()} />);
+    expect(screen.getByText('₫319.200')).toBeVisible();
+    expect(screen.getByText('₫399.000')).toBeVisible();
+  });
+
+  it('renders the validated buyer voucher price with preview wording', () => {
+    const catalog = response();
+    catalog.items = [
+      {
+        ...product,
+        buyerBestPrice: {
+          version: 'buyer-best-price-v1',
+          quantity: 1,
+          currency: 'VND',
+          evaluatedAt: '2026-08-31T04:00:00.000Z',
+          effectivePriceMinor: 399_000,
+          shopVoucher: null,
+          platformVoucher: {
+            code: 'SAVE50K',
+            name: 'Giảm 50K',
+            slot: 'PLATFORM',
+            discountMinor: 50_000,
+          },
+          shopVoucherDiscountMinor: 0,
+          platformVoucherDiscountMinor: 50_000,
+          merchandiseDiscountMinor: 50_000,
+          merchandisePayableMinor: 349_000,
+          shipping: null,
+        },
+      },
+    ];
+    render(<CatalogContent response={catalog} context={context()} />);
+    expect(screen.getByText('₫349.000')).toBeVisible();
+    expect(screen.getByText('Giá tốt nhất dự kiến · Voucher đã áp dụng')).toBeVisible();
+  });
+
+  it('builds allowlisted page links and drops unsupported parameters', () => {
+    expect(catalogPageHref(context({ category: 'electronics', q: 'phone' }), 3)).toBe(
+      '/search?q=phone&category=electronics&sort=newest&pageSize=2&page=3',
+    );
+  });
+
+  it.each([
+    [1, false, true],
+    [2, true, true],
+    [3, true, false],
+  ])('renders pagination state for page %i', (page, hasPrevious, hasNext) => {
+    render(
+      <CatalogPagination
+        response={response(page)}
+        context={context({ category: 'electronics', q: 'phone' })}
+      />,
+    );
+    const previous = screen.getByLabelText('Trang trước');
+    const next = screen.getByLabelText('Trang sau');
+    expect(previous.tagName === 'A').toBe(hasPrevious);
+    expect(next.tagName === 'A').toBe(hasNext);
+    expect(screen.getByLabelText(`Trang ${page}`)).toHaveAttribute('aria-current', 'page');
+    if (hasNext) expect(next).toHaveAttribute('href', expect.stringContaining('q=phone'));
+  });
+
+  it('omits pagination for a single page', () => {
+    render(<CatalogPagination response={response(1, 1)} context={context()} />);
+    expect(
+      screen.queryByRole('navigation', { name: 'Phân trang sản phẩm' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('supports a route-specific pagination builder without changing search behavior', () => {
+    render(
+      <CatalogPagination
+        response={response(2)}
+        pageHrefBuilder={(page) => `/shops/demo-shop?sort=newest&page=${page}`}
+      />,
+    );
+    expect(screen.getByLabelText('Trang trước')).toHaveAttribute(
+      'href',
+      '/shops/demo-shop?sort=newest&page=1',
+    );
+    expect(screen.getByLabelText('Trang sau')).toHaveAttribute(
+      'href',
+      '/shops/demo-shop?sort=newest&page=3',
+    );
+  });
+
+  it('renders API-backed controls, selected state, summary, and removable filters', () => {
+    const discovery = response();
+    discovery.query = {
+      ...discovery.query,
+      q: 'tai nghe',
+      category: 'electronics',
+      location: 'Hà Nội',
+      promotion: 'discounted',
+      sort: 'relevance',
+    };
+    discovery.facets = {
+      categories: [{ slug: 'electronics', name: 'Điện tử', parentSlug: null }],
+      locations: ['Hà Nội'],
+      priceRange: { min: 100, max: 900 },
+    };
+    const selectedContext = context({ ...discovery.query });
+    render(<DiscoveryControls response={discovery} context={selectedContext} />);
+
+    expect(screen.getByRole('search', { name: 'Tìm và lọc sản phẩm' })).toHaveAttribute(
+      'method',
+      'get',
+    );
+    expect(screen.getByRole('searchbox', { name: 'Từ khóa' })).toHaveValue('tai nghe');
+    expect(screen.getByRole('combobox', { name: 'Danh mục' })).toHaveValue('electronics');
+    expect(screen.getByRole('combobox', { name: 'Nơi bán' })).toHaveValue('Hà Nội');
+    expect(screen.getByRole('checkbox', { name: 'Đang giảm giá' })).toBeChecked();
+    expect(screen.getByRole('status')).toHaveTextContent('6 sản phẩm');
+    expect(screen.getByRole('link', { name: 'Bỏ Từ khóa tai nghe' })).toHaveAttribute(
+      'href',
+      expect.not.stringContaining('q='),
+    );
+  });
+
+  it('renders actionable empty and recoverable failure states', () => {
+    const { rerender } = render(<CatalogEmptyState filtered />);
+    expect(screen.getByRole('heading', { name: 'Chưa tìm thấy sản phẩm phù hợp' })).toBeVisible();
+    expect(screen.getByRole('link', { name: 'Xóa tất cả bộ lọc' })).toHaveAttribute(
+      'href',
+      '/search',
+    );
+    rerender(<CatalogErrorState retryHref="/search?q=phone&page=2" />);
+    expect(screen.getByRole('alert')).toBeVisible();
+    expect(screen.getByRole('link', { name: 'Thử lại' })).toHaveAttribute(
+      'href',
+      '/search?q=phone&page=2',
+    );
+  });
+
+  it('formats and visualizes numbers in price range inputs with thousands separators', () => {
+    const discovery = response();
+    render(<DiscoveryControls response={discovery} context={context()} />);
+    const minInput = screen.getByRole('textbox', { name: 'Giá thấp nhất' });
+    const maxInput = screen.getByRole('textbox', { name: 'Giá cao nhất' });
+
+    fireEvent.change(minInput, { target: { value: '1000' } });
+    expect(minInput).toHaveValue('1.000');
+
+    fireEvent.change(maxInput, { target: { value: '5000000' } });
+    expect(maxInput).toHaveValue('5.000.000');
+  });
+
+  it('updates price inputs when choosing a price range preset from the dropdown', () => {
+    const discovery = response();
+    render(<DiscoveryControls response={discovery} context={context()} />);
+    const presetSelect = screen.getByRole('combobox', { name: 'Chọn khoảng giá' });
+    const minInput = screen.getByRole('textbox', { name: 'Giá thấp nhất' });
+    const maxInput = screen.getByRole('textbox', { name: 'Giá cao nhất' });
+
+    fireEvent.change(presetSelect, { target: { value: '100000-500000' } });
+    expect(minInput).toHaveValue('100.000');
+    expect(maxInput).toHaveValue('500.000');
+
+    fireEvent.change(presetSelect, { target: { value: '10000000-' } });
+    expect(minInput).toHaveValue('10.000.000');
+    expect(maxInput).toHaveValue('');
+  });
+});

@@ -1,0 +1,87 @@
+name: shopee-clone-production
+
+x-api-environment: &api-environment
+  NODE_ENV: production
+  PORT: '3001'
+  DATABASE_URL: ${DATABASE_URL:?Production RDS PostgreSQL DATABASE_URL is required}
+  # The production stack owns Elasticsearch, so the API resolves it over the
+  # Compose network instead of trying to reach localhost inside its container.
+  ELASTICSEARCH_URL: ${ELASTICSEARCH_CONTAINER_URL:-http://elasticsearch:9200}
+
+x-api-labels: &api-labels
+  com.shopee-clone.scope: production
+
+services:
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.17.0
+    restart: unless-stopped
+    environment:
+      discovery.type: single-node
+      xpack.security.enabled: 'false'
+      ES_JAVA_OPTS: ${ELASTICSEARCH_JAVA_OPTS:--Xms512m -Xmx512m}
+    mem_limit: ${ELASTICSEARCH_MEM_LIMIT:-1g}
+    expose:
+      - '9200'
+    volumes:
+      - elasticsearch-data:/usr/share/elasticsearch/data
+    healthcheck:
+      test:
+        [
+          'CMD-SHELL',
+          'curl --silent --fail http://localhost:9200/_cluster/health?wait_for_status=yellow&timeout=1s >/dev/null',
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 30s
+    labels:
+      <<: *api-labels
+      com.shopee-clone.component: elasticsearch
+
+  migrate:
+    profiles: ['migration']
+    image: ${MIGRATOR_IMAGE:-datnguyen10102004/shopee-clone-api-migrator}:${IMAGE_TAG:-0.1.0}
+    pull_policy: always
+    env_file:
+      - ${PROD_ENV_FILE:-.env.production}
+    environment: *api-environment
+    restart: 'no'
+    labels:
+      <<: *api-labels
+      com.shopee-clone.component: database-migration
+
+  api:
+    image: ${API_IMAGE:-datnguyen10102004/shopee-clone-api}:${IMAGE_TAG:-0.1.0}
+    pull_policy: always
+    init: true
+    restart: unless-stopped
+    env_file:
+      - ${PROD_ENV_FILE:-.env.production}
+    environment: *api-environment
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    ports:
+      - '${API_BIND_ADDRESS:-0.0.0.0}:${API_HOST_PORT:-3001}:3001'
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://127.0.0.1:3001/api/v1/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    stop_grace_period: 30s
+    labels:
+      <<: *api-labels
+      com.shopee-clone.component: api
+
+volumes:
+  elasticsearch-data:
+    labels:
+      <<: *api-labels
+      com.shopee-clone.component: elasticsearch-data

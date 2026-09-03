@@ -1,0 +1,42 @@
+# Git and version control
+.git
+.gitignore
+.gitattributes
+.github
+
+# Dependencies and caches
+node_modules
+**/node_modules
+.turbo
+**/.turbo
+.next
+**/.next
+dist
+**/dist
+build
+**/build
+
+# Environment and secrets
+.env
+.env*.local
+.env.production
+.env.development
+
+# Runtime data and test reports
+.runtime
+**/.runtime
+playwright-report
+test-results
+coverage
+
+# IDE and OS files
+.vscode
+.idea
+.DS_Store
+Thumbs.db
+*.log
+
+# Documentation & spec notes
+flow.md
+docs
+openspec

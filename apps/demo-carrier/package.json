@@ -1,0 +1,31 @@
+{
+  "name": "@shopee-clone/demo-carrier",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "build": "nest build",
+    "start": "node dist/main.js",
+    "dev": "nest start --watch",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "jest --runInBand"
+  },
+  "dependencies": {
+    "@nestjs/common": "11.1.29",
+    "@nestjs/core": "11.1.29",
+    "@nestjs/platform-express": "11.1.29",
+    "@shopee-clone/contracts": "workspace:*",
+    "class-transformer": "0.5.1",
+    "class-validator": "0.15.1"
+  },
+  "devDependencies": {
+    "@shopee-clone/config": "workspace:*",
+    "@nestjs/cli": "11.0.24",
+    "@types/express": "5.0.6",
+    "@types/node": "22.20.1",
+    "eslint": "9.39.5",
+    "jest": "29.7.0",
+    "ts-jest": "29.4.12",
+    "typescript": "5.9.3"
+  }
+}

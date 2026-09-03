@@ -1,0 +1,174 @@
+import { describe, expect, it } from 'vitest';
+
+import {
+  isProductDeletedProblemDetails,
+  isProductDetailResponse,
+  parseProductDetailResponse,
+} from '../src';
+
+const productId = '00000000-0000-4000-8000-000000000301';
+const variantId = '00000000-0000-4000-8000-000000000401';
+const mediaId = '00000000-0000-4000-8000-000000000501';
+const response = {
+  id: productId,
+  name: 'Smartphone Pro',
+  description: 'Product detail fixture',
+  category: { slug: 'mobile-accessories', name: 'Mobile & Accessories' },
+  ratingAverageBasisPoints: 490,
+  ratingCount: 12,
+  soldCount: 20,
+  gallery: [
+    {
+      id: mediaId,
+      url: '/media/products/phone.jpg',
+      altText: 'Phone',
+      sortOrder: 0,
+      variantId: null,
+      isPrimary: true,
+    },
+  ],
+  variants: [
+    {
+      id: variantId,
+      name: '128GB',
+      sku: 'PHONE-128',
+      priceMinor: 1_000,
+      compareAtPriceMinor: 1_200,
+      discountPercent: 16,
+      availableQuantity: 2,
+      availability: 'in-stock',
+      preferredImageId: mediaId,
+    },
+  ],
+  purchasable: true,
+  initialVariantId: variantId,
+  shop: {
+    id: '00000000-0000-4000-8000-000000000101',
+    ownerUserId: '00000000-0000-4000-8000-000000000102',
+    slug: 'tech-store',
+    name: 'Tech Store',
+    location: 'Hồ Chí Minh',
+    activeProductCount: 3,
+  },
+  shippingPreview: {
+    origin: 'Hồ Chí Minh',
+    destinationLabel: 'Toàn quốc',
+    feeMinor: null,
+    deliveryTimeLabel: null,
+    message: 'Xác nhận sau.',
+  },
+  relatedProducts: [],
+};
+
+describe('product detail contract', () => {
+  it('accepts only the minimal deleted-product 410 problem details', () => {
+    expect(
+      isProductDeletedProblemDetails({
+        type: 'https://shopee-clone.local/problems/product-deleted',
+        title: 'Product deleted',
+        status: 410,
+        detail: 'The requested product has been deleted.',
+        code: 'PRODUCT_DELETED',
+      }),
+    ).toBe(true);
+    expect(
+      isProductDeletedProblemDetails({
+        type: 'https://shopee-clone.local/problems/product-deleted',
+        title: 'Product deleted',
+        status: 410,
+        detail: 'The requested product has been deleted.',
+        code: 'PRODUCT_DELETED',
+        deletedAt: 'secret',
+      }),
+    ).toBe(false);
+  });
+
+  it('accepts populated, no-media, unavailable, and empty-related responses', () => {
+    expect(parseProductDetailResponse(response)).toEqual(response);
+    expect(
+      isProductDetailResponse({
+        ...response,
+        description: '',
+      }),
+    ).toBe(true);
+    expect(
+      isProductDetailResponse({
+        ...response,
+        gallery: [],
+        variants: [{ ...response.variants[0], preferredImageId: null }],
+      }),
+    ).toBe(true);
+    expect(
+      isProductDetailResponse({
+        ...response,
+        variants: [{ ...response.variants[0], availableQuantity: 0, availability: 'unavailable' }],
+        purchasable: false,
+        initialVariantId: variantId,
+      }),
+    ).toBe(true);
+    expect(
+      isProductDetailResponse({
+        ...response,
+        gallery: [{ ...response.gallery[0], url: 'https://cdn.example.test/product.jpg' }],
+      }),
+    ).toBe(true);
+  });
+
+  it('requires variant scheduled pricing to match the displayed price', () => {
+    const scheduledPrice = {
+      basePriceMinor: 1_250,
+      effectivePriceMinor: 1_000,
+      compareAtPriceMinor: 1_250,
+      discountBasisPoints: 2_000,
+      campaignId: 'campaign-1',
+      evaluatedAt: '2026-08-31T00:00:00.000Z',
+    };
+    expect(
+      isProductDetailResponse({
+        ...response,
+        variants: [{ ...response.variants[0], scheduledPrice }],
+      }),
+    ).toBe(true);
+    expect(
+      isProductDetailResponse({
+        ...response,
+        variants: [{ ...response.variants[0], priceMinor: 999, scheduledPrice }],
+      }),
+    ).toBe(false);
+  });
+
+  it('rejects unsafe money, inconsistent availability, invalid media and broken related links', () => {
+    expect(
+      isProductDetailResponse({
+        ...response,
+        variants: [{ ...response.variants[0], priceMinor: 1.5 }],
+      }),
+    ).toBe(false);
+    expect(
+      isProductDetailResponse({
+        ...response,
+        variants: [{ ...response.variants[0], availableQuantity: 0 }],
+      }),
+    ).toBe(false);
+    expect(
+      isProductDetailResponse({
+        ...response,
+        gallery: [{ ...response.gallery[0], variantId: '00000000-0000-4000-8000-000000000402' }],
+      }),
+    ).toBe(false);
+    expect(
+      isProductDetailResponse({
+        ...response,
+        gallery: [{ ...response.gallery[0], url: 'http://insecure.example.test/product.jpg' }],
+      }),
+    ).toBe(false);
+    expect(
+      isProductDetailResponse({
+        ...response,
+        relatedProducts: [
+          { ...response.variants[0], id: productId, href: `/products/${productId}` },
+        ],
+      }),
+    ).toBe(false);
+  });
+});

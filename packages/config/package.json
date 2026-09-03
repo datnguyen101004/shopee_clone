@@ -1,0 +1,23 @@
+{
+  "name": "@shopee-clone/config",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./tsconfig/base.json": "./tsconfig/base.json",
+    "./tsconfig/nextjs.json": "./tsconfig/nextjs.json",
+    "./tsconfig/nestjs.json": "./tsconfig/nestjs.json",
+    "./eslint/base": "./eslint/base.mjs",
+    "./eslint/node": "./eslint/node.mjs",
+    "./eslint/react": "./eslint/react.mjs"
+  },
+  "dependencies": {
+    "@eslint/js": "9.39.5",
+    "globals": "17.10.0",
+    "typescript-eslint": "8.46.1"
+  },
+  "peerDependencies": {
+    "eslint": "^9.39.0",
+    "typescript": "^5.9.0"
+  }
+}

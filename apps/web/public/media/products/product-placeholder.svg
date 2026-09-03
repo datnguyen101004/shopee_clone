@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 600" role="img" aria-labelledby="title description">
+  <title id="title">Ảnh sản phẩm dự phòng</title>
+  <description id="description">Nền màu cam nhạt với túi mua sắm Shopee Clone</description>
+  <rect width="600" height="600" fill="#fff3ed"/>
+  <rect x="165" y="190" width="270" height="260" rx="34" fill="#ee4d2d"/>
+  <path d="M235 215c0-55 30-95 65-95s65 40 65 95" fill="none" stroke="#ee4d2d" stroke-width="28" stroke-linecap="round"/>
+  <text x="300" y="365" text-anchor="middle" font-family="Arial, sans-serif" font-size="132" font-weight="700" fill="#fff">S</text>
+</svg>

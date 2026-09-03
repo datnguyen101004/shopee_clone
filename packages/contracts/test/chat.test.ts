@@ -1,0 +1,206 @@
+import { describe, expect, it } from 'vitest';
+import {
+  CHAT_MESSAGE_MAX_LENGTH,
+  parseChatConversationActionResponse,
+  parseChatConversationListResponse,
+  parseChatAttentionResponse,
+  parseChatMessagePage,
+  parseChatOutboxHealthResponse,
+  parseChatReportReceipt,
+  parseSendChatMessageRequest,
+  parseChatRealtimeEvent,
+} from '../src/chat';
+
+const user = '00000000-0000-4000-8000-000000000001';
+const message = '00000000-0000-4000-8000-000000000002';
+const conversation = {
+  id: '00000000-0000-4000-8000-000000000003',
+  participant: { userId: user, displayName: 'Buyer', avatarUrl: null, presence: 'INACTIVE' },
+  lastMessagePreview: 'hello',
+  lastMessageAt: '2026-01-01T00:00:00.000Z',
+  unreadCount: 0,
+  lastReadSequence: 1,
+  lastMessageSequence: 1,
+};
+const acceptedMessage = {
+  id: message,
+  conversationId: conversation.id,
+  sequence: 1,
+  senderUserId: user,
+  clientMessageId: '00000000-0000-4000-8000-000000000004',
+  content: 'hello',
+  createdAt: '2026-01-01T00:00:00.000Z',
+  deliveryState: 'SENT',
+  isRead: true,
+};
+
+describe('chat contracts', () => {
+  it('rejects unknown request keys and rich payloads', () => {
+    expect(
+      parseSendChatMessageRequest({
+        recipientUserId: user,
+        clientMessageId: message,
+        content: 'hello',
+        extra: true,
+      }),
+    ).toBeNull();
+    expect(
+      parseSendChatMessageRequest({
+        recipientUserId: user,
+        clientMessageId: message,
+        content: { text: 'hello' },
+      }),
+    ).toBeNull();
+  });
+
+  it('enforces text bounds', () => {
+    expect(
+      parseSendChatMessageRequest({
+        recipientUserId: user,
+        clientMessageId: message,
+        content: 'a'.repeat(CHAT_MESSAGE_MAX_LENGTH),
+      }),
+    ).not.toBeNull();
+    expect(
+      parseSendChatMessageRequest({
+        recipientUserId: user,
+        clientMessageId: message,
+        content: 'a'.repeat(CHAT_MESSAGE_MAX_LENGTH + 1),
+      }),
+    ).toBeNull();
+  });
+
+  it('rejects unsupported or malformed event versions', () => {
+    expect(
+      parseChatRealtimeEvent({ eventVersion: 'chat-v0', type: 'chat.presence.updated' }),
+    ).toBeNull();
+    expect(
+      parseChatRealtimeEvent({
+        eventVersion: 'chat-v1',
+        type: 'chat.presence.updated',
+        userId: user,
+        presence: 'UNKNOWN',
+      }),
+    ).toBeNull();
+  });
+
+  it('rejects malformed nested response payloads instead of trusting casts', () => {
+    expect(
+      parseChatConversationListResponse({
+        chatVersion: 'chat-v1',
+        items: [{ ...conversation, participant: { userId: user } }],
+        nextCursor: null,
+        unreadCount: 0,
+      }),
+    ).toBeNull();
+    expect(
+      parseChatMessagePage({
+        chatVersion: 'chat-v1',
+        conversation: { id: conversation.id },
+        items: [acceptedMessage],
+        hasMoreBefore: false,
+        hasMoreAfter: false,
+        unreadCount: 0,
+      }),
+    ).toBeNull();
+    expect(
+      parseChatRealtimeEvent({
+        eventVersion: 'chat-v1',
+        type: 'chat.conversation.updated',
+        conversation,
+      }),
+    ).not.toBeNull();
+    expect(
+      parseChatRealtimeEvent({
+        eventVersion: 'chat-v1',
+        type: 'chat.conversation.updated',
+        conversation,
+        unexpected: true,
+      }),
+    ).toBeNull();
+  });
+
+  it('parses privacy-safe aggregate outbox readiness only', () => {
+    expect(
+      parseChatOutboxHealthResponse({
+        ready: true,
+        pending: 0,
+        processing: 0,
+        failed: 0,
+        oldestPendingAgeSeconds: null,
+        claimed: 2,
+        sent: 2,
+        failedAttempts: 0,
+        polls: 4,
+        lastPollAt: '2026-01-01T00:00:00.000Z',
+        lastErrorAt: null,
+      }),
+    ).not.toBeNull();
+    expect(
+      parseChatOutboxHealthResponse({
+        ready: true,
+        pending: 0,
+        processing: 0,
+        failed: 0,
+        oldestPendingAgeSeconds: null,
+        claimed: 2,
+        sent: 2,
+        failedAttempts: 0,
+        polls: 4,
+        lastPollAt: null,
+        lastErrorAt: null,
+        content: 'secret',
+      }),
+    ).toBeNull();
+  });
+
+  it('covers safety, reply, attention, and report contracts with exact-key rejection', () => {
+    expect(
+      parseSendChatMessageRequest({
+        recipientUserId: user,
+        clientMessageId: message,
+        content: 'reply',
+        replyToMessageId: conversation.id,
+      }),
+    ).not.toBeNull();
+    expect(
+      parseSendChatMessageRequest({
+        recipientUserId: user,
+        clientMessageId: message,
+        content: 'reply',
+        replyToMessageId: conversation.id,
+        privateNote: 'must not cross the chat boundary',
+      }),
+    ).toBeNull();
+
+    const action = {
+      chatVersion: 'chat-v1',
+      conversationId: conversation.id,
+      notificationsMuted: true,
+      blockedByMe: false,
+      canMessage: true,
+    };
+    expect(parseChatConversationActionResponse(action)).toEqual(action);
+    expect(parseChatConversationActionResponse({ ...action, reporterUserId: user })).toBeNull();
+
+    const attention = {
+      chatVersion: 'chat-v1',
+      conversationId: conversation.id,
+      clientInstanceId: 'browser-a',
+      expiresAt: '2026-01-01T00:00:15.000Z',
+    };
+    expect(parseChatAttentionResponse(attention)).toEqual(attention);
+    expect(parseChatAttentionResponse({ ...attention, sourceAddress: '192.0.2.1' })).toBeNull();
+
+    const receipt = {
+      id: message,
+      conversationId: conversation.id,
+      messageId: null,
+      reasonCode: 'SPAM',
+      status: 'SUBMITTED',
+      createdAt: '2026-01-01T00:00:00.000Z',
+    };
+    expect(parseChatReportReceipt(receipt)).toEqual(receipt);
+    expect(parseChatReportReceipt({ ...receipt, details: 'private text' })).toBeNull();
+  });
+});

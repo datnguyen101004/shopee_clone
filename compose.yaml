@@ -1,0 +1,109 @@
+name: shopee-clone
+
+services:
+  postgres:
+    image: postgres:18.4-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER is required}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB is required}
+      POSTGRES_TEST_DB: ${POSTGRES_TEST_DB:-shopee_clone_test}
+    ports:
+      - '127.0.0.1:${POSTGRES_PORT:?POSTGRES_PORT is required}:5432'
+    volumes:
+      - postgres-data:/var/lib/postgresql
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}"']
+      interval: 2s
+      timeout: 5s
+      retries: 20
+      start_period: 5s
+    labels:
+      com.shopee-clone.component: postgres
+      com.shopee-clone.scope: ${SHOPEE_COMPOSE_SCOPE:-development}
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.17.0
+    profiles: ['search']
+    restart: unless-stopped
+    environment:
+      discovery.type: single-node
+      xpack.security.enabled: 'false'
+      ES_JAVA_OPTS: -Xms512m -Xmx512m
+    mem_limit: 1g
+    ports:
+      - '127.0.0.1:${ELASTICSEARCH_PORT:-9200}:9200'
+    volumes:
+      - elasticsearch-data:/usr/share/elasticsearch/data
+    healthcheck:
+      test:
+        [
+          'CMD-SHELL',
+          'curl --silent --fail http://localhost:9200/_cluster/health?wait_for_status=yellow&timeout=1s >/dev/null',
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 30s
+    labels:
+      com.shopee-clone.component: elasticsearch
+      com.shopee-clone.scope: ${SHOPEE_COMPOSE_SCOPE:-development}
+
+  api:
+    image: datnguyen10102004/shopee-clone-api:${IMAGE_TAG:-0.1.0}
+    pull_policy: always
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file:
+      - ${DEV_ENV_FILE:-.env}
+    environment:
+      NODE_ENV: ${NODE_ENV:-production}
+      # Process always listens on 3001 inside the container.
+      # Host publish port can still be 80 via PORT / API_HOST_PORT in .env.
+      PORT: '3001'
+      DATABASE_URL: ${DATABASE_CONTAINER_URL:-postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}}
+      ELASTICSEARCH_URL: ${ELASTICSEARCH_CONTAINER_URL:-http://elasticsearch:9200}
+    ports:
+      - '${API_HOST_PORT:-3001}:3001'
+    labels:
+      com.shopee-clone.component: api
+      com.shopee-clone.scope: ${SHOPEE_COMPOSE_SCOPE:-development}
+
+  demo-carrier:
+    build:
+      context: .
+      dockerfile: apps/demo-carrier/Dockerfile
+    profiles: ['carrier']
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      PORT: '3010'
+      # Keep the carrier process on the marketplace database boundary. The
+      # current simulation keeps its remote-looking state in process memory;
+      # authoritative shipment/order projections live in this database via API.
+      DATABASE_URL: ${DATABASE_CONTAINER_URL:-postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}}
+      DEMO_CARRIER_HMAC_ACTIVE_KEY_ID: ${DEMO_CARRIER_HMAC_ACTIVE_KEY_ID:-local-demo-carrier-v1}
+      DEMO_CARRIER_HMAC_ACTIVE_SECRET: ${DEMO_CARRIER_HMAC_ACTIVE_SECRET:-replace-with-a-local-only-demo-carrier-secret}
+      DEMO_CARRIER_HMAC_PREVIOUS_KEY_ID: ${DEMO_CARRIER_HMAC_PREVIOUS_KEY_ID:-}
+      DEMO_CARRIER_HMAC_PREVIOUS_SECRET: ${DEMO_CARRIER_HMAC_PREVIOUS_SECRET:-}
+    ports:
+      - '${DEMO_CARRIER_HOST_PORT:-3010}:3010'
+    labels:
+      com.shopee-clone.component: demo-carrier
+      com.shopee-clone.scope: ${SHOPEE_COMPOSE_SCOPE:-development}
+
+volumes:
+  postgres-data:
+    labels:
+      com.shopee-clone.component: postgres-data
+      com.shopee-clone.scope: ${SHOPEE_COMPOSE_SCOPE:-development}
+  elasticsearch-data:
+    labels:
+      com.shopee-clone.component: elasticsearch-data
+      com.shopee-clone.scope: ${SHOPEE_COMPOSE_SCOPE:-development}

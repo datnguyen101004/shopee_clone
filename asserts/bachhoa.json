@@ -1,0 +1,474 @@
+{
+  "source": "https://www.bachhoaxanh.com/nuoc-suoi-khoang",
+  "api": "https://api.bachhoaxanh.com/gw/Category/V2/GetCate",
+  "image_limit": 300,
+  "limit_reached": false,
+  "store_id": 2546,
+  "province_id": 3,
+  "source_total": 51,
+  "pages_fetched": 5,
+  "products_received": 51,
+  "record_count": 51,
+  "unique_image_count": 51,
+  "records": [
+    {
+      "id": 361438,
+      "name": "Thùng 24 chai nước kiềm có khoáng La Vie + 500ml",
+      "price": 89000,
+      "rating": 5.0,
+      "notes": "Danh mục: Nước suối; Thương hiệu: La Vie; Quy cách: 24 chai 500ml; Giá gốc: 129.000đ; Giảm 31%; Khuyến mãi: 85K/TH từ 5TH; 1 lượt đánh giá",
+      "image_url": "https://cdnv2.tgdd.vn/bhx-static/bhx/production/2025/12/image/production/2025/12/image/Products/2563/361438/thung-24-chai-nuoc-kiem-co-khoang-la-vie-500ml_202512291605200073.jpg",
+      "product_url": "https://www.bachhoaxanh.com/nuoc-suoi-khoang/thung-24-chai-nuoc-kiem-co-khoang-la-vie-500ml"
+    },
+    {
+      "id": 76403,
+      "name": "Thùng 24 chai nước khoáng La Vie 350ml",
+      "price": 77000,
+      "rating": 5.0,
+      "notes": "Danh mục: Nước suối; Thương hiệu: La Vie; Quy cách: 24 chai 350ml; Giá gốc: 107.000đ; Giảm 28%; 2 lượt đánh giá",
+      "image_url": "https://cdnv2.tgdd.vn/bhx-static/bhx/production/2026/6/image/Products/Images/2563/76403/bhx/76403_202606021435010340.jpg",
+      "product_url": "https://www.bachhoaxanh.com/nuoc-suoi-khoang/thung-24-chai-nuoc-khoang-la-vie-350ml"
+    },
+    {
+      "id": 324823,
+      "name": "Thùng 24 chai nước khoáng La Vie vị dịu nhẹ 500ml",
+      "price": 82000,
+      "rating": 4.0,
+      "notes": "Danh mục: Nước suối; Thương hiệu: La Vie; Quy cách: 24 chai 500ml; Giá gốc: 115.000đ; Giảm 29%; Khuyến mãi: 79K/TH từ 5TH; 4 lượt đánh giá",
+      "image_url": "https://cdnv2.tgdd.vn/bhx-static/bhx/Products/Images/2563/324823/bhx/324823_202411121052010188.jpg",
+      "product_url": "https://www.bachhoaxanh.com/nuoc-suoi-khoang/thung-24-chai-nuoc-khoang-la-vie-500ml-vi-diu-nhe"
+    },
+    {
+      "id": 84812,
+      "name": "Thùng 24 chai nước khoáng La Vie 500ml",
+      "price": 82000,
+      "rating": 4.0,
+      "notes": "Danh mục: Nước suối; Thương hiệu: La Vie; Quy cách: 24 chai 500ml; Giá gốc: 115.000đ; Giảm 29%; Khuyến mãi: 79.000Đ/THÙNG KHI MUA COMBO 5 THÙNG; 9 lượt đánh giá",
+      "image_url": "https://cdnv2.tgdd.vn/bhx-static/bhx/Products/Images/2563/84812/bhx/84812_202411111632302202.jpg",
+      "product_url": "https://www.bachhoaxanh.com/nuoc-suoi-khoang/thung-24-chai-nuoc-khoang-la-vie-500ml"
+    },
+    {
+      "id": 76402,
+      "name": "Thùng 12 chai nước khoáng La Vie 1.5 lít",
+      "price": 89000,
+      "rating": 4.0,
+      "notes": "Danh mục: Nước suối; Thương hiệu: La Vie; Quy cách: 12 chai 1.5 lít; Giá gốc: 125.000đ; Giảm 29%; 5 lượt đánh giá",
+      "image_url": "https://cdnv2.tgdd.vn/bhx-static/bhx/Products/Images/2563/76402/bhx/nuoc-khoang-la-vie-15l_202511181638146370.jpg",
+      "product_url": "https://www.bachhoaxanh.com/nuoc-suoi-khoang/nuoc-khoang-la-vie-15l"
+    },
+    {
+      "id": 306897,
+      "name": "Thùng 4 bình nước khoáng La Vie 5 lít",
+      "price": 99000,
+      "rating": 1.0,
+      "notes": "Danh mục: Nước suối; Thương hiệu: La Vie; Quy cách: 4 bình 5 lít; Giá gốc: 108.000đ; Giảm 8%; 1 lượt đánh giá",
+      "image_url": "https://cdnv2.tgdd.vn/bhx-static/bhx/Products/Images/2563/306897/bhx/thung-4-chai-nuoc-khoang-la-vie-5-lit_202511181625293007.jpg",
+      "product_url": "https://www.bachhoaxanh.com/nuoc-suoi-khoang/thung-4-chai-nuoc-khoang-la-vie-5-lit"
+    },
+    {
+      "id": 336079,
+      "name": "Thùng 4 bình nước khoáng La Vie 5 lít vị dịu nhẹ",
+      "price": 99000,
+      "rating": 3.0,
+      "notes": "Danh mục: Nước suối; Thương hiệu: La Vie; Quy cách: 4 bình 5 lít; Giá gốc: 108.000đ; Giảm 8%; 1 lượt đánh giá",
+      "image_url": "https://cdnv2.tgdd.vn/bhx-static/bhx/Products/Images/2563/336079/bhx/thung-4-binh-nuoc-khoang-la-vie-5-lit-vi-diu-nhe_202510071333043055.jpg",
+      "product_url": "https://www.bachhoaxanh.com/nuoc-suoi-khoang/thung-4-binh-nuoc-khoang-la-vie-5-lit-vi-diu-nhe"
+    },
+    {
+      "id": 83683,
+      "name": "Thùng 24 chai nước tinh khiết Dasani 510ml",
+      "price": 95000,
+      "rating": 3.0,
+      "notes": "Danh mục: Nước suối; Thương hiệu: Dasani; Quy cách: 24 chai 510ml; Giá gốc: 115.000đ; Giảm 17%; 19 lượt đánh giá",
+      "image_url": "https://cdnv2.tgdd.vn/bhx-static/bhx/Products/Images/2563/83683/bhx/83683_202411111629177695.jpg",
+      "product_url": "https://www.bachhoaxanh.com/nuoc-suoi-khoang/24-chai-nuoc-tinh-khiet-dasani-500ml"
+    },
+    {
+      "id": 309363,
+      "name": "Thùng 24 chai nước uống i-on kiềm Ocany 500ml",
+      "price": 129000,
+      "rating": 5.0,
+      "notes": "Danh mục: Nước suối; Thương hiệu: Ocany; Quy cách: 24 chai 500ml; 1 lượt đánh giá",
+      "image_url": "https://cdnv2.tgdd.vn/bhx-static/bhx/production/2026/6/image/Products/Images/2563/309363/bhx/309363_202606111434095339.jpg",
+      "product_url": "https://www.bachhoaxanh.com/nuoc-suoi-khoang/thung-24-chai-nuoc-uong-i-on-kiem-ocany-600ml"
+    },
+    {
+      "id": 309365,
+      "name": "Thùng 12 chai nước uống i-on kiềm Ocany 1.5 lít",
+      "price": 139000,
+      "rating": null,
+      "notes": "Danh mục: Nước suối; Thương hiệu: Ocany; Quy cách: 12 chai 1.5 lít; Chưa có đánh giá",
+      "image_url": "https://cdnv2.tgdd.vn/bhx-static/bhx/production/2026/6/image/Products/Images/2563/309365/bhx/309365_202606111434058812.jpg",
+      "product_url": "https://www.bachhoaxanh.com/nuoc-suoi-khoang/thung-12-chai-nuoc-uong-i-on-kiem-ocany-15-lit"
+    },
+    {
+      "id": 242251,
+      "name": "Thùng 12 chai nước khoáng Vikoda 1.5 lít",
+      "price": 99000,
+      "rating": null,
+      "notes": "Danh mục: Nước suối; Thương hiệu: Vikoda; Quy cách: 12 chai 1.5 lít; Giá gốc: 132.000đ; Giảm 25%; Chưa có đánh giá",
+      "image_url": "https://cdnv2.tgdd.vn/bhx-static/bhx/Products/Images/2563/242251/bhx/thung-12-chai-nuoc-khoang-vikoda-15-lit_202511270939491591.jpg",
+      "product_url": "https://www.bachhoaxanh.com/nuoc-suoi-khoang/thung-12-chai-nuoc-khoang-vikoda-15-lit"
+    },
+    {
+      "id": 242196,
+      "name": "Thùng 24 chai nước khoáng Vikoda 500ml",
+      "price": 95000,
+      "rating": 1.0,
+      "notes": "Danh mục: Nước suối; Thương hiệu: Vikoda; Quy cách: 24 chai 500ml; Giá gốc: 130.000đ; Giảm 27%; 3 lượt đánh giá",
+      "image_url": "https://cdnv2.tgdd.vn/bhx-static/bhx/Products/Images/2563/242196/bhx/thung-24-chai-nuoc-khoang-vikoda-500ml_202511261004187706.jpg",
+      "product_url": "https://www.bachhoaxanh.com/nuoc-suoi-khoang/thung-24-chai-nuoc-khoang-vikoda-500ml"
+    },
+    {
+      "id": 84816,
+      "name": "Thùng 24 chai nước tinh khiết Aquafina 500ml",
+      "price": 110000,
+      "rating": 4.0,
+      "notes": "Danh mục: Nước suối; Thương hiệu: Aquafina; Quy cách: 24 chai 500ml; Giá gốc: 122.000đ; Giảm 10%; 19 lượt đánh giá",
+      "image_url": "https://cdnv2.tgdd.vn/bhx-static/bhx/production/2025/12/image/production/2025/12/image/Products/2563/84816/thung-24-chai-nuoc-tinh-khiet-aquafina-500ml_202512231353351046.jpg",
+      "product_url": "https://www.bachhoaxanh.com/nuoc-suoi-khoang/thung-24-chai-nuoc-tinh-khiet-aquafina-500ml"
+    },
+    {
+      "id": 84815,
+      "name": "Thùng 4 bình nước tinh khiết Aquafina 5 lít",
+      "price": 117000,
+      "rating": 4.0,
+      "notes": "Danh mục: Nước suối; Thương hiệu: Aquafina; Quy cách: 4 bình 5 lít; 21 lượt đánh giá",
+      "image_url": "https://cdnv2.tgdd.vn/bhx-static/bhx/Products/Images/2563/84815/bhx/84815-thumb_202508010912366251.jpg",
+      "product_url": "https://www.bachhoaxanh.com/nuoc-suoi-khoang/thung-4-chai-nuoc-tinh-khiet-aquafina-5-lit"
+    },
+    {
+      "id": 336078,
+      "name": "Nước khoáng La Vie 5 lít vị dịu nhẹ",
+      "price": 26000,
+      "rating": 5.0,
+      "notes": "Danh mục: Nước suối; Thương hiệu: La Vie; Quy cách: Bình 5 lít; Giá gốc: 27.000đ; Giảm 4%; 1 lượt đánh giá",
+      "image_url": "https://cdnv2.tgdd.vn/bhx-static/bhx/Products/Images/2563/336078/bhx/nuoc-khoang-la-vie-5-lit-vi-diu-nhe_202505211456586061.jpg",
+      "product_url": "https://www.bachhoaxanh.com/nuoc-suoi-khoang/nuoc-khoang-la-vie-5-lit-vi-diu-nhe"
+    },
+    {
+      "id": 306896,
+      "name": "Nước khoáng La Vie 5 lít",
+      "price": 26000,
+      "rating": 4.0,
+      "notes": "Danh mục: Nước suối; Thương hiệu: La Vie; Quy cách: Bình 5 lít; Giá gốc: 27.000đ; Giảm 4%; 1 lượt đánh giá",
+      "image_url": "https://cdnv2.tgdd.vn/bhx-static/bhx/Products/Images/2563/306896/bhx/nuoc-khoang-la-vie-5-lit_202511181620092764.jpg",
+      "product_url": "https://www.bachhoaxanh.com/nuoc-suoi-khoang/nuoc-khoang-la-vie-5-lit"
+    },
+    {
+      "id": 76509,
+      "name": "Nước tinh khiết Aquafina 5 lít",
+      "price": 29500,
+      "rating": 5.0,
+      "notes": "Danh mục: Nước suối; Thương hiệu: Aquafina; Quy cách: Bình 5 lít; 105 lượt đánh giá",
+      "image_url": "https://cdnv2.tgdd.vn/bhx-static/bhx/Products/Images/2563/76509/bhx/76509-thumb_202508010910576282.jpg",
+      "product_url": "https://www.bachhoaxanh.com/nuoc-suoi-khoang/nuoc-tinh-khiet-aquafina-5-lit"
+    },
+    {
+      "id": 241305,
+      "name": "Thùng 24 lon nước giải khát có ga Aquafina Soda 320ml",
+      "price": 175000,
+      "rating": 5.0,
+      "notes": "Danh mục: Nước suối; Thương hiệu: Aquafina; Quy cách: 24 lon 320ml; 10 lượt đánh giá",
+      "image_url": "https://cdnv2.tgdd.vn/bhx-static/bhx/Products/Images/2563/241305/bhx/241305_202411121017546752.jpg",
+      "product_url": "https://www.bachhoaxanh.com/nuoc-suoi-khoang/thung-24-lon-nuoc-giai-khat-co-ga-aquafina-soda-320ml"
+    },
+    {
+      "id": 83690,
+      "name": "6 chai nước tinh khiết Dasani 510ml",
+      "price": 24000,
+      "rating": 4.0,
+      "notes": "Danh mục: Nước suối; Thương hiệu: Dasani; Quy cách: 6 chai 510ml; Giá gốc: 31.000đ; Giảm 23%; 9 lượt đánh giá",
+      "image_url": "https://cdnv2.tgdd.vn/bhx-static/bhx/Products/Images/2563/83690/bhx/83690_202411111632149388.jpg",
+      "product_url": "https://www.bachhoaxanh.com/nuoc-suoi-khoang/6-chai-nuoc-tinh-khiet-dasani-500ml"
+    },
+    {
+      "id": 200536,
+      "name": "6 chai nước khoáng La Vie 350ml",
+      "price": 27000,
+      "rating": null,
+      "notes": "Danh mục: Nước suối; Thương hiệu: La Vie; Quy cách: 6 chai 350ml; Chưa có đánh giá",
+      "image_url": "https://cdnv2.tgdd.vn/bhx-static/bhx/production/2026/5/image/production/2026/5/image/Products/2563/200536/6-chai-nuoc-khoang-la-vie-350ml_202605270926124689.jpg",
+      "product_url": "https://www.bachhoaxanh.com/nuoc-suoi-khoang/6-chai-nuoc-khoang-la-vie-350ml"
+    },
+    {
+      "id": 200531,
+      "name": "6 chai nước khoáng La Vie 500ml",
+      "price": 32000,
+      "rating": 4.0,
+      "notes": "Danh mục: Nước suối; Thương hiệu: La Vie; Quy cách: 6 chai 500ml; 5 lượt đánh giá",
+      "image_url": "https://cdnv2.tgdd.vn/bhx-static/bhx/Products/Images/2563/200531/bhx/200531_202411111721307391.jpg",
+      "product_url": "https://www.bachhoaxanh.com/nuoc-suoi-khoang/6-chai-nuoc-khoang-la-vie-500ml"
+    },
+    {
+      "id": 5366895,
+      "name": "Nước kiềm có khoáng La Vie + 1.5 lít",
+      "price": 12400,
+      "rating": null,
+      "notes": "Danh mục: Nước suối; Thương hiệu: La Vie; Quy cách: Chai 1.5 lít; Khuyến mãi: MUA 2 TẶNG 1 LA VIE CHAI 1.5L BẤT KỲ; Chưa có đánh giá",
+      "image_url": "https://cdnv2.tgdd.vn/bhx-static/bhx/production/2026/6/image/production/2026/6/image/Products/2563/5366895/nuoc-kiem-co-khoang-la-vie-15-lit_202606030140211186.jpg",
+      "product_url": "https://www.bachhoaxanh.com/nuoc-suoi-khoang/nuoc-kiem-co-khoang-la-vie-15-lit"
+    },
+    {
+      "id": 5366889,
+      "name": "Combo 2 thùng 24 chai nước khoáng La Vie 500ml và Thùng 24 chai nước khoáng La Vie vị dịu nhẹ 500ml",
+      "price": 246000,
+      "rating": null,
+      "notes": "Danh mục: Nước suối; Thương hiệu: La Vie; Quy cách: 3 thùng; Giá gốc: 345.000đ; Giảm 29%; Chưa có đánh giá",
+      "image_url": "https://cdnv2.tgdd.vn/bhx-static/bhx/production/2026/6/image/production/2026/6/image/Products/2563/5366889/thung-24-chai-nuoc-khoang-la-vie-500ml-vi-diu-nhe-clone_202606301102361220.jpg",
+      "product_url": "https://www.bachhoaxanh.com/nuoc-suoi-khoang/thung-24-chai-nuoc-khoang-la-vie-500ml-vi-diu-nhe-clone"
+    },
+    {
+      "id": 5366888,
+      "name": "Combo 2 thùng nước khoáng La Vie vị dịu nhẹ và 1 thùng nước khoáng La Vie 500ml",
+      "price": 246000,
+      "rating": null,
+      "notes": "Danh mục: Nước suối; Thương hiệu: La Vie; Quy cách: 3 thùng; Giá gốc: 345.000đ; Giảm 29%; Chưa có đánh giá",
+      "image_url": "https://cdnv2.tgdd.vn/bhx-static/bhx/production/2026/6/image/production/2026/6/image/Products/2563/5366888/combo-2-thung-la-vie-vi-diu-nhe-va-nuoc-khoang-lavie-500ml_202606301101508267.jpg",
+      "product_url": "https://www.bachhoaxanh.com/nuoc-suoi-khoang/combo-2-thung-la-vie-vi-diu-nhe-va-nuoc-khoang-lavie-500ml"
+    },
+    {
+      "id": 361625,
+      "name": "Combo 3 thùng 24 chai nước kiềm có khoáng La Vie + 500ml",
+      "price": 267000,
+      "rating": 1.0,
+      "notes": "Danh mục: Nước suối; Thương hiệu: La Vie; Quy cách: 3 thùng; Giá gốc: 387.000đ; Giảm 31%; 1 lượt đánh giá",
+      "image_url": "https://cdnv2.tgdd.vn/bhx-static/bhx/production/2026/7/image/production/2026/7/image/Products/2563/361625/3-thung-24-chai-nuoc-kiem-co-khoang-la-vie-500ml_202607300858046612.jpg",
+      "product_url": "https://www.bachhoaxanh.com/nuoc-suoi-khoang/3-thung-24-chai-nuoc-kiem-co-khoang-la-vie-500ml"
+    },
+    {
+      "id": 361624,
+      "name": "Combo 3 thùng 24 chai nước khoáng La Vie 500ml",
+      "price": 246000,
+      "rating": 5.0,
+      "notes": "Danh mục: Nước suối; Thương hiệu: La Vie; Quy cách: 3 thùng; Giá gốc: 345.000đ; Giảm 29%; 2 lượt đánh giá",
+      "image_url": "https://cdnv2.tgdd.vn/bhx-static/bhx/production/2026/7/image/production/2026/7/image/Products/2563/361624/3-thung-24-chai-nuoc-khoang-la-vie-500ml_202607300857557092.jpg",
+      "product_url": "https://www.bachhoaxanh.com/nuoc-suoi-khoang/3-thung-24-chai-nuoc-khoang-la-vie-500ml"
+    },
+    {
+      "id": 361623,
+      "name": "Combo 3 thùng 24 chai nước khoáng La Vie vị dịu nhẹ 500ml",
+      "price": 246000,
+      "rating": 5.0,
+      "notes": "Danh mục: Nước suối; Thương hiệu: La Vie; Quy cách: 3 thùng; Giá gốc: 345.000đ; Giảm 29%; 1 lượt đánh giá",
+      "image_url": "https://cdnv2.tgdd.vn/bhx-static/bhx/production/2026/7/image/production/2026/7/image/Products/2563/361623/3-thung-24-chai-nuoc-khoang-la-vie-500ml-vi-diu-nhe_202607300858004251.jpg",
+      "product_url": "https://www.bachhoaxanh.com/nuoc-suoi-khoang/3-thung-24-chai-nuoc-khoang-la-vie-500ml-vi-diu-nhe"
+    },
+    {
+      "id": 361437,
+      "name": "Nước kiềm có khoáng La Vie + 500ml",
+      "price": 5600,
+      "rating": 5.0,
+      "notes": "Danh mục: Nước suối; Thương hiệu: La Vie; Quy cách: Chai 500ml; Khuyến mãi: 12.000Đ=3 CHAI LA VIE 500ML BẤT KỲ; 1 lượt đánh giá",
+      "image_url": "https://cdnv2.tgdd.vn/bhx-static/bhx/production/2026/6/image/Products/Images/2563/361437/bhx/361437_202606111434026267.jpg",
+      "product_url": "https://www.bachhoaxanh.com/nuoc-suoi-khoang/nuoc-kiem-co-khoang-la-vie-500ml"
+    },
+    {
+      "id": 336081,
+      "name": "Nước khoáng La Vie 1.5 lít vị dịu nhẹ",
+      "price": 11300,
+      "rating": null,
+      "notes": "Danh mục: Nước suối; Thương hiệu: La Vie; Quy cách: Chai 1.5 lít; Khuyến mãi: MUA 2 TẶNG 1 LA VIE CHAI 1.5L BẤT KỲ; Chưa có đánh giá",
+      "image_url": "https://cdnv2.tgdd.vn/bhx-static/bhx/Products/Images/2563/336081/bhx/nuoc-khoang-la-vie-15-lit-vi-diu-nhe_202507031509054636.jpg",
+      "product_url": "https://www.bachhoaxanh.com/nuoc-suoi-khoang/nuoc-khoang-la-vie-15-lit-vi-diu-nhe"
+    },
+    {
+      "id": 324814,
+      "name": "Nước khoáng La Vie 500ml vị dịu nhẹ",
+      "price": 5300,
+      "rating": null,
+      "notes": "Danh mục: Nước suối; Thương hiệu: La Vie; Quy cách: Chai 500ml; Khuyến mãi: 12.000Đ=3 CHAI LA VIE 500ML BẤT KỲ; Chưa có đánh giá",
+      "image_url": "https://cdnv2.tgdd.vn/bhx-static/bhx/Products/Images/2563/324814/bhx/324814_202411121052444870.jpg",
+      "product_url": "https://www.bachhoaxanh.com/nuoc-suoi-khoang/nuoc-khoang-la-vie-500ml-vi-diu-nhe"
+    },
+    {
+      "id": 309364,
+      "name": "Nước uống i-on kiềm Ocany 1.5 lít",
+      "price": 12000,
+      "rating": null,
+      "notes": "Danh mục: Nước suối; Thương hiệu: Ocany; Quy cách: Chai 1.5 lít; Chưa có đánh giá",
+      "image_url": "https://cdnv2.tgdd.vn/bhx-static/bhx/production/2026/6/image/Products/Images/2563/309364/bhx/309364_202606111434170933.jpg",
+      "product_url": "https://www.bachhoaxanh.com/nuoc-suoi-khoang/nuoc-uong-i-on-kiem-ocany-15-lit"
+    },
+    {
+      "id": 309362,
+      "name": "Nước uống i-on kiềm Ocany 500ml",
+      "price": 5500,
+      "rating": null,
+      "notes": "Danh mục: Nước suối; Thương hiệu: Ocany; Quy cách: Chai 500ml; Chưa có đánh giá",
+      "image_url": "https://cdnv2.tgdd.vn/bhx-static/bhx/production/2026/6/image/Products/Images/2563/309362/bhx/309362_202606111434130599.jpg",
+      "product_url": "https://www.bachhoaxanh.com/nuoc-suoi-khoang/nuoc-uong-i-on-kiem-ocany-600ml"
+    },
+    {
+      "id": 242287,
+      "name": "Lốc 6 chai nước khoáng Vikoda 1.5 lít",
+      "price": 54000,
+      "rating": null,
+      "notes": "Danh mục: Nước suối; Thương hiệu: Vikoda; Quy cách: 6 chai 1.5 lít; Giá gốc: 66.000đ; Giảm 18%; Chưa có đánh giá",
+      "image_url": "https://cdnv2.tgdd.vn/bhx-static/bhx/Products/Images/2563/242287/bhx/loc-6-chai-nuoc-khoang-vikoda-15-lit_202511270944318475.jpg",
+      "product_url": "https://www.bachhoaxanh.com/nuoc-suoi-khoang/loc-6-chai-nuoc-khoang-vikoda-15-lit"
+    },
+    {
+      "id": 242286,
+      "name": "Lốc 6 chai nước khoáng Vikoda 500ml",
+      "price": 24000,
+      "rating": null,
+      "notes": "Danh mục: Nước suối; Thương hiệu: Vikoda; Quy cách: 6 chai 500ml; Giá gốc: 33.000đ; Giảm 27%; Chưa có đánh giá",
+      "image_url": "https://cdnv2.tgdd.vn/bhx-static/bhx/Products/Images/2563/242286/bhx/loc-6-chai-nuoc-khoang-vikoda-500ml_202511261010169896.jpg",
+      "product_url": "https://www.bachhoaxanh.com/nuoc-suoi-khoang/loc-6-chai-nuoc-khoang-vikoda-500ml"
+    },
+    {
+      "id": 242248,
+      "name": "Nước khoáng Vikoda 1.5 lít",
+      "price": 11200,
+      "rating": 4.0,
+      "notes": "Danh mục: Nước suối; Thương hiệu: Vikoda; Quy cách: Chai 1.5 lít; Khuyến mãi: CHỈ 18.000Đ KHI MUA 2 CHAI; 6 lượt đánh giá",
+      "image_url": "https://cdnv2.tgdd.vn/bhx-static/bhx/Products/Images/2563/242248/bhx/nuoc-khoang-vikoda-15-lit_202511270930344462.jpg",
+      "product_url": "https://www.bachhoaxanh.com/nuoc-suoi-khoang/nuoc-khoang-vikoda-15-lit"
+    },
+    {
+      "id": 242191,
+      "name": "Nước khoáng Vikoda 500ml",
+      "price": 5500,
+      "rating": 4.0,
+      "notes": "Danh mục: Nước suối; Thương hiệu: Vikoda; Quy cách: Chai 500ml; Khuyến mãi: MUA 3 TẶNG 1 (CHAI); 4 lượt đánh giá",
+      "image_url": "https://cdnv2.tgdd.vn/bhx-static/bhx/Products/Images/2563/242191/bhx/nuoc-khoang-vikoda-500ml_202511261004283679.jpg",
+      "product_url": "https://www.bachhoaxanh.com/nuoc-suoi-khoang/nuoc-khoang-vikoda-500ml"
+    },
+    {
+      "id": 241303,
+      "name": "6 lon nước giải khát có ga Aquafina Soda 320ml",
+      "price": 45000,
+      "rating": 5.0,
+      "notes": "Danh mục: Nước suối; Thương hiệu: Aquafina; Quy cách: 6 lon 320ml; 7 lượt đánh giá",
+      "image_url": "https://cdnv2.tgdd.vn/bhx-static/bhx/Products/Images/2563/241303/bhx/241303-thumb_202507291656545305.jpg",
+      "product_url": "https://www.bachhoaxanh.com/nuoc-suoi-khoang/6-lon-nuoc-giai-khat-co-ga-aquafina-soda-320ml"
+    },
+    {
+      "id": 241300,
+      "name": "Nước giải khát có ga Aquafina Soda 320ml",
+      "price": 7900,
+      "rating": 4.0,
+      "notes": "Danh mục: Nước suối; Thương hiệu: Aquafina; Quy cách: Chai 320ml; 6 lượt đánh giá",
+      "image_url": "https://cdnv2.tgdd.vn/bhx-static/bhx/Products/Images/2563/241300/bhx/241300-thumb_202507291654503849.jpg",
+      "product_url": "https://www.bachhoaxanh.com/nuoc-suoi-khoang/nuoc-giai-khat-co-ga-aquafina-soda-lon-330ml"
+    },
+    {
+      "id": 212782,
+      "name": "6 chai nước tinh khiết Aquafina 500ml",
+      "price": 32500,
+      "rating": null,
+      "notes": "Danh mục: Nước suối; Thương hiệu: Aquafina; Quy cách: 6 chai 500ml; 2 lượt đánh giá",
+      "image_url": "https://cdnv2.tgdd.vn/bhx-static/bhx/Products/Images/2563/212782/bhx/212782-thumb_202508010908177906.jpg",
+      "product_url": "https://www.bachhoaxanh.com/nuoc-suoi-khoang/6-chai-nuoc-tinh-khiet-aquafina-500ml"
+    },
+    {
+      "id": 200532,
+      "name": "6 chai nước uống i-on kiềm Akaline I-on Life 450ml",
+      "price": 33500,
+      "rating": 5.0,
+      "notes": "Danh mục: Nước suối; Thương hiệu: I-on Life; Quy cách: 6 chai 450ml; 2 lượt đánh giá",
+      "image_url": "https://cdnv2.tgdd.vn/bhx-static/bhx/Products/Images/2563/200532/bhx/200532_202411111721168873.jpg",
+      "product_url": "https://www.bachhoaxanh.com/nuoc-suoi-khoang/6-chai-nuoc-khoang-i-on-life-450ml"
+    },
+    {
+      "id": 85219,
+      "name": "Nước khoáng La Vie 350ml",
+      "price": 4600,
+      "rating": 4.0,
+      "notes": "Danh mục: Nước suối; Thương hiệu: La Vie; Quy cách: Chai 350ml; Khuyến mãi: CHỈ 10.000Đ KHI MUA 3 CHAI; 6 lượt đánh giá",
+      "image_url": "https://cdnv2.tgdd.vn/bhx-static/bhx/production/2026/3/image/production/2026/3/image/Products/2563/85219/nuoc-khoang-la-vie-350ml_202603241414498313.jpg",
+      "product_url": "https://www.bachhoaxanh.com/nuoc-suoi-khoang/nuoc-khoang-la-vie-350ml"
+    },
+    {
+      "id": 84814,
+      "name": "Nước tinh khiết Aquafina 1.5 lít",
+      "price": 11900,
+      "rating": 5.0,
+      "notes": "Danh mục: Nước suối; Thương hiệu: Aquafina; Quy cách: Chai 1.5 lít; 64 lượt đánh giá",
+      "image_url": "https://cdnv2.tgdd.vn/bhx-static/bhx/Products/Images/2563/84814/bhx/84814-thumb_202508010857485582.jpg",
+      "product_url": "https://www.bachhoaxanh.com/nuoc-suoi-khoang/nuoc-tinh-khiet-aquafina-15-lit"
+    },
+    {
+      "id": 84813,
+      "name": "Nước khoáng La Vie 1.5 lít",
+      "price": 11300,
+      "rating": 5.0,
+      "notes": "Danh mục: Nước suối; Thương hiệu: La Vie; Quy cách: Chai 1.5 lít; Khuyến mãi: MUA 2 TẶNG 1 LA VIE CHAI 1.5L BẤT KỲ; 5 lượt đánh giá",
+      "image_url": "https://cdnv2.tgdd.vn/bhx-static/bhx/Products/Images/2563/84813/bhx/nuoc-khoang-la-vie-15-lit_202511181638103785.jpg",
+      "product_url": "https://www.bachhoaxanh.com/nuoc-suoi-khoang/nuoc-khoang-la-vie-15-lit"
+    },
+    {
+      "id": 83687,
+      "name": "6 chai nước tinh khiết Dasani 1.5 lít",
+      "price": 49000,
+      "rating": 4.0,
+      "notes": "Danh mục: Nước suối; Thương hiệu: Dasani; Quy cách: 6 chai 1.5 lít; Giá gốc: 63.000đ; Giảm 22%; 7 lượt đánh giá",
+      "image_url": "https://cdnv2.tgdd.vn/bhx-static/bhx/Products/Images/2563/83687/bhx/83687_202411111632007131.jpg",
+      "product_url": "https://www.bachhoaxanh.com/nuoc-suoi-khoang/6-chai-nuoc-tinh-khiet-dasani-15-lit"
+    },
+    {
+      "id": 79249,
+      "name": "Nước tinh khiết Dasani 510ml",
+      "price": 5200,
+      "rating": 3.0,
+      "notes": "Danh mục: Nước suối; Thương hiệu: Dasani; Quy cách: Chai 510ml; Khuyến mãi: CHỈ 12.000Đ KHI MUA 3 CHAI; 10 lượt đánh giá",
+      "image_url": "https://cdnv2.tgdd.vn/bhx-static/bhx/Products/Images/2563/79249/bhx/79249_202411111623488071.jpg",
+      "product_url": "https://www.bachhoaxanh.com/nuoc-suoi-khoang/nuoc-tinh-khiet-dasani-500ml"
+    },
+    {
+      "id": 79247,
+      "name": "Nước tinh khiết Aquafina 500ml",
+      "price": 5400,
+      "rating": 4.0,
+      "notes": "Danh mục: Nước suối; Thương hiệu: Aquafina; Quy cách: Chai 500ml; 39 lượt đánh giá",
+      "image_url": "https://cdnv2.tgdd.vn/bhx-static/bhx/Products/Images/2563/79247/bhx/79247-thumb_202508010906273249.jpg",
+      "product_url": "https://www.bachhoaxanh.com/nuoc-suoi-khoang/nuoc-tinh-khiet-aquafina-500ml"
+    },
+    {
+      "id": 79165,
+      "name": "Nước uống i-on kiềm Akaline I-on Life 1.25 lít",
+      "price": 11900,
+      "rating": 4.0,
+      "notes": "Danh mục: Nước suối; Thương hiệu: I-on Life; Quy cách: Chai 1.25 lít; 10 lượt đánh giá",
+      "image_url": "https://cdnv2.tgdd.vn/bhx-static/bhx/Products/Images/2563/79165/bhx/79165_202411111623110034.jpg",
+      "product_url": "https://www.bachhoaxanh.com/nuoc-suoi-khoang/nuoc-khoang-i-on-life-125-lit"
+    },
+    {
+      "id": 76541,
+      "name": "Nước tinh khiết Dasani 1.5 lít",
+      "price": 10800,
+      "rating": 4.0,
+      "notes": "Danh mục: Nước suối; Thương hiệu: Dasani; Quy cách: Chai 1.5 lít; Khuyến mãi: CHỈ 17.000Đ KHI MUA 2 CHAI; 8 lượt đánh giá",
+      "image_url": "https://cdnv2.tgdd.vn/bhx-static/bhx/Products/Images/2563/76541/bhx/76541_202411111623181664.jpg",
+      "product_url": "https://www.bachhoaxanh.com/nuoc-suoi-khoang/nuoc-tinh-khiet-dasani-15-lit"
+    },
+    {
+      "id": 76404,
+      "name": "Nước khoáng Vĩnh Hảo 500ml",
+      "price": 5300,
+      "rating": 4.0,
+      "notes": "Danh mục: Nước suối; Thương hiệu: Vĩnh Hảo; Quy cách: Chai 500ml; Khuyến mãi: MUA 2 TẶNG 1 (CHAI); 4 lượt đánh giá",
+      "image_url": "https://cdnv2.tgdd.vn/bhx-static/bhx/Products/Images/2563/76404/bhx/nuoc-khoang-vinh-hao-500ml_202512112100544269.jpg",
+      "product_url": "https://www.bachhoaxanh.com/nuoc-suoi-khoang/nuoc-khoang-vinh-hao-500ml"
+    },
+    {
+      "id": 76401,
+      "name": "Nước khoáng La Vie 500ml",
+      "price": 5300,
+      "rating": 4.0,
+      "notes": "Danh mục: Nước suối; Thương hiệu: La Vie; Quy cách: Chai 500ml; Khuyến mãi: 12.000Đ=3 CHAI LA VIE 500ML BẤT KỲ; 8 lượt đánh giá",
+      "image_url": "https://cdnv2.tgdd.vn/bhx-static/bhx/Products/Images/2563/76401/bhx/76401_202411111620342005.jpg",
+      "product_url": "https://www.bachhoaxanh.com/nuoc-suoi-khoang/nuoc-khoang-la-vie-500ml"
+    },
+    {
+      "id": 76398,
+      "name": "Nước uống i-on kiềm Akaline I-on Life 450ml",
+      "price": 5900,
+      "rating": 4.0,
+      "notes": "Danh mục: Nước suối; Thương hiệu: I-on Life; Quy cách: Chai 450ml; 4 lượt đánh giá",
+      "image_url": "https://cdnv2.tgdd.vn/bhx-static/bhx/Products/Images/2563/76398/bhx/76398_202411111620109637.jpg",
+      "product_url": "https://www.bachhoaxanh.com/nuoc-suoi-khoang/nuoc-ion-life-450ml"
+    }
+  ]
+}

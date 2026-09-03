@@ -6,13 +6,180 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: development-cicd
+  # Migration and deployment must never be interrupted or overlap.
+  cancel-in-progress: false
+
+env:
+  NODE_VERSION: 22.12.0
+  PNPM_VERSION: 10.34.5
+
 jobs:
-  select-development:
-    name: Select development branch
+  validate-branch:
+    name: Require development branch
     runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:
-      - name: Reject deployment from main
+      - name: Reject a non-development dispatch
+        env:
+          SELECTED_BRANCH: ${{ github.ref_name }}
         run: |
-          echo "::error::Start this workflow again and select the development branch."
-          exit 1
+          if [ "$SELECTED_BRANCH" != "development" ]; then
+            echo "::error::Select the development branch when starting Development CICD."
+            exit 1
+          fi
+
+  quality:
+    needs: validate-branch
+    name: CI checks (no E2E)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install pinned pnpm
+        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+        with:
+          version: ${{ env.PNPM_VERSION }}
+          run_install: false
+
+      - name: Set up pinned Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install dependencies from lockfile
+        run: pnpm install --frozen-lockfile
+
+      - name: Validate infrastructure and CI definitions
+        run: |
+          pnpm infra:config:example
+          PROD_ENV_FILE=.env.example docker compose --env-file .env.example -f compose-prod.yaml --profile migration config --quiet
+          pnpm ci:validate
+          bash -n scripts/deploy-development-via-ssm.sh
+
+      - name: Check Prisma schema and generated client
+        run: |
+          pnpm db:format
+          git diff --exit-code -- apps/api/prisma/schema.prisma
+          pnpm db:validate
+          pnpm db:generate
+
+      - name: Lint
+        run: |
+          pnpm --filter @shopee-clone/contracts lint
+          pnpm --filter @shopee-clone/api lint
+
+      - name: Typecheck
+        run: |
+          pnpm --filter @shopee-clone/contracts build
+          pnpm --filter @shopee-clone/contracts typecheck
+          pnpm --filter @shopee-clone/api typecheck
+
+      - name: Run database-independent tests
+        run: pnpm test:ci
+
+      - name: Build production API and contracts
+        run: |
+          pnpm --filter @shopee-clone/contracts build
+          pnpm --filter @shopee-clone/api build
+
+  publish-images:
+    name: Build and push API images
+    needs: quality
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      DOCKERHUB_USERNAME: ${{ vars.DOCKERHUB_USERNAME }}
+      DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+    steps:
+      - name: Check deployment registry configuration
+        shell: bash
+        run: |
+          test -n "$DOCKERHUB_USERNAME" || { echo 'Missing repository variable DOCKERHUB_USERNAME'; exit 1; }
+          test -n "$DOCKERHUB_TOKEN" || { echo 'Missing repository secret DOCKERHUB_TOKEN'; exit 1; }
+
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@b45d80f862d83dbcd57f89517bcf500b2ab88fb2 # v4.0.0
+        with:
+          username: ${{ env.DOCKERHUB_USERNAME }}
+          password: ${{ env.DOCKERHUB_TOKEN }}
+
+      - name: Build and push API runtime
+        uses: docker/build-push-action@d08e5c354a6adb9ed34480a06d141179aa583294 # v7.0.0
+        with:
+          context: .
+          file: docker/Dockerfile.api
+          target: runner
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ${{ env.DOCKERHUB_USERNAME }}/shopee-clone-api:${{ github.sha }}
+            ${{ env.DOCKERHUB_USERNAME }}/shopee-clone-api:development
+          cache-from: type=gha,scope=api-runtime
+          cache-to: type=gha,mode=max,scope=api-runtime
+
+      - name: Build and push Prisma migrator
+        uses: docker/build-push-action@d08e5c354a6adb9ed34480a06d141179aa583294 # v7.0.0
+        with:
+          context: .
+          file: docker/Dockerfile.api
+          target: migrator
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ${{ env.DOCKERHUB_USERNAME }}/shopee-clone-api-migrator:${{ github.sha }}
+            ${{ env.DOCKERHUB_USERNAME }}/shopee-clone-api-migrator:development
+          cache-from: |
+            type=gha,scope=api-runtime
+            type=gha,scope=api-migrator
+          cache-to: type=gha,mode=max,scope=api-migrator
+
+  deploy:
+    name: Migrate RDS PostgreSQL and deploy EC2
+    needs: publish-images
+    if: github.ref == 'refs/heads/development'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      AWS_REGION: ${{ vars.AWS_REGION }}
+      AWS_ROLE_TO_ASSUME: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+      EC2_INSTANCE_ID: ${{ vars.EC2_INSTANCE_ID }}
+      DEPLOY_PATH: ${{ vars.EC2_DEPLOY_PATH }}
+      IMAGE_TAG: ${{ github.sha }}
+      API_IMAGE: ${{ vars.DOCKERHUB_USERNAME }}/shopee-clone-api
+      MIGRATOR_IMAGE: ${{ vars.DOCKERHUB_USERNAME }}/shopee-clone-api-migrator
+    steps:
+      - name: Check deployment configuration
+        shell: bash
+        run: |
+          for name in AWS_REGION AWS_ROLE_TO_ASSUME EC2_INSTANCE_ID DEPLOY_PATH API_IMAGE MIGRATOR_IMAGE; do
+            test -n "${!name}" || { echo "Missing deployment setting: $name"; exit 1; }
+          done
+
+      - name: Check out deployment tooling
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Configure AWS credentials through GitHub OIDC
+        uses: aws-actions/configure-aws-credentials@e6de054238d6b7531b4efff3b6587d9aade6a06c # v6.2.3
+        with:
+          role-to-assume: ${{ env.AWS_ROLE_TO_ASSUME }}
+          aws-region: ${{ env.AWS_REGION }}
+          role-session-name: shopee-development-${{ github.run_id }}
+
+      - name: Run migration and deploy through AWS Systems Manager
+        shell: bash
+        run: bash scripts/deploy-development-via-ssm.sh

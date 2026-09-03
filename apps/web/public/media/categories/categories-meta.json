@@ -1,0 +1,164 @@
+{
+  "men-clothes": {
+    "id": 11035567,
+    "name": "Thời Trang Nam",
+    "localPath": "/media/categories/men-clothes.png",
+    "shopeeUrl": "https://down-vn.img.susercontent.com/file/687f3967b7c2fe6a134a2c11894eea4b"
+  },
+  "women-clothes": {
+    "id": 11035639,
+    "name": "Thời Trang Nữ",
+    "localPath": "/media/categories/women-clothes.png",
+    "shopeeUrl": "https://down-vn.img.susercontent.com/file/75ea42f9eca124e9cb3cde744c060e4d"
+  },
+  "mobile-gadgets": {
+    "id": 11036030,
+    "name": "Điện Thoại & Phụ Kiện",
+    "localPath": "/media/categories/mobile-gadgets.png",
+    "shopeeUrl": "https://down-vn.img.susercontent.com/file/31234a27876fb89cd522d7e3db1ba5ca"
+  },
+  "moms-kids-babies": {
+    "id": 11036194,
+    "name": "Mẹ & Bé",
+    "localPath": "/media/categories/moms-kids-babies.png",
+    "shopeeUrl": "https://down-vn.img.susercontent.com/file/099edde1ab31df35bc255912bab54a5e"
+  },
+  "consumer-electronics": {
+    "id": 11036132,
+    "name": "Thiết Bị Điện Tử",
+    "localPath": "/media/categories/consumer-electronics.png",
+    "shopeeUrl": "https://down-vn.img.susercontent.com/file/978b9e4cb61c611aaaf58664fae133c5"
+  },
+  "home-living": {
+    "id": 11036670,
+    "name": "Nhà Cửa & Đời Sống",
+    "localPath": "/media/categories/home-living.png",
+    "shopeeUrl": "https://down-vn.img.susercontent.com/file/24b194a695ea59d384768b7b471d563f"
+  },
+  "computer-accessories": {
+    "id": 11035954,
+    "name": "Máy Tính & Laptop",
+    "localPath": "/media/categories/computer-accessories.png",
+    "shopeeUrl": "https://down-vn.img.susercontent.com/file/c3f3edfaa9f6dafc4825b77d8449999d"
+  },
+  "beauty-personal-care": {
+    "id": 11036279,
+    "name": "Sắc Đẹp",
+    "localPath": "/media/categories/beauty-personal-care.png",
+    "shopeeUrl": "https://down-vn.img.susercontent.com/file/ef1f336ecc6f97b790d5aae9916dcb72"
+  },
+  "cameras": {
+    "id": 11036101,
+    "name": "Máy Ảnh & Máy Quay Phim",
+    "localPath": "/media/categories/cameras.png",
+    "shopeeUrl": "https://down-vn.img.susercontent.com/file/ec14dd4fc238e676e43be2a911414d4d"
+  },
+  "health": {
+    "id": 11036345,
+    "name": "Sức Khỏe",
+    "localPath": "/media/categories/health.png",
+    "shopeeUrl": "https://down-vn.img.susercontent.com/file/49119e891a44fa135f5f6f5fd4cfc747"
+  },
+  "watches": {
+    "id": 11035788,
+    "name": "Đồng Hồ",
+    "localPath": "/media/categories/watches.png",
+    "shopeeUrl": "https://down-vn.img.susercontent.com/file/86c294aae72ca1db5f541790f7796260"
+  },
+  "women-shoes": {
+    "id": 11035825,
+    "name": "Giày Dép Nữ",
+    "localPath": "/media/categories/women-shoes.png",
+    "shopeeUrl": "https://down-vn.img.susercontent.com/file/48630b7c76a7b62bc070c9e227097847"
+  },
+  "men-shoes": {
+    "id": 11035801,
+    "name": "Giày Dép Nam",
+    "localPath": "/media/categories/men-shoes.png",
+    "shopeeUrl": "https://down-vn.img.susercontent.com/file/74ca517e1fa74dc4d974e5d03c3139de"
+  },
+  "women-bags": {
+    "id": 11035761,
+    "name": "Túi Ví Nữ",
+    "localPath": "/media/categories/women-bags.png",
+    "shopeeUrl": "https://down-vn.img.susercontent.com/file/fa6ada2555e8e51f369718bbc92ccc52"
+  },
+  "home-appliances": {
+    "id": 11036971,
+    "name": "Thiết Bị Điện Gia Dụng",
+    "localPath": "/media/categories/home-appliances.png",
+    "shopeeUrl": "https://down-vn.img.susercontent.com/file/7abfbfee3c4844652b4a8245e473d857"
+  },
+  "fashion-accessories": {
+    "id": 11035853,
+    "name": "Phụ Kiện & Trang Sức Nữ",
+    "localPath": "/media/categories/fashion-accessories.png",
+    "shopeeUrl": "https://down-vn.img.susercontent.com/file/8e71245b9659ea72c1b4e737be5cf42e"
+  },
+  "sport-outdoor": {
+    "id": 11035478,
+    "name": "Thể Thao & Du Lịch",
+    "localPath": "/media/categories/sport-outdoor.png",
+    "shopeeUrl": "https://down-vn.img.susercontent.com/file/6cb7e633f8b63757463b676bd19a50e4"
+  },
+  "grocery": {
+    "id": 11036525,
+    "name": "Bách Hóa Online",
+    "localPath": "/media/categories/grocery.png",
+    "shopeeUrl": "https://down-vn.img.susercontent.com/file/c432168ee788f903f1ea024487f2c889"
+  },
+  "automotive": {
+    "id": 11036793,
+    "name": "Ô Tô & Xe Máy & Xe Đạp",
+    "localPath": "/media/categories/automotive.png",
+    "shopeeUrl": "https://down-vn.img.susercontent.com/file/3fb459e3449905545701b418e8220334"
+  },
+  "books-stationery": {
+    "id": 11036863,
+    "name": "Nhà Sách Online",
+    "localPath": "/media/categories/books-stationery.png",
+    "shopeeUrl": "https://down-vn.img.susercontent.com/file/36013311815c55d303b0e6c62d6a8139"
+  },
+  "men-bags": {
+    "id": 11035741,
+    "name": "Balo & Túi Ví Nam",
+    "localPath": "/media/categories/men-bags.png",
+    "shopeeUrl": "https://down-vn.img.susercontent.com/file/18fd9d878ad946db2f1bf4e33760c86f"
+  },
+  "kid-fashion": {
+    "id": 11036382,
+    "name": "Thời Trang Trẻ Em",
+    "localPath": "/media/categories/kid-fashion.png",
+    "shopeeUrl": "https://down-vn.img.susercontent.com/file/4540f87aa3cbe99db739f9e8dd2cdaf0"
+  },
+  "toys": {
+    "id": 11036932,
+    "name": "Đồ Chơi",
+    "localPath": "/media/categories/toys.png",
+    "shopeeUrl": "https://down-vn.img.susercontent.com/file/ce8f8abc726cafff671d0e5311caa684"
+  },
+  "home-care": {
+    "id": 11036624,
+    "name": "Giặt Giũ & Chăm Sóc Nhà Cửa",
+    "localPath": "/media/categories/home-care.png",
+    "shopeeUrl": "https://down-vn.img.susercontent.com/file/cd8e0d2e6c14c4904058ae20821d0763"
+  },
+  "pets": {
+    "id": 11036478,
+    "name": "Chăm Sóc Thú Cưng",
+    "localPath": "/media/categories/pets.png",
+    "shopeeUrl": "https://down-vn.img.susercontent.com/file/cdf21b1bf4bfff257efe29054ecea1ec"
+  },
+  "tickets-vouchers-services": {
+    "id": 11035898,
+    "name": "Voucher & Dịch Vụ",
+    "localPath": "/media/categories/tickets-vouchers-services.png",
+    "shopeeUrl": "https://down-vn.img.susercontent.com/file/b0f78c3136d2d78d49af71dd1c3f38c1"
+  },
+  "tools-home-improvement": {
+    "id": 11116484,
+    "name": "Dụng cụ và thiết bị tiện ích",
+    "localPath": "/media/categories/tools-home-improvement.png",
+    "shopeeUrl": "https://down-vn.img.susercontent.com/file/e4fbccba5e1189d1141b9d6188af79c0"
+  }
+}

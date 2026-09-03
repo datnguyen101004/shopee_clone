@@ -65,7 +65,6 @@ function orderNavigation(
     paymentStatus?: PurchasePaymentStatus;
   }[],
 ) {
-  const statuses = new Set(orders.map((order) => order.status));
   const singleOrderReference =
     orders.length === 1 ? (orders[0]?.id ?? orders[0]?.orderReference ?? null) : null;
   return {

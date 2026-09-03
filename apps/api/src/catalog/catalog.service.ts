@@ -11,11 +11,7 @@ import type {
 } from '@shopee-clone/contracts';
 import { buyerDisplayProductPriceMinor } from '@shopee-clone/contracts';
 
-import {
-  relevanceScore,
-  normalizeDiscoveryText,
-  rankSearchSuggestions,
-} from './catalog-discovery';
+import { relevanceScore, normalizeDiscoveryText, rankSearchSuggestions } from './catalog-discovery';
 import { CatalogPublicFacade, type PublicShopCatalogSummary } from './catalog-public.facade';
 import type { NormalizedCatalogQuery } from './catalog-query';
 import { CatalogRepository } from './catalog.repository';
@@ -141,17 +137,26 @@ function buildFacetsFromSearch(
 function compareCandidates(
   left: DisplayableCatalogCandidate,
   right: DisplayableCatalogCandidate,
-  query: Pick<NormalizedCatalogQuery, 'q' | 'sort'>,
+  query: Pick<NormalizedCatalogQuery, 'q' | 'sort' | 'recommendationSurface'>,
 ): number {
   let primary = 0;
+  const dailyBaseline = query.recommendationSurface === 'daily-recommendations' && !query.q;
   if (query.sort === 'relevance' && query.q) primary = right.relevance - left.relevance;
-  else if (query.sort === 'best-selling') primary = right.card.soldCount - left.card.soldCount;
-  else if (query.sort === 'price-asc')
+  else if (query.sort === 'best-selling' || dailyBaseline) {
+    primary = right.card.soldCount - left.card.soldCount;
+  } else if (query.sort === 'price-asc')
     primary = buyerDisplayProductPriceMinor(left.card) - buyerDisplayProductPriceMinor(right.card);
   else if (query.sort === 'price-desc')
     primary = buyerDisplayProductPriceMinor(right.card) - buyerDisplayProductPriceMinor(left.card);
   else primary = right.createdAt.getTime() - left.createdAt.getTime();
   if (primary !== 0) return primary;
+
+  if (query.sort === 'best-selling' || dailyBaseline) {
+    const ratingConfidence = right.card.ratingCount - left.card.ratingCount;
+    if (ratingConfidence !== 0) return ratingConfidence;
+    const ratingAverage = right.card.ratingAverageBasisPoints - left.card.ratingAverageBasisPoints;
+    if (ratingAverage !== 0) return ratingAverage;
+  }
 
   const newest = right.createdAt.getTime() - left.createdAt.getTime();
   return newest !== 0 ? newest : left.card.id.localeCompare(right.card.id);
@@ -387,7 +392,7 @@ export class CatalogService extends CatalogPublicFacade {
     let attempts = 0;
 
     while (attempts < 3) {
-      const result = await this.productSearch.search(query, nextFrom, fetchSize);
+      const result = await this.productSearch.search(query, nextFrom, fetchSize, buyerId);
       totalItems = result.totalItems;
       facetSnapshot = result.facets;
       for (const id of result.ids) {
@@ -432,7 +437,8 @@ export class CatalogService extends CatalogPublicFacade {
           (categoryIds === null || categoryIds.has(candidate.categoryId)) &&
           (query.minPrice === null || price >= query.minPrice) &&
           (query.maxPrice === null || price <= query.maxPrice) &&
-          (query.rating === null || candidate.card.ratingAverageBasisPoints >= query.rating * 100) &&
+          (query.rating === null ||
+            candidate.card.ratingAverageBasisPoints >= query.rating * 100) &&
           (requestedLocation === null ||
             normalizeDiscoveryText(candidate.card.shop.location) === requestedLocation) &&
           (query.availability === null || query.availability === 'in-stock') &&
@@ -474,9 +480,7 @@ export class CatalogService extends CatalogPublicFacade {
         return await this.getProductsFromElasticsearch(query, buyerId);
       } catch (error) {
         const reason =
-          error instanceof ProductSearchQueryUnavailableError
-            ? error.reason
-            : 'connection-failure';
+          error instanceof ProductSearchQueryUnavailableError ? error.reason : 'connection-failure';
         this.logger.warn(`Catalogue search fallback reason=${reason}`);
       }
     }
@@ -492,9 +496,7 @@ export class CatalogService extends CatalogPublicFacade {
         return { suggestions: await this.productSearch.suggest(query, limit) };
       } catch (error) {
         const reason =
-          error instanceof ProductSearchQueryUnavailableError
-            ? error.reason
-            : 'connection-failure';
+          error instanceof ProductSearchQueryUnavailableError ? error.reason : 'connection-failure';
         this.logger.warn(`Catalogue suggestions fallback reason=${reason}`);
       }
     }

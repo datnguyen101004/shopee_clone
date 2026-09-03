@@ -1,5 +1,6 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Optional } from '@nestjs/common';
 import type {
+  CatalogProductCard,
   HomepageCampaignModule,
   HomepageCategoryModule,
   HomepageModule,
@@ -14,6 +15,9 @@ import { HomepageRepository } from './homepage.repository';
 import { ScheduledDiscountService } from '../pricing/scheduled-discount.service';
 import { applyScheduledPrice, representativeOffer } from '../catalog/catalog-presentation';
 import { BuyerBestPriceService } from '../pricing/buyer-best-price.service';
+import { CatalogPublicFacade } from '../catalog/catalog-public.facade';
+import type { NormalizedCatalogQuery } from '../catalog/catalog-query';
+import { SEARCH_CONFIG, type SearchConfig } from '../search/search.config';
 
 const moduleTypeMap = {
   [HomepageModuleType.CAMPAIGN_BANNER]: 'campaign-banner',
@@ -33,6 +37,52 @@ function safeMinor(value: bigint): number | null {
   return Number.isSafeInteger(converted) && converted >= 0 ? converted : null;
 }
 
+function diversityKey(value: string): string {
+  return value.trim().toLocaleLowerCase('vi');
+}
+
+function diversifyRecommendations(
+  products: readonly CatalogProductCard[],
+  maximum = 24,
+): CatalogProductCard[] {
+  const selected: CatalogProductCard[] = [];
+  const seen = new Set<string>();
+  const shopCounts = new Map<string, number>();
+  const categoryCounts = new Map<string, number>();
+
+  for (const product of products) {
+    if (selected.length >= maximum || seen.has(product.id)) continue;
+    const shopKey = diversityKey(product.shop.name);
+    const categoryKey = diversityKey(product.category.name);
+    if ((shopCounts.get(shopKey) ?? 0) >= 3 || (categoryCounts.get(categoryKey) ?? 0) >= 6) {
+      continue;
+    }
+    seen.add(product.id);
+    selected.push(product);
+    shopCounts.set(shopKey, (shopCounts.get(shopKey) ?? 0) + 1);
+    categoryCounts.set(categoryKey, (categoryCounts.get(categoryKey) ?? 0) + 1);
+  }
+  return selected;
+}
+
+function homepageProductFromCatalog(product: CatalogProductCard): HomepageProductSummary {
+  return {
+    id: product.id,
+    name: product.name,
+    shopName: product.shop.name,
+    href: product.href,
+    imageUrl: product.imageUrl,
+    imageAlt: product.imageAlt,
+    priceMinor: product.priceMinor,
+    ...(product.compareAtPriceMinor !== undefined
+      ? { compareAtPriceMinor: product.compareAtPriceMinor }
+      : {}),
+    ...(product.scheduledPrice ? { scheduledPrice: product.scheduledPrice } : {}),
+    ...(product.buyerBestPrice ? { buyerBestPrice: product.buyerBestPrice } : {}),
+    soldCount: product.soldCount,
+  };
+}
+
 @Injectable()
 export class HomepageService {
   constructor(
@@ -42,7 +92,41 @@ export class HomepageService {
     private readonly scheduledDiscounts?: ScheduledDiscountService,
     @Inject(BuyerBestPriceService)
     private readonly buyerPrices?: BuyerBestPriceService,
+    @Optional()
+    @Inject(CatalogPublicFacade)
+    private readonly catalog?: CatalogPublicFacade,
+    @Optional()
+    @Inject(SEARCH_CONFIG)
+    private readonly searchConfig?: SearchConfig,
   ) {}
+
+  private async resolveDailyRecommendations(
+    buyerId: string | null,
+  ): Promise<HomepageProductSummary[] | null> {
+    if (!this.catalog || !this.searchConfig?.features.dailyRecommendations) return null;
+
+    const query: NormalizedCatalogQuery = {
+      q: null,
+      category: null,
+      minPrice: null,
+      maxPrice: null,
+      rating: null,
+      location: null,
+      availability: 'in-stock',
+      promotion: null,
+      sort: buyerId ? 'relevance' : 'best-selling',
+      page: 1,
+      pageSize: 48,
+      recommendationSurface: 'daily-recommendations',
+    };
+    try {
+      const response = await this.catalog.getProducts(query, buyerId);
+      const selected = diversifyRecommendations(response.items);
+      return selected.length ? selected.map(homepageProductFromCatalog) : null;
+    } catch {
+      return null;
+    }
+  }
 
   async getHomepage(buyerId: string | null = null): Promise<HomepageResponse> {
     const now = this.clock.now();
@@ -186,12 +270,17 @@ export class HomepageService {
           ...(entry.soldCount !== null ? { soldCount: entry.soldCount } : {}),
         });
       }
-      if (products.length) {
+      const recommendationProducts =
+        record.type === HomepageModuleType.DAILY_RECOMMENDATIONS
+          ? await this.resolveDailyRecommendations(buyerId)
+          : null;
+      const resolvedProducts = recommendationProducts ?? products;
+      if (resolvedProducts.length) {
         const type = moduleTypeMap[record.type];
         modules.push({
           ...base,
           type,
-          products,
+          products: resolvedProducts,
           ...(record.activeUntil ? { endsAt: record.activeUntil.toISOString() } : {}),
         } satisfies HomepageProductModule);
       }

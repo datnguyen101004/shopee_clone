@@ -6,9 +6,11 @@ import { HomepageRepository } from './homepage.repository';
 import { HomepageService } from './homepage.service';
 import { PricingModule } from '../pricing/pricing.module';
 import { AuthModule } from '../auth/auth.module';
+import { CatalogModule } from '../catalog/catalog.module';
+import { SearchModule } from '../search/search.module';
 
 @Module({
-  imports: [PricingModule, AuthModule],
+  imports: [PricingModule, AuthModule, CatalogModule, SearchModule],
   controllers: [HomepageController],
   providers: [
     HomepageRepository,

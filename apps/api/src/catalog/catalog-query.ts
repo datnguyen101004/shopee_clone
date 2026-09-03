@@ -20,6 +20,8 @@ export interface NormalizedCatalogQuery {
   sort: CatalogSort;
   page: number;
   pageSize: number;
+  /** Internal ranking surface used by bounded recommendation feeds. */
+  recommendationSurface?: 'daily-recommendations';
 }
 
 export type CatalogParameterName =
@@ -99,7 +101,6 @@ function optionalNonNegativeInteger(
   }
   return parsed;
 }
-
 
 function optionalEnum<T extends string>(
   name: 'availability' | 'promotion' | 'sort',

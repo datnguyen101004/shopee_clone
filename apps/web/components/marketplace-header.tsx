@@ -47,6 +47,10 @@ export function MarketplaceHeader({
 
   useEffect(() => {
     const query = searchQuery.trim();
+    // Do not keep displaying results for the previous query while the
+    // debounced request for the current query is pending.
+    setSuggestions([]);
+    setSuggestionsOpen(false);
     if (!query) return;
 
     const controller = new AbortController();

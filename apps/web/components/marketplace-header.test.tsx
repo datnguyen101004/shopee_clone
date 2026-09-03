@@ -6,6 +6,16 @@ import { MarketplaceHeader } from './marketplace-header';
 import { marketplaceCategories } from './marketplace-navigation';
 import { fetchCatalogSuggestions } from '../lib/catalog-suggestions-api';
 
+const router = {
+  refresh: vi.fn(),
+  replace: vi.fn(),
+};
+
+vi.mock('next/navigation', () => ({
+  usePathname: () => '/',
+  useRouter: () => router,
+}));
+
 vi.mock('../lib/catalog-suggestions-api', () => ({
   fetchCatalogSuggestions: vi.fn(),
 }));
@@ -139,6 +149,31 @@ describe('StorefrontShell', () => {
         expect.any(AbortSignal),
       );
       expect(screen.getByRole('option')).toHaveTextContent('Quần');
+    } finally {
+      fetchSuggestions.mockReset();
+      vi.useRealTimers();
+    }
+  });
+
+  it('clears suggestions from the previous query while the next one is debounced', async () => {
+    vi.useFakeTimers();
+    const fetchSuggestions = vi.mocked(fetchCatalogSuggestions);
+    fetchSuggestions.mockResolvedValue([{ text: 'iPhone 13 Pro Max' }]);
+    try {
+      renderShell();
+      const input = screen.getByRole('searchbox', { name: 'Tìm kiếm sản phẩm' });
+      fireEvent.input(input, { target: { value: 'iphone' } });
+      await act(async () => {
+        vi.advanceTimersByTime(500);
+        await Promise.resolve();
+      });
+      expect(screen.getByRole('option')).toHaveTextContent('iPhone 13 Pro Max');
+
+      fireEvent.input(input, { target: { value: 'iphone 6' } });
+      await act(async () => {
+        await Promise.resolve();
+      });
+      expect(screen.queryByRole('option')).not.toBeInTheDocument();
     } finally {
       fetchSuggestions.mockReset();
       vi.useRealTimers();

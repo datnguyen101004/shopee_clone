@@ -9,6 +9,7 @@ export interface SearchConfig {
     indexFreshnessTargetSeconds: number;
     incrementalBatchSize: number;
     periodicReconciliationWindowSeconds: number;
+    personalizationProfileTimeoutMs: number;
   };
   features: {
     baselineSearch: boolean;
@@ -106,6 +107,13 @@ export function loadSearchConfig(environment: NodeJS.ProcessEnv = process.env): 
         3_600,
         60,
         86_400,
+      ),
+      personalizationProfileTimeoutMs: readInteger(
+        environment,
+        'SEARCH_PERSONALIZATION_PROFILE_TIMEOUT_MS',
+        100,
+        20,
+        2_000,
       ),
     },
     features: {

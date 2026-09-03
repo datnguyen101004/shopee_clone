@@ -31,41 +31,41 @@
 
 ## 4. Day 2 — Baseline evaluation and operational gates
 
-- [ ] 4.1 Create a versioned local relevance dataset with graded labels for exact-name, category, shop, accented/unaccented, filter, expected-zero, and intentionally irrelevant queries against a documented catalogue snapshot.
-- [ ] 4.2 Implement a repeatable evaluator that runs the current PostgreSQL path and Elasticsearch baseline on the same snapshot and reports NDCG@10, MRR, exact-name top-one rate, irrelevant top-ten rate, unexpected-zero rate, and per-group regressions.
-- [ ] 4.3 Make the evaluator fail on any sellability violation, explicit-sort violation, unexpected zero-result increase, or important query-group regression over 5%.
-- [ ] 4.4 Report the baseline target gates: NDCG@10 at least `max(0.80, current × 1.10)`, MRR at least `0.75`, exact-name top-one at least `95%`, and irrelevant top-ten at most `10%`.
-- [ ] 4.5 Add a documented local benchmark profile and measure Elasticsearch query p95, catalogue API p95, fallback latency, and incremental-index freshness against the design targets.
+- [x] 4.1 Create a versioned local relevance dataset with graded labels for exact-name, category, shop, accented/unaccented, filter, expected-zero, and intentionally irrelevant queries against a documented catalogue snapshot.
+- [x] 4.2 Implement a repeatable evaluator that runs the current PostgreSQL path and Elasticsearch baseline on the same snapshot and reports NDCG@10, MRR, exact-name top-one rate, irrelevant top-ten rate, unexpected-zero rate, and per-group regressions.
+- [x] 4.3 Make the evaluator fail on any sellability violation, explicit-sort violation, unexpected zero-result increase, or important query-group regression over 5%.
+- [x] 4.4 Report the baseline target gates: NDCG@10 at least `max(0.80, current × 1.10)`, MRR at least `0.75`, exact-name top-one at least `95%`, and irrelevant top-ten at most `10%`.
+- [x] 4.5 Add a documented local benchmark profile and measure Elasticsearch query p95, catalogue API p95, fallback latency, and incremental-index freshness against the design targets.
 
 ## 5. Day 3 — Offline buyer profiles and demonstration model
 
-- [ ] 5.1 Add additive Prisma persistence for bounded buyer profiles, active/candidate model metadata, ordered feature weights, version compatibility, training source, metrics, and activation status.
-- [ ] 5.2 Implement the offline profile builder from authenticated recent views, favorites, followed shops, and valid non-cancelled order lines using the configured weights `1`, `3`, `3`, and `5`.
-- [ ] 5.3 Bound stored category/shop affinities, preferred price features, recent product IDs, and aggregate values; do not copy raw unbounded history or create anonymous profiles.
-- [ ] 5.4 Enforce profile eligibility score `>= 5`, maximum age `24h`, buyer ownership, and exact feature-schema compatibility, with guests and ineligible buyers resolving to cold-start.
-- [ ] 5.5 Create versioned seeded impression-like buyer/product examples with labels, ordered pair features, a fixed random seed, and a deterministic train/held-out partition.
-- [ ] 5.6 Implement a TypeScript logistic-regression training command that emits an intercept, ordered weights, AUC, log-loss, ranking metrics, and reproducible model metadata.
-- [ ] 5.7 Permit model activation only when its feature schema and stored-script versions match, and label seeded-fixture metrics as demonstration-only until the held-out set contains at least 200 valid positives.
-- [ ] 5.8 Add tests for deterministic profiles/training, bounded feature storage, cancelled-order exclusion, cold start, stale profiles, cross-buyer isolation, and incompatible model versions.
+- [x] 5.1 Add additive Prisma persistence for bounded buyer profiles, active/candidate model metadata, ordered feature weights, version compatibility, training source, metrics, and activation status.
+- [x] 5.2 Implement the offline profile builder from authenticated recent views, favorites, followed shops, and valid non-cancelled order lines using the configured weights `1`, `3`, `3`, and `5`.
+- [x] 5.3 Bound stored category/shop affinities, preferred price features, recent product IDs, and aggregate values; do not copy raw unbounded history or create anonymous profiles.
+- [x] 5.4 Enforce profile eligibility score `>= 5`, maximum age `24h`, buyer ownership, and exact feature-schema compatibility, with guests and ineligible buyers resolving to cold-start.
+- [x] 5.5 Create versioned seeded impression-like buyer/product examples with labels, ordered pair features, a fixed random seed, and a deterministic train/held-out partition.
+- [x] 5.6 Implement a TypeScript logistic-regression training command that emits an intercept, ordered weights, AUC, log-loss, ranking metrics, and reproducible model metadata.
+- [x] 5.7 Permit model activation only when its feature schema and stored-script versions match, and label seeded-fixture metrics as demonstration-only until the held-out set contains at least 200 valid positives.
+- [x] 5.8 Add tests for deterministic profiles/training, bounded feature storage, cancelled-order exclusion, cold start, stale profiles, cross-buyer isolation, and incompatible model versions.
 
 ## 6. Day 3 — Personalized search scoring
 
-- [ ] 6.1 Implement and bootstrap one versioned stored Painless script that derives bounded consumer-product pair features, applies the active logistic weights, computes `sigmoid(z)`, and always returns a finite non-negative score.
-- [ ] 6.2 Pass only the compatible active model and bounded authenticated buyer profile as runtime parameters; read product profile values from Elasticsearch documents and score only already filtered candidates.
-- [ ] 6.3 Add optional authenticated context to catalogue search while keeping guest requests public and preserving existing invalid-credential behavior.
-- [ ] 6.4 Apply personalized scoring only to `sort=relevance`; for explicit sorts, use it only after equal primary sort values and never move a higher-priced product ahead of a lower-priced product under `price-asc`.
-- [ ] 6.5 Implement the fallback chain `personalized Elasticsearch → baseline Elasticsearch → existing PostgreSQL search` for profile timeout/miss, version mismatch, missing model, script failure, Elasticsearch timeout, and disabled flags.
-- [ ] 6.6 If required by the current session-loading flow, add a bounded authenticated storefront refresh that reuses the existing catalogue contract and components without introducing a UI/UX redesign.
-- [ ] 6.7 Add tests using at least two distinct eligible buyers plus guest and cold-start cases to prove buyer-dependent relevance, deterministic ordering, identity isolation, explicit-sort invariants, and every fallback layer.
+- [x] 6.1 Implement and bootstrap one versioned stored Painless script that derives bounded consumer-product pair features, applies the active logistic weights, computes `sigmoid(z)`, and always returns a finite non-negative score.
+- [x] 6.2 Pass only the compatible active model and bounded authenticated buyer profile as runtime parameters; read product profile values from Elasticsearch documents and score only already filtered candidates.
+- [x] 6.3 Add optional authenticated context to catalogue search while keeping guest requests public and preserving existing invalid-credential behavior.
+- [x] 6.4 Apply personalized scoring only to `sort=relevance`; for explicit sorts, use it only after equal primary sort values and never move a higher-priced product ahead of a lower-priced product under `price-asc`.
+- [x] 6.5 Implement the fallback chain `personalized Elasticsearch → baseline Elasticsearch → existing PostgreSQL search` for profile timeout/miss, version mismatch, missing model, script failure, Elasticsearch timeout, and disabled flags.
+- [x] 6.6 If required by the current session-loading flow, add a bounded authenticated storefront refresh that reuses the existing catalogue contract and components without introducing a UI/UX redesign.
+- [x] 6.7 Add tests using at least two distinct eligible buyers plus guest and cold-start cases to prove buyer-dependent relevance, deterministic ordering, identity isolation, explicit-sort invariants, and every fallback layer.
 
 ## 7. Day 3 — Homepage daily recommendations
 
-- [ ] 7.1 Reuse the search candidate and scoring boundary only for `DAILY_RECOMMENDATIONS`, with an eligible candidate pool and separate enablement from search personalization.
-- [ ] 7.2 Implement the guest/cold-start baseline from best-selling, rating confidence, and freshness, and apply personalized scoring only when profile, model, script, and index versions are compatible.
-- [ ] 7.3 Return at most 24 unique sellable products while deterministically enforcing at most three products per shop and at most six products per category; return the available subset rather than relaxing sellability.
-- [ ] 7.4 Preserve the current Flash Sale, Top Selling, Mall, other curated homepage modules, and product-detail related-products path without changing their ordering or contracts.
-- [ ] 7.5 Implement the homepage fallback chain from personalized recommendations to baseline recommendations to the existing curated/PostgreSQL resolution without hiding unrelated modules.
-- [ ] 7.6 Add tests for eligible buyer, guest, cold start, diversity caps, insufficient candidates, stale indexed products, profile/script/Elasticsearch failure, and unchanged non-daily modules and related products.
+- [x] 7.1 Reuse the search candidate and scoring boundary only for `DAILY_RECOMMENDATIONS`, with an eligible candidate pool and separate enablement from search personalization.
+- [x] 7.2 Implement the guest/cold-start baseline from best-selling, rating confidence, and freshness, and apply personalized scoring only when profile, model, script, and index versions are compatible.
+- [x] 7.3 Return at most 24 unique sellable products while deterministically enforcing at most three products per shop and at most six products per category; return the available subset rather than relaxing sellability.
+- [x] 7.4 Preserve the current Flash Sale, Top Selling, Mall, other curated homepage modules, and product-detail related-products path without changing their ordering or contracts.
+- [x] 7.5 Implement the homepage fallback chain from personalized recommendations to baseline recommendations to the existing curated/PostgreSQL resolution without hiding unrelated modules.
+- [x] 7.6 Add tests for eligible buyer, guest, cold start, diversity caps, insufficient candidates, stale indexed products, profile/script/Elasticsearch failure, and unchanged non-daily modules and related products.
 
 ## 8. Final verification and local handoff
 

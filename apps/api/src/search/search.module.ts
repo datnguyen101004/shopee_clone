@@ -3,6 +3,7 @@ import { Client } from '@elastic/elasticsearch';
 
 import { PricingModule } from '../pricing/pricing.module';
 import { PrismaModule } from '../prisma/prisma.module';
+import { RecommendationsModule } from '../recommendations/recommendations.module';
 import { loadSearchConfig, SEARCH_CONFIG, type SearchConfig } from './search.config';
 import {
   ELASTICSEARCH_CLIENT,
@@ -17,7 +18,7 @@ import { ProductSearchCheckpointRepository } from './product-search-checkpoint.r
 import { ProductSearchQueryService } from './product-search-query.service';
 
 @Module({
-  imports: [PrismaModule, PricingModule],
+  imports: [PrismaModule, PricingModule, RecommendationsModule],
   providers: [
     { provide: SEARCH_CONFIG, useFactory: loadSearchConfig },
     {

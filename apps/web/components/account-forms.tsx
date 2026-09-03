@@ -38,6 +38,44 @@ function AccountSuccess({ children }: { children: string }) {
   );
 }
 
+function EyeIcon() {
+  return (
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+      <circle cx="12" cy="12" r="3" />
+    </svg>
+  );
+}
+
+function EyeSlashIcon() {
+  return (
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
+      <line x1="1" y1="1" x2="23" y2="23" />
+    </svg>
+  );
+}
+
 export function LoginForm({
   intent,
   resetSucceeded = false,
@@ -52,6 +90,7 @@ export function LoginForm({
   const [pending, setPending] = useState(false);
   const [error, setError] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -100,6 +139,36 @@ export function LoginForm({
           hiện.
         </p>
       ) : null}
+      <label htmlFor="login-email">Email</label>
+      <input id="login-email" name="email" type="email" autoComplete="email" required />
+      <label htmlFor="login-password">Mật khẩu</label>
+      <div className="account-form__password-field">
+        <input
+          id="login-password"
+          name="password"
+          type={showPassword ? 'text' : 'password'}
+          autoComplete="current-password"
+          maxLength={AUTH_PASSWORD_MAX_LENGTH}
+          required
+          value={password}
+          onChange={(event) => setPassword(event.target.value)}
+        />
+        <button
+          type="button"
+          className="account-form__password-toggle"
+          aria-label={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
+          onClick={() => setShowPassword((prev) => !prev)}
+        >
+          {showPassword ? <EyeSlashIcon /> : <EyeIcon />}
+        </button>
+      </div>
+      {error ? <AccountError message={error} /> : null}
+      <button type="submit" disabled={pending}>
+        {pending ? 'Đang đăng nhập…' : 'Đăng nhập'}
+      </button>
+      <div className="account-form__separator" aria-hidden="true">
+        <span>hoặc</span>
+      </div>
       <a
         className="account-form__google"
         href={googleSignInStartUrl(intent?.returnTo ?? returnTo)}
@@ -108,26 +177,6 @@ export function LoginForm({
         <span aria-hidden="true">G</span>
         Tiếp tục với Google
       </a>
-      <div className="account-form__separator" aria-hidden="true">
-        <span>hoặc</span>
-      </div>
-      <label htmlFor="login-email">Email</label>
-      <input id="login-email" name="email" type="email" autoComplete="email" required />
-      <label htmlFor="login-password">Mật khẩu</label>
-      <input
-        id="login-password"
-        name="password"
-        type="password"
-        autoComplete="current-password"
-        maxLength={AUTH_PASSWORD_MAX_LENGTH}
-        required
-        value={password}
-        onChange={(event) => setPassword(event.target.value)}
-      />
-      {error ? <AccountError message={error} /> : null}
-      <button type="submit" disabled={pending}>
-        {pending ? 'Đang đăng nhập…' : 'Đăng nhập'}
-      </button>
       <div className="account-form__links">
         <Link href="/forgot-password">Quên mật khẩu?</Link>
         <Link href="/register">Tạo tài khoản</Link>
@@ -143,6 +192,8 @@ export function RegisterForm() {
   const [error, setError] = useState('');
   const [password, setPassword] = useState('');
   const [confirmation, setConfirmation] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmation, setShowConfirmation] = useState(false);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -190,29 +241,49 @@ export function RegisterForm() {
       <label htmlFor="register-email">Email</label>
       <input id="register-email" name="email" type="email" autoComplete="email" required />
       <label htmlFor="register-password">Mật khẩu</label>
-      <input
-        id="register-password"
-        name="password"
-        type="password"
-        autoComplete="new-password"
-        minLength={8}
-        maxLength={AUTH_PASSWORD_MAX_LENGTH}
-        required
-        value={password}
-        onChange={(event) => setPassword(event.target.value)}
-        aria-describedby="register-password-help"
-      />
+      <div className="account-form__password-field">
+        <input
+          id="register-password"
+          name="password"
+          type={showPassword ? 'text' : 'password'}
+          autoComplete="new-password"
+          minLength={8}
+          maxLength={AUTH_PASSWORD_MAX_LENGTH}
+          required
+          value={password}
+          onChange={(event) => setPassword(event.target.value)}
+          aria-describedby="register-password-help"
+        />
+        <button
+          type="button"
+          className="account-form__password-toggle"
+          aria-label={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
+          onClick={() => setShowPassword((prev) => !prev)}
+        >
+          {showPassword ? <EyeSlashIcon /> : <EyeIcon />}
+        </button>
+      </div>
       <small id="register-password-help">Dùng 8–128 ký tự và tránh mật khẩu phổ biến.</small>
       <label htmlFor="register-confirmation">Nhập lại mật khẩu</label>
-      <input
-        id="register-confirmation"
-        name="confirmation"
-        type="password"
-        autoComplete="new-password"
-        required
-        value={confirmation}
-        onChange={(event) => setConfirmation(event.target.value)}
-      />
+      <div className="account-form__password-field">
+        <input
+          id="register-confirmation"
+          name="confirmation"
+          type={showConfirmation ? 'text' : 'password'}
+          autoComplete="new-password"
+          required
+          value={confirmation}
+          onChange={(event) => setConfirmation(event.target.value)}
+        />
+        <button
+          type="button"
+          className="account-form__password-toggle"
+          aria-label={showConfirmation ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
+          onClick={() => setShowConfirmation((prev) => !prev)}
+        >
+          {showConfirmation ? <EyeSlashIcon /> : <EyeIcon />}
+        </button>
+      </div>
       {error ? <AccountError message={error} /> : null}
       <button type="submit" disabled={pending}>
         {pending ? 'Đang tạo tài khoản…' : 'Đăng ký'}

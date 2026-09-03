@@ -1,0 +1,12 @@
+{
+  "datasetVersion": "mock-reco-v1",
+  "source": "../../mock/mock_training_examples.csv",
+  "randomSeed": 20260902,
+  "trainCount": 2400,
+  "heldoutCount": 600,
+  "heldoutPositiveCount": 300,
+  "labelSource": "synthetic-preference-rule",
+  "featureSchemaVersion": 1,
+  "modelVersion": 1,
+  "partition": "declared split generated from the fixed random seed"
+}

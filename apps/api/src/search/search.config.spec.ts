@@ -11,6 +11,7 @@ describe('search runtime configuration', () => {
         indexFreshnessTargetSeconds: 30,
         incrementalBatchSize: 250,
         periodicReconciliationWindowSeconds: 3_600,
+        personalizationProfileTimeoutMs: 100,
       },
       features: {
         baselineSearch: false,
@@ -43,6 +44,7 @@ describe('search runtime configuration', () => {
         indexFreshnessTargetSeconds: 45,
         incrementalBatchSize: 500,
         periodicReconciliationWindowSeconds: 7200,
+        personalizationProfileTimeoutMs: 100,
       },
       features: {
         baselineSearch: true,
@@ -60,6 +62,7 @@ describe('search runtime configuration', () => {
     ['ELASTICSEARCH_INDEX_FRESHNESS_TARGET_SECONDS', '0'],
     ['ELASTICSEARCH_INCREMENTAL_BATCH_SIZE', '9'],
     ['ELASTICSEARCH_PERIODIC_RECONCILIATION_WINDOW_SECONDS', '59'],
+    ['SEARCH_PERSONALIZATION_PROFILE_TIMEOUT_MS', '19'],
     ['SEARCH_ELASTICSEARCH_ENABLED', '1'],
     ['SEARCH_PERSONALIZATION_ENABLED', 'yes'],
     ['SEARCH_DAILY_RECOMMENDATIONS_ENABLED', 'TRUE'],

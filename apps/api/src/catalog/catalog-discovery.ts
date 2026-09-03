@@ -66,13 +66,13 @@ export function rankSearchSuggestions(
   const normalizedQuery = tokens.join(' ');
   const ranked = candidates.flatMap((candidate) => {
     const words = discoveryTokens(candidate.name);
-    if (!tokens.every((token) => words.some((word) => discoveryTokenMatches(word, token)))) {
-      return [];
-    }
     let score = 0;
     const normalizedName = normalizeDiscoveryText(candidate.name);
+    // Suggestions are completions of the product name, not arbitrary matches
+    // from a name containing the query in the middle.
+    if (!normalizedName.startsWith(normalizedQuery)) return [];
     if (normalizedName === normalizedQuery) score += 1_000;
-    else if (normalizedName.startsWith(normalizedQuery)) score += 500;
+    else score += 500;
     for (const token of tokens) {
       const word = words.find((value) => discoveryTokenMatches(value, token));
       if (word === token) score += 200;

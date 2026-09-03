@@ -14,6 +14,7 @@ function config(overrides: Partial<SearchConfig['features']> = {}): SearchConfig
       indexFreshnessTargetSeconds: 30,
       incrementalBatchSize: 250,
       periodicReconciliationWindowSeconds: 3_600,
+      personalizationProfileTimeoutMs: 100,
     },
     features: {
       baselineSearch: true,
@@ -104,5 +105,24 @@ describe('SearchElasticsearchAdapter health', () => {
 
     await adapter.onModuleDestroy();
     expect(close).toHaveBeenCalledTimes(1);
+  });
+
+  it('bootstraps the versioned stored script through the indexing client', async () => {
+    const putScript = jest.fn().mockResolvedValue(undefined);
+    const adapter = new SearchElasticsearchAdapter(config(), {
+      cluster: { health: jest.fn() },
+      putScript,
+    });
+
+    await adapter.bootstrapStoredScript({
+      id: 'ranking-v1',
+      lang: 'painless',
+      source: 'return 1;',
+    });
+
+    expect(putScript).toHaveBeenCalledWith({
+      id: 'ranking-v1',
+      script: { lang: 'painless', source: 'return 1;' },
+    });
   });
 });

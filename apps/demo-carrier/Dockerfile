@@ -15,6 +15,11 @@ ENV NODE_ENV=production
 COPY --from=build /workspace/apps/demo-carrier/dist ./dist
 COPY --from=build /workspace/apps/demo-carrier/package.json ./package.json
 COPY --from=build /workspace/node_modules ./node_modules
-COPY --from=build /workspace/packages ./packages
+# Workspace links are not usable after copying node_modules into the
+# standalone runtime image. Ship the compiled contracts package at the
+# normal Node resolution path instead of relying on a second workspace DB or
+# checkout at runtime.
+COPY --from=build /workspace/packages/contracts/dist ./node_modules/@shopee-clone/contracts/dist
+COPY --from=build /workspace/packages/contracts/package.json ./node_modules/@shopee-clone/contracts/package.json
 EXPOSE 3010
 CMD ["node", "dist/main.js"]

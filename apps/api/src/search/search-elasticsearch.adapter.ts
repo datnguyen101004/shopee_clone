@@ -39,6 +39,10 @@ export interface ElasticsearchClientPort {
     operations: unknown[];
   }): Promise<ElasticsearchBulkResponse>;
   count?(request: { index: string }): Promise<{ count: number }>;
+  putScript?(request: {
+    id: string;
+    script: { lang: 'painless'; source: string };
+  }): Promise<unknown>;
   close?(): Promise<void>;
 }
 
@@ -147,13 +151,46 @@ export class SearchElasticsearchAdapter implements OnModuleDestroy {
     }
   }
 
-  async search(request: Omit<Parameters<NonNullable<ElasticsearchClientPort['search']>>[0], 'index'>): Promise<unknown> {
+  async search(
+    request: Omit<Parameters<NonNullable<ElasticsearchClientPort['search']>>[0], 'index'>,
+  ): Promise<unknown> {
     if (!this.client?.search || !this.config.features.baselineSearch) {
       throw new Error('Elasticsearch search is unavailable.');
     }
     return this.client.search({
       ...request,
       index: this.config.elasticsearch.productIndexAlias,
+    });
+  }
+
+  async bootstrapStoredScript(script: {
+    id: string;
+    lang: 'painless';
+    source: string;
+  }): Promise<void> {
+    const target = this.indexingClient ?? this.client;
+    if (!this.config.elasticsearch.url || !target?.putScript) {
+      throw new Error('Elasticsearch stored-script bootstrap is unavailable.');
+    }
+    await new Promise<void>((resolve, reject) => {
+      const timer = setTimeout(() => {
+        const timeout = new Error('Elasticsearch stored-script bootstrap timed out.');
+        timeout.name = 'TimeoutError';
+        reject(timeout);
+      }, this.config.elasticsearch.indexingRequestTimeoutMs);
+      target.putScript!({
+        id: script.id,
+        script: { lang: script.lang, source: script.source },
+      }).then(
+        () => {
+          clearTimeout(timer);
+          resolve();
+        },
+        (error: unknown) => {
+          clearTimeout(timer);
+          reject(error);
+        },
+      );
     });
   }
 

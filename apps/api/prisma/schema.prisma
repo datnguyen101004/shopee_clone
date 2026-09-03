@@ -532,6 +532,14 @@ enum RefundLedgerKind {
   @@map("refund_ledger_kind")
 }
 
+enum RecommendationModelActivationStatus {
+  CANDIDATE @map("candidate")
+  ACTIVE    @map("active")
+  RETIRED   @map("retired")
+
+  @@map("recommendation_model_activation_status")
+}
+
 model User {
   id                       String                             @id @default(uuid()) @db.Uuid
   email                    String                             @unique @db.VarChar(320)
@@ -595,6 +603,7 @@ model User {
   chatRateLimitEvents      ChatRateLimitEvent[]               @relation("ChatRateSubject")
   chatAttentionLeases      ChatAttentionLease[]               @relation("ChatAttentionUser")
   chatRestriction          UserChatRestriction?               @relation("ChatRestrictionUser")
+  buyerSearchProfile       BuyerSearchProfile?
   chatReportsTargeted      UserReport[]                       @relation("UserReportsTarget")
 
   @@index([status])
@@ -843,6 +852,64 @@ model ProductSearchIndexCheckpoint {
   updatedAt         DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   @@map("product_search_index_checkpoints")
+}
+
+/**
+ * Bounded, versioned offline buyer profile used by recommendation/search
+ * ranking. Raw activity history is intentionally not copied into this row.
+ */
+model BuyerSearchProfile {
+  userId                  String   @id @map("user_id") @db.Uuid
+  profileVersion          Int      @map("profile_version")
+  featureSchemaVersion    Int      @map("feature_schema_version")
+  generatedAt             DateTime @map("generated_at") @db.Timestamptz(3)
+  eligibilityScore        Int      @map("eligibility_score")
+  eligible                Boolean  @default(false)
+  viewCount30d            Int      @map("view_count_30d")
+  favoriteCount90d        Int      @map("favorite_count_90d")
+  followedShopCount       Int      @map("followed_shop_count")
+  orderCount90d           Int      @map("order_count_90d")
+  categoryAffinities      Json     @map("category_affinities") @db.JsonB
+  shopAffinities          Json     @map("shop_affinities") @db.JsonB
+  preferredPriceMinMinor  BigInt?  @map("preferred_price_min_minor")
+  preferredPriceMaxMinor  BigInt?  @map("preferred_price_max_minor")
+  preferredPriceMeanMinor BigInt?  @map("preferred_price_mean_minor")
+  recentProductIds        Json     @map("recent_product_ids") @db.JsonB
+  source                  String   @db.VarChar(80)
+  createdAt               DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt               DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  user                    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([featureSchemaVersion, generatedAt(sort: Desc)])
+  @@index([eligibilityScore, generatedAt(sort: Desc)])
+  @@map("buyer_search_profiles")
+}
+
+/**
+ * Versioned offline ranking model metadata. Weights are stored as an ordered
+ * JSON array so the feature order is explicit and reproducible.
+ */
+model PersonalizedRankingModel {
+  id                       String                              @id @default(uuid()) @db.Uuid
+  modelVersion             Int                                 @unique @map("model_version")
+  productProjectionVersion Int                                 @map("product_projection_version")
+  featureSchemaVersion     Int                                 @map("feature_schema_version")
+  storedScriptVersion      Int                                 @map("stored_script_version")
+  datasetVersion           String                              @map("dataset_version") @db.VarChar(80)
+  randomSeed               Int                                 @map("random_seed")
+  trainingSource           String                              @map("training_source") @db.VarChar(80)
+  intercept                Float
+  featureWeights           Json                                @map("feature_weights") @db.JsonB
+  metrics                  Json                                @db.JsonB
+  activationStatus         RecommendationModelActivationStatus @default(CANDIDATE) @map("activation_status")
+  trainedAt                DateTime                            @map("trained_at") @db.Timestamptz(3)
+  activatedAt              DateTime?                           @map("activated_at") @db.Timestamptz(3)
+  createdAt                DateTime                            @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt                DateTime                            @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@index([activationStatus, featureSchemaVersion, storedScriptVersion])
+  @@index([datasetVersion, trainedAt(sort: Desc)])
+  @@map("personalized_ranking_models")
 }
 
 model Product {

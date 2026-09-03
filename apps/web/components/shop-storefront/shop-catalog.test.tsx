@@ -28,7 +28,7 @@ const response: PublicShopCatalogPage = {
 };
 
 describe('ShopCatalog', () => {
-  it('renders scoped controls, canonical cards, favorite action, and preserved pagination', () => {
+  it('renders scoped controls, canonical cards, and preserved pagination', () => {
     render(
       <ShopCatalog
         shopSlug="demo-shop"
@@ -48,7 +48,7 @@ describe('ShopCatalog', () => {
     );
     expect(screen.getByRole('searchbox', { name: 'Từ khóa' })).toHaveValue('phone');
     expect(screen.getByRole('combobox', { name: 'Danh mục' })).toHaveValue('electronics');
-    expect(screen.getByRole('button', { name: 'Đăng nhập để thêm vào yêu thích' })).toBeVisible();
+    expect(screen.queryByRole('button', { name: 'Đăng nhập để thêm vào yêu thích' })).not.toBeInTheDocument();
     expect(screen.getByLabelText('Trang sau')).toHaveAttribute(
       'href',
       '/shops/demo-shop?q=phone&category=electronics&sort=price-asc&page=3&pageSize=1',

@@ -13,6 +13,7 @@ export interface ProductSearchDocument {
   slug: string;
   name: string;
   name_normalized: string;
+  name_suggest: { input: string; weight: number };
   description: string;
   category_id: string;
   category_slug: string;
@@ -92,6 +93,14 @@ export function productSearchMapping() {
         },
       },
       name_normalized: { type: 'keyword' },
+      name_suggest: {
+        type: 'completion',
+        analyzer: 'vietnamese_index',
+        search_analyzer: 'vietnamese_search',
+        preserve_separators: true,
+        preserve_position_increments: true,
+        max_input_length: 100,
+      },
       description: {
         type: 'text',
         analyzer: 'vietnamese_index',

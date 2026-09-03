@@ -13,7 +13,6 @@ import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 
 import { MarketplaceProductImage } from '../marketplace-product-image';
-import { FavoriteButton } from '../engagement/favorite-button';
 import { FavoriteStateProvider } from '../engagement/favorite-state-provider';
 import { useAuthSession } from '../auth-session-provider';
 import {
@@ -127,33 +126,46 @@ function formatPriceDisplay(value: number | string | null | undefined): string {
   return new Intl.NumberFormat('vi-VN').format(Number(digits));
 }
 
+const PRICE_RANGE_PRESETS = [
+  { label: 'Chọn khoảng giá', min: null, max: null, key: '' },
+  { label: '0 – 100.000₫ (Dưới 100k)', min: 0, max: 100000, key: '0-100000' },
+  { label: '100.000₫ – 500.000₫ (100k – 500k)', min: 100000, max: 500000, key: '100000-500000' },
+  { label: '500.000₫ – 1.000.000₫ (500k – 1 triệu)', min: 500000, max: 1000000, key: '500000-1000000' },
+  { label: '1.000.000₫ – 3.000.000₫ (1 triệu – 3 triệu)', min: 1000000, max: 3000000, key: '1000000-3000000' },
+  { label: '3.000.000₫ – 10.000.000₫ (3 triệu – 10 triệu)', min: 3000000, max: 10000000, key: '3000000-10000000' },
+  { label: 'Trên 10.000.000₫ (Trên 10 triệu)', min: 10000000, max: null, key: '10000000-' },
+];
+
 function FormattedPriceInput({
   name,
   ariaLabel,
-  initialValue,
+  value,
+  onChangeValue,
   placeholder,
 }: {
   name: 'minPrice' | 'maxPrice';
   ariaLabel: string;
-  initialValue: number | null;
+  value: number | null;
+  onChangeValue: (val: number | null) => void;
   placeholder: string;
 }) {
-  const [displayValue, setDisplayValue] = useState(() => formatPriceDisplay(initialValue));
-  const [rawValue, setRawValue] = useState(() =>
-    initialValue !== null ? String(initialValue) : '',
-  );
+  const [displayValue, setDisplayValue] = useState(() => formatPriceDisplay(value));
+
+  useEffect(() => {
+    setDisplayValue(formatPriceDisplay(value));
+  }, [value]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const rawDigits = e.target.value.replace(/\D/g, '');
     if (!rawDigits) {
       setDisplayValue('');
-      setRawValue('');
+      onChangeValue(null);
       return;
     }
     const num = Number(rawDigits);
     if (!Number.isSafeInteger(num)) return;
     setDisplayValue(new Intl.NumberFormat('vi-VN').format(num));
-    setRawValue(rawDigits);
+    onChangeValue(num);
   };
 
   return (
@@ -161,7 +173,11 @@ function FormattedPriceInput({
       <span className="shopee-price-currency" aria-hidden="true">
         ₫
       </span>
-      <input type="hidden" name={name} value={rawValue} />
+      <input
+        type="hidden"
+        name={name}
+        value={value !== null && value !== undefined ? String(value) : ''}
+      />
       <input
         aria-label={ariaLabel}
         type="text"
@@ -237,7 +253,6 @@ export function ProductCard({ product }: { product: CatalogProductCard }) {
           <span className="catalog-card__location">{product.shop.location}</span>
         </div>
       </Link>
-      <FavoriteButton productId={product.id} compact />
     </Card>
   );
 }
@@ -393,6 +408,36 @@ export function DiscoveryControls({
   context: CatalogRouteContext;
 }) {
   const { query, facets, pagination } = response;
+  const [minPrice, setMinPrice] = useState<number | null>(query.minPrice);
+  const [maxPrice, setMaxPrice] = useState<number | null>(query.maxPrice);
+
+  useEffect(() => {
+    setMinPrice(query.minPrice);
+  }, [query.minPrice]);
+
+  useEffect(() => {
+    setMaxPrice(query.maxPrice);
+  }, [query.maxPrice]);
+
+  const activePresetKey = useMemo(() => {
+    const matched = PRICE_RANGE_PRESETS.find(
+      (p) => p.min === (minPrice ?? null) && p.max === (maxPrice ?? null),
+    );
+    return matched ? matched.key : '';
+  }, [minPrice, maxPrice]);
+
+  const handlePresetChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const selectedKey = e.target.value;
+    const matched = PRICE_RANGE_PRESETS.find((p) => p.key === selectedKey);
+    if (matched) {
+      setMinPrice(matched.min);
+      setMaxPrice(matched.max);
+    } else {
+      setMinPrice(null);
+      setMaxPrice(null);
+    }
+  };
+
   const sortDescription =
     query.sort === 'relevance' && !query.q
       ? 'Mới nhất (thay cho độ liên quan)'
@@ -484,11 +529,26 @@ export function DiscoveryControls({
           <legend className="shopee-group-title">
             <FaTag className="shopee-group-icon" /> Khoảng Giá (₫)
           </legend>
+          <div className="shopee-price-preset-wrap">
+            <select
+              aria-label="Chọn khoảng giá"
+              value={activePresetKey}
+              onChange={handlePresetChange}
+              className="shopee-form-select catalog-price-preset"
+            >
+              {PRICE_RANGE_PRESETS.map((preset) => (
+                <option key={preset.key} value={preset.key}>
+                  {preset.label}
+                </option>
+              ))}
+            </select>
+          </div>
           <div className="shopee-price-inputs">
             <FormattedPriceInput
               ariaLabel="Giá thấp nhất"
               name="minPrice"
-              initialValue={query.minPrice}
+              value={minPrice}
+              onChangeValue={setMinPrice}
               placeholder={
                 facets.priceRange.min === null ? 'TỪ' : formatPriceDisplay(facets.priceRange.min)
               }
@@ -497,15 +557,13 @@ export function DiscoveryControls({
             <FormattedPriceInput
               ariaLabel="Giá cao nhất"
               name="maxPrice"
-              initialValue={query.maxPrice}
+              value={maxPrice}
+              onChangeValue={setMaxPrice}
               placeholder={
                 facets.priceRange.max === null ? 'ĐẾN' : formatPriceDisplay(facets.priceRange.max)
               }
             />
           </div>
-          <button type="submit" className="shopee-btn-apply">
-            Áp dụng
-          </button>
         </fieldset>
 
         {/* Rating Filter */}
@@ -554,24 +612,8 @@ export function DiscoveryControls({
           </label>
         </div>
 
-        {/* Sorting Dropdown */}
-        <div className="catalog-field shopee-filter-group">
-          <label htmlFor="catalog-sort" className="shopee-group-title">
-            Sắp xếp
-          </label>
-          <select
-            id="catalog-sort"
-            name="sort"
-            defaultValue={query.sort}
-            className="shopee-form-select"
-          >
-            <option value="relevance">Liên quan nhất</option>
-            <option value="newest">Mới nhất</option>
-            <option value="best-selling">Bán chạy</option>
-            <option value="price-asc">Giá thấp đến cao</option>
-            <option value="price-desc">Giá cao đến thấp</option>
-          </select>
-        </div>
+        {/* Preserved sort in form */}
+        <input type="hidden" name="sort" value={query.sort} />
 
         {context.pageSize !== 12 ? (
           <input type="hidden" name="pageSize" value={context.pageSize} />
@@ -579,16 +621,67 @@ export function DiscoveryControls({
 
         {/* Actions */}
         <div className="catalog-discovery__actions shopee-filter-actions">
+          <button type="submit" className="shopee-btn-apply">
+            Áp dụng
+          </button>
           <Link href="/search" className="shopee-btn-clear">
             Xóa lọc
           </Link>
         </div>
       </form>
 
-      {/* Result Status Summary */}
+      {/* Result Status Summary with Sorting Controls */}
       <div className="catalog-result-summary" role="status" aria-live="polite">
-        <strong>{formatNumber(pagination.totalItems)} sản phẩm</strong>
-        <span>Sắp xếp: {sortDescription}</span>
+        <div className="catalog-result-summary__left">
+          <span className="catalog-sort-title">Sắp xếp theo:</span>
+          <div className="catalog-sort-options">
+            <Link
+              href={catalogSearchHref(replaceCatalogQuery(contextQuery(context), { sort: 'relevance', page: 1 }))}
+              className={`catalog-sort-btn${query.sort === 'relevance' ? ' is-active' : ''}`}
+            >
+              Liên quan nhất
+            </Link>
+            <Link
+              href={catalogSearchHref(replaceCatalogQuery(contextQuery(context), { sort: 'newest', page: 1 }))}
+              className={`catalog-sort-btn${query.sort === 'newest' ? ' is-active' : ''}`}
+            >
+              Mới nhất
+            </Link>
+            <Link
+              href={catalogSearchHref(replaceCatalogQuery(contextQuery(context), { sort: 'best-selling', page: 1 }))}
+              className={`catalog-sort-btn${query.sort === 'best-selling' ? ' is-active' : ''}`}
+            >
+              Bán chạy
+            </Link>
+            <select
+              id="catalog-sort"
+              name="sort"
+              value={query.sort === 'price-asc' || query.sort === 'price-desc' ? query.sort : ''}
+              aria-label="Sắp xếp theo giá"
+              className={`catalog-sort-select${query.sort.startsWith('price-') ? ' is-active' : ''}`}
+              onChange={(e) => {
+                if (e.target.value) {
+                  window.location.href = catalogSearchHref(
+                    replaceCatalogQuery(contextQuery(context), {
+                      sort: e.target.value as 'price-asc' | 'price-desc',
+                      page: 1,
+                    }),
+                  );
+                }
+              }}
+            >
+              <option value="" disabled hidden={query.sort.startsWith('price-')}>
+                Giá
+              </option>
+              <option value="price-asc">Giá: Thấp đến Cao</option>
+              <option value="price-desc">Giá: Cao đến Thấp</option>
+            </select>
+          </div>
+        </div>
+
+        <div className="catalog-result-summary__right">
+          <strong>{formatNumber(pagination.totalItems)} sản phẩm</strong>
+        </div>
       </div>
 
       <ActiveFilters context={context} />

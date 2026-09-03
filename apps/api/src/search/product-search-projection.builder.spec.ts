@@ -173,6 +173,7 @@ describe('product search projection builder', () => {
     expect(result.document).toMatchObject({
       product_id: 'product-1',
       name_normalized: 'tai nghe bluetooth',
+      name_suggest: { input: 'Tai nghe Bluetooth', weight: 31 },
       category_name_normalized: 'dien thoai phu kien',
       shop_name_normalized: 'cua hang dien tu',
       category_path_ids: ['category-root', 'category-child'],

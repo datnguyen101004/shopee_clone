@@ -2,7 +2,8 @@
 
 import { Container, PageShell } from '@shopee-clone/ui';
 import Link from 'next/link';
-import type { ReactNode } from 'react';
+import { usePathname, useRouter } from 'next/navigation';
+import { useCallback, type ReactNode } from 'react';
 
 import { useAuthSession } from './auth-session-provider';
 import { useCart } from './cart/cart-provider';
@@ -28,6 +29,20 @@ export function StorefrontShell({ children }: { children: ReactNode }) {
   const navigation = useMarketplaceNavigation();
   const auth = useAuthSession();
   const cart = useCart();
+  const pathname = usePathname();
+  const router = useRouter();
+  const handleLogout = useCallback(async () => {
+    await auth.logout();
+
+    // A homepage navigation/refetch drops the authenticated RSC payload and
+    // makes the server request the anonymous homepage aggregate again.
+    if (pathname === '/') {
+      router.refresh();
+      return;
+    }
+    router.replace('/');
+  }, [auth, pathname, router]);
+
   return (
     <ChatProvider><PageShell
       header={
@@ -41,7 +56,7 @@ export function StorefrontShell({ children }: { children: ReactNode }) {
               ? (cart.state.cart?.summary.distinctLineCount ?? 0)
               : 0
           }
-          onLogout={() => void auth.logout()}
+          onLogout={() => void handleLogout()}
         />
       }
       navigation={

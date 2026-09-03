@@ -12,10 +12,9 @@ import {
 import { Badge, Card, Container, RotateCcw, ShieldCheck, Truck } from '@shopee-clone/ui';
 import Image from 'next/image';
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { MarketplaceProductImage } from '../marketplace-product-image';
-import { FavoriteButton } from '../engagement/favorite-button';
 import { FavoriteStateProvider } from '../engagement/favorite-state-provider';
 import { useAuthSession } from '../auth-session-provider';
 
@@ -220,7 +219,11 @@ function CampaignSection({ module }: { module: HomepageCampaignModule }) {
 
 function CategorySection({ module }: { module: HomepageCategoryModule }) {
   return (
-    <section aria-labelledby={`module-${module.id}`} data-module-type={module.type}>
+    <section
+      className="homepage-categories"
+      aria-labelledby={`module-${module.id}`}
+      data-module-type={module.type}
+    >
       <div className="section-heading">
         <h2 id={`module-${module.id}`}>{module.title}</h2>
         <p>{module.subtitle}</p>
@@ -304,12 +307,95 @@ function ProductCard({ product }: { product: HomepageProductSummary }) {
           ) : null}
         </div>
       </Link>
-      <FavoriteButton productId={product.id} compact />
     </Card>
   );
 }
 
+function DailyRecommendationsSection({ module }: { module: HomepageProductModule }) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [canScrollPrev, setCanScrollPrev] = useState(false);
+  const [canScrollNext, setCanScrollNext] = useState(true);
+
+  const checkScrollability = useCallback(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    setCanScrollPrev(el.scrollLeft > 5);
+    setCanScrollNext(el.scrollLeft < el.scrollWidth - el.clientWidth - 5);
+  }, []);
+
+  useEffect(() => {
+    checkScrollability();
+    const el = containerRef.current;
+    if (!el) return;
+    const handleResize = () => checkScrollability();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [checkScrollability, module.products]);
+
+  const scroll = (direction: 'prev' | 'next') => {
+    const el = containerRef.current;
+    if (!el) return;
+    const scrollAmount = el.clientWidth * 0.9;
+    el.scrollBy({
+      left: direction === 'next' ? scrollAmount : -scrollAmount,
+      behavior: 'smooth',
+    });
+  };
+
+  return (
+    <section
+      className={`homepage-product-section homepage-product-section--${module.type}`}
+      aria-labelledby={`module-${module.id}`}
+      data-module-type={module.type}
+    >
+      <div className="section-heading">
+        <div>
+          <h2 id={`module-${module.id}`}>{module.title}</h2>
+        </div>
+        {module.subtitle ? <p>{module.subtitle}</p> : null}
+      </div>
+      <div className="carousel-wrapper">
+        <button
+          type="button"
+          className="carousel-btn carousel-btn--prev"
+          aria-label="Sản phẩm trước"
+          disabled={!canScrollPrev}
+          onClick={() => scroll('prev')}
+        >
+          ‹
+        </button>
+        <div
+          className="carousel-container"
+          ref={containerRef}
+          onScroll={checkScrollability}
+        >
+          <div className="carousel-track">
+            {module.products.map((product) => (
+              <div className="carousel-item" key={product.id}>
+                <ProductCard product={product} />
+              </div>
+            ))}
+          </div>
+        </div>
+        <button
+          type="button"
+          className="carousel-btn carousel-btn--next"
+          aria-label="Sản phẩm tiếp theo"
+          disabled={!canScrollNext}
+          onClick={() => scroll('next')}
+        >
+          ›
+        </button>
+      </div>
+    </section>
+  );
+}
+
 function ProductSection({ module }: { module: HomepageProductModule }) {
+  if (module.type === 'daily-recommendations') {
+    return <DailyRecommendationsSection module={module} />;
+  }
+
   return (
     <section
       className={`homepage-product-section homepage-product-section--${module.type}`}
@@ -341,7 +427,10 @@ export function HomepageModules({ modules }: { modules: HomepageModule[] }) {
   const displayModules =
     personalizedModules?.source === modules ? personalizedModules.modules : modules;
   useEffect(() => {
-    if (authState.status !== 'authenticated') return;
+    if (authState.status !== 'authenticated') {
+      setPersonalizedModules(null);
+      return;
+    }
     const controller = new AbortController();
     const endpoint = new URL(
       '/api/v1/homepage',

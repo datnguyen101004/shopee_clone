@@ -18,6 +18,11 @@ describe('product search document definition', () => {
       search_analyzer: 'vietnamese_search',
       fields: { exact: { type: 'keyword' }, normalized: { type: 'keyword' } },
     });
+    expect(mapping.properties.name_suggest).toMatchObject({
+      type: 'completion',
+      analyzer: 'vietnamese_index',
+      search_analyzer: 'vietnamese_search',
+    });
     expect(mapping.properties.effective_price_minor).toEqual({ type: 'long' });
     expect(mapping.properties.rating_average_basis_points).toEqual({ type: 'integer' });
     expect(mapping.properties.displayable).toEqual({ type: 'boolean' });

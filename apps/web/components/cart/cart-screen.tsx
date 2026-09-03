@@ -476,9 +476,6 @@ export function CartScreen() {
         ) : null}
       </div>
       <div className="cart-groups">
-        {pricing.status !== 'missing-address' ? (
-          <CartPricingPanel cart={current} pricing={pricing} />
-        ) : null}
         {current.groups.map((group) => (
           <ShopGroup
             key={group.shop.id}
@@ -487,11 +484,9 @@ export function CartScreen() {
             pricing={pricing}
           />
         ))}
-        {pricing.status === 'missing-address' ? (
-          <CartPricingPanel cart={current} pricing={pricing} />
-        ) : null}
       </div>
       <CartVoucherPanel pricing={pricing} />
+      <CartPricingPanel cart={current} pricing={pricing} />
       <aside className="cart-summary" aria-label="Tổng kết giỏ hàng">
         <label className="cart-check">
           <input

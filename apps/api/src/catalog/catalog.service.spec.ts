@@ -105,8 +105,8 @@ describe('CatalogService', () => {
   const repository = {
     findActiveCategories: jest.fn(),
     findCandidates: jest.fn(),
-  findCandidatesForShop: jest.fn(),
-  findCandidatesByIds: jest.fn(),
+    findCandidatesForShop: jest.fn(),
+    findCandidatesByIds: jest.fn(),
   };
   const service = new CatalogService(repository as unknown as CatalogRepository);
 
@@ -331,6 +331,28 @@ describe('CatalogService', () => {
     expect(response.items.map((item) => item.id)).toEqual(['newer', 'older']);
   });
 
+  it('uses best-selling, rating confidence, and freshness for daily cold-start fallback', async () => {
+    repository.findActiveCategories.mockResolvedValue(categories);
+    repository.findCandidates.mockResolvedValue([
+      candidate({
+        id: 'low-confidence',
+        soldCount: 10,
+        ratingCount: 1,
+        createdAt: new Date('2026-08-12'),
+      }),
+      candidate({
+        id: 'high-confidence',
+        soldCount: 10,
+        ratingCount: 10,
+        createdAt: new Date('2026-08-10'),
+      }),
+    ]);
+    const response = await service.getProducts(
+      query({ q: null, sort: 'relevance', recommendationSurface: 'daily-recommendations' }),
+    );
+    expect(response.items.map((item) => item.id)).toEqual(['high-confidence', 'low-confidence']);
+  });
+
   it('reuses the canonical card projection and counts shop category ancestors', async () => {
     repository.findActiveCategories.mockResolvedValue(categories);
     repository.findCandidatesForShop.mockResolvedValue([
@@ -500,7 +522,12 @@ describe('CatalogService', () => {
     );
 
     const response = await elastic.getProducts(query({ pageSize: 2, sort: 'relevance' }));
-    expect(search.search).toHaveBeenCalledWith(expect.objectContaining({ sort: 'relevance' }), 0, 4);
+    expect(search.search).toHaveBeenCalledWith(
+      expect.objectContaining({ sort: 'relevance' }),
+      0,
+      4,
+      null,
+    );
     expect(repository.findCandidatesByIds).toHaveBeenCalledWith(['product-1', 'product-2']);
     expect(response.items.map((item) => item.id)).toEqual(['product-1', 'product-2']);
     expect(response.pagination).toEqual({ page: 1, pageSize: 2, totalItems: 2, totalPages: 1 });
@@ -517,7 +544,11 @@ describe('CatalogService', () => {
         .mockResolvedValueOnce({
           ids: ['deleted-product', 'product-2'],
           totalItems: 2,
-          facets: { categorySlugs: ['phones'], locations: ['Hà Nội'], priceRange: { min: 800, max: 800 } },
+          facets: {
+            categorySlugs: ['phones'],
+            locations: ['Hà Nội'],
+            priceRange: { min: 800, max: 800 },
+          },
         })
         .mockRejectedValueOnce(new Error('connection failed')),
     };

@@ -43,6 +43,7 @@ describe('catalog discovery scoring', () => {
           { name: 'Quần Jean Nam', soldCount: 2, createdAt },
           { name: 'Quần Jeans Nam', soldCount: 5, createdAt },
           { name: 'Áo Jean Nam', soldCount: 99, createdAt },
+          { name: 'Bộ quần jean nam', soldCount: 999, createdAt },
         ],
         'quần jea',
         3,

@@ -16,6 +16,7 @@ function config(): SearchConfig {
       indexFreshnessTargetSeconds: 30,
       incrementalBatchSize: 250,
       periodicReconciliationWindowSeconds: 3_600,
+      personalizationProfileTimeoutMs: 100,
     },
     features: { baselineSearch: false, personalization: false, dailyRecommendations: false },
   };
@@ -31,6 +32,7 @@ function document(productId = 'product-1'): ProductSearchProjection {
       slug: productId,
       name: 'Tai nghe',
       name_normalized: 'tai nghe',
+      name_suggest: { input: 'Tai nghe', weight: 20 },
       description: 'Tai nghe không dây',
       category_id: 'category-1',
       category_slug: 'dien-tu',

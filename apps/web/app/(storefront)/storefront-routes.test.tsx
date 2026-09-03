@@ -8,7 +8,10 @@ import StorefrontLayout from './layout';
 import { LoginPageContent } from './login/page';
 import SearchPage from './search/page';
 
-vi.mock('next/navigation', () => ({ useRouter: () => ({ replace: vi.fn() }) }));
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ replace: vi.fn() }),
+  usePathname: () => '/',
+}));
 
 vi.mock('../../lib/catalog-api', () => ({
   fetchCatalogProducts: vi.fn().mockImplementation((query: { q?: string }) =>

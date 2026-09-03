@@ -45,7 +45,14 @@
     "notifications:dispatch": "tsx scripts/process-notification-outbox.ts",
     "search:reindex": "tsx scripts/search-full-reindex.ts",
     "search:reconcile": "tsx scripts/search-reconcile.ts",
-    "search:rollback": "tsx scripts/search-rollback.ts"
+    "search:rollback": "tsx scripts/search-rollback.ts",
+    "search:bootstrap:personalized-script": "tsx scripts/search-bootstrap-personalized-script.ts",
+    "search:relevance:dataset": "tsx scripts/search-relevance-dataset.ts",
+    "search:baseline:evaluate": "tsx scripts/search-baseline-evaluate.ts",
+    "recommendations:profiles": "tsx scripts/recommendations-build-profiles.ts",
+    "recommendations:seed": "tsx scripts/recommendations-seed-examples.ts",
+    "recommendations:train": "tsx scripts/recommendations-train-model.ts",
+    "recommendations:activate": "tsx scripts/recommendations-activate-model.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1111.0",

@@ -39,6 +39,13 @@ function validInteger(value: number, minimum = 0): number | null {
   return Number.isSafeInteger(value) && value >= minimum ? value : null;
 }
 
+function completionWeight(soldCount: number): number {
+  // Completion weights must be positive integers; zero-sale products remain
+  // eligible but are ranked below products with sales.
+  const bounded = validInteger(soldCount) ?? 0;
+  return Math.min(Math.max(bounded, 1), 2_147_483_647);
+}
+
 function staticDiscountBasisPoints(priceMinor: number, compareAtPriceMinor: number | null): number {
   if (compareAtPriceMinor === null || compareAtPriceMinor <= priceMinor) return 0;
   const basisPoints = Number(
@@ -102,6 +109,7 @@ export function buildProductSearchProjection(
       slug: product.slug,
       name: product.name,
       name_normalized: normalizeProductSearchText(product.name),
+      name_suggest: { input: product.name, weight: completionWeight(product.soldCount) },
       description: product.description,
       category_id: product.categoryId,
       category_slug: product.category.slug,

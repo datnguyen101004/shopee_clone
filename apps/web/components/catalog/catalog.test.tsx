@@ -241,4 +241,20 @@ describe('catalog components', () => {
     fireEvent.change(maxInput, { target: { value: '5000000' } });
     expect(maxInput).toHaveValue('5.000.000');
   });
+
+  it('updates price inputs when choosing a price range preset from the dropdown', () => {
+    const discovery = response();
+    render(<DiscoveryControls response={discovery} context={context()} />);
+    const presetSelect = screen.getByRole('combobox', { name: 'Chọn khoảng giá' });
+    const minInput = screen.getByRole('textbox', { name: 'Giá thấp nhất' });
+    const maxInput = screen.getByRole('textbox', { name: 'Giá cao nhất' });
+
+    fireEvent.change(presetSelect, { target: { value: '100000-500000' } });
+    expect(minInput).toHaveValue('100.000');
+    expect(maxInput).toHaveValue('500.000');
+
+    fireEvent.change(presetSelect, { target: { value: '10000000-' } });
+    expect(minInput).toHaveValue('10.000.000');
+    expect(maxInput).toHaveValue('');
+  });
 });

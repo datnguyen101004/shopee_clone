@@ -62,7 +62,7 @@ const requiredDeploymentFragments = [
   '--document-name AWS-RunShellScript',
   'compose-prod.yaml.next config --quiet',
   'compose --profile migration run --rm --no-deps migrate',
-  'compose up -d --no-deps --force-recreate api',
+  'compose up -d --force-recreate elasticsearch api',
   'docker inspect --format',
   'compose logs --no-color --tail=150 api',
 ];
@@ -76,7 +76,7 @@ for (const fragment of requiredDeploymentFragments) {
 
 assert(
   deploymentScript.indexOf('compose --profile migration run --rm --no-deps migrate') <
-    deploymentScript.indexOf('compose up -d --no-deps --force-recreate api'),
+    deploymentScript.indexOf('compose up -d --force-recreate elasticsearch api'),
   'Database migration must complete before the API is recreated.',
 );
 

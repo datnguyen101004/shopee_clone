@@ -2,8 +2,9 @@
 
 The `Development CICD` workflow is started manually from the GitHub Actions **Run workflow** button.
 It publishes immutable API and migrator images to Docker Hub, applies pending Prisma migrations to
-Aurora from the EC2 host, and recreates the API container. Pushes to `development` do not start a
-deployment automatically. E2E and seed commands are deliberately excluded from this demo pipeline.
+Aurora from the EC2 host, starts the production Elasticsearch service, and recreates the API
+container. Pushes to `development` do not start a deployment automatically. E2E and seed commands
+are deliberately excluded from this demo pipeline.
 
 When starting it, select the `development` branch so the images and deployment use that branch's
 current commit. The workflow rejects any manual run that selects another branch.
@@ -20,8 +21,8 @@ current commit. The workflow rejects any manual run that selects another branch.
 5. Send an `AWS-RunShellScript` command to the EC2 instance through Systems Manager.
 6. Validate and atomically update `compose-prod.yaml`, retaining the previous file as
    `compose-prod.yaml.previous`.
-7. Pull both immutable images, run `prisma migrate deploy`, recreate the API, and wait for a healthy
-   container.
+7. Pull both immutable images, run `prisma migrate deploy`, start Elasticsearch and recreate the API,
+   and wait for a healthy container.
 
 Migration runs before API replacement. If migration fails, the existing API is not recreated. A
 successful migration is not rolled back if the new API later fails its healthcheck, so production
@@ -111,6 +112,10 @@ Attach this minimum deployment policy, replacing `AWS_ACCOUNT_ID` if the instanc
 - `/usr/bin/shopee-clone/compose-prod.yaml` exists; every deployment validates and synchronizes it
   from the repository before migration.
 - `/usr/bin/shopee-clone/.env.production` exists and contains the production runtime configuration.
+- The production Compose file provisions Elasticsearch with a persistent Docker volume. The API
+  uses `ELASTICSEARCH_CONTAINER_URL` when provided, otherwise `http://elasticsearch:9200`.
+- The EC2 instance has enough memory for Elasticsearch (the default heap/container limit is 512 MiB /
+  1 GiB) and has Docker permission to create its volume.
 - The EC2 security group can reach Aurora, and the instance role has any application permissions
   needed for S3 or other AWS services.
 - If either Docker Hub repository is private, perform `docker login` once on EC2 with a read-only

@@ -66,7 +66,7 @@ command_parameters="$(
         "sudo docker pull \"$API_IMAGE:$IMAGE_TAG\"",
         "sudo docker pull \"$MIGRATOR_IMAGE:$IMAGE_TAG\"",
         "compose --profile migration run --rm --no-deps migrate",
-        "compose up -d --no-deps --force-recreate api",
+        "compose up -d --force-recreate elasticsearch api",
         "container_id=\"$(compose ps -q api)\"",
         "test -n \"$container_id\"",
         "healthy=false",

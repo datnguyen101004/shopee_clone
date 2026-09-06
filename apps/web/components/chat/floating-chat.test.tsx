@@ -78,6 +78,14 @@ describe('FloatingChat', () => {
     expect(chat.closeWidget).toHaveBeenCalled();
   });
 
+  it('renders embedded mode without the floating trigger', () => {
+    chat.open = true;
+    const view = render(<FloatingChat embedded />);
+    expect(view.container.querySelector('.floating-chat-trigger')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Đóng trò chuyện' })).toBeNull();
+    expect(screen.getByRole('dialog', { name: 'Trò chuyện' })).toHaveClass('floating-chat--embedded');
+  });
+
   it('uses the shop label instead of the owner account name', () => {
     const shopConversation = { ...conversation, shopName: 'Điện Thoại Hay' };
     chat.open = true;

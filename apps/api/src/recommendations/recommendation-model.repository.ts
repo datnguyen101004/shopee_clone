@@ -14,11 +14,16 @@ export function isCompatibleRankingModel(model: {
   featureSchemaVersion: number;
   storedScriptVersion: number;
 }): boolean {
-  return (
+  const current = (
     model.productProjectionVersion === CURRENT_RECOMMENDATION_VERSIONS.productProjectionVersion &&
     model.featureSchemaVersion === CURRENT_RECOMMENDATION_VERSIONS.featureSchemaVersion &&
     model.storedScriptVersion === CURRENT_RECOMMENDATION_VERSIONS.storedScriptVersion
   );
+  // Keep the previous all-v1 model readable while the additive campaign
+  // projection is rebuilt. New active models are still queried strictly by
+  // findActiveCompatible using the current versions.
+  const previous = model.productProjectionVersion === 1 && model.featureSchemaVersion === 1 && model.storedScriptVersion === 1;
+  return current || previous;
 }
 
 @Injectable()

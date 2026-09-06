@@ -1,625 +1,372 @@
 'use client';
 
-import type { AdminProductDetail } from '@shopee-clone/contracts';
-import Image from 'next/image';
+import type { AdminProductListItem, AdminProductListQuery } from '@shopee-clone/contracts';
 import Link from 'next/link';
-import { useState } from 'react';
+import { useCallback, useEffect, useState, type FormEvent } from 'react';
 
-import { ProductIcon, ShopIcon } from '../../../../components/admin/admin-icons';
+import {
+  EyeIcon,
+  LockIcon,
+  ProductIcon,
+  UnlockIcon,
+} from '../../../../components/admin/admin-icons';
+import { AdminEntityLink } from '../../../../components/admin/admin-entity-link';
 import { useAuthSession } from '../../../../components/auth-session-provider';
 import {
   adminErrorMessage,
   applyAdminProductAction,
-  lookupAdminProduct,
+  fetchAdminProducts,
 } from '../../../../lib/admin-api';
 
-function formatVnd(amount: number): string {
-  return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount);
+type ProductFilters = {
+  q: string;
+  moderationStatus: NonNullable<AdminProductListQuery['moderationStatus']> | '';
+};
+
+const STATUS_LABELS: Record<AdminProductListItem['status'], string> = {
+  DRAFT: 'Bản nháp',
+  ACTIVE: 'Đang bán',
+  HIDDEN: 'Đang ẩn',
+  ARCHIVED: 'Đã lưu trữ',
+};
+
+function formatVnd(amount: number | null, maxAmount = amount): string {
+  if (amount === null || maxAmount === null) return 'Chưa có giá';
+  const formatter = new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' });
+  const min = formatter.format(amount);
+  return amount === maxAmount ? min : `${min} – ${formatter.format(maxAmount)}`;
 }
 
 export default function AdminProductsPage() {
   const { authenticatedFetch } = useAuthSession();
-  const [query, setQuery] = useState('');
-  const [searchedQuery, setSearchedQuery] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [product, setProduct] = useState<AdminProductDetail | null>(null);
-  const [searched, setSearched] = useState(false);
+  const [draftQuery, setDraftQuery] = useState('');
+  const [draftModerationStatus, setDraftModerationStatus] =
+    useState<ProductFilters['moderationStatus']>('');
+  const [filters, setFilters] = useState<ProductFilters>({ q: '', moderationStatus: '' });
+  const [products, setProducts] = useState<AdminProductListItem[]>([]);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-
-  // Action modal state
+  const [modalProduct, setModalProduct] = useState<AdminProductListItem | null>(null);
   const [modalAction, setModalAction] = useState<'SUSPEND' | 'RESTORE' | null>(null);
   const [reason, setReason] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
 
-  const handleSearch = async (searchTerm?: string) => {
-    const term = (searchTerm ?? query).trim();
-    if (!term) return;
+  const loadProducts = useCallback(
+    async (nextFilters: ProductFilters, cursor?: string, append = false) => {
+      setLoading(true);
+      setErrorMessage(null);
+      try {
+        const response = await fetchAdminProducts(authenticatedFetch, {
+          limit: 20,
+          cursor,
+          q: nextFilters.q || undefined,
+          status: 'ACTIVE',
+          moderationStatus: nextFilters.moderationStatus || undefined,
+        });
+        setProducts((current) => (append ? [...current, ...response.items] : response.items));
+        setNextCursor(response.nextCursor);
+      } catch (error: unknown) {
+        setErrorMessage(adminErrorMessage(error, 'Không thể tải danh sách sản phẩm'));
+        if (!append) setProducts([]);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [authenticatedFetch],
+  );
 
-    setLoading(true);
-    setErrorMessage(null);
-    setSearched(true);
-    setSearchedQuery(term);
+  useEffect(() => {
+    const timer = window.setTimeout(() => void loadProducts(filters), 0);
+    return () => window.clearTimeout(timer);
+  }, [filters, loadProducts]);
 
-    try {
-      const res = await lookupAdminProduct(authenticatedFetch, { slug: term, id: term });
-      setProduct(res.product);
-    } catch (error: unknown) {
-      setErrorMessage(adminErrorMessage(error, 'Lỗi khi tra cứu sản phẩm'));
-      setProduct(null);
-    } finally {
-      setLoading(false);
-    }
+  const handleSearch = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setFilters({ q: draftQuery.trim(), moderationStatus: draftModerationStatus });
+  };
+
+  const handleModerationFilterChange = (value: ProductFilters['moderationStatus']) => {
+    setDraftModerationStatus(value);
+    setFilters({ q: draftQuery.trim(), moderationStatus: value });
+  };
+
+  const openAction = (product: AdminProductListItem) => {
+    setModalProduct(product);
+    setModalAction(product.moderationStatus === 'ACTIVE' ? 'SUSPEND' : 'RESTORE');
+    setReason('');
+    setActionError(null);
+  };
+
+  const closeAction = () => {
+    if (submitting) return;
+    setModalProduct(null);
+    setModalAction(null);
+    setReason('');
+    setActionError(null);
   };
 
   const handleAction = async () => {
-    if (!product || !modalAction) return;
+    if (!modalProduct || !modalAction) return;
     if (reason.trim().length < 8) {
       setActionError('Lý do phải có ít nhất 8 ký tự.');
       return;
     }
-
     setSubmitting(true);
     setActionError(null);
-
     try {
-      const result = await applyAdminProductAction(authenticatedFetch, product.id, {
+      const result = await applyAdminProductAction(authenticatedFetch, modalProduct.id, {
         action: modalAction,
         reason: reason.trim(),
       });
-
-      setProduct((prev) => (prev ? { ...prev, moderationStatus: result.moderationStatus } : null));
-      setModalAction(null);
-      setReason('');
+      setProducts((current) =>
+        current.map((item) =>
+          item.id === modalProduct.id
+            ? { ...item, moderationStatus: result.moderationStatus }
+            : item,
+        ),
+      );
+      closeAction();
     } catch (error: unknown) {
-      setActionError(adminErrorMessage(error, 'Lỗi thực hiện hành động'));
+      setActionError(adminErrorMessage(error, 'Không thể cập nhật trạng thái sản phẩm'));
     } finally {
       setSubmitting(false);
     }
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-      <div>
-        <h1 style={{ fontSize: '24px', fontWeight: 700, color: '#111827' }}>Kiểm soát Sản phẩm</h1>
-        <p style={{ color: '#6b7280', fontSize: '14px', marginTop: '4px' }}>
-          Tra cứu nhanh chi tiết sản phẩm theo Slug hoặc UUID để kiểm duyệt, khóa hoặc mở khóa sản
-          phẩm vi phạm.
-        </p>
-      </div>
-
-      {/* Search Input Bar */}
-      <div
-        style={{
-          background: '#ffffff',
-          borderRadius: '12px',
-          padding: '20px 24px',
-          boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
-          border: '1px solid #e5e7eb',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '12px',
-        }}
+    <div className="admin-page admin-products-page">
+      <form
+        className="admin-toolbar admin-products-list-toolbar"
+        onSubmit={handleSearch}
+        role="search"
       >
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            void handleSearch();
-          }}
-          style={{ display: 'flex', gap: '12px' }}
-        >
-          <div style={{ position: 'relative', flex: 1 }}>
+        <div className="admin-toolbar__filters admin-products-list-toolbar__filters">
+          <div className="admin-field admin-products-list-toolbar__search">
+            <label htmlFor="admin-product-search">Tìm sản phẩm</label>
             <input
-              type="text"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Nhập slug (ví dụ: ao-thun-nam-cotton) hoặc UUID sản phẩm..."
-              style={{
-                width: '100%',
-                padding: '12px 16px',
-                borderRadius: '8px',
-                border: '1px solid #d1d5db',
-                fontSize: '14px',
-                outline: 'none',
-              }}
+              id="admin-product-search"
+              className="admin-control"
+              value={draftQuery}
+              onChange={(event) => setDraftQuery(event.target.value)}
+              placeholder="Tên, slug, gian hàng hoặc danh mục"
             />
           </div>
-          <button
-            type="submit"
-            disabled={loading || !query.trim()}
-            className="admin-btn admin-btn-primary"
-            style={{
-              padding: '12px 24px',
-              whiteSpace: 'nowrap',
-            }}
-          >
-            {loading ? 'Đang tìm...' : 'Tra cứu'}
-          </button>
-        </form>
-
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            fontSize: '13px',
-            color: '#6b7280',
-            flexWrap: 'wrap',
-          }}
-        >
-          <span>Gợi ý thử nhanh:</span>
-          {['ao-thun-nam', 'tai-nghe-bluetooth', 'kem-chong-nang'].map((sample) => (
-            <button
-              key={sample}
-              type="button"
-              onClick={() => {
-                setQuery(sample);
-                void handleSearch(sample);
-              }}
-              className="admin-chip-btn"
+          <div className="admin-field">
+            <label htmlFor="admin-product-moderation">Kiểm duyệt</label>
+            <select
+              id="admin-product-moderation"
+              className="admin-control"
+              value={draftModerationStatus}
+              onChange={(event) =>
+                handleModerationFilterChange(
+                  event.target.value as ProductFilters['moderationStatus'],
+                )
+              }
             >
-              {sample}
-            </button>
-          ))}
+              <option value="">Tất cả</option>
+              <option value="ACTIVE">Đang hoạt động</option>
+              <option value="SUSPENDED">Đã tạm khóa</option>
+            </select>
+          </div>
         </div>
-      </div>
+      </form>
 
-      {/* Error Message */}
-      {errorMessage && (
-        <div
-          style={{
-            padding: '14px 18px',
-            background: '#fef2f2',
-            border: '1px solid #fecaca',
-            color: '#dc2626',
-            borderRadius: '8px',
-            fontSize: '14px',
-          }}
-        >
+      {errorMessage ? (
+        <div className="admin-state-card admin-state-card--error" role="alert">
           {errorMessage}
         </div>
-      )}
+      ) : null}
 
-      {/* Empty State when searched and not found */}
-      {searched && !loading && !product && !errorMessage && (
-        <div
-          style={{
-            background: '#ffffff',
-            borderRadius: '12px',
-            padding: '48px 24px',
-            textAlign: 'center',
-            border: '1px solid #e5e7eb',
-            color: '#6b7280',
-          }}
-        >
-          <div style={{ fontSize: '36px', marginBottom: '8px' }}>🔍</div>
-          <div style={{ fontSize: '16px', fontWeight: 600, color: '#111827' }}>
-            Không tìm thấy sản phẩm nào
-          </div>
-          <p style={{ fontSize: '14px', marginTop: '4px' }}>
-            Không có sản phẩm nào khớp với từ khóa &ldquo;<strong>{searchedQuery}</strong>&rdquo;.
-            Vui lòng kiểm tra lại slug hoặc ID.
-          </p>
-        </div>
-      )}
-
-      {/* Product Detail Card */}
-      {product && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-          {/* Main Info Card */}
-          <div
-            style={{
-              background: '#ffffff',
-              borderRadius: '12px',
-              padding: '24px',
-              border: '1px solid #e5e7eb',
-              boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '20px',
-            }}
-          >
-            <div style={{ display: 'flex', gap: '24px', alignItems: 'flex-start' }}>
-              {/* Product Primary Image */}
-              <div
-                style={{
-                  width: '120px',
-                  height: '120px',
-                  borderRadius: '10px',
-                  background: '#f3f4f6',
-                  overflow: 'hidden',
-                  flexShrink: 0,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  border: '1px solid #e5e7eb',
-                }}
-              >
-                {product.images.length > 0 && product.images[0] ? (
-                  <Image
-                    src={product.images[0].url}
-                    alt={product.name}
-                    width={120}
-                    height={120}
-                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                    unoptimized
-                  />
-                ) : (
-                  <ProductIcon size={40} color="#9ca3af" />
-                )}
-              </div>
-
-              {/* Basic Info */}
-              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                <div
-                  style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}
-                >
-                  <span
-                    style={{
-                      padding: '2px 8px',
-                      borderRadius: '6px',
-                      fontSize: '12px',
-                      fontWeight: 600,
-                      background: product.moderationStatus === 'ACTIVE' ? '#dcfce7' : '#fee2e2',
-                      color: product.moderationStatus === 'ACTIVE' ? '#166534' : '#991b1b',
-                    }}
-                  >
-                    Kiểm duyệt:{' '}
-                    {product.moderationStatus === 'ACTIVE' ? 'Đang hoạt động' : 'ĐÃ BỊ KHÓA'}
-                  </span>
-
-                  <span
-                    style={{
-                      padding: '2px 8px',
-                      borderRadius: '6px',
-                      fontSize: '12px',
-                      fontWeight: 600,
-                      background: '#f3f4f6',
-                      color: '#4b5563',
-                    }}
-                  >
-                    Trạng thái: {product.status}
-                  </span>
-
-                  <span
-                    style={{
-                      padding: '2px 8px',
-                      borderRadius: '6px',
-                      fontSize: '12px',
-                      background: '#eff6ff',
-                      color: '#1d4ed8',
-                    }}
-                  >
-                    {product.categoryName}
-                  </span>
-                </div>
-
-                <h2
-                  style={{
-                    fontSize: '18px',
-                    fontWeight: 700,
-                    color: '#111827',
-                    margin: '4px 0 0 0',
-                  }}
-                >
-                  {product.name}
-                </h2>
-
-                <div
-                  style={{
-                    fontSize: '13px',
-                    color: '#6b7280',
-                    display: 'flex',
-                    gap: '16px',
-                    flexWrap: 'wrap',
-                  }}
-                >
-                  <span>
-                    Slug: <code>{product.slug}</code>
-                  </span>
-                  <span>UUID: {product.id}</span>
-                </div>
-
-                <div
-                  style={{
-                    fontSize: '13px',
-                    color: '#374151',
-                    display: 'flex',
-                    gap: '20px',
-                    marginTop: '4px',
-                  }}
-                >
-                  <span>
-                    ⭐ {(product.ratingAverageBasisPoints / 100).toFixed(1)} / 5.0 (
-                    {product.ratingCount} đánh giá)
-                  </span>
-                  <span>
-                    Đã bán: <strong>{product.soldCount}</strong>
-                  </span>
-                </div>
-              </div>
-
-              {/* Action Buttons */}
-              <div
-                style={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '8px',
-                  alignItems: 'flex-end',
-                }}
-              >
-                <Link
-                  href={`/products/${product.slug}`}
-                  target="_blank"
-                  className="admin-btn admin-btn-secondary"
-                  style={{
-                    fontSize: '13px',
-                    padding: '8px 14px',
-                    color: '#2563eb',
-                  }}
-                >
-                  Xem trên Storefront ↗
-                </Link>
-
-                {product.moderationStatus === 'ACTIVE' ? (
-                  <button
-                    onClick={() => {
-                      setModalAction('SUSPEND');
-                      setActionError(null);
-                      setReason('');
-                    }}
-                    className="admin-btn admin-btn-danger"
-                    style={{
-                      fontSize: '13px',
-                      padding: '8px 16px',
-                    }}
-                  >
-                    Khóa sản phẩm (Suspend)
-                  </button>
-                ) : (
-                  <button
-                    onClick={() => {
-                      setModalAction('RESTORE');
-                      setActionError(null);
-                      setReason('');
-                    }}
-                    className="admin-btn admin-btn-success"
-                    style={{
-                      fontSize: '13px',
-                      padding: '8px 16px',
-                    }}
-                  >
-                    Mở khóa sản phẩm (Restore)
-                  </button>
-                )}
-              </div>
-            </div>
-
-            {/* Shop Info Subsection */}
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                padding: '12px 16px',
-                background: '#f9fafb',
-                borderRadius: '8px',
-                fontSize: '13px',
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <ShopIcon size={18} color="#ee4d2d" />
-                <span>
-                  Gian hàng: <strong>{product.shopName}</strong> (<code>{product.shopSlug}</code>)
-                </span>
-                <span
-                  style={{
-                    fontSize: '11px',
-                    padding: '1px 6px',
-                    borderRadius: '4px',
-                    background: product.shopStatus === 'ACTIVE' ? '#dcfce7' : '#fee2e2',
-                    color: product.shopStatus === 'ACTIVE' ? '#15803d' : '#b91c1c',
-                  }}
-                >
-                  {product.shopStatus}
-                </span>
-              </div>
-              <Link
-                href={`/admin/shops?q=${product.shopSlug}`}
-                style={{ color: '#ee4d2d', textDecoration: 'none', fontWeight: 500 }}
-              >
-                Quản lý shop này →
-              </Link>
-            </div>
-          </div>
-
-          {/* Variants Table */}
-          <div
-            style={{
-              background: '#ffffff',
-              borderRadius: '12px',
-              padding: '24px',
-              border: '1px solid #e5e7eb',
-              boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '16px',
-            }}
-          >
-            <h3 style={{ fontSize: '16px', fontWeight: 700, color: '#111827', margin: 0 }}>
-              Danh sách Biến thể & Tồn kho ({product.variants.length} phân loại)
-            </h3>
-
-            <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
-                <thead>
-                  <tr
-                    style={{
-                      background: '#f9fafb',
-                      borderBottom: '1px solid #e5e7eb',
-                      textAlign: 'left',
-                    }}
-                  >
-                    <th style={{ padding: '10px 12px', color: '#4b5563' }}>SKU</th>
-                    <th style={{ padding: '10px 12px', color: '#4b5563' }}>
-                      Phân loại / Thuộc tính
-                    </th>
-                    <th style={{ padding: '10px 12px', color: '#4b5563' }}>Giá niêm yết</th>
-                    <th style={{ padding: '10px 12px', color: '#4b5563' }}>Tồn kho</th>
-                    <th style={{ padding: '10px 12px', color: '#4b5563' }}>Trạng thái</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {product.variants.map((variant) => {
-                    const attrText = Object.entries(variant.attributes)
-                      .map(([k, v]) => `${k}: ${v}`)
-                      .join(' • ');
-
-                    return (
-                      <tr key={variant.id} style={{ borderBottom: '1px solid #f3f4f6' }}>
-                        <td style={{ padding: '10px 12px', fontFamily: 'monospace' }}>
-                          {variant.sku}
-                        </td>
-                        <td style={{ padding: '10px 12px', color: '#111827' }}>
-                          {attrText || 'Mặc định (Default)'}
-                        </td>
-                        <td style={{ padding: '10px 12px', fontWeight: 600, color: '#ee4d2d' }}>
-                          {formatVnd(variant.price)}
-                        </td>
-                        <td style={{ padding: '10px 12px' }}>{variant.stock}</td>
-                        <td style={{ padding: '10px 12px' }}>
-                          <span
-                            style={{
-                              padding: '2px 6px',
-                              borderRadius: '4px',
-                              fontSize: '11px',
-                              background: variant.isActive ? '#dcfce7' : '#f3f4f6',
-                              color: variant.isActive ? '#15803d' : '#6b7280',
-                            }}
-                          >
-                            {variant.isActive ? 'Kích hoạt' : 'Tắt'}
-                          </span>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Moderation Reason Modal */}
-      {modalAction && product && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(0, 0, 0, 0.4)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 50,
-            padding: '16px',
-          }}
-        >
-          <div
-            style={{
-              background: '#ffffff',
-              borderRadius: '12px',
-              width: '100%',
-              maxWidth: '500px',
-              padding: '24px',
-              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '16px',
-            }}
-          >
-            <h3 style={{ fontSize: '18px', fontWeight: 700, color: '#111827', margin: 0 }}>
-              {modalAction === 'SUSPEND' ? 'Khóa sản phẩm vi phạm' : 'Mở khóa sản phẩm'}
-            </h3>
-
-            <p style={{ fontSize: '14px', color: '#4b5563', margin: 0 }}>
-              Bạn đang thực hiện {modalAction === 'SUSPEND' ? 'khóa' : 'mở khóa'} sản phẩm{' '}
-              <strong>{product.name}</strong> (<code>{product.slug}</code>). Hành động này sẽ được
-              ghi vết vào Nhật ký kiểm toán đặc quyền.
+      <section
+        className="admin-table-card admin-products-list-card"
+        aria-label="Danh sách sản phẩm đang hoạt động"
+      >
+        <div className="admin-table-card__header">
+          <div>
+            <h2>Sản phẩm đang hoạt động</h2>
+            <p>
+              {filters.q
+                ? `Kết quả cho “${filters.q}”`
+                : 'Danh sách sản phẩm đang hoạt động trên toàn sàn'}
             </p>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-              <label style={{ fontSize: '13px', fontWeight: 600, color: '#374151' }}>
-                Lý do thực hiện (tối thiểu 8 ký tự):
-              </label>
-              <textarea
-                value={reason}
-                onChange={(e) => setReason(e.target.value)}
-                placeholder="Ví dụ: Sản phẩm vi phạm chính sách hàng cấm / Shop đã cung cấp chứng từ hợp lệ..."
-                rows={3}
-                style={{
-                  width: '100%',
-                  padding: '10px',
-                  borderRadius: '6px',
-                  border: '1px solid #d1d5db',
-                  fontSize: '14px',
-                  outline: 'none',
-                }}
-              />
-              <div style={{ fontSize: '12px', color: '#6b7280', textAlign: 'right' }}>
-                {reason.trim().length}/240 ký tự
-              </div>
-            </div>
-
-            {actionError && (
-              <div
-                style={{
-                  fontSize: '13px',
-                  color: '#dc2626',
-                  background: '#fef2f2',
-                  padding: '8px 12px',
-                  borderRadius: '6px',
-                }}
-              >
-                {actionError}
-              </div>
-            )}
-
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'flex-end',
-                gap: '10px',
-                marginTop: '12px',
-              }}
+          </div>
+          <span className="admin-table-card__count">Đã tải {products.length} sản phẩm</span>
+        </div>
+        {loading && products.length === 0 ? (
+          <div className="admin-state-card__message" role="status">
+            Đang tải danh sách sản phẩm…
+          </div>
+        ) : null}
+        {!loading && products.length === 0 ? (
+          <div className="admin-state-card__message" role="status">
+            Không có sản phẩm nào phù hợp bộ lọc.
+          </div>
+        ) : null}
+        {products.length > 0 ? (
+          <div className="admin-table-scroll">
+            <table className="admin-data-table admin-products-list-table">
+              <thead>
+                <tr>
+                  <th>Sản phẩm</th>
+                  <th>Gian hàng</th>
+                  <th>Danh mục</th>
+                  <th>Giá / tồn kho</th>
+                  <th>Trạng thái</th>
+                  <th className="admin-table-cell--actions">Thao tác</th>
+                </tr>
+              </thead>
+              <tbody>
+                {products.map((product) => (
+                  <tr key={product.id}>
+                    <td>
+                      <AdminEntityLink
+                        href={`/admin/products/${product.id}`}
+                        name={product.name}
+                        imageUrl={product.primaryImageUrl}
+                        meta={product.slug}
+                        fallbackIcon={<ProductIcon size={22} color="#94a3b8" />}
+                      />
+                    </td>
+                    <td>
+                      <AdminEntityLink
+                        href={product.shopId ? `/admin/shops/${product.shopId}` : '/admin/shops'}
+                        name={product.shopName}
+                        meta={product.shopSlug}
+                      />
+                    </td>
+                    <td>
+                      <AdminEntityLink
+                        href={
+                          product.categoryId
+                            ? `/admin/categories#admin-category-${product.categoryId}`
+                            : '/admin/categories'
+                        }
+                        name={product.categoryName}
+                        meta={product.categorySlug}
+                      />
+                    </td>
+                    <td>
+                      <span>{formatVnd(product.minPrice, product.maxPrice)}</span>
+                      <small className="admin-table-subtext">
+                        {product.stockQuantity} tồn · {product.variantCount} phân loại
+                      </small>
+                    </td>
+                    <td>
+                      <span
+                        className={`admin-badge ${product.moderationStatus === 'ACTIVE' ? 'admin-badge--success' : 'admin-badge--danger'}`}
+                      >
+                        {product.moderationStatus === 'ACTIVE' ? 'Đang hoạt động' : 'Đã tạm khóa'}
+                      </span>
+                      <small className="admin-table-subtext">
+                        {STATUS_LABELS[product.status]} · {product.soldCount} đã bán
+                      </small>
+                    </td>
+                    <td className="admin-table-cell--actions">
+                      <div className="admin-table-actions">
+                        <Link
+                          href={`/admin/products/${product.id}`}
+                          className="admin-icon-btn admin-icon-btn--secondary"
+                          aria-label={`Xem sản phẩm ${product.name}`}
+                          title="Xem sản phẩm"
+                        >
+                          <EyeIcon aria-hidden="true" />
+                        </Link>
+                        <button
+                          type="button"
+                          className={`admin-icon-btn ${product.moderationStatus === 'ACTIVE' ? 'admin-icon-btn--danger' : 'admin-icon-btn--success'}`}
+                          aria-label={`${product.moderationStatus === 'ACTIVE' ? 'Khóa' : 'Mở khóa'} sản phẩm ${product.name}`}
+                          title={
+                            product.moderationStatus === 'ACTIVE'
+                              ? 'Khóa sản phẩm'
+                              : 'Mở khóa sản phẩm'
+                          }
+                          onClick={() => openAction(product)}
+                        >
+                          {product.moderationStatus === 'ACTIVE' ? (
+                            <LockIcon aria-hidden="true" />
+                          ) : (
+                            <UnlockIcon aria-hidden="true" />
+                          )}
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : null}
+        <footer className="admin-list-footer">
+          <span>Hiển thị {products.length} sản phẩm đã tải</span>
+          {nextCursor ? (
+            <button
+              type="button"
+              className="admin-btn admin-btn-secondary"
+              onClick={() => void loadProducts(filters, nextCursor, true)}
+              disabled={loading}
             >
+              {loading ? 'Đang tải…' : 'Tải thêm sản phẩm'}
+            </button>
+          ) : (
+            <span>Đã hiển thị hết kết quả</span>
+          )}
+        </footer>
+      </section>
+
+      {modalProduct && modalAction ? (
+        <div className="admin-dialog-backdrop" role="presentation">
+          <section
+            className="admin-dialog admin-product-action-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="admin-product-action-title"
+          >
+            <h2 id="admin-product-action-title">
+              {modalAction === 'SUSPEND' ? 'Khóa sản phẩm' : 'Mở khóa sản phẩm'}
+            </h2>
+            <p>
+              Sản phẩm: <strong>{modalProduct.name}</strong>
+            </p>
+            <label className="admin-field" htmlFor="admin-product-action-reason">
+              <span>Lý do (8–240 ký tự)</span>
+              <textarea
+                id="admin-product-action-reason"
+                className="admin-control"
+                value={reason}
+                onChange={(event) => setReason(event.target.value)}
+                minLength={8}
+                maxLength={240}
+                rows={4}
+              />
+            </label>
+            {actionError ? (
+              <p className="admin-inline-error" role="alert">
+                {actionError}
+              </p>
+            ) : null}
+            <div className="admin-dialog__actions">
               <button
                 type="button"
-                onClick={() => setModalAction(null)}
-                disabled={submitting}
                 className="admin-btn admin-btn-secondary"
-                style={{
-                  padding: '8px 16px',
-                  fontSize: '13px',
-                }}
+                onClick={closeAction}
+                disabled={submitting}
               >
                 Hủy
               </button>
               <button
                 type="button"
+                className={`admin-btn ${modalAction === 'SUSPEND' ? 'admin-btn-danger' : 'admin-btn-primary'}`}
                 onClick={() => void handleAction()}
-                disabled={submitting || reason.trim().length < 8}
-                className={`admin-btn ${modalAction === 'SUSPEND' ? 'admin-btn-danger' : 'admin-btn-success'}`}
-                style={{
-                  padding: '8px 18px',
-                  fontSize: '13px',
-                }}
+                disabled={submitting}
               >
-                {submitting ? 'Đang xử lý...' : 'Xác nhận'}
+                {submitting ? 'Đang lưu…' : 'Xác nhận'}
               </button>
             </div>
-          </div>
+          </section>
         </div>
-      )}
+      ) : null}
     </div>
   );
 }

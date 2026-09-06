@@ -1,5 +1,6 @@
 import type {
   AdminProductActionResult,
+  AdminProductListResponse,
   AdminProductLookupResponse,
 } from '@shopee-clone/contracts';
 import {
@@ -22,7 +23,11 @@ import { RequireRoles, RolesGuard } from '../auth/role-authorization.guard';
 import { AdminExceptionFilter } from './admin-exception.filter';
 // DTO classes must remain runtime values for Nest validation metadata.
 // eslint-disable-next-line @typescript-eslint/consistent-type-imports
-import { AdminProductActionDto, AdminProductLookupQueryDto } from './admin.dto';
+import {
+  AdminProductActionDto,
+  AdminProductListQueryDto,
+  AdminProductLookupQueryDto,
+} from './admin.dto';
 import { AdminService } from './admin.service';
 
 @ApiTags('admin products')
@@ -33,6 +38,13 @@ import { AdminService } from './admin.service';
 @RequireRoles('admin')
 export class AdminProductsController {
   constructor(@Inject(AdminService) private readonly admin: AdminService) {}
+
+  @Get()
+  @Header('Cache-Control', 'private, no-store')
+  @ApiOperation({ summary: 'List products for marketplace moderation' })
+  list(@Query() query: AdminProductListQueryDto): Promise<AdminProductListResponse> {
+    return this.admin.listProducts(query);
+  }
 
   @Get('lookup')
   @Header('Cache-Control', 'private, no-store')

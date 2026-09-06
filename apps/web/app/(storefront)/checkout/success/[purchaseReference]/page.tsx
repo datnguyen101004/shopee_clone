@@ -2,7 +2,7 @@ import { PurchaseSuccessScreen } from '../../../../../components/checkout/purcha
 
 export default async function CheckoutSuccessPage({
   params,
-}: PageProps<'/checkout/success/[purchaseReference]'>) {
+}: { params: Promise<{ purchaseReference: string }> }) {
   const { purchaseReference } = await params;
   return <PurchaseSuccessScreen purchaseReference={purchaseReference} />;
 }

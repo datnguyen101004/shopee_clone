@@ -52,7 +52,7 @@ function badgeLabel(count: number): string {
   return count > 99 ? '99+' : String(count);
 }
 
-export function NotificationBell() {
+export function NotificationBell({ sellerDashboard = false }: { sellerDashboard?: boolean }) {
   const auth = useAuthSession();
   const chat = useChat();
   const popoverId = useId();
@@ -158,7 +158,8 @@ export function NotificationBell() {
       );
       setUnreadCount((current) => Math.max(0, current - readResult.updatedCount));
       setOpen(false);
-      if (!(item.category === 'CHAT' && item.metadata.chat)) window.location.assign(item.metadata.targetUrl);
+      if (!(item.category === 'CHAT' && item.metadata.chat))
+        window.location.assign(item.metadata.targetUrl);
     } catch {
       // Leave the popover open so the user can retry.
     } finally {
@@ -167,6 +168,7 @@ export function NotificationBell() {
   }
 
   const countLabel = badgeLabel(unreadCount);
+  const allNotificationsHref = sellerDashboard ? '/seller/notifications' : '/account/notifications';
 
   return (
     <div className="market-notification" ref={rootRef}>
@@ -237,7 +239,7 @@ export function NotificationBell() {
           ) : null}
           <Link
             className="market-notification__all"
-            href="/account/notifications"
+            href={allNotificationsHref}
             onClick={() => setOpen(false)}
           >
             Xem tất cả

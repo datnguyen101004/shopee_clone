@@ -1,0 +1,11 @@
+/* Storefront Modular CSS Bundle */
+@import './header.css';
+@import './home.css';
+@import './catalog.css';
+@import './product-detail.css';
+@import './reviews.css';
+@import './checkout.css';
+@import './chat.css';
+@import './orders.css';
+@import './returns.css';
+@import './shop.css';

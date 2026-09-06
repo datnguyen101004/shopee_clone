@@ -3,13 +3,23 @@
 import {
   buyerDisplayProductPriceMinor,
   parseHomepageResponse,
+  type HomepageBanner,
   type HomepageCampaignModule,
   type HomepageCategoryModule,
   type HomepageModule,
   type HomepageProductModule,
   type HomepageProductSummary,
 } from '@shopee-clone/contracts';
-import { Badge, Card, Container, RotateCcw, ShieldCheck, Truck } from '@shopee-clone/ui';
+import {
+  Badge,
+  ProductCard as UiProductCard,
+  RotateCcw,
+  SectionHeader,
+  ShieldCheck,
+  StorefrontContainer,
+  StorefrontSection,
+  Truck,
+} from '@shopee-clone/ui';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -171,36 +181,221 @@ function getBannerImage(url?: string | null): string {
   return url;
 }
 
-function CampaignSection({ module }: { module: HomepageCampaignModule }) {
+function CampaignBannerVisual({
+  banner,
+  inert = false,
+}: {
+  banner: HomepageBanner;
+  inert?: boolean;
+}) {
+  const image = (
+    <div className="hero-banner-container">
+      <Image
+        src={getBannerImage(banner.imageUrl)}
+        alt={banner.altText || banner.title || 'Shopee Clone Siêu Sale Đại Tiệc'}
+        width={1400}
+        height={410}
+        priority={!inert}
+        unoptimized
+        className="hero-banner-img"
+      />
+    </div>
+  );
+
+  if (banner.href && !inert) {
+    return (
+      <Link
+        href={banner.href}
+        className="hero-banner-link"
+        aria-label={banner.title || 'Chiến dịch siêu hội mua sắm'}
+      >
+        {image}
+      </Link>
+    );
+  }
+
   return (
-    <section
+    <div className="hero-banner-link hero-banner-link--static" aria-label={banner.title}>
+      {image}
+    </div>
+  );
+}
+
+function CampaignSection({ module }: { module: HomepageCampaignModule }) {
+  const [trackIndex, setTrackIndex] = useState(module.banners.length > 1 ? 1 : 0);
+  const [transitionEnabled, setTransitionEnabled] = useState(true);
+  const [isInViewport, setIsInViewport] = useState(true);
+  const bannerFrameRef = useRef<HTMLDivElement | null>(null);
+  const touchStartX = useRef<number | null>(null);
+  const banners = module.banners;
+  const hasMultipleBanners = banners.length > 1;
+  const activeIndex = hasMultipleBanners ? (trackIndex - 1 + banners.length) % banners.length : 0;
+  const activeBanner = banners[Math.min(activeIndex, Math.max(0, banners.length - 1))];
+  const trackBanners = hasMultipleBanners
+    ? [banners[banners.length - 1]!, ...banners, banners[0]!]
+    : banners;
+
+  const goNext = useCallback(() => {
+    if (!hasMultipleBanners) return;
+    setTransitionEnabled(true);
+    setTrackIndex((current) => (current >= banners.length + 1 ? 2 : current + 1));
+  }, [banners.length, hasMultipleBanners]);
+
+  const goPrevious = useCallback(() => {
+    if (!hasMultipleBanners) return;
+    setTransitionEnabled(true);
+    setTrackIndex((current) => (current <= 0 ? banners.length - 1 : current - 1));
+  }, [banners.length, hasMultipleBanners]);
+
+  const goTo = useCallback(
+    (index: number) => {
+      if (!hasMultipleBanners) return;
+      const nextIndex = (index + banners.length) % banners.length;
+      if (nextIndex === activeIndex) return;
+
+      setTransitionEnabled(true);
+      setTrackIndex(nextIndex + 1);
+    },
+    [activeIndex, banners.length, hasMultipleBanners],
+  );
+
+  useEffect(() => {
+    const node = bannerFrameRef.current;
+    if (!node || !('IntersectionObserver' in window)) return undefined;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        setIsInViewport(Boolean(entry?.isIntersecting && entry.intersectionRatio > 0));
+      },
+      { threshold: [0, 0.01] },
+    );
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    if (!hasMultipleBanners || !isInViewport) return undefined;
+    const timer = window.setTimeout(() => {
+      goNext();
+    }, 3000);
+    return () => window.clearTimeout(timer);
+  }, [activeIndex, goNext, hasMultipleBanners, isInViewport]);
+
+  useEffect(() => {
+    if (!hasMultipleBanners || (trackIndex !== 0 && trackIndex !== banners.length + 1)) {
+      return undefined;
+    }
+
+    const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    const timer = window.setTimeout(
+      () => {
+        setTransitionEnabled(false);
+        setTrackIndex(trackIndex === 0 ? banners.length : 1);
+      },
+      reducedMotion ? 0 : 620,
+    );
+    return () => window.clearTimeout(timer);
+  }, [banners.length, hasMultipleBanners, trackIndex]);
+
+  useEffect(() => {
+    if (transitionEnabled) return undefined;
+    const frame = window.requestAnimationFrame(() => setTransitionEnabled(true));
+    return () => window.cancelAnimationFrame(frame);
+  }, [transitionEnabled]);
+
+  return (
+    <StorefrontSection
       className="homepage-campaign"
       aria-labelledby={`module-${module.id}`}
       data-module-type={module.type}
+      role={hasMultipleBanners ? 'region' : undefined}
+      aria-roledescription={hasMultipleBanners ? 'carousel' : undefined}
+      onTouchStart={(event) => {
+        touchStartX.current = event.touches[0]?.clientX ?? null;
+      }}
+      onTouchEnd={(event) => {
+        const start = touchStartX.current;
+        const end = event.changedTouches[0]?.clientX;
+        touchStartX.current = null;
+        if (start === null || end === undefined || Math.abs(end - start) < 40) return;
+        if (end < start) goNext();
+        else goPrevious();
+      }}
     >
-      {module.banners.map((banner) => (
-        <Link
-          key={banner.id}
-          href={banner.href}
-          className="hero-banner-link"
-          aria-label={banner.title || 'Chiến dịch siêu hội mua sắm'}
-        >
+      {activeBanner && (
+        <div className="hero-banner-frame" ref={bannerFrameRef}>
           <h1 id={`module-${module.id}`} className="sr-only">
-            {banner.title}
+            {activeBanner.title}
           </h1>
-          <div className="hero-banner-container">
-            <Image
-              src={getBannerImage(banner.imageUrl)}
-              alt={banner.altText || banner.title || 'Shopee Clone Siêu Sale Đại Tiệc'}
-              width={1400}
-              height={410}
-              priority
-              unoptimized
-              className="hero-banner-img"
-            />
+          <div className="hero-banner-viewport">
+            <div
+              className="hero-banner-track"
+              style={{
+                transform: `translate3d(-${trackIndex * 100}%, 0, 0)`,
+                transition: transitionEnabled ? undefined : 'none',
+              }}
+              onTransitionEnd={(event) => {
+                if (event.target !== event.currentTarget || event.propertyName !== 'transform') {
+                  return;
+                }
+                if (trackIndex === 0) {
+                  setTransitionEnabled(false);
+                  setTrackIndex(banners.length);
+                } else if (trackIndex === banners.length + 1) {
+                  setTransitionEnabled(false);
+                  setTrackIndex(1);
+                }
+              }}
+            >
+              {trackBanners.map((banner, index) => {
+                const isActive = index === trackIndex;
+                return (
+                  <div
+                    key={`${banner.id}-${index}`}
+                    className={`hero-banner-slide${isActive ? ' is-active' : ''}`}
+                    aria-hidden={!isActive}
+                  >
+                    <CampaignBannerVisual banner={banner} inert={!isActive} />
+                  </div>
+                );
+              })}
+            </div>
           </div>
-        </Link>
-      ))}
+          {hasMultipleBanners && (
+            <div className="hero-banner-controls" aria-label="Điều khiển banner">
+              <button
+                type="button"
+                className="carousel-btn carousel-btn--prev hero-banner-control"
+                onClick={goPrevious}
+                aria-label="Banner trước"
+              >
+                ‹
+              </button>
+              <div className="hero-banner-indicators" role="tablist" aria-label="Chọn banner">
+                {banners.map((banner, index) => (
+                  <button
+                    key={banner.id}
+                    type="button"
+                    role="tab"
+                    aria-selected={index === activeIndex}
+                    aria-label={`Banner ${index + 1}`}
+                    className={`hero-banner-indicator${index === activeIndex ? ' is-active' : ''}`}
+                    onClick={() => goTo(index)}
+                  />
+                ))}
+              </div>
+              <button
+                type="button"
+                className="carousel-btn carousel-btn--next hero-banner-control"
+                onClick={goNext}
+                aria-label="Banner tiếp theo"
+              >
+                ›
+              </button>
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="benefit-strip" aria-label="Quyền lợi mua sắm" tabIndex={0}>
         <span>
@@ -213,21 +408,18 @@ function CampaignSection({ module }: { module: HomepageCampaignModule }) {
           <RotateCcw aria-hidden="true" /> Đổi trả dễ dàng
         </span>
       </div>
-    </section>
+    </StorefrontSection>
   );
 }
 
 function CategorySection({ module }: { module: HomepageCategoryModule }) {
   return (
-    <section
+    <StorefrontSection
       className="homepage-categories"
       aria-labelledby={`module-${module.id}`}
       data-module-type={module.type}
     >
-      <div className="section-heading">
-        <h2 id={`module-${module.id}`}>{module.title}</h2>
-        <p>{module.subtitle}</p>
-      </div>
+      <SectionHeader id={`module-${module.id}`} title={module.title} subtitle={module.subtitle} />
       <div className="category-grid">
         {module.categories.map((category) => {
           const iconSrc = getCategoryIcon(category.icon, category.href, category.label);
@@ -252,7 +444,7 @@ function CategorySection({ module }: { module: HomepageCategoryModule }) {
           );
         })}
       </div>
-    </section>
+    </StorefrontSection>
   );
 }
 
@@ -262,52 +454,58 @@ function formatMoney(value: number): string {
 
 function ProductCard({ product }: { product: HomepageProductSummary }) {
   return (
-    <Card className="product-card">
-      <Link href={product.href} className="product-card__link" aria-label={`Xem ${product.name}`}>
-        <div
-          className={`product-card__image${product.imageUrl ? '' : ' product-card__image--fallback'}`}
-        >
-          {product.imageUrl ? (
-            <MarketplaceProductImage
-              src={product.imageUrl}
-              alt={product.imageAlt}
-              width={320}
-              height={320}
-            />
-          ) : (
-            <span className="homepage-media-fallback" role="img" aria-label={product.imageAlt}>
-              S
-            </span>
-          )}
-          {product.label ? (
-            <Badge variant={product.label === 'Mall' ? 'danger' : 'brand'}>{product.label}</Badge>
-          ) : null}
-        </div>
-        <div className="product-card__body">
-          <h3>{product.name}</h3>
-          <p className="product-card__shop">{product.shopName}</p>
-          <div className="product-card__price">
-            <strong>₫{formatMoney(buyerDisplayProductPriceMinor(product))}</strong>
-            {product.compareAtPriceMinor ? (
-              <del>₫{formatMoney(product.compareAtPriceMinor)}</del>
-            ) : null}
-          </div>
-          {product.buyerBestPrice?.merchandiseDiscountMinor ? (
-            <small>Giá tốt nhất dự kiến · Voucher đã áp dụng</small>
-          ) : null}
-          {product.scheduledPrice ? (
-            <small
-              aria-label={`Giảm giá sản phẩm ${Math.floor(product.scheduledPrice.discountBasisPoints / 100)} phần trăm`}
-            >
-              Đang giảm {Math.floor(product.scheduledPrice.discountBasisPoints / 100)}%
-            </small>
-          ) : null}
-          {product.soldCount !== undefined ? (
-            <span className="product-card__sold">Đã bán {formatMoney(product.soldCount)}</span>
-          ) : null}
-        </div>
-      </Link>
-    </Card>
+    <UiProductCard
+      className="product-card"
+      linkClassName="product-card__link"
+      linkComponent={Link}
+      href={product.href}
+      linkAriaLabel={`Xem ${product.name}`}
+      image={
+        product.imageUrl ? (
+          <MarketplaceProductImage
+            src={product.imageUrl}
+            alt={product.imageAlt}
+            width={320}
+            height={320}
+          />
+        ) : (
+          <span className="homepage-media-fallback" role="img" aria-label={product.imageAlt}>
+            S
+          </span>
+        )
+      }
+      mediaClassName={!product.imageUrl ? 'product-card__image--fallback' : undefined}
+      badge={
+        product.label ? (
+          <Badge variant={product.label === 'Mall' ? 'danger' : 'brand'}>{product.label}</Badge>
+        ) : null
+      }
+      name={product.name}
+      titleHeadingLevel="h3"
+      shopName={product.shopName}
+      shopNameClassName="product-card__shop"
+      price={`₫${formatMoney(buyerDisplayProductPriceMinor(product))}`}
+      compareAtPrice={
+        product.compareAtPriceMinor ? `₫${formatMoney(product.compareAtPriceMinor)}` : undefined
+      }
+      bestPriceBadge={
+        product.buyerBestPrice?.merchandiseDiscountMinor ? (
+          <small>Giá tốt nhất dự kiến · Voucher đã áp dụng</small>
+        ) : null
+      }
+      scheduledDeal={
+        product.scheduledPrice ? (
+          <small
+            aria-label={`Giảm giá sản phẩm ${Math.floor(product.scheduledPrice.discountBasisPoints / 100)} phần trăm`}
+          >
+            Đang giảm {Math.floor(product.scheduledPrice.discountBasisPoints / 100)}%
+          </small>
+        ) : null
+      }
+      soldCount={
+        product.soldCount !== undefined ? `Đã bán ${formatMoney(product.soldCount)}` : undefined
+      }
+    />
   );
 }
 
@@ -343,17 +541,12 @@ function DailyRecommendationsSection({ module }: { module: HomepageProductModule
   };
 
   return (
-    <section
+    <StorefrontSection
       className={`homepage-product-section homepage-product-section--${module.type}`}
       aria-labelledby={`module-${module.id}`}
       data-module-type={module.type}
     >
-      <div className="section-heading">
-        <div>
-          <h2 id={`module-${module.id}`}>{module.title}</h2>
-        </div>
-        {module.subtitle ? <p>{module.subtitle}</p> : null}
-      </div>
+      <SectionHeader id={`module-${module.id}`} title={module.title} subtitle={module.subtitle} />
       <div className="carousel-wrapper">
         <button
           type="button"
@@ -364,11 +557,7 @@ function DailyRecommendationsSection({ module }: { module: HomepageProductModule
         >
           ‹
         </button>
-        <div
-          className="carousel-container"
-          ref={containerRef}
-          onScroll={checkScrollability}
-        >
+        <div className="carousel-container" ref={containerRef} onScroll={checkScrollability}>
           <div className="carousel-track">
             {module.products.map((product) => (
               <div className="carousel-item" key={product.id}>
@@ -387,7 +576,7 @@ function DailyRecommendationsSection({ module }: { module: HomepageProductModule
           ›
         </button>
       </div>
-    </section>
+    </StorefrontSection>
   );
 }
 
@@ -396,25 +585,29 @@ function ProductSection({ module }: { module: HomepageProductModule }) {
     return <DailyRecommendationsSection module={module} />;
   }
 
+  const titleContent =
+    module.type === 'flash-sale' ? (
+      <span className="homepage-section-title--flash">
+        <Badge variant="danger">FLASH</Badge>
+        <span>{module.title}</span>
+      </span>
+    ) : (
+      module.title
+    );
+
   return (
-    <section
+    <StorefrontSection
       className={`homepage-product-section homepage-product-section--${module.type}`}
       aria-labelledby={`module-${module.id}`}
       data-module-type={module.type}
     >
-      <div className="section-heading">
-        <div>
-          {module.type === 'flash-sale' ? <Badge variant="danger">FLASH</Badge> : null}
-          <h2 id={`module-${module.id}`}>{module.title}</h2>
-        </div>
-        <p>{module.subtitle}</p>
-      </div>
+      <SectionHeader id={`module-${module.id}`} title={titleContent} subtitle={module.subtitle} />
       <div className="product-grid">
         {module.products.map((product) => (
           <ProductCard product={product} key={product.id} />
         ))}
       </div>
-    </section>
+    </StorefrontSection>
   );
 }
 
@@ -451,7 +644,7 @@ export function HomepageModules({ modules }: { modules: HomepageModule[] }) {
   );
   return (
     <FavoriteStateProvider productIds={productIds}>
-      <Container className="home-flow">
+      <StorefrontContainer className="home-flow">
         {displayModules.map((module) => {
           if (module.type === 'campaign-banner')
             return <CampaignSection module={module} key={module.id} />;
@@ -464,7 +657,7 @@ export function HomepageModules({ modules }: { modules: HomepageModule[] }) {
           }
           return null;
         })}
-      </Container>
+      </StorefrontContainer>
     </FavoriteStateProvider>
   );
 }

@@ -9,6 +9,7 @@ import {
   type BuyerOrderShipment,
   type BuyerOrderVoucherSnapshot,
   type CheckoutAddressSnapshot,
+  type CampaignPriceSnapshot,
   type ShippingBreakdown,
 } from '@shopee-clone/contracts';
 import { Injectable } from '@nestjs/common';
@@ -85,6 +86,9 @@ function projectSummary(order: BuyerOrderSummaryGraph | BuyerOrderDetailGraph): 
       platformVoucherDiscountMinor: checkedMoneyFromBigInt(line.platformVoucherDiscountMinor),
       merchandiseVoucherDiscountMinor: checkedMoneyFromBigInt(line.merchandiseVoucherDiscountMinor),
       payableMerchandiseMinor: checkedMoneyFromBigInt(line.payableMerchandiseMinor),
+      ...(line.campaignPriceSnapshot
+        ? { campaignPrice: jsonObject<CampaignPriceSnapshot>(line.campaignPriceSnapshot) }
+        : {}),
       productName: line.productName,
       productImageUrl: line.productImageUrl,
       productAvailable: line.product.deletedAt === null,

@@ -5,7 +5,7 @@ import {
   type PaymentInstructions,
   type PaymentStatusResponse,
 } from '@shopee-clone/contracts';
-import { Container } from '@shopee-clone/ui';
+import { StorefrontContainer } from '@shopee-clone/ui';
 import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
@@ -155,13 +155,13 @@ export function MomoPaymentScreen({ paymentReference }: { paymentReference: stri
 
   if (auth.state.status === 'guest') {
     return (
-      <Container className="checkout-page">
+      <StorefrontContainer className="checkout-page">
         <Link
           href={`/login?returnTo=${encodeURIComponent(`/checkout/payment/${paymentReference}`)}`}
         >
           Đăng nhập để xem thanh toán
         </Link>
-      </Container>
+      </StorefrontContainer>
     );
   }
   const provider = payment?.provider ?? null;
@@ -174,7 +174,7 @@ export function MomoPaymentScreen({ paymentReference }: { paymentReference: stri
     ? Math.max(0, Math.ceil((new Date(payment.expiresAt).getTime() - now) / 1_000))
     : null;
   return (
-    <Container className="checkout-page momo-payment-page">
+    <StorefrontContainer className="checkout-page momo-payment-page">
       <section className="checkout-card" aria-live="polite">
         <p>{provider ? `${providerLabel} SANDBOX` : 'PAYMENT SANDBOX'}</p>
         <h1>{copy.title}</h1>
@@ -213,6 +213,6 @@ export function MomoPaymentScreen({ paymentReference }: { paymentReference: stri
       {payment?.status === 'PAID' ? (
         <Link href={`/checkout/success/${payment.purchaseReference}`}>Xem đơn hàng</Link>
       ) : null}
-    </Container>
+    </StorefrontContainer>
   );
 }

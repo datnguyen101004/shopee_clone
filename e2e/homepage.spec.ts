@@ -28,7 +28,7 @@ test.describe('API-driven marketplace homepage', () => {
     const productBox = await product.boundingBox();
     expect(productBox?.height).toBeGreaterThanOrEqual(44);
     await product.click();
-    await expect(page).toHaveURL(/\/products\/[0-9a-f-]+$/);
+    await expect(page).toHaveURL(/\/products\/[a-z0-9-]+$/);
     await expect(page.getByRole('heading', { name: productName! })).toBeVisible();
     await expect(page.getByRole('group', { name: 'Biến thể sản phẩm' })).toBeVisible();
     await expect(page.getByRole('link', { name: 'Shopee Clone - Trang chủ' })).toBeVisible();
@@ -39,7 +39,7 @@ test.describe('API-driven marketplace homepage', () => {
       scrollWidth: document.documentElement.scrollWidth,
     }));
     expect(size.scrollWidth).toBeLessThanOrEqual(size.width);
-    const primary = page.getByRole('link', { name: 'Săn deal ngay' });
+    const primary = page.getByRole('link', { name: /Mua sắm thả ga|Săn deal/i }).first();
     expect((await primary.boundingBox())?.height).toBeGreaterThanOrEqual(44);
     await primary.focus();
     await expect(primary).toBeFocused();
@@ -59,6 +59,78 @@ test.describe('API-driven marketplace homepage', () => {
         animations: 'disabled',
       });
     }
+  });
+
+  test('runs the CMS banner carousel and preserves unavailable targets', async ({ page }) => {
+    await page.goto('/');
+    const carousel = page.locator('[data-module-type="campaign-banner"]');
+    const activeLayer = carousel.locator('.hero-banner-slide.is-active');
+    const image = activeLayer.locator('.hero-banner-img');
+    const track = carousel.locator('.hero-banner-track');
+    const indicators = carousel.locator('.hero-banner-indicator');
+
+    await expect(indicators).toHaveCount(3);
+    await expect(carousel.locator('a.hero-banner-link').first()).toHaveAttribute(
+      'href',
+      /\/campaigns\//,
+    );
+
+    const next = carousel.getByRole('button', { name: 'Banner tiếp theo' });
+    const previous = carousel.getByRole('button', { name: 'Banner trước' });
+    await expect(next).toBeHidden();
+    await expect(previous).toBeHidden();
+    await carousel.hover();
+    await expect(next).toBeVisible();
+    await expect(previous).toBeVisible();
+    const firstAlt = await image.getAttribute('alt');
+
+    await next.click();
+    await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+    await page.mouse.move(0, 0);
+    const secondAlt = await image.getAttribute('alt');
+    expect(secondAlt).not.toBe(firstAlt);
+    await page.waitForTimeout(2_500);
+    await expect(image).toHaveAttribute('alt', secondAlt!);
+    await page.waitForTimeout(800);
+    await expect.poll(() => image.getAttribute('alt')).not.toBe(secondAlt);
+
+    await carousel.hover();
+    await next.click();
+    await expect(image).toHaveAttribute('alt', firstAlt!);
+    await expect.poll(() => track.getAttribute('style')).toContain('translate3d(-400%');
+    await page.waitForTimeout(700);
+    await expect.poll(() => track.getAttribute('style')).toContain('translate3d(-100%');
+
+    await indicators.nth(2).click();
+    await expect(image).toHaveAttribute('alt', 'Banner có mục tiêu không khả dụng');
+    await expect(activeLayer.locator('a.hero-banner-link')).toHaveCount(0);
+    await expect(activeLayer.locator('.hero-banner-link--static')).toBeVisible();
+
+    await indicators.nth(0).click();
+    const hoverAlt = await image.getAttribute('alt');
+    await carousel.hover();
+    await page.waitForTimeout(3_200);
+    await expect.poll(() => image.getAttribute('alt')).not.toBe(hoverAlt);
+
+    await indicators.nth(0).click();
+    const focusedAlt = await image.getAttribute('alt');
+    await next.focus();
+    await page.waitForTimeout(3_200);
+    await expect.poll(() => image.getAttribute('alt')).not.toBe(focusedAlt);
+    await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+
+    await indicators.nth(0).click();
+    const outOfViewportAlt = await image.getAttribute('alt');
+    await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+    await expect.poll(async () => page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
+    await page.waitForTimeout(3_200);
+    await expect(image).toHaveAttribute('alt', outOfViewportAlt!);
+    await page.evaluate(() => window.scrollTo(0, 0));
+
+    await indicators.nth(2).click();
+    await expect(image).toHaveAttribute('alt', 'Banner có mục tiêu không khả dụng');
+    await indicators.nth(0).click();
+    await expect(image).toHaveAttribute('alt', 'Shopee Clone Siêu Sale Đại Tiệc');
   });
 
   test('keeps empty and data-source failure compositions accessible', async ({

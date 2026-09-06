@@ -18,6 +18,9 @@ import { BuyerBestPriceService } from '../pricing/buyer-best-price.service';
 import { CatalogPublicFacade } from '../catalog/catalog-public.facade';
 import type { NormalizedCatalogQuery } from '../catalog/catalog-query';
 import { SEARCH_CONFIG, type SearchConfig } from '../search/search.config';
+import { campaignLifecycleAt, isValidBannerDestination } from '@shopee-clone/contracts';
+import { NotificationService } from '../notifications/notification.service';
+import { homepageBannerCampaignTargetUnavailableEvent } from '../notifications/notification-events';
 
 const moduleTypeMap = {
   [HomepageModuleType.CAMPAIGN_BANNER]: 'campaign-banner',
@@ -30,9 +33,35 @@ const moduleTypeMap = {
 
 const DAILY_RECOMMENDATION_LIMIT = 12;
 const DAILY_RECOMMENDATION_CANDIDATE_LIMIT = 48;
+const FLASH_SALE_CAMPAIGN_SHELF_ENABLED = process.env.CAMPAIGN_FLASH_SALE_SHELF_ENABLED !== 'false';
+const CAMPAIGN_COLLECTIONS_ENABLED = process.env.CAMPAIGN_COLLECTIONS_ENABLED !== 'false';
 
-function safePath(path: string): boolean {
-  return path === '/' || path.startsWith('/search?') || /^\/products\/[A-Za-z0-9%_-]+$/.test(path);
+type BannerTargetType = 'CAMPAIGN' | 'PRODUCT' | 'SHOP' | 'CATEGORY' | 'SEARCH' | 'URL';
+
+const BANNER_TARGET_TYPES: readonly BannerTargetType[] = [
+  'CAMPAIGN',
+  'PRODUCT',
+  'SHOP',
+  'CATEGORY',
+  'SEARCH',
+  'URL',
+];
+
+function bannerTargetTypeOf(banner: { targetType?: string | null }): BannerTargetType {
+  if (banner.targetType && BANNER_TARGET_TYPES.includes(banner.targetType as BannerTargetType)) {
+    return banner.targetType as BannerTargetType;
+  }
+  return 'URL';
+}
+
+function campaignFailureReason(
+  campaign: { publishedAt: Date | null; cancelledAt: Date | null; announceAt: Date; enrollmentStartsAt: Date; enrollmentEndsAt: Date; startsAt: Date; endsAt: Date } | null,
+  now: Date,
+): 'ENDED' | 'CANCELLED' | 'MISSING' | 'FETCH_FAILED' {
+  if (!campaign) return 'MISSING';
+  if (campaign.cancelledAt) return 'CANCELLED';
+  if (campaign.endsAt <= now) return 'ENDED';
+  return 'FETCH_FAILED';
 }
 
 function safeMinor(value: bigint): number | null {
@@ -117,6 +146,9 @@ export class HomepageService {
     @Optional()
     @Inject(SEARCH_CONFIG)
     private readonly searchConfig?: SearchConfig,
+    @Optional()
+    @Inject(NotificationService)
+    private readonly notifications?: NotificationService,
   ) {}
 
   private async resolveDailyRecommendations(
@@ -173,12 +205,110 @@ export class HomepageService {
   async getHomepage(buyerId: string | null = null): Promise<HomepageResponse> {
     const now = this.clock.now();
     const records = await this.repository.findActive(now);
+    const repositoryWithTargets = this.repository as HomepageRepository & {
+      findCampaignTargets?: (ids: readonly string[]) => Promise<Array<{
+        id: string;
+        publishedAt: Date | null;
+        cancelledAt: Date | null;
+        announceAt: Date;
+        enrollmentStartsAt: Date;
+        enrollmentEndsAt: Date;
+        startsAt: Date;
+        endsAt: Date;
+      }>>;
+      findProductTargets?: (ids: readonly string[]) => Promise<Array<{ id: string; slug: string; status: string; deletedAt: Date | null }>>;
+      findShopTargets?: (ids: readonly string[]) => Promise<Array<{ id: string; slug: string; status: string; onboardingStatus: string; deletedAt: Date | null }>>;
+      findCategoryTargets?: (ids: readonly string[]) => Promise<Array<{ id: string; slug: string; isActive: boolean; deletedAt: Date | null }>>;
+      findActiveAdminUserIds?: () => Promise<string[]>;
+    };
+    const bannerRecords = records.flatMap((record) => record.banners);
+    const targetIdsByType = (type: BannerTargetType) =>
+      bannerRecords
+        .filter((banner) => bannerTargetTypeOf(banner) === type)
+        .map((banner) => banner.targetId)
+        .filter((id): id is string => Boolean(id));
+    const [campaignTargets, productTargets, shopTargets, categoryTargets] = await Promise.all([
+      repositoryWithTargets.findCampaignTargets?.(targetIdsByType('CAMPAIGN')) ?? Promise.resolve([]),
+      repositoryWithTargets.findProductTargets?.(targetIdsByType('PRODUCT')) ?? Promise.resolve([]),
+      repositoryWithTargets.findShopTargets?.(targetIdsByType('SHOP')) ?? Promise.resolve([]),
+      repositoryWithTargets.findCategoryTargets?.(targetIdsByType('CATEGORY')) ?? Promise.resolve([]),
+    ]);
+    const campaignById = new Map(campaignTargets.map((campaign) => [campaign.id, campaign]));
+    const productById = new Map(productTargets.map((product) => [product.id, product]));
+    const shopById = new Map(shopTargets.map((shop) => [shop.id, shop]));
+    const categoryById = new Map(categoryTargets.map((category) => [category.id, category]));
+    let adminUserIdsPromise: Promise<string[]> | undefined;
+    const notifyUnavailableCampaign = (bannerId: string, campaignId: string, reason: 'ENDED' | 'CANCELLED' | 'MISSING' | 'FETCH_FAILED') => {
+      if (!this.notifications || !repositoryWithTargets.findActiveAdminUserIds) return;
+      adminUserIdsPromise ??= repositoryWithTargets.findActiveAdminUserIds();
+      void adminUserIdsPromise
+        .then((adminUserIds) => this.notifications
+          ? this.notifications.notify(homepageBannerCampaignTargetUnavailableEvent({ bannerId, campaignId, reason, adminUserIds }))
+          : undefined)
+        .catch(() => undefined);
+    };
+    // The generic collection relation is optional during the migration rollout.
+    // A repository without the relation is treated as the pre-migration
+    // compatibility path. Once the relation is available, an empty active
+    // campaign collection intentionally produces an empty shelf rather than
+    // showing stale legacy Flash Sale products.
+    const campaignCollectionSourceAvailable =
+      CAMPAIGN_COLLECTIONS_ENABLED &&
+      typeof (this.repository as HomepageRepository & {
+        findActiveCampaignCollections?: (at: Date) => Promise<unknown[]>;
+      }).findActiveCampaignCollections === 'function';
+    const campaignCollections = campaignCollectionSourceAvailable
+      ? await (this.repository as HomepageRepository & {
+          findActiveCampaignCollections: (at: Date) => Promise<unknown[]>;
+        }).findActiveCampaignCollections(now)
+      : [];
+    type HomepageProductEntry = (typeof records)[number]['products'][number];
+    const campaignProductsByModule = new Map<string, HomepageProductEntry[]>();
+    for (const collection of campaignCollections as Array<{
+      id: string;
+      moduleId: string;
+      typeId: string;
+      module: { type: HomepageModuleType };
+        type: { id: string };
+      campaign: {
+        id: string;
+        type: { id: string; code: string; displayName: string };
+        participations: Array<{
+          products: Array<{ product: HomepageProductEntry['product'] }>;
+        }>;
+      };
+    }>) {
+      if (collection.typeId !== collection.campaign.type.id) continue;
+      if (collection.module.type === HomepageModuleType.FLASH_SALE && collection.campaign.type.code !== 'FLASH_SALE') continue;
+      const entries = campaignProductsByModule.get(collection.moduleId) ?? [];
+      for (const participation of collection.campaign.participations) {
+        for (const submitted of participation.products) {
+          if (entries.some((entry) => entry.product.id === submitted.product.id)) continue;
+          entries.push({
+            id: `campaign:${collection.id}:${submitted.product.id}`,
+            label: collection.campaign.type.displayName,
+            soldCount: null,
+            sortOrder: entries.length,
+            productId: submitted.product.id,
+            moduleId: collection.moduleId,
+            product: submitted.product,
+          } as HomepageProductEntry);
+        }
+      }
+      campaignProductsByModule.set(collection.moduleId, entries);
+    }
+    const sourceEntries = (record: (typeof records)[number]): HomepageProductEntry[] => {
+      if (!CAMPAIGN_COLLECTIONS_ENABLED || !campaignCollectionSourceAvailable) return record.products;
+      if (record.type === HomepageModuleType.FLASH_SALE && !FLASH_SALE_CAMPAIGN_SHELF_ENABLED) return record.products;
+      if (record.type === HomepageModuleType.FLASH_SALE) return campaignProductsByModule.get(record.id) ?? [];
+      return campaignProductsByModule.get(record.id) ?? record.products;
+    };
     const modules: HomepageModule[] = [];
     const discounts = this.scheduledDiscounts
       ? await this.scheduledDiscounts.resolveVariants(
           undefined,
           records.flatMap((record) =>
-            record.products.flatMap((entry) =>
+            sourceEntries(record).flatMap((entry) =>
               entry.product.variants.map((variant) => ({
                 id: variant.id,
                 productId: entry.product.id,
@@ -195,7 +325,7 @@ export class HomepageService {
       Parameters<BuyerBestPriceService['previews']>[1][number]
     >();
     for (const record of records) {
-      for (const entry of record.products) {
+      for (const entry of sourceEntries(record)) {
         const product = entry.product;
         if (!HomepageRepository.isDisplayableProduct(product)) continue;
         const representative = representativeOffer(
@@ -235,17 +365,76 @@ export class HomepageService {
 
       if (record.type === HomepageModuleType.CAMPAIGN_BANNER) {
         const banners = record.banners
-          .filter((banner) => safePath(banner.destinationPath))
-          .map((banner) => ({
-            id: banner.id,
-            ...(banner.eyebrow ? { eyebrow: banner.eyebrow } : {}),
-            title: banner.title,
-            ...(banner.description ? { description: banner.description } : {}),
-            imageUrl: banner.imageUrl,
-            altText: banner.altText ?? banner.title,
-            href: banner.destinationPath,
-            theme: banner.themeKey,
-          }));
+          .filter((banner) =>
+            banner.isEnabled !== false &&
+            (!banner.displayFrom || banner.displayFrom <= now) &&
+            (!banner.displayUntil || banner.displayUntil > now),
+          )
+          .map((banner) => {
+            const targetType = bannerTargetTypeOf(banner);
+            const targetId = banner.targetId;
+            const targetQuery = banner.targetQuery;
+            let href: string | undefined;
+            let targetAvailable = false;
+
+            if (targetType === 'CAMPAIGN') {
+              const campaign = targetId ? campaignById.get(targetId) ?? null : null;
+              if (campaign && campaignLifecycleAt(campaign) === 'ACTIVE') {
+                href = `/campaigns/${encodeURIComponent(targetId!)}`;
+                targetAvailable = true;
+              } else {
+                notifyUnavailableCampaign(
+                  banner.id,
+                  targetId ?? `missing:${banner.id}`,
+                  campaignFailureReason(campaign, now),
+                );
+              }
+            } else if (targetType === 'PRODUCT') {
+              const product = targetId ? productById.get(targetId) : undefined;
+              if (product && product.status === 'ACTIVE' && product.deletedAt === null) {
+                href = `/products/${encodeURIComponent(product.slug || product.id)}`;
+                targetAvailable = true;
+              }
+            } else if (targetType === 'SHOP') {
+              const shop = targetId ? shopById.get(targetId) : undefined;
+              if (shop && shop.status === 'ACTIVE' && shop.onboardingStatus === 'APPROVED' && shop.deletedAt === null) {
+                href = `/shops/${encodeURIComponent(shop.slug)}`;
+                targetAvailable = true;
+              }
+            } else if (targetType === 'CATEGORY') {
+              const category = targetId ? categoryById.get(targetId) : undefined;
+              if (category && category.isActive && category.deletedAt === null) {
+                href = `/search?category=${encodeURIComponent(category.slug)}`;
+                targetAvailable = true;
+              }
+            } else if (targetType === 'SEARCH') {
+              if (targetQuery) {
+                href = `/search?q=${encodeURIComponent(targetQuery)}`;
+                targetAvailable = true;
+              }
+            } else if (targetQuery && isValidBannerDestination(targetQuery)) {
+              href = targetQuery;
+              targetAvailable = true;
+            }
+
+            if (targetType !== 'CAMPAIGN' && !targetAvailable) return null;
+
+            return {
+              id: banner.id,
+              ...(banner.eyebrow ? { eyebrow: banner.eyebrow } : {}),
+              title: banner.title,
+              ...(banner.description ? { description: banner.description } : {}),
+              imageUrl: banner.imageUrl,
+              altText: banner.altText ?? banner.title,
+              ...(href ? { href } : {}),
+              theme: banner.themeKey,
+              targetType,
+              ...(targetId ? { targetId } : {}),
+              ...(targetQuery ? { targetQuery } : {}),
+              targetAvailable,
+            };
+          })
+          .filter((banner): banner is NonNullable<typeof banner> => banner !== null);
         if (banners.length) {
           modules.push({
             ...base,
@@ -276,7 +465,7 @@ export class HomepageService {
       }
 
       const products: HomepageProductSummary[] = [];
-      for (const entry of record.products) {
+      for (const entry of sourceEntries(record)) {
         const product = entry.product;
         if (!HomepageRepository.isDisplayableProduct(product)) continue;
         const representative = representativeOffer(

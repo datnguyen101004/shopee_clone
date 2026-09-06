@@ -17,6 +17,39 @@ function voucher(overrides: Record<string, unknown> = {}) {
 }
 
 describe('SellerPromotionsService concurrency boundary', () => {
+  it('generates a unique shop voucher code inside the create transaction', async () => {
+    const created = voucher({ code: 'SHOP-ABCDEF1234', usedCount: 0 });
+    const tx = {
+      sellerPromotionCommand: {
+        findUnique: jest.fn().mockResolvedValue(null),
+        create: jest.fn().mockResolvedValue(undefined),
+      },
+      product: { findMany: jest.fn().mockResolvedValue([]) },
+      voucher: { create: jest.fn().mockResolvedValue(created) },
+    };
+    const prisma = { $transaction: jest.fn(async (callback: (value: typeof tx) => unknown) => callback(tx)) };
+    const scope = { resolve: jest.fn().mockResolvedValue({ id: 'shop-1', timeZone: 'Asia/Ho_Chi_Minh' }) };
+    const service = new SellerPromotionsService(prisma as never, scope as never);
+
+    await service.createVoucher('owner-1', {
+      name: 'Shop sale',
+      benefitType: 'FIXED_AMOUNT',
+      fixedAmountMinor: 10000,
+      percentageBasisPoints: null,
+      maximumDiscountMinor: null,
+      minimumSpendMinor: 50000,
+      startsAt: '2026-08-01T00:00:00.000Z',
+      endsAt: '2026-08-31T23:59:59.999Z',
+      usageLimit: 10,
+      perBuyerLimit: 1,
+      productIds: [],
+    }, '00000000-0000-4000-8000-000000000021');
+
+    expect(tx.voucher.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ code: expect.stringMatching(/^SHOP-[A-F0-9]{10}$/) }),
+    }));
+  });
+
   it('updates scalar fields and product scope atomically with a version/usage predicate', async () => {
     const current = voucher({ usedCount: 0 });
     const saved = voucher({ name: 'Updated', version: 3 });

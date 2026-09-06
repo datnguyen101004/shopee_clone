@@ -1,7 +1,7 @@
 'use client';
 
 import { hasMarketplaceRole } from '@shopee-clone/contracts';
-import { Container, Search, ShoppingCart, Store, UserRound } from '@shopee-clone/ui';
+import { Search, ShoppingCart, Store, StorefrontContainer, UserRound } from '@shopee-clone/ui';
 import Link from 'next/link';
 import { useEffect, useRef, useState, type FormEvent, type RefObject } from 'react';
 
@@ -92,7 +92,7 @@ export function MarketplaceHeader({
   }
 
   return (
-    <Container className="market-header">
+    <StorefrontContainer className="market-header">
       <div className="market-topline">
         {account.status === 'authenticated' && hasMarketplaceRole(account.user, 'seller') ? (
           <Link href="/seller">Kênh người bán</Link>
@@ -134,7 +134,7 @@ export function MarketplaceHeader({
             placeholder="Tìm sản phẩm, thương hiệu và tên shop"
             autoComplete="off"
             aria-autocomplete="list"
-            aria-controls={suggestionsId}
+            aria-controls={suggestionsOpen && suggestions.length ? suggestionsId : undefined}
             aria-invalid={Boolean(searchError) || undefined}
             aria-describedby={searchError ? 'site-search-error' : undefined}
             onInput={(event) => {
@@ -240,7 +240,7 @@ export function MarketplaceHeader({
           </button>
         </div>
       </div>
-    </Container>
+    </StorefrontContainer>
   );
 }
 
@@ -266,14 +266,14 @@ export function MarketplaceCategoryNavigation({
   onNavigate: () => void;
 }) {
   return (
-    <Container className="market-category-navigation">
+    <StorefrontContainer className="market-category-navigation">
       <div className="market-category-navigation__desktop">
         <CategoryLinks />
       </div>
       <div id={mobileNavigationId} className="market-category-navigation__mobile" hidden={!open}>
         <CategoryLinks onNavigate={onNavigate} />
       </div>
-    </Container>
+    </StorefrontContainer>
   );
 }
 

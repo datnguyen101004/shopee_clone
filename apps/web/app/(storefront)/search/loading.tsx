@@ -1,8 +1,8 @@
-import { Container } from '@shopee-clone/ui';
+import { StorefrontContainer } from '@shopee-clone/ui';
 
 export default function CatalogLoading() {
   return (
-    <Container
+    <StorefrontContainer
       className="catalog-page catalog-loading"
       aria-label="Đang tải danh mục sản phẩm"
       aria-busy="true"
@@ -13,6 +13,6 @@ export default function CatalogLoading() {
           <span className="catalog-skeleton catalog-skeleton--card" key={index} />
         ))}
       </div>
-    </Container>
+    </StorefrontContainer>
   );
 }

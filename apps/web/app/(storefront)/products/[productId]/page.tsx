@@ -1,5 +1,5 @@
 import { isCanonicalProductId } from '@shopee-clone/contracts';
-import { Badge, Container } from '@shopee-clone/ui';
+import { Badge, StorefrontContainer } from '@shopee-clone/ui';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 
@@ -34,16 +34,16 @@ export default async function ProductDetailPage({
     }
     if (error instanceof ProductDetailApiError && error.kind === 'deleted') {
       return (
-        <Container className="product-detail-page product-detail-state">
+        <StorefrontContainer className="product-detail-page product-detail-state">
           <Badge variant="danger">SẢN PHẨM ĐÃ XÓA</Badge>
           <h1>Sản phẩm đã bị xóa</h1>
           <p>Sản phẩm này không còn được bán. Bạn vẫn có thể xem lại lịch sử đánh giá từ đơn hàng của mình.</p>
           <Link href="/search">Quay lại khám phá sản phẩm</Link>
-        </Container>
+        </StorefrontContainer>
       );
     }
     return (
-      <Container className="product-detail-page product-detail-state">
+      <StorefrontContainer className="product-detail-page product-detail-state">
         <Badge variant="danger">TẠM THỜI GIÁN ĐOẠN</Badge>
         <h1>Chưa thể tải sản phẩm</h1>
         <p>Dịch vụ sản phẩm đang gặp sự cố. Thông tin mua sắm khác vẫn hoạt động bình thường.</p>
@@ -51,12 +51,12 @@ export default async function ProductDetailPage({
           <Link href={`/products/${productId}`}>Thử lại</Link>
           <Link href="/search">Quay lại khám phá sản phẩm</Link>
         </div>
-      </Container>
+      </StorefrontContainer>
     );
   }
 
   return (
-    <Container className="product-detail-page">
+    <StorefrontContainer className="product-detail-page">
       <nav className="product-detail-breadcrumb" aria-label="Điều hướng sản phẩm">
         <Link href="/search" className="product-detail-breadcrumb__link">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -156,7 +156,7 @@ export default async function ProductDetailPage({
           <div className="product-detail-context__shipping-body">
             <h2>Từ {product.shippingPreview.origin}</h2>
             <p className="product-detail-context__shipping-dest">
-              Giao đến <strong>{product.shippingPreview.destinationLabel}</strong>
+              Giao đến <span className="font-medium">{product.shippingPreview.destinationLabel}</span>
             </p>
             <div className="product-detail-context__shipping-badge">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -185,14 +185,14 @@ export default async function ProductDetailPage({
                   )}
                 </div>
                 <div className="product-detail-related__info">
-                  <strong>{related.name}</strong>
-                  <b>₫{formatNumber(related.priceMinor)}</b>
+                  <span className="font-medium">{related.name}</span>
+                  <span className="product-detail-related__price font-semibold">₫{formatNumber(related.priceMinor)}</span>
                 </div>
               </Link>
             ))}
           </div>
         </section>
       ) : null}
-    </Container>
+    </StorefrontContainer>
   );
 }

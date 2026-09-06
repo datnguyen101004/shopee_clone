@@ -145,9 +145,9 @@ function OrderCard({ order }: { order: BuyerOrderSummary }) {
     <Card className="buyer-order-card">
       <header>
         <Link href={`/shops/${order.shop.slug}`}>{order.shop.name}</Link>
-        <strong className={`buyer-order-status is-${order.status.toLowerCase()}`}>
+        <span className={`buyer-order-status is-${order.status.toLowerCase()}`}>
           {buyerOrderStatusLabel(order)}
-        </strong>
+        </span>
         <span aria-label="Trạng thái thanh toán">
           Thanh toán: {paymentStatusLabels[order.paymentStatus]}
         </span>
@@ -167,15 +167,15 @@ function OrderCard({ order }: { order: BuyerOrderSummary }) {
               )}
             </Link>
             <div>
-              <strong>
+              <span className="buyer-order-product-name font-medium">
                 <Link href={`/products/${line.productId}`}>{line.productName}</Link>
-              </strong>
+              </span>
               <small>
                 {line.variantName} · x{line.quantity}
                 {line.productAvailable ? '' : ' · Sản phẩm đã bị xóa'}
               </small>
             </div>
-            <b>{money(line.payableMerchandiseMinor)}</b>
+            <span className="buyer-order-price font-medium">{money(line.payableMerchandiseMinor)}</span>
           </article>
         ))}
       </div>
@@ -336,7 +336,7 @@ function ReviewAction({
                 <span aria-hidden="true">SP</span>
               )}
               <div>
-                <strong>{line.productName}</strong>
+                <span className="font-medium">{line.productName}</span>
                 <small>Phân loại: {line.variantName}</small>
               </div>
             </div>
@@ -367,7 +367,7 @@ function ReviewAction({
                     </label>
                   ))}
                 </div>
-                <strong>
+                <span className="review-rating-label font-medium">
                   {rating === 5
                     ? 'Tuyệt vời'
                     : rating === 4
@@ -377,7 +377,7 @@ function ReviewAction({
                         : rating === 2
                           ? 'Không hài lòng'
                           : 'Tệ'}
-                </strong>
+                </span>
               </fieldset>
               <div className="review-dialog__comment">
                 <label htmlFor={`review-text-${line.lineId}`}>Đúng với mô tả:</label>
@@ -410,7 +410,7 @@ function ReviewAction({
                     }
                   />
                   <span aria-hidden="true">＋</span>
-                  <strong>Thêm hình ảnh</strong>
+                  <span>Thêm hình ảnh</span>
                   <small>{files.length}/6</small>
                 </label>
                 {files.map((file, index) => (
@@ -718,21 +718,21 @@ export function BuyerOrderDetailScreen({ orderReference }: { orderReference: str
             <header className="buyer-order-detail__heading">
               <div>
                 <small>Mã đơn</small>
-                <strong>{detail.order.orderReference}</strong>
+                <span className="font-medium">{detail.order.orderReference}</span>
                 <small>Mã giao dịch {detail.order.purchaseReference}</small>
               </div>
-              <strong className={`buyer-order-status is-${detail.order.status.toLowerCase()}`}>
+              <span className={`buyer-order-status is-${detail.order.status.toLowerCase()}`}>
                 {buyerOrderStatusLabel(detail.order)}
-              </strong>
+              </span>
               <span aria-label="Trạng thái thanh toán">
                 Thanh toán: {paymentStatusLabels[detail.order.paymentStatus]}
               </span>
             </header>
             <Card className="buyer-order-detail__card">
               <h2>Địa chỉ nhận hàng</h2>
-              <strong>
+              <span className="font-medium">
                 {detail.address.recipientName} · {detail.address.phoneNumber}
-              </strong>
+              </span>
               <p>
                 {detail.address.addressLine}, {detail.address.ward}, {detail.address.district},{' '}
                 {detail.address.province}
@@ -740,9 +740,9 @@ export function BuyerOrderDetailScreen({ orderReference }: { orderReference: str
             </Card>
             <Card className="buyer-order-detail__card">
               <h2>{detail.order.shop.name}</h2>
-              <strong className={`buyer-order-status is-${detail.order.status.toLowerCase()}`}>
+              <span className={`buyer-order-status is-${detail.order.status.toLowerCase()}`}>
                 {buyerOrderStatusLabel(detail.order)}
-              </strong>
+              </span>
               {detail.order.lines.map((line) => (
                 <article className="buyer-order-detail__line" key={line.lineId}>
                   <Link
@@ -757,9 +757,9 @@ export function BuyerOrderDetailScreen({ orderReference }: { orderReference: str
                     )}
                   </Link>
                   <div>
-                    <strong>
+                    <span className="font-medium">
                       <Link href={`/products/${line.productId}`}>{line.productName}</Link>
-                    </strong>
+                    </span>
                     <small>
                       {line.variantName} · x{line.quantity}
                       {line.productAvailable ? '' : ' · Sản phẩm đã bị xóa'}

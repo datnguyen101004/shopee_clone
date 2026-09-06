@@ -1,4 +1,4 @@
-import { Card, Container } from '@shopee-clone/ui';
+import { Card, StorefrontContainer } from '@shopee-clone/ui';
 import type { ReactNode } from 'react';
 
 export function AccountPage({
@@ -13,7 +13,7 @@ export function AccountPage({
   children: ReactNode;
 }) {
   return (
-    <Container className="account-page">
+    <StorefrontContainer className="account-page">
       <section className="account-page__panel" aria-labelledby="account-page-title">
         <div className="account-page__intro">
           <span>{eyebrow}</span>
@@ -22,6 +22,6 @@ export function AccountPage({
         </div>
         <Card className="account-page__card">{children}</Card>
       </section>
-    </Container>
+    </StorefrontContainer>
   );
 }

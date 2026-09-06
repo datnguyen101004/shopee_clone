@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -73,11 +73,15 @@ describe('AdminModerationPage', () => {
     vi.mocked(listAdminReportedReviews).mockResolvedValue({ items: [] } as never);
   });
 
-  it('shows admin-safe queue identifiers without exposing reporter contact data', async () => {
+  it('hides technical queue identifiers without exposing reporter contact data', async () => {
     render(<AdminModerationPage />);
 
-    expect(await screen.findByRole('heading', { name: 'Trung tâm Kiểm duyệt & Tố cáo' })).toBeInTheDocument();
-    expect(await screen.findByText(caseSummary.targetId)).toBeInTheDocument();
+    expect(
+      await screen.findByRole('main', { name: 'Trung tâm kiểm duyệt và tố cáo' }),
+    ).toBeInTheDocument();
+    expect(await screen.findByText(caseSummary.targetName)).toBeInTheDocument();
+    expect(screen.queryByText(caseSummary.id)).not.toBeInTheDocument();
+    expect(screen.queryByText(caseSummary.targetId)).not.toBeInTheDocument();
     expect(screen.queryByText('private@example.test')).not.toBeInTheDocument();
   });
 
@@ -96,7 +100,7 @@ describe('AdminModerationPage', () => {
     expect(listModerationCases).not.toHaveBeenCalled();
   });
 
-  it('renders bounded chat evidence and only offers chat-valid decisions', async () => {
+  it('opens only the chat-valid processing form without rendering report detail', async () => {
     const user = userEvent.setup();
     vi.mocked(listModerationCases).mockResolvedValue({ items: [chatCase], nextCursor: null } as never);
     vi.mocked(getModerationCaseDetail).mockResolvedValue({
@@ -122,34 +126,52 @@ describe('AdminModerationPage', () => {
     } as never);
     render(<AdminModerationPage />);
 
-    await user.click(await screen.findByRole('button', { name: /Mở hồ sơ Tài khoản bị báo cáo/ }));
-    expect(await screen.findByText('Ngữ cảnh chat giới hạn')).toBeInTheDocument();
-    expect(screen.getByText('Nội dung giới hạn')).toBeInTheDocument();
-    expect(screen.getByText('reporter-1')).toBeInTheDocument();
+    await user.click(await screen.findByRole('button', { name: /Xử lý report Tài khoản bị báo cáo/ }));
+    expect(screen.queryByText('Ngữ cảnh chat giới hạn')).not.toBeInTheDocument();
+    expect(screen.queryByText('Nội dung giới hạn')).not.toBeInTheDocument();
+    expect(screen.queryByText('reporter-1')).not.toBeInTheDocument();
     expect(screen.queryByText('private@example.test')).not.toBeInTheDocument();
-    expect(screen.getByLabelText('Hành động xử lý')).toBeInTheDocument();
+    expect(screen.getByRole('radiogroup', { name: 'Hành động xử lý report' })).toBeInTheDocument();
     expect(screen.getByText('Hạn chế tạm thời')).toBeInTheDocument();
     expect(screen.queryByText('Đình chỉ')).not.toBeInTheDocument();
 
     await user.click(screen.getByText('Hạn chế tạm thời'));
     await user.type(screen.getByLabelText(/Lý do công khai/), 'Lý do giới hạn chat hợp lệ');
     await user.type(screen.getByLabelText(/Ghi chú nội bộ/), 'Đã kiểm tra bằng chứng');
-    await user.clear(screen.getByLabelText('Mở lại lúc (chỉ áp dụng hạn chế tạm thời)'));
-    await user.type(screen.getByLabelText('Mở lại lúc (chỉ áp dụng hạn chế tạm thời)'), '2030-01-01T12:00');
-    await user.click(screen.getByRole('button', { name: 'Xác nhận áp dụng quyết định' }));
+    await user.clear(screen.getByLabelText('Mở lại ngày (chỉ áp dụng hạn chế tạm thời)'));
+    await user.type(screen.getByLabelText('Mở lại ngày (chỉ áp dụng hạn chế tạm thời)'), '2030-01-01');
+    await user.click(screen.getByRole('button', { name: 'Tiếp tục xử lý' }));
     expect(screen.getByRole('alertdialog')).toHaveTextContent('hạn chế chat tạm thời');
-    await user.click(screen.getByRole('button', { name: 'Hủy' }));
+    await user.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Hủy' }));
     expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Đóng chi tiết hồ sơ' }));
-    await waitFor(() => expect(screen.getByRole('button', { name: /Mở hồ sơ Tài khoản bị báo cáo/ })).toHaveFocus());
+    await user.click(screen.getByRole('button', { name: 'Đóng form xử lý' }));
+    expect(screen.queryByText('Ngữ cảnh chat giới hạn')).not.toBeInTheDocument();
   });
 
-  it('applies an exact-id search across statuses and target types', async () => {
+  it('filters reports immediately while the user types', async () => {
     const user = userEvent.setup();
     render(<AdminModerationPage />);
-    const search = screen.getByLabelText('Tìm mã hồ sơ hoặc đối tượng');
-    await user.type(search, chatCase.id);
-    await user.keyboard('{Enter}');
-    await waitFor(() => expect(listModerationCases).toHaveBeenLastCalledWith(authenticatedFetch, expect.objectContaining({ searchId: chatCase.id, status: undefined, targetType: undefined })));
+    const search = screen.getByLabelText('Tìm report hoặc đối tượng');
+    await user.type(search, 'không tồn tại');
+    expect(await screen.findByText('Không có report nào phù hợp bộ lọc.')).toBeInTheDocument();
+    await user.clear(search);
+    expect(await screen.findByText(caseSummary.targetName)).toBeInTheDocument();
+  });
+
+  it('uses report type filters instead of legacy moderation tabs', async () => {
+    const user = userEvent.setup();
+    render(<AdminModerationPage />);
+
+    expect(screen.queryByRole('tab')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Loại report')).toBeInTheDocument();
+    expect(screen.getByLabelText('Trạng thái')).toBeInTheDocument();
+    expect(screen.getByLabelText('Đối tượng')).toBeInTheDocument();
+    expect(screen.getByLabelText('Thời gian')).toBeInTheDocument();
+
+    await user.selectOptions(screen.getByLabelText('Loại report'), 'REVIEW');
+    await waitFor(() => expect(listAdminReportedReviews).toHaveBeenCalled());
+    expect(screen.getByRole('heading', { name: /Report đánh giá/ })).toBeInTheDocument();
+    expect(screen.queryByText('Hồ sơ vi phạm')).not.toBeInTheDocument();
+    expect(screen.queryByText('Kiểm duyệt đánh giá')).not.toBeInTheDocument();
   });
 });

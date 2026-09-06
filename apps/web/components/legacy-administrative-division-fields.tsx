@@ -48,6 +48,7 @@ function DivisionPopup({
   loading = false,
   loadError = false,
   description,
+  dialogClassName,
   onRetry,
   onSelect,
 }: {
@@ -63,6 +64,7 @@ function DivisionPopup({
   loading?: boolean;
   loadError?: boolean;
   description: string;
+  dialogClassName?: string;
   onRetry?: () => void;
   onSelect: (choice: DivisionChoice) => void;
 }) {
@@ -131,7 +133,7 @@ function DivisionPopup({
       ) : null}
       <Dialog open={open} onOpenChange={setPopupOpen}>
         <DialogContent
-          className="buyer-division-dialog"
+          className={['buyer-division-dialog', dialogClassName].filter(Boolean).join(' ')}
           title={`Chọn ${label.toLocaleLowerCase('vi-VN')}`}
           description={description}
           onOpenAutoFocus={(event) => {
@@ -191,6 +193,7 @@ export function LegacyAdministrativeDivisionFields({
   wardError,
   disabled = false,
   idPrefix = 'address',
+  dialogClassName,
   onChange,
 }: {
   initialProvince?: string;
@@ -201,6 +204,7 @@ export function LegacyAdministrativeDivisionFields({
   wardError?: string;
   disabled?: boolean;
   idPrefix?: string;
+  dialogClassName?: string;
   onChange?: (value: { province: string; district: string; ward: string }) => void;
 }) {
   const [province, setProvince] = useState(initialProvince);
@@ -252,6 +256,7 @@ export function LegacyAdministrativeDivisionFields({
         choices={LEGACY_VIETNAM_PROVINCES}
         error={provinceError}
         disabled={disabled}
+        dialogClassName={dialogClassName}
         description={`Dữ liệu 63 tỉnh/thành cũ, snapshot ${LEGACY_ADMINISTRATIVE_SNAPSHOT_DATE}. Có thể tìm kiếm không dấu.`}
         onSelect={(choice) => {
           const selectedProvince = choice as LegacyProvince;
@@ -275,6 +280,7 @@ export function LegacyAdministrativeDivisionFields({
         choices={resolvedProvince?.districts ?? []}
         error={districtError}
         disabled={disabled || !resolvedProvince}
+        dialogClassName={dialogClassName}
         description={
           resolvedProvince
             ? `Chỉ hiển thị đơn vị thuộc ${resolvedProvince.name}.`
@@ -316,6 +322,7 @@ export function LegacyAdministrativeDivisionFields({
         readOnly={noWardLevel}
         loading={Boolean(resolvedDistrict) && wardLoadStatus === 'loading'}
         loadError={Boolean(resolvedDistrict) && wardLoadStatus === 'error'}
+        dialogClassName={dialogClassName}
         description={
           resolvedDistrict
             ? `Chỉ hiển thị phường/xã thuộc ${resolvedDistrict.name}.`

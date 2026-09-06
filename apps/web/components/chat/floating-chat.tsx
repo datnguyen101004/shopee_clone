@@ -38,12 +38,12 @@ function conversationLabel(conversation: {
   return conversation.shopName?.trim() || conversation.participant.displayName;
 }
 
-export function FloatingChat() {
+export function FloatingChat({ embedded = false }: { embedded?: boolean }) {
   const chat = useChat();
   const auth = useAuthSession();
   const authenticatedUserId = auth.state.status === 'authenticated' ? auth.state.user.id : null;
   const { open } = chat;
-  const { closeWidget } = chat;
+  const { closeWidget, openWidget } = chat;
   const triggerRef = useRef<HTMLButtonElement>(null);
   const widgetRef = useRef<HTMLElement>(null);
   const messagesPaneRef = useRef<HTMLDivElement>(null);
@@ -99,6 +99,16 @@ export function FloatingChat() {
     ? conversationLabel(chat.selectedConversation)
     : 'Người dùng';
   const loadOlderInFlight = useRef(false);
+
+  useEffect(() => {
+    if (!embedded || chat.open) return;
+    openWidget();
+  }, [chat.open, embedded, openWidget]);
+
+  useEffect(() => {
+    if (!embedded) return;
+    return () => closeWidget();
+  }, [closeWidget, embedded]);
 
   useEffect(() => {
     if (open && !wasOpen.current) {
@@ -270,6 +280,7 @@ export function FloatingChat() {
 
   return (
     <>
+      {!embedded ? (
       <button
         ref={triggerRef}
         type="button"
@@ -293,11 +304,12 @@ export function FloatingChat() {
           </span>
         ) : null}
       </button>
+      ) : null}
 
       {chat.open ? (
         <section
           ref={widgetRef}
-          className="floating-chat"
+          className={`floating-chat${embedded ? ' floating-chat--embedded' : ''}`}
           role="dialog"
           aria-modal="false"
           aria-label="Trò chuyện"
@@ -342,37 +354,39 @@ export function FloatingChat() {
                 ) : null}
               </div>
               <div className="floating-chat__header-titles">
-                <strong>
+                <span className="floating-chat__title font-semibold">
                   {chat.selectedConversation
                     ? `Trò chuyện với ${conversationLabel(chat.selectedConversation)}`
                     : 'Trò chuyện'}
-                </strong>
+                </span>
                 <span className="floating-chat__header-subtitle">Shopee Chat</span>
               </div>
             </div>
             <div className="floating-chat__header-controls">
-              <button
-                type="button"
-                className="floating-chat__close-btn"
-                aria-label="Đóng trò chuyện"
-                onClick={chat.closeWidget}
-                title="Đóng trò chuyện"
-              >
-                <svg
-                  width="15"
-                  height="15"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2.2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  aria-hidden="true"
+              {!embedded ? (
+                <button
+                  type="button"
+                  className="floating-chat__close-btn"
+                  aria-label="Đóng trò chuyện"
+                  onClick={chat.closeWidget}
+                  title="Đóng trò chuyện"
                 >
-                  <line x1="18" y1="6" x2="6" y2="18" />
-                  <line x1="6" y1="6" x2="18" y2="18" />
-                </svg>
-              </button>
+                  <svg
+                    width="15"
+                    height="15"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
+                    <line x1="18" y1="6" x2="6" y2="18" />
+                    <line x1="6" y1="6" x2="18" y2="18" />
+                  </svg>
+                </button>
+              ) : null}
             </div>
           </header>
 
@@ -456,7 +470,7 @@ export function FloatingChat() {
                       </div>
                       <div className="floating-chat__contact-info">
                         <div className="floating-chat__contact-headline">
-                          <strong>{conversationLabel(conversation)}</strong>
+                          <span className="font-medium">{conversationLabel(conversation)}</span>
                           {conversation.unreadCount ? (
                             <em aria-label={`${conversation.unreadCount} tin chưa đọc`}>
                               {conversation.unreadCount}
@@ -794,7 +808,7 @@ export function FloatingChat() {
                       {chat.replyTo ? (
                         <div className="floating-chat__reply-composer" role="status">
                           <span>
-                            Đang trả lời <strong>{chat.replyTo.senderLabel}</strong>: {chat.replyTo.preview}
+                            Đang trả lời <span className="font-medium">{chat.replyTo.senderLabel}</span>: {chat.replyTo.preview}
                           </span>
                           <button type="button" onClick={() => chat.setReplyTo(null)}>
                             Hủy
@@ -882,7 +896,7 @@ export function FloatingChat() {
             >
               <div className="floating-chat__discard-dialog">
                 <div className="floating-chat__discard-header">
-                  <strong>Bản nháp chưa gửi</strong>
+                  <span className="font-medium">Bản nháp chưa gửi</span>
                 </div>
                 <p>Bản nháp chưa gửi sẽ bị bỏ nếu chuyển liên hệ.</p>
                 <div className="floating-chat__discard-buttons">
@@ -937,7 +951,7 @@ export function FloatingChat() {
                   }
                 }}
               >
-                <strong>Báo cáo tin nhắn</strong>
+                <span className="font-medium">Báo cáo tin nhắn</span>
                 <p>Tin nhắn này sẽ được gửi tới đội ngũ kiểm duyệt.</p>
                 <label>
                   Lý do
@@ -984,7 +998,7 @@ export function FloatingChat() {
           {blockTarget ? (
             <div className="floating-chat__report-overlay" role="alertdialog" aria-modal="true" aria-label="Xác nhận chặn người dùng">
               <div className="floating-chat__report-dialog">
-                <strong>Chặn {conversationLabel(blockTarget)}?</strong>
+                <span className="font-medium">Chặn {conversationLabel(blockTarget)}?</span>
                 <p>Bạn sẽ không thể gửi hoặc nhận tin nhắn mới từ người này. Lịch sử hiện tại vẫn được giữ lại.</p>
                 <div className="floating-chat__report-actions">
                   <button type="button" onClick={() => setBlockTarget(null)}>Hủy</button>

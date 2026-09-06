@@ -34,6 +34,7 @@ import {
   UpdateAdminHomepageModuleSettingsDto,
 } from './admin.dto';
 import { AdminService } from './admin.service';
+import { HomepageCmsService } from '../homepage/homepage-cms.service';
 
 @ApiTags('admin homepage configuration')
 @ApiBearerAuth()
@@ -42,15 +43,17 @@ import { AdminService } from './admin.service';
 @UseGuards(AuthGuard, RolesGuard)
 @RequireRoles('admin')
 export class AdminHomepageController {
-  constructor(@Inject(AdminService) private readonly admin: AdminService) {}
+  constructor(
+    @Inject(AdminService) private readonly admin: AdminService,
+    @Inject(HomepageCmsService) private readonly cms: HomepageCmsService,
+  ) {}
 
   // Banners
   @Get('banners')
   @Header('Cache-Control', 'private, no-store')
   @ApiOperation({ summary: 'List all campaign banners' })
   async listBanners(): Promise<AdminBannerListResponse> {
-    const items = await this.admin.listBanners();
-    return { items };
+    return this.cms.listBanners();
   }
 
   @Post('banners')
@@ -60,7 +63,7 @@ export class AdminHomepageController {
     @Body() input: CreateAdminBannerDto,
     @Req() request: AuthenticatedRequest,
   ): Promise<AdminBannerSummary> {
-    return this.admin.createBanner(request.authUser!.id, input);
+    return this.cms.createBanner(request.authUser!.id, input);
   }
 
   @Patch('banners/:bannerId')
@@ -71,7 +74,7 @@ export class AdminHomepageController {
     @Body() input: UpdateAdminBannerDto,
     @Req() request: AuthenticatedRequest,
   ): Promise<AdminBannerSummary> {
-    return this.admin.updateBanner(request.authUser!.id, bannerId, input);
+    return this.cms.updateBanner(request.authUser!.id, bannerId, input);
   }
 
   @Delete('banners/:bannerId')
@@ -82,7 +85,7 @@ export class AdminHomepageController {
     @Param('bannerId') bannerId: string,
     @Req() request: AuthenticatedRequest,
   ): Promise<void> {
-    return this.admin.deleteBanner(request.authUser!.id, bannerId);
+    return this.cms.deleteBanner(request.authUser!.id, bannerId);
   }
 
   @Post('banners/reorder')
@@ -92,7 +95,7 @@ export class AdminHomepageController {
     @Body() input: ReorderAdminBannersDto,
     @Req() request: AuthenticatedRequest,
   ): Promise<AdminBannerSummary[]> {
-    return this.admin.reorderBanners(request.authUser!.id, input);
+    return this.cms.reorderBanners(request.authUser!.id, input);
   }
 
   // Modules

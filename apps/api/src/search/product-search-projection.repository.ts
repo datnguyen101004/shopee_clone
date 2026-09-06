@@ -75,6 +75,12 @@ export class ProductSearchProjectionRepository {
           { variants: { some: { updatedAt: window } } },
           { variants: { some: { inventory: { updatedAt: window } } } },
           { discountCampaignProducts: { some: { campaign: { updatedAt: window } } } },
+          { sellerCampaignProducts: { some: { participation: { updatedAt: window } } } },
+          { sellerCampaignProducts: { some: { participation: { campaign: { updatedAt: window } } } } },
+          { sellerCampaignProducts: { some: { participation: { campaign: { type: { updatedAt: window } } } } } },
+          { promotionReservations: { some: { updatedAt: window } } },
+          { promotionReservations: { some: { marketplaceCampaign: { updatedAt: window } } } },
+          { promotionReservations: { some: { marketplaceCampaign: { type: { updatedAt: window } } } } },
           { reviews: { some: { updatedAt: window } } },
           { attributes: { some: { definition: { updatedAt: window } } } },
         ],
@@ -92,14 +98,27 @@ export class ProductSearchProjectionRepository {
   ): Promise<Array<{ id: string }>> {
     return this.prisma.product.findMany({
       where: {
-        discountCampaignProducts: {
-          some: {
-            campaign: {
-              startsAt: { lte: windowEnd },
-              endsAt: { gte: windowStart },
+        OR: [
+          {
+            discountCampaignProducts: {
+              some: {
+                campaign: {
+                  startsAt: { lte: windowEnd },
+                  endsAt: { gte: windowStart },
+                },
+              },
             },
           },
-        },
+          {
+            promotionReservations: {
+              some: {
+                isEnabled: true,
+                startsAt: { lte: windowEnd },
+                endsAt: { gte: windowStart },
+              },
+            },
+          },
+        ],
       },
       select: { id: true },
       orderBy: [{ id: 'asc' }],

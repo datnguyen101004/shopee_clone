@@ -20,6 +20,8 @@ import {
   seedCategories,
   seedHomepageBanners,
   seedHomepageModules,
+  seedMarketplaceCampaignTypes,
+  seedMarketplaceCampaignFixtureIds,
   seedShops,
   seedShopFollowers,
   seedShippingAddresses,
@@ -206,11 +208,82 @@ async function seedMarketplace() {
       });
     }
 
+    for (const campaignType of seedMarketplaceCampaignTypes) {
+      await transaction.marketplaceCampaignType.upsert({
+        where: { id: campaignType.id },
+        create: campaignType,
+        update: {
+          code: campaignType.code,
+          displayName: campaignType.displayName,
+          description: campaignType.description,
+          policyKey: campaignType.policyKey,
+          policyVersion: campaignType.policyVersion,
+          policyConfig: campaignType.policyConfig,
+          presentationKey: campaignType.presentationKey,
+          productOrderKey: campaignType.productOrderKey,
+          importanceClass: campaignType.importanceClass,
+          rankingProfileKey: campaignType.rankingProfileKey,
+          isEnabled: campaignType.isEnabled,
+        },
+      });
+    }
+
+    // Keep one deterministic campaign without any homepage banner. This
+    // proves campaign content is independently seedable from CMS placements.
+    await transaction.marketplaceCampaign.upsert({
+      where: { id: seedMarketplaceCampaignFixtureIds.bannerDefault },
+      create: {
+        id: seedMarketplaceCampaignFixtureIds.bannerDefault,
+        typeId: seedMarketplaceCampaignTypes[0].id,
+        name: 'Banner seed campaign',
+        description: 'Unpublished campaign owner for the canonical seed banner.',
+        announceAt: new Date('2026-10-01T00:00:00.000Z'),
+        enrollmentStartsAt: new Date('2026-10-02T00:00:00.000Z'),
+        enrollmentEndsAt: new Date('2026-10-03T00:00:00.000Z'),
+        startsAt: new Date('2026-10-04T00:00:00.000Z'),
+        endsAt: new Date('2026-10-05T00:00:00.000Z'),
+        minimumDiscountBasisPoints: 500,
+        publishedAt: null,
+        detailEyebrow: 'CHIẾN DỊCH MẪU',
+        detailImageUrl: '/media/homepage/campaign-banner.jpg',
+        detailAltText: 'Chiến dịch mẫu',
+        detailThemeKey: 'brand',
+        detailContentJson: [{ kind: 'paragraph', text: 'Nội dung chiến dịch mẫu.' }],
+      },
+      update: {
+        typeId: seedMarketplaceCampaignTypes[0].id,
+        name: 'Banner seed campaign',
+        description: 'Unpublished campaign owner for the canonical seed banner.',
+        announceAt: new Date('2026-10-01T00:00:00.000Z'),
+        enrollmentStartsAt: new Date('2026-10-02T00:00:00.000Z'),
+        enrollmentEndsAt: new Date('2026-10-03T00:00:00.000Z'),
+        startsAt: new Date('2026-10-04T00:00:00.000Z'),
+        endsAt: new Date('2026-10-05T00:00:00.000Z'),
+        minimumDiscountBasisPoints: 500,
+        publishedAt: null,
+        cancelledAt: null,
+        cancellationReason: null,
+        detailEyebrow: 'CHIẾN DỊCH MẪU',
+        detailImageUrl: '/media/homepage/campaign-banner.jpg',
+        detailAltText: 'Chiến dịch mẫu',
+        detailThemeKey: 'brand',
+        detailContentJson: [{ kind: 'paragraph', text: 'Nội dung chiến dịch mẫu.' }],
+      },
+    });
+
     for (const banner of seedHomepageBanners) {
       await transaction.homepageBanner.upsert({
         where: { id: banner.id },
-        create: banner,
-        update: banner,
+        create: {
+          ...banner,
+          isEnabled: true,
+          priority: banner.sortOrder,
+        },
+        update: {
+          ...banner,
+          isEnabled: true,
+          priority: banner.sortOrder,
+        },
       });
     }
 
@@ -252,11 +325,205 @@ async function seedMarketplace() {
     where: { datasetRecord: { isActive: true } },
     select: { id: true, shopId: true },
     orderBy: [{ id: 'asc' }],
-    take: 3,
+    take: 50,
   });
   if (availableProducts.length < 3) {
     throw new Error('At least three canonical products are required for engagement seed data.');
   }
+
+  // Deterministic campaign fixtures make the local seller/admin journeys
+  // useful immediately after seeding. Dates are fixed so each lifecycle can
+  // be exercised without mutating production data.
+  const campaignTypes = await prisma.marketplaceCampaignType.findMany({
+    where: { code: { in: ['STANDARD', 'FLASH_SALE', 'CHEAPEST_DEALS'] } },
+    select: { id: true, code: true },
+  });
+  const typeIdByCode = new Map(campaignTypes.map((type) => [type.code, type.id]));
+  const fixtureTimes = {
+    draft: [
+      '2026-10-01T00:00:00.000Z',
+      '2026-10-02T00:00:00.000Z',
+      '2026-10-03T00:00:00.000Z',
+      '2026-10-04T00:00:00.000Z',
+      '2026-10-05T00:00:00.000Z',
+    ],
+    enrolling: [
+      '2026-09-01T00:00:00.000Z',
+      '2026-09-02T00:00:00.000Z',
+      '2026-09-20T00:00:00.000Z',
+      '2026-09-21T00:00:00.000Z',
+      '2026-09-30T00:00:00.000Z',
+    ],
+    scheduled: [
+      '2026-08-01T00:00:00.000Z',
+      '2026-08-02T00:00:00.000Z',
+      '2026-08-10T00:00:00.000Z',
+      '2026-09-10T00:00:00.000Z',
+      '2026-09-30T00:00:00.000Z',
+    ],
+    active: [
+      '2026-08-01T00:00:00.000Z',
+      '2026-08-02T00:00:00.000Z',
+      '2026-08-20T00:00:00.000Z',
+      '2026-09-01T00:00:00.000Z',
+      '2026-09-30T00:00:00.000Z',
+    ],
+    ended: [
+      '2026-07-01T00:00:00.000Z',
+      '2026-07-02T00:00:00.000Z',
+      '2026-07-10T00:00:00.000Z',
+      '2026-07-11T00:00:00.000Z',
+      '2026-08-01T00:00:00.000Z',
+    ],
+    cancelled: [
+      '2026-09-01T00:00:00.000Z',
+      '2026-09-02T00:00:00.000Z',
+      '2026-09-20T00:00:00.000Z',
+      '2026-09-21T00:00:00.000Z',
+      '2026-09-30T00:00:00.000Z',
+    ],
+  } as const;
+  const fixtureDefinitions = [
+    { id: seedMarketplaceCampaignFixtureIds.draft, code: 'STANDARD', name: 'Fixture · Draft', times: fixtureTimes.draft, publishedAt: null, cancelledAt: null },
+    { id: seedMarketplaceCampaignFixtureIds.enrolling, code: 'FLASH_SALE', name: 'Fixture · Enrollment open', times: fixtureTimes.enrolling, publishedAt: '2026-08-31T00:00:00.000Z', cancelledAt: null },
+    { id: seedMarketplaceCampaignFixtureIds.scheduled, code: 'CHEAPEST_DEALS', name: 'Fixture · Scheduled', times: fixtureTimes.scheduled, publishedAt: '2026-07-31T00:00:00.000Z', cancelledAt: null },
+    { id: seedMarketplaceCampaignFixtureIds.active, code: 'FLASH_SALE', name: 'Fixture · Active Flash Sale', times: fixtureTimes.active, publishedAt: '2026-07-31T00:00:00.000Z', cancelledAt: null },
+    { id: seedMarketplaceCampaignFixtureIds.ended, code: 'STANDARD', name: 'Fixture · Ended', times: fixtureTimes.ended, publishedAt: '2026-06-30T00:00:00.000Z', cancelledAt: null },
+    { id: seedMarketplaceCampaignFixtureIds.cancelled, code: 'CHEAPEST_DEALS', name: 'Fixture · Cancelled', times: fixtureTimes.cancelled, publishedAt: '2026-08-31T00:00:00.000Z', cancelledAt: '2026-08-31T01:00:00.000Z' },
+  ] as const;
+  const fixtureProduct = availableProducts[0]!;
+  const secondFixtureProduct =
+    availableProducts.find((product) => product.shopId === fixtureProduct.shopId && product.id !== fixtureProduct.id) ??
+    availableProducts[1]!;
+  await prisma.$transaction(async (transaction) => {
+    for (const fixture of fixtureDefinitions) {
+      const typeId = typeIdByCode.get(fixture.code);
+      if (!typeId) throw new Error(`Missing seeded campaign type ${fixture.code}.`);
+      const [announceAt, enrollmentStartsAt, enrollmentEndsAt, startsAt, endsAt] = fixture.times.map((value) => new Date(value));
+      await transaction.marketplaceCampaign.upsert({
+        where: { id: fixture.id },
+        create: {
+          id: fixture.id,
+          typeId,
+          name: fixture.name,
+          description: `Dữ liệu kiểm thử ${fixture.name.toLowerCase()}.`,
+          announceAt,
+          enrollmentStartsAt,
+          enrollmentEndsAt,
+          startsAt,
+          endsAt,
+          minimumDiscountBasisPoints: fixture.code === 'FLASH_SALE' ? 1_000 : 500,
+          publishedAt: fixture.publishedAt ? new Date(fixture.publishedAt) : null,
+          cancelledAt: fixture.cancelledAt ? new Date(fixture.cancelledAt) : null,
+          cancellationReason: fixture.cancelledAt ? 'Fixture cancellation state.' : null,
+          detailEyebrow: 'CHIẾN DỊCH MẪU',
+          detailImageUrl: '/media/homepage/campaign-banner.jpg',
+          detailAltText: fixture.name,
+          detailThemeKey: 'brand',
+          detailContentJson: [{ kind: 'paragraph', text: `Nội dung ${fixture.name.toLowerCase()}.` }],
+        },
+        update: {
+          typeId,
+          name: fixture.name,
+          announceAt,
+          enrollmentStartsAt,
+          enrollmentEndsAt,
+          startsAt,
+          endsAt,
+          publishedAt: fixture.publishedAt ? new Date(fixture.publishedAt) : null,
+          cancelledAt: fixture.cancelledAt ? new Date(fixture.cancelledAt) : null,
+          cancellationReason: fixture.cancelledAt ? 'Fixture cancellation state.' : null,
+        },
+      });
+    }
+
+    const activeBannerContent = [
+      { kind: 'heading', level: 2, text: 'Flash Sale mẫu' },
+      { kind: 'paragraph', text: 'Sản phẩm mẫu được lấy từ chiến dịch Flash Sale đang hoạt động.' },
+    ];
+    for (const [index, banner] of seedHomepageBanners.entries()) {
+      const targetType = index === 0 ? 'CAMPAIGN' : banner.targetType;
+      const targetId = index === 0
+        ? seedMarketplaceCampaignFixtureIds.active
+        : ('targetId' in banner ? banner.targetId : null);
+      const targetQuery = index === 0
+        ? null
+        : ('targetQuery' in banner ? banner.targetQuery : null);
+      await transaction.homepageBanner.update({
+        where: { id: banner.id },
+        data: {
+          targetType,
+          targetId,
+          targetQuery,
+          priority: banner.sortOrder,
+        },
+      });
+    }
+    await transaction.marketplaceCampaign.update({
+      where: { id: seedMarketplaceCampaignFixtureIds.active },
+      data: {
+        detailEyebrow: 'FLASH SALE MẪU',
+        detailImageUrl: '/media/homepage/campaign-banner.jpg',
+        detailAltText: 'Flash Sale mẫu',
+        detailThemeKey: 'brand',
+        detailContentJson: activeBannerContent,
+      },
+    });
+    const flashModule = await transaction.homepageModule.findUniqueOrThrow({ where: { id: seedHomepageModules[2].id } });
+    await transaction.homepageCampaignCollection.upsert({
+      where: { moduleId_campaignId: { moduleId: flashModule.id, campaignId: seedMarketplaceCampaignFixtureIds.active } },
+      create: { id: '00000000-0000-4000-8000-000000000931', moduleId: flashModule.id, campaignId: seedMarketplaceCampaignFixtureIds.active, typeId: typeIdByCode.get('FLASH_SALE')!, sortOrder: 1, isEnabled: true },
+      update: { typeId: typeIdByCode.get('FLASH_SALE')!, sortOrder: 1, isEnabled: true },
+    });
+
+    const joined = await transaction.sellerCampaignParticipation.upsert({
+      where: { campaignId_shopId: { campaignId: seedMarketplaceCampaignFixtureIds.active, shopId: fixtureProduct.shopId } },
+      create: { campaignId: seedMarketplaceCampaignFixtureIds.active, shopId: fixtureProduct.shopId, state: 'JOINED', respondedAt: new Date('2026-08-20T00:00:00.000Z') },
+      update: { state: 'JOINED', respondedAt: new Date('2026-08-20T00:00:00.000Z') },
+    });
+    await transaction.sellerCampaignProduct.deleteMany({ where: { participationId: joined.id } });
+    await transaction.sellerCampaignProduct.create({ data: { participationId: joined.id, productId: fixtureProduct.id, discountBasisPoints: 1_500 } });
+    await transaction.productPromotionReservation.upsert({
+      where: { id: seedMarketplaceCampaignFixtureIds.activeReservation },
+      create: { id: seedMarketplaceCampaignFixtureIds.activeReservation, productId: fixtureProduct.id, shopId: fixtureProduct.shopId, source: 'MARKETPLACE_CAMPAIGN', marketplaceCampaignId: seedMarketplaceCampaignFixtureIds.active, discountBasisPoints: 1_500, startsAt: new Date('2026-09-01T00:00:00.000Z'), endsAt: new Date('2026-09-30T00:00:00.000Z'), isEnabled: true },
+      update: { productId: fixtureProduct.id, shopId: fixtureProduct.shopId, marketplaceCampaignId: seedMarketplaceCampaignFixtureIds.active, discountBasisPoints: 1_500, startsAt: new Date('2026-09-01T00:00:00.000Z'), endsAt: new Date('2026-09-30T00:00:00.000Z'), isEnabled: true },
+    });
+
+    const enrollingJoined = await transaction.sellerCampaignParticipation.upsert({
+      where: { campaignId_shopId: { campaignId: seedMarketplaceCampaignFixtureIds.enrolling, shopId: fixtureProduct.shopId } },
+      create: { campaignId: seedMarketplaceCampaignFixtureIds.enrolling, shopId: fixtureProduct.shopId, state: 'JOINED', respondedAt: new Date('2026-09-03T00:00:00.000Z') },
+      update: { state: 'JOINED', respondedAt: new Date('2026-09-03T00:00:00.000Z') },
+    });
+    await transaction.sellerCampaignProduct.deleteMany({ where: { participationId: enrollingJoined.id } });
+    await transaction.sellerCampaignProduct.create({ data: { participationId: enrollingJoined.id, productId: secondFixtureProduct.id, discountBasisPoints: 1_000 } });
+    await transaction.productPromotionReservation.upsert({
+      where: { id: seedMarketplaceCampaignFixtureIds.futureReservation },
+      create: { id: seedMarketplaceCampaignFixtureIds.futureReservation, productId: secondFixtureProduct.id, shopId: secondFixtureProduct.shopId, source: 'MARKETPLACE_CAMPAIGN', marketplaceCampaignId: seedMarketplaceCampaignFixtureIds.enrolling, discountBasisPoints: 1_000, startsAt: new Date('2026-09-21T00:00:00.000Z'), endsAt: new Date('2026-09-30T00:00:00.000Z'), isEnabled: true },
+      update: { productId: secondFixtureProduct.id, shopId: secondFixtureProduct.shopId, marketplaceCampaignId: seedMarketplaceCampaignFixtureIds.enrolling, discountBasisPoints: 1_000, startsAt: new Date('2026-09-21T00:00:00.000Z'), endsAt: new Date('2026-09-30T00:00:00.000Z'), isEnabled: true },
+    });
+
+    const declined = await transaction.sellerCampaignParticipation.upsert({
+      where: { campaignId_shopId: { campaignId: seedMarketplaceCampaignFixtureIds.enrolling, shopId: seedShops[1].id } },
+      create: { campaignId: seedMarketplaceCampaignFixtureIds.enrolling, shopId: seedShops[1].id, state: 'DECLINED', respondedAt: new Date('2026-09-03T00:00:00.000Z') },
+      update: { state: 'DECLINED', respondedAt: new Date('2026-09-03T00:00:00.000Z') },
+    });
+    await transaction.sellerCampaignProduct.deleteMany({ where: { participationId: declined.id } });
+
+    // Explicit response fixtures keep seller screens useful for every state;
+    // conflict details are derived from the shared reservation table at read
+    // time, so no invalid overlapping reservation is inserted into the seed.
+    await transaction.sellerCampaignParticipation.upsert({
+      where: { campaignId_shopId: { campaignId: seedMarketplaceCampaignFixtureIds.scheduled, shopId: fixtureProduct.shopId } },
+      create: { campaignId: seedMarketplaceCampaignFixtureIds.scheduled, shopId: fixtureProduct.shopId, state: 'UNRESPONDED' },
+      update: { state: 'UNRESPONDED', respondedAt: null },
+    });
+    const withdrawn = await transaction.sellerCampaignParticipation.upsert({
+      where: { campaignId_shopId: { campaignId: seedMarketplaceCampaignFixtureIds.ended, shopId: fixtureProduct.shopId } },
+      create: { campaignId: seedMarketplaceCampaignFixtureIds.ended, shopId: fixtureProduct.shopId, state: 'WITHDRAWN', respondedAt: new Date('2026-07-05T00:00:00.000Z') },
+      update: { state: 'WITHDRAWN', respondedAt: new Date('2026-07-05T00:00:00.000Z') },
+    });
+    await transaction.sellerCampaignProduct.deleteMany({ where: { participationId: withdrawn.id } });
+  });
 
   const favoriteFixtures = [
     {

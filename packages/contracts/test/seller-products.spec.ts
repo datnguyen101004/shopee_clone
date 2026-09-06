@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   generateSellerProductCombinations,
+  isSellerProductPage,
   isSellerProductUpsertRequest,
   normalizeSellerProductMediaUrl,
   normalizeSellerProductSlug,
@@ -49,6 +50,41 @@ describe('seller product contracts', () => {
     expect(isSellerProductUpsertRequest({
       ...request,
       media: [{ url: undefined, assetId, imageId: undefined, altText: null, sortOrder: 0 }],
+    })).toBe(true);
+  });
+
+  it('accepts bounded operational and campaign summaries in product pages', () => {
+    const campaignId = '00000000-0000-4000-8000-000000000301';
+    const productId = '00000000-0000-4000-8000-000000000302';
+    expect(isSellerProductPage({
+      items: [{
+        id: productId,
+        slug: 'campaign-product',
+        name: 'Campaign product',
+        categoryName: 'Điện thoại',
+        lifecycle: 'published',
+        moderationStatus: 'active',
+        primaryMediaUrl: null,
+        variantCount: 1,
+        stockQuantity: 5,
+        updatedAt: '2026-09-01T00:00:00.000Z',
+        operationalPriceRange: { minPriceMinor: 100000, maxPriceMinor: 120000 },
+        sellerPromotionSummary: { activeCount: 1, upcomingCount: 0 },
+        campaigns: [{
+          campaignId,
+          bannerId: campaignId,
+          typeCode: 'FLASH_SALE',
+          typeLabel: 'Flash Sale',
+          title: 'Flash Sale tháng 9',
+          state: 'JOINED',
+          group: 'ACTIVE',
+          startsAt: '2026-09-01T00:00:00.000Z',
+          endsAt: '2026-09-02T00:00:00.000Z',
+          discountBasisPoints: 1500,
+        }],
+        additionalCampaignCount: 1,
+      }],
+      nextCursor: null,
     })).toBe(true);
   });
 });

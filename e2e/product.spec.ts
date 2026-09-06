@@ -43,7 +43,7 @@ test.describe('API-driven product detail', () => {
     await quantity.fill(String(variant.availableQuantity + 1));
     await expect(main.getByText(`Số lượng tối đa là ${variant.availableQuantity}.`)).toBeVisible();
     await quantity.fill('2');
-    await expect(main.getByRole('link', { name: /Thêm vào giỏ hàng/ })).toHaveAttribute(
+    await expect(main.getByRole('link', { name: /Thêm vào giỏ/ })).toHaveAttribute(
       'href',
       /intent=add-to-cart/,
     );

@@ -16,6 +16,16 @@ export const homepageModuleTypes = [
 
 export type HomepageModuleType = (typeof homepageModuleTypes)[number];
 
+export const homepageBannerTargetTypes = [
+  'CAMPAIGN',
+  'PRODUCT',
+  'SHOP',
+  'CATEGORY',
+  'SEARCH',
+  'URL',
+] as const;
+export type HomepageBannerTargetType = (typeof homepageBannerTargetTypes)[number];
+
 interface HomepageModuleBase {
   id: string;
   key: string;
@@ -32,8 +42,12 @@ export interface HomepageBanner {
   description?: string;
   imageUrl: string | null;
   altText: string;
-  href: string;
+  href?: string;
   theme: string;
+  targetType?: HomepageBannerTargetType;
+  targetId?: string;
+  targetQuery?: string;
+  targetAvailable?: boolean;
 }
 
 export interface HomepageCategoryShortcut {
@@ -106,8 +120,12 @@ const isBanner = (value: unknown): value is HomepageBanner =>
   isOptionalString(value.description) &&
   isNullableString(value.imageUrl) &&
   isString(value.altText) &&
-  isString(value.href) &&
-  isString(value.theme);
+  (value.href === undefined || isString(value.href)) &&
+  isString(value.theme) &&
+  (value.targetType === undefined || (isString(value.targetType) && (homepageBannerTargetTypes as readonly string[]).includes(value.targetType))) &&
+  (value.targetId === undefined || isString(value.targetId)) &&
+  (value.targetQuery === undefined || isString(value.targetQuery)) &&
+  (value.targetAvailable === undefined || typeof value.targetAvailable === 'boolean');
 
 const isCategory = (value: unknown): value is HomepageCategoryShortcut =>
   isRecord(value) &&

@@ -11,6 +11,9 @@ import type {
 import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 
+import { AdminModerationActionDialog } from '../../../../components/admin/admin-moderation-action-dialog';
+import { AdminModerationCaseDetail } from '../../../../components/admin/admin-moderation-case-detail';
+import { AdminEntityLink } from '../../../../components/admin/admin-entity-link';
 import { useAuthSession } from '../../../../components/auth-session-provider';
 import {
   executeAdminReviewAction,
@@ -49,27 +52,11 @@ type Confirmation =
   | { kind: 'decision'; label: string }
   | { kind: 'review'; action: AdminReviewVisibilityAction; label: string };
 
+type ReportTypeFilter = '' | 'CHAT_MESSAGE' | 'SHOP' | 'PRODUCT' | 'REVIEW';
+type TimeFilter = '' | 'TODAY' | '7_DAYS' | '30_DAYS';
+
 function messageFrom(error: unknown, fallback: string): string {
   return error instanceof Error && error.message ? error.message : fallback;
-}
-
-function safeHttpsHref(raw: string): string | null {
-  try {
-    const url = new URL(raw);
-    return url.protocol === 'https:' ? url.href : null;
-  } catch {
-    return null;
-  }
-}
-
-function targetHref(detail: ModerationCaseDetail): string | null {
-  if (detail.targetType === 'PRODUCT') return `/products/${detail.targetId}`;
-  if (detail.targetType === 'CHAT_CONVERSATION' || detail.targetType === 'CHAT_MESSAGE') return null;
-  return detail.targetDetails.slug ? `/shops/${encodeURIComponent(detail.targetDetails.slug)}` : null;
-}
-
-function summaryTargetHref(item: ModerationCaseSummary): string | null {
-  return item.targetType === 'PRODUCT' ? `/products/${item.targetId}` : null;
 }
 
 function decisionLabel(outcome: ModerationDecisionOutcome): string {
@@ -82,23 +69,79 @@ function decisionLabel(outcome: ModerationDecisionOutcome): string {
   return 'kết thúc hồ sơ mà không áp dụng chế tài';
 }
 
-export default function AdminModerationPage() {
+function moderationAdminHref(item: ModerationCaseSummary): string {
+  if (item.targetType === 'PRODUCT') return `/admin/products/${item.targetId}`;
+  if (item.targetType === 'SHOP') return `/admin/shops/${item.targetId}`;
+  return `/admin/moderation/${item.id}`;
+}
+
+function ModerationActionIcon({ name }: { name: 'details' | 'process' }) {
+  if (name === 'details') {
+    return (
+      <svg
+        aria-hidden="true"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z" />
+        <circle cx="12" cy="12" r="2.5" />
+      </svg>
+    );
+  }
+
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M12 3 19 6v5c0 4.5-2.8 7.5-7 10-4.2-2.5-7-5.5-7-10V6l7-3Z" />
+      <path d="m9 12 2 2 4-4" />
+    </svg>
+  );
+}
+
+function matchesTimeFilter(value: string, filter: TimeFilter): boolean {
+  if (!filter) return true;
+  const timestamp = new Date(value).getTime();
+  if (Number.isNaN(timestamp)) return false;
+  const now = Date.now();
+  const day = 24 * 60 * 60 * 1000;
+  if (filter === 'TODAY') {
+    const today = new Date();
+    const date = new Date(value);
+    return today.toDateString() === date.toDateString();
+  }
+  const days = filter === '7_DAYS' ? 7 : 30;
+  return timestamp >= now - days * day;
+}
+
+export default function AdminModerationPage({ initialCaseId }: { initialCaseId?: string } = {}) {
   const { authenticatedFetch, state: authState } = useAuthSession();
-  const isAdmin =
-    authState.status === 'authenticated' && authState.user.roles.includes('admin');
-  const [activeTab, setActiveTab] = useState<'cases' | 'reviews'>('cases');
+  const isAdmin = authState.status === 'authenticated' && authState.user.roles.includes('admin');
   const [cases, setCases] = useState<ModerationCaseSummary[]>([]);
   const [statusFilter, setStatusFilter] = useState<'OPEN' | 'IN_REVIEW' | 'RESOLVED' | ''>('OPEN');
-  const [typeFilter, setTypeFilter] = useState<'PRODUCT' | 'SHOP' | 'CHAT_CONVERSATION' | 'CHAT_MESSAGE' | ''>('');
+  const [typeFilter, setTypeFilter] = useState<
+    'PRODUCT' | 'SHOP' | 'CHAT_CONVERSATION' | 'CHAT_MESSAGE' | ''
+  >('');
+  const [reportTypeFilter, setReportTypeFilter] = useState<ReportTypeFilter>('');
+  const [timeFilter, setTimeFilter] = useState<TimeFilter>('');
   const [targetIdSearch, setTargetIdSearch] = useState('');
-  const [targetIdFilter, setTargetIdFilter] = useState('');
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [queueError, setQueueError] = useState<string | null>(null);
   const [isLoadingList, setIsLoadingList] = useState(true);
-  const [selectedCaseId, setSelectedCaseId] = useState<string | null>(null);
   const [caseDetail, setCaseDetail] = useState<ModerationCaseDetail | null>(null);
   const [isLoadingDetail, setIsLoadingDetail] = useState(false);
-  const [decisionOutcome, setDecisionOutcome] = useState<ModerationDecisionOutcome>('SUSPEND_TARGET');
+  const [decisionOutcome, setDecisionOutcome] =
+    useState<ModerationDecisionOutcome>('SUSPEND_TARGET');
   const [decisionReason, setDecisionReason] = useState('');
   const [decisionPrivateNote, setDecisionPrivateNote] = useState('');
   const [restrictionUntil, setRestrictionUntil] = useState('');
@@ -107,28 +150,29 @@ export default function AdminModerationPage() {
   const [isMutating, setIsMutating] = useState(false);
   const [lookupReviewId, setLookupReviewId] = useState('');
   const [reviewDetail, setReviewDetail] = useState<AdminReviewDetail | null>(null);
+  const [reviewAction, setReviewAction] = useState<AdminReviewVisibilityAction>('HIDE');
   const [reviewActionReason, setReviewActionReason] = useState('');
   const [reviewError, setReviewError] = useState<string | null>(null);
   const [isLoadingReview, setIsLoadingReview] = useState(false);
   const [reportedReviews, setReportedReviews] = useState<AdminReportedReviewSummary[]>([]);
   const [isLoadingReportedReviews, setIsLoadingReportedReviews] = useState(false);
   const [reportedReviewsError, setReportedReviewsError] = useState<string | null>(null);
+  const [actionDialog, setActionDialog] = useState<'case' | 'review' | null>(null);
   const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
-  const decisionButtonRef = useRef<HTMLButtonElement>(null);
   const confirmationTriggerRef = useRef<HTMLElement | null>(null);
   const confirmationButtonRef = useRef<HTMLButtonElement>(null);
-  const caseCardRefs = useRef(new Map<string, HTMLButtonElement>());
+  const isDetailRoute = Boolean(initialCaseId);
 
   const fetchCases = useCallback(
     async (cursor?: string) => {
       setIsLoadingList(true);
       setQueueError(null);
       try {
-        const hasExactIdSearch = targetIdFilter.length > 0;
+        const selectedTargetType =
+          reportTypeFilter && reportTypeFilter !== 'REVIEW' ? reportTypeFilter : typeFilter;
         const response = await listModerationCases(authenticatedFetch, {
-          status: hasExactIdSearch ? undefined : statusFilter || undefined,
-          targetType: hasExactIdSearch ? undefined : typeFilter || undefined,
-          searchId: targetIdFilter || undefined,
+          status: statusFilter || undefined,
+          targetType: selectedTargetType || undefined,
           cursor,
         });
         setCases((current) => (cursor ? [...current, ...response.items] : response.items));
@@ -139,12 +183,11 @@ export default function AdminModerationPage() {
         setIsLoadingList(false);
       }
     },
-    [authenticatedFetch, statusFilter, targetIdFilter, typeFilter],
+    [authenticatedFetch, reportTypeFilter, statusFilter, typeFilter],
   );
 
   const loadCaseDetail = useCallback(
     async (caseId: string, preserveDrafts = false) => {
-      setSelectedCaseId(caseId);
       setIsLoadingDetail(true);
       setActionError(null);
       try {
@@ -162,14 +205,23 @@ export default function AdminModerationPage() {
           setDecisionPrivateNote('');
           setRestrictionUntil('');
         }
+        return detail;
       } catch (error) {
         setActionError(messageFrom(error, 'Không thể tải chi tiết hồ sơ kiểm duyệt.'));
+        return null;
       } finally {
         setIsLoadingDetail(false);
       }
     },
     [authenticatedFetch],
   );
+
+  const openCaseAction = async (caseId?: string) => {
+    const requestedId = caseId ?? initialCaseId;
+    if (!requestedId) return;
+    const detail = caseDetail?.id === requestedId ? caseDetail : await loadCaseDetail(requestedId);
+    if (detail?.id === requestedId) setActionDialog('case');
+  };
 
   const loadReportedReviews = useCallback(async () => {
     setIsLoadingReportedReviews(true);
@@ -178,7 +230,9 @@ export default function AdminModerationPage() {
       const response = await listAdminReportedReviews(authenticatedFetch);
       setReportedReviews(response.items);
     } catch (error) {
-      setReportedReviewsError(messageFrom(error, 'Không thể tải danh sách đánh giá được người bán báo cáo.'));
+      setReportedReviewsError(
+        messageFrom(error, 'Không thể tải danh sách đánh giá được người bán báo cáo.'),
+      );
     } finally {
       setIsLoadingReportedReviews(false);
     }
@@ -186,17 +240,24 @@ export default function AdminModerationPage() {
 
   useEffect(() => {
     const loadTimer = window.setTimeout(() => {
-      if (isAdmin) void fetchCases();
+      if (isAdmin && !initialCaseId && reportTypeFilter !== 'REVIEW') void fetchCases();
     }, 0);
     return () => window.clearTimeout(loadTimer);
-  }, [fetchCases, isAdmin]);
+  }, [fetchCases, initialCaseId, isAdmin, reportTypeFilter]);
 
   useEffect(() => {
     const loadTimer = window.setTimeout(() => {
-      if (isAdmin && activeTab === 'reviews') void loadReportedReviews();
+      if (isAdmin && !initialCaseId && reportTypeFilter === 'REVIEW') void loadReportedReviews();
     }, 0);
     return () => window.clearTimeout(loadTimer);
-  }, [activeTab, isAdmin, loadReportedReviews]);
+  }, [initialCaseId, isAdmin, loadReportedReviews, reportTypeFilter]);
+
+  useEffect(() => {
+    const loadTimer = window.setTimeout(() => {
+      if (isAdmin && initialCaseId) void loadCaseDetail(initialCaseId);
+    }, 0);
+    return () => window.clearTimeout(loadTimer);
+  }, [initialCaseId, isAdmin, loadCaseDetail]);
 
   useEffect(() => {
     if (confirmation) confirmationButtonRef.current?.focus();
@@ -206,7 +267,9 @@ export default function AdminModerationPage() {
     async (caseId: string, error: unknown) => {
       if (error instanceof ModerationApiError && error.status === 409) {
         await loadCaseDetail(caseId, true);
-        setActionError('Hồ sơ đã thay đổi ở phiên khác. Dữ liệu mới đã được tải; nội dung bạn soạn vẫn được giữ lại.');
+        setActionError(
+          'Hồ sơ đã thay đổi ở phiên khác. Dữ liệu mới đã được tải; nội dung bạn soạn vẫn được giữ lại.',
+        );
         return;
       }
       setActionError(messageFrom(error, 'Không thể cập nhật hồ sơ kiểm duyệt.'));
@@ -214,7 +277,7 @@ export default function AdminModerationPage() {
     [loadCaseDetail],
   );
 
-  const openDecisionConfirmation = () => {
+  const openDecisionConfirmation = (trigger: HTMLButtonElement | null) => {
     if (!caseDetail) return;
     const trimmedReason = decisionReason.trim();
     if (trimmedReason.length < 8 || trimmedReason.length > 240) {
@@ -222,17 +285,20 @@ export default function AdminModerationPage() {
       return;
     }
     if (decisionOutcome === 'RESTRICT_CHAT_TEMPORARY' && !restrictionUntil) {
-      setActionError('Vui lòng chọn thời điểm mở lại chat.');
+      setActionError('Vui lòng chọn ngày mở lại chat.');
       return;
     }
     if (
-      ['WARN_USER', 'RESTRICT_CHAT_TEMPORARY', 'RESTRICT_CHAT_INDEFINITE', 'RESTORE_CHAT'].includes(decisionOutcome) &&
+      ['WARN_USER', 'RESTRICT_CHAT_TEMPORARY', 'RESTRICT_CHAT_INDEFINITE', 'RESTORE_CHAT'].includes(
+        decisionOutcome,
+      ) &&
       decisionPrivateNote.trim().length < 8
     ) {
       setActionError('Các quyết định chat cần ghi chú nội bộ ít nhất 8 ký tự.');
       return;
     }
-    confirmationTriggerRef.current = decisionButtonRef.current;
+    confirmationTriggerRef.current =
+      trigger ?? (document.activeElement instanceof HTMLElement ? document.activeElement : null);
     setConfirmation({
       kind: 'decision',
       label: `Xác nhận ${decisionLabel(decisionOutcome)} cho ${caseDetail.targetName}`,
@@ -269,8 +335,9 @@ export default function AdminModerationPage() {
       setDecisionPrivateNote('');
       setRestrictionUntil('');
       setStatusMessage('Quyết định kiểm duyệt đã được ghi nhận.');
+      setActionDialog(null);
       await loadCaseDetail(caseDetail.id);
-      await fetchCases();
+      if (!initialCaseId) await fetchCases();
     } catch (error) {
       setConfirmation(null);
       await refreshAfterConflict(caseDetail.id, error);
@@ -281,11 +348,13 @@ export default function AdminModerationPage() {
 
   const loadReviewDetail = async (reviewId: string) => {
     const normalizedId = reviewId.trim();
-    if (!normalizedId) return;
+    if (!normalizedId) return null;
     setIsLoadingReview(true);
     setReviewError(null);
     try {
-      setReviewDetail(await getAdminReviewDetail(authenticatedFetch, normalizedId));
+      const detail = await getAdminReviewDetail(authenticatedFetch, normalizedId);
+      setReviewDetail(detail);
+      return detail;
     } catch (error) {
       setReviewDetail(null);
       if (error instanceof ModerationApiError && error.status === 404) {
@@ -300,6 +369,15 @@ export default function AdminModerationPage() {
     }
   };
 
+  const openReviewAction = async (reviewId: string) => {
+    const detail = await loadReviewDetail(reviewId);
+    if (detail) {
+      setReviewAction(detail.visibility === 'VISIBLE' ? 'HIDE' : 'RESTORE');
+      setReviewActionReason('');
+      setActionDialog('review');
+    }
+  };
+
   const handleLookupReview = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     await loadReviewDetail(lookupReviewId);
@@ -307,7 +385,7 @@ export default function AdminModerationPage() {
 
   const openReviewConfirmation = (
     action: AdminReviewVisibilityAction,
-    trigger: HTMLButtonElement,
+    trigger: HTMLButtonElement | null,
   ) => {
     if (!reviewDetail) return;
     if (reviewActionReason.trim().length < 8 || reviewActionReason.trim().length > 240) {
@@ -340,7 +418,14 @@ export default function AdminModerationPage() {
       const updated = await getAdminReviewDetail(authenticatedFetch, reviewDetail.id);
       setReviewDetail(updated);
       setReviewActionReason('');
-      setStatusMessage(action === 'HIDE' ? 'Đánh giá đã được ẩn và số liệu đã được làm mới.' : action === 'RESTORE' ? 'Đánh giá đã được khôi phục.' : 'Đã giữ nguyên hiển thị và đóng các báo cáo của người bán.');
+      setActionDialog(null);
+      setStatusMessage(
+        action === 'HIDE'
+          ? 'Đánh giá đã được ẩn và số liệu đã được làm mới.'
+          : action === 'RESTORE'
+            ? 'Đánh giá đã được khôi phục.'
+            : 'Đã giữ nguyên hiển thị và đóng các báo cáo của người bán.',
+      );
       await loadReportedReviews();
     } catch (error) {
       setReviewError(messageFrom(error, 'Không thể cập nhật trạng thái đánh giá.'));
@@ -361,28 +446,14 @@ export default function AdminModerationPage() {
     requestAnimationFrame(() => confirmationTriggerRef.current?.focus());
   };
 
-  const closeCaseDetail = () => {
-    const caseId = selectedCaseId;
-    setSelectedCaseId(null);
-    setCaseDetail(null);
-    setActionError(null);
-    if (caseId) {
-      requestAnimationFrame(() => caseCardRefs.current.get(caseId)?.focus());
-    }
-  };
-
-  const handleTargetIdSearch = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    setTargetIdFilter(targetIdSearch.trim());
-  };
-
-  const clearTargetIdSearch = () => {
-    setTargetIdSearch('');
-    setTargetIdFilter('');
-  };
+  const clearTargetIdSearch = () => setTargetIdSearch('');
 
   if (authState.status === 'loading') {
-    return <p className="admin-moderation-container" role="status">Đang kiểm tra quyền quản trị…</p>;
+    return (
+      <p className="admin-moderation-container" role="status">
+        Đang kiểm tra quyền quản trị…
+      </p>
+    );
   }
 
   if (authState.status === 'guest') {
@@ -404,360 +475,571 @@ export default function AdminModerationPage() {
     );
   }
 
-  const selectedTargetHref = caseDetail ? targetHref(caseDetail) : null;
+  const searchQuery = targetIdSearch.trim().toLocaleLowerCase('vi-VN');
+  const visibleCases = cases.filter((item) => {
+    if (!matchesTimeFilter(item.createdAt, timeFilter)) return false;
+    if (!searchQuery) return true;
+    return [
+      item.id,
+      item.targetId,
+      item.targetName,
+      item.primaryReasonCode,
+      REASON_LABELS[item.primaryReasonCode] ?? '',
+      STATUS_LABELS[item.status] ?? '',
+    ].some((value) => value.toLocaleLowerCase('vi-VN').includes(searchQuery));
+  });
+  const visibleReviews = reportedReviews.filter((review) => {
+    if (!matchesTimeFilter(review.latestReportedAt, timeFilter)) return false;
+    if (!searchQuery) return true;
+    return [
+      review.reviewId,
+      review.productId,
+      review.shopId,
+      review.productName,
+      review.shopName,
+    ].some((value) => value.toLocaleLowerCase('vi-VN').includes(searchQuery));
+  });
 
   return (
-    <main className="admin-moderation-container" aria-labelledby="moderation-title">
-      <header className="admin-moderation-header">
-        <div>
-          <h1 id="moderation-title">Trung tâm Kiểm duyệt &amp; Tố cáo</h1>
-          <p>Xử lý báo cáo, trạng thái sản phẩm/shop và đánh giá đã xác minh.</p>
-        </div>
-        <div className="admin-tab-group" role="tablist" aria-label="Khu vực kiểm duyệt">
-          <button
-            id="moderation-cases-tab"
-            type="button"
-            role="tab"
-            aria-selected={activeTab === 'cases'}
-            aria-controls="moderation-cases-panel"
-            onClick={() => setActiveTab('cases')}
-            className={`admin-tab-btn ${activeTab === 'cases' ? 'admin-tab-btn--active' : ''}`}
-          >
-            Hồ sơ vi phạm ({cases.length})
-          </button>
-          <button
-            id="moderation-reviews-tab"
-            type="button"
-            role="tab"
-            aria-selected={activeTab === 'reviews'}
-            aria-controls="moderation-reviews-panel"
-            onClick={() => setActiveTab('reviews')}
-            className={`admin-tab-btn ${activeTab === 'reviews' ? 'admin-tab-btn--active' : ''}`}
-          >
-            Kiểm duyệt đánh giá
-          </button>
-        </div>
-      </header>
-
-      <p className="sr-only" role="status" aria-live="polite">{statusMessage}</p>
-
-      {activeTab === 'cases' ? (
-        <section id="moderation-cases-panel" role="tabpanel" aria-labelledby="moderation-cases-tab" className="admin-moderation-grid">
-          <aside className="admin-case-sidebar" aria-label="Hàng đợi hồ sơ">
-            <form className="admin-target-search" onSubmit={handleTargetIdSearch}>
-              <label htmlFor="case-target-id-search">Tìm mã hồ sơ hoặc đối tượng</label>
-              <div className="admin-target-search__field">
-                <svg className="admin-target-search__icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <circle cx="11" cy="11" r="7" />
-                  <path d="m20 20-4-4" />
-                </svg>
-                <input
-                  id="case-target-id-search"
-                  className="admin-form-input"
-                  value={targetIdSearch}
-                  onChange={(event) => setTargetIdSearch(event.target.value)}
-                  placeholder="Nhập UUID hồ sơ, sản phẩm hoặc shop"
-                />
-                {targetIdFilter ? (
-                  <button type="button" className="admin-target-search__clear" aria-label="Xóa mã tìm kiếm" onClick={clearTargetIdSearch} disabled={isLoadingList}>
-                    ×
-                  </button>
-                ) : null}
-                <button type="submit" className="sr-only">Tìm kiếm</button>
-              </div>
-              <p className="admin-target-search__hint">Nhấn Enter để tìm chính xác. Khi tìm theo mã, mọi trạng thái và loại đối tượng đều được xét.</p>
-            </form>
-            <div className="admin-filter-bar">
-              <label>
-                <span className="sr-only">Trạng thái hồ sơ</span>
-                <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as typeof statusFilter)}>
-                  <option value="OPEN">Chờ xử lý</option>
-                  <option value="IN_REVIEW">Đang xem xét</option>
-                  <option value="RESOLVED">Đã giải quyết</option>
-                  <option value="">Tất cả trạng thái</option>
-                </select>
-              </label>
-              <label>
-                <span className="sr-only">Loại đối tượng</span>
-                <select value={typeFilter} onChange={(event) => setTypeFilter(event.target.value as typeof typeFilter)}>
-                  <option value="">Tất cả đối tượng</option>
-                  <option value="PRODUCT">Sản phẩm</option>
-                  <option value="SHOP">Cửa hàng</option>
-                  <option value="CHAT_CONVERSATION">Cuộc trò chuyện</option>
-                  <option value="CHAT_MESSAGE">Tin nhắn</option>
-                </select>
-              </label>
+    <main
+      className="admin-page admin-moderation-container"
+      aria-label="Trung tâm kiểm duyệt và tố cáo"
+    >
+      {!isDetailRoute ? (
+        <div className="admin-toolbar admin-moderation-toolbar" role="search">
+          <div className="admin-field admin-moderation-toolbar__search">
+            <label htmlFor="moderation-report-search">Tìm report hoặc đối tượng</label>
+            <div className="admin-target-search__field">
+              <input
+                id="moderation-report-search"
+                className="admin-form-input admin-control"
+                value={targetIdSearch}
+                onChange={(event) => setTargetIdSearch(event.target.value)}
+                placeholder="Mã report, sản phẩm, shop hoặc đánh giá"
+              />
+              {targetIdSearch ? (
+                <button
+                  type="button"
+                  className="admin-target-search__clear"
+                  aria-label="Xóa tìm kiếm"
+                  onClick={clearTargetIdSearch}
+                  disabled={isLoadingList}
+                >
+                  ×
+                </button>
+              ) : null}
+              <svg
+                className="admin-target-search__icon"
+                aria-hidden="true"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <circle cx="11" cy="11" r="7" />
+                <path d="m20 20-4-4" />
+              </svg>
             </div>
+          </div>
+          <div className="admin-field">
+            <label htmlFor="moderation-report-type">Loại report</label>
+            <select
+              id="moderation-report-type"
+              className="admin-control"
+              value={reportTypeFilter}
+              onChange={(event) => setReportTypeFilter(event.target.value as ReportTypeFilter)}
+            >
+              <option value="">Tất cả loại report</option>
+              <option value="CHAT_MESSAGE">Tin nhắn</option>
+              <option value="SHOP">Shop</option>
+              <option value="PRODUCT">Sản phẩm</option>
+              <option value="REVIEW">Đánh giá</option>
+            </select>
+          </div>
+          <div className="admin-field">
+            <label htmlFor="moderation-report-status">Trạng thái</label>
+            <select
+              id="moderation-report-status"
+              className="admin-control"
+              value={statusFilter}
+              onChange={(event) => setStatusFilter(event.target.value as typeof statusFilter)}
+            >
+              <option value="OPEN">Chờ xử lý</option>
+              <option value="IN_REVIEW">Đang xem xét</option>
+              <option value="RESOLVED">Đã giải quyết</option>
+              <option value="">Tất cả trạng thái</option>
+            </select>
+          </div>
+          <div className="admin-field">
+            <label htmlFor="moderation-report-object">Đối tượng</label>
+            <select
+              id="moderation-report-object"
+              className="admin-control"
+              value={typeFilter}
+              onChange={(event) => setTypeFilter(event.target.value as typeof typeFilter)}
+            >
+              <option value="">Tất cả đối tượng</option>
+              <option value="PRODUCT">Sản phẩm</option>
+              <option value="SHOP">Shop</option>
+              <option value="CHAT_CONVERSATION">Cuộc trò chuyện</option>
+              <option value="CHAT_MESSAGE">Tin nhắn</option>
+            </select>
+          </div>
+          <div className="admin-field">
+            <label htmlFor="moderation-report-time">Thời gian</label>
+            <select
+              id="moderation-report-time"
+              className="admin-control"
+              value={timeFilter}
+              onChange={(event) => setTimeFilter(event.target.value as TimeFilter)}
+            >
+              <option value="">Tất cả thời gian</option>
+              <option value="TODAY">Hôm nay</option>
+              <option value="7_DAYS">7 ngày qua</option>
+              <option value="30_DAYS">30 ngày qua</option>
+            </select>
+          </div>
+        </div>
+      ) : null}
 
-            {queueError ? <p role="alert" className="admin-inline-error">{queueError}</p> : null}
-            {isLoadingList && cases.length === 0 ? <p role="status">Đang tải danh sách hồ sơ…</p> : null}
-            {!isLoadingList && !queueError && cases.length === 0 ? <p role="status">Không có hồ sơ nào phù hợp bộ lọc.</p> : null}
-            {cases.length > 0 ? (
-              <div className="admin-case-list">
-                {cases.map((item) => {
-                  const itemTargetHref = summaryTargetHref(item);
-                  return (
-                  <article
-                    key={item.id}
-                    className={`admin-case-card ${selectedCaseId === item.id ? 'admin-case-card--selected' : ''}`}
-                  >
-                    <button
-                      type="button"
-                      className="admin-case-card__select"
-                      aria-pressed={selectedCaseId === item.id}
-                      aria-label={`Mở hồ sơ ${item.targetName}`}
-                      ref={(element) => {
-                        if (element) caseCardRefs.current.set(item.id, element);
-                        else caseCardRefs.current.delete(item.id);
-                      }}
-                      onClick={() => void loadCaseDetail(item.id)}
-                    >
-                      <span className="admin-case-card__header">
-                        <span className={`admin-badge ${item.targetType === 'PRODUCT' ? 'admin-badge--product' : item.targetType === 'SHOP' ? 'admin-badge--shop' : 'admin-badge--chat'}`}>
-                          {item.targetType === 'PRODUCT' ? 'Sản phẩm' : item.targetType === 'SHOP' ? 'Cửa hàng' : item.targetType === 'CHAT_MESSAGE' ? 'Tin nhắn' : 'Cuộc trò chuyện'}
-                        </span>
-                        <span className={`admin-badge ${item.status === 'RESOLVED' ? 'admin-badge--resolved' : item.status === 'IN_REVIEW' ? 'admin-badge--inreview' : 'admin-badge--open'}`}>
-                          {STATUS_LABELS[item.status]}
-                        </span>
-                      </span>
-                      <span className="admin-case-card__title">{item.targetName}</span>
-                      <span className="admin-case-card__meta">
-                        {item.reportCount} báo cáo · {REASON_LABELS[item.primaryReasonCode] ?? item.primaryReasonCode}
-                      </span>
-                      <span className="admin-case-card__target-id">Mã hồ sơ: <code>{item.id}</code></span>
-                    </button>
-                    <p className="admin-case-card__target-id">
-                      Mã đối tượng: {itemTargetHref ? <Link href={itemTargetHref} className="admin-case-card__target-link"><code>{item.targetId}</code></Link> : <code>{item.targetId}</code>}
-                    </p>
-                  </article>
-                  );
-                })}
-                {nextCursor ? (
-                  <button type="button" className="admin-btn-action" onClick={() => void fetchCases(nextCursor)} disabled={isLoadingList}>
-                    {isLoadingList ? 'Đang tải…' : 'Tải thêm hồ sơ'}
-                  </button>
-                ) : null}
+      <p className="sr-only" role="status" aria-live="polite">
+        {statusMessage}
+      </p>
+
+      {!isDetailRoute && reportTypeFilter !== 'REVIEW' ? (
+        <section
+          id="moderation-reports-panel"
+          className="admin-moderation-workspace"
+          aria-label="Danh sách report cần xử lý"
+        >
+          <section
+            className="admin-table-card admin-moderation-list-card"
+            aria-label="Bảng report cần xử lý"
+          >
+            <div className="admin-table-card__header">
+              <div>
+                <h2>Đối tượng được báo cáo</h2>
+                <p>Quản lý tin nhắn, shop và sản phẩm theo trạng thái report.</p>
+              </div>
+              <span className="admin-table-card__count">Đã tải {visibleCases.length} report</span>
+            </div>
+            {queueError ? (
+              <p role="alert" className="admin-inline-error">
+                {queueError}
+              </p>
+            ) : null}
+            {isLoadingList && cases.length === 0 ? (
+              <p role="status">Đang tải danh sách hồ sơ…</p>
+            ) : null}
+            {!isLoadingList && !queueError && visibleCases.length === 0 ? (
+              <p role="status">Không có report nào phù hợp bộ lọc.</p>
+            ) : null}
+            {visibleCases.length > 0 ? (
+              <div className="admin-table-scroll">
+                <table className="admin-data-table admin-moderation-table">
+                  <thead>
+                    <tr>
+                      <th>Loại report</th>
+                      <th>Đối tượng</th>
+                      <th>Báo cáo</th>
+                      <th>Trạng thái</th>
+                      <th>Cập nhật</th>
+                      <th className="admin-table-cell--actions">Thao tác</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {visibleCases.map((item) => (
+                      <tr key={item.id}>
+                        <td>
+                          <span
+                            className={`admin-badge ${item.targetType === 'PRODUCT' ? 'admin-badge--product' : item.targetType === 'SHOP' ? 'admin-badge--shop' : 'admin-badge--chat'}`}
+                          >
+                            {item.targetType === 'PRODUCT'
+                              ? 'Sản phẩm'
+                              : item.targetType === 'SHOP'
+                                ? 'Shop'
+                                : item.targetType === 'CHAT_MESSAGE'
+                                  ? 'Tin nhắn'
+                                  : 'Cuộc trò chuyện'}
+                          </span>
+                        </td>
+                        <td>
+                          <AdminEntityLink
+                            href={moderationAdminHref(item)}
+                            name={item.targetName}
+                            imageUrl={item.targetImageUrl}
+                            meta={
+                              item.targetType === 'PRODUCT'
+                                ? 'Sản phẩm'
+                                : item.targetType === 'SHOP'
+                                  ? 'Shop'
+                                  : 'Nội dung chat'
+                            }
+                          />
+                        </td>
+                        <td>
+                          <strong className="admin-table-primary">
+                            {item.reportCount} báo cáo
+                          </strong>
+                          <small className="admin-table-subtext">
+                            {REASON_LABELS[item.primaryReasonCode] ?? item.primaryReasonCode}
+                          </small>
+                        </td>
+                        <td>
+                          <span
+                            className={`admin-badge ${item.status === 'RESOLVED' ? 'admin-badge--resolved' : item.status === 'IN_REVIEW' ? 'admin-badge--inreview' : 'admin-badge--open'}`}
+                          >
+                            {STATUS_LABELS[item.status]}
+                          </span>
+                        </td>
+                        <td>
+                          <time dateTime={item.lastActivityAt}>
+                            {new Date(item.lastActivityAt).toLocaleString('vi-VN')}
+                          </time>
+                        </td>
+                        <td className="admin-table-cell--actions">
+                          <div className="admin-table-actions">
+                            <Link
+                              href={`/admin/moderation/${item.id}`}
+                              className="admin-icon-btn admin-icon-btn--secondary"
+                              aria-label={`Mở hồ sơ ${item.targetName}`}
+                              title="Xem chi tiết"
+                            >
+                              <ModerationActionIcon name="details" />
+                            </Link>
+                            <button
+                              type="button"
+                              className="admin-icon-btn admin-icon-btn--primary"
+                              aria-label={`Xử lý report ${item.targetName}`}
+                              title="Xử lý report"
+                              onClick={() => void openCaseAction(item.id)}
+                            >
+                              <ModerationActionIcon name="process" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             ) : null}
-          </aside>
-
-          <section aria-live="polite">
-            {!selectedCaseId ? <p className="admin-empty-state">Chọn một hồ sơ để xem báo cáo và quyết định kiểm duyệt.</p> : null}
-            {selectedCaseId && isLoadingDetail ? <p role="status" className="admin-empty-state">Đang tải chi tiết hồ sơ…</p> : null}
-            {caseDetail && !isLoadingDetail ? (
-              <article className="admin-detail-panel" aria-labelledby="case-detail-title">
-                <header className="admin-detail-header">
-                  <div>
-                    <h2 id="case-detail-title">{caseDetail.targetName}</h2>
-                    <p>Mã hồ sơ: <code>{caseDetail.id}</code></p>
-                    <p>
-                      Mã đối tượng: {selectedTargetHref ? <Link href={selectedTargetHref} className="admin-case-detail__target-link"><code>{caseDetail.targetId}</code></Link> : <code>{caseDetail.targetId}</code>}
-                    </p>
-                  </div>
-                  <div className="admin-detail-header-actions">
-                    <span className="admin-badge">{STATUS_LABELS[caseDetail.status]}</span>
-                    <button
-                      type="button"
-                      className="admin-detail-close"
-                      onClick={closeCaseDetail}
-                      disabled={isMutating}
-                    >
-                      Đóng chi tiết hồ sơ
-                    </button>
-                  </div>
-                </header>
-
-                {actionError ? <p className="admin-inline-error" role="alert">{actionError}</p> : null}
-
-                <section aria-labelledby="reports-title">
-                  <h3 id="reports-title" className="admin-section-title">Báo cáo đính kèm ({caseDetail.reports.length})</h3>
-                  <div className="admin-reports-container">
-                    {caseDetail.reports.map((report) => (
-                      <article key={report.id} className="admin-report-card">
-                        <p className="admin-report-card__header">Mã người gửi: <code>{report.reporterOpaqueId}</code> · {new Date(report.createdAt).toLocaleString('vi-VN')}</p>
-                        <p className="admin-report-card__reason">{REASON_LABELS[report.reasonCode] ?? report.reasonCode}</p>
-                        <p className="admin-report-card__details">{report.details}</p>
-                        {report.evidenceUrls.length > 0 ? (
-                          <ul className="admin-evidence-list" aria-label="Liên kết bằng chứng">
-                            {report.evidenceUrls.map((url, index) => {
-                              const href = safeHttpsHref(url);
-                              return (
-                                <li key={`${report.id}-${index}`}>
-                                  <code>{url}</code>
-                                  {href ? <a href={href} target="_blank" rel="noopener noreferrer">Mở bằng chứng {index + 1}</a> : <span>Liên kết không hợp lệ</span>}
-                                </li>
-                              );
-                            })}
-                          </ul>
-                        ) : null}
-                      </article>
+            <footer className="admin-list-footer">
+              <span>Hiển thị {visibleCases.length} report đã tải</span>
+              {nextCursor ? (
+                <button
+                  type="button"
+                  className="admin-btn admin-btn-secondary"
+                  onClick={() => void fetchCases(nextCursor)}
+                  disabled={isLoadingList}
+                >
+                  {isLoadingList ? 'Đang tải…' : 'Tải thêm report'}
+                </button>
+              ) : (
+                <span>Đã hiển thị hết kết quả</span>
+              )}
+            </footer>
+          </section>
+        </section>
+      ) : !isDetailRoute ? (
+        <section
+          id="moderation-review-reports-panel"
+          className="admin-moderation-workspace"
+          aria-label="Report đánh giá"
+        >
+          <section
+            className="admin-table-card admin-moderation-list-card"
+            aria-labelledby="reported-reviews-title"
+          >
+            <div className="admin-table-card__header">
+              <div>
+                <h2 id="reported-reviews-title">Report đánh giá ({visibleReviews.length})</h2>
+                <p>Quản lý đánh giá bị báo cáo theo trạng thái và thời gian.</p>
+              </div>
+              <button
+                type="button"
+                className="admin-btn admin-btn-secondary"
+                onClick={() => void loadReportedReviews()}
+                disabled={isLoadingReportedReviews}
+              >
+                {isLoadingReportedReviews ? 'Đang tải…' : 'Làm mới'}
+              </button>
+            </div>
+            {reportedReviewsError ? (
+              <p className="admin-inline-error" role="alert">
+                {reportedReviewsError}
+              </p>
+            ) : null}
+            {isLoadingReportedReviews && reportedReviews.length === 0 ? (
+              <p role="status">Đang tải report đánh giá…</p>
+            ) : null}
+            {!isLoadingReportedReviews && !reportedReviewsError && visibleReviews.length === 0 ? (
+              <p className="admin-reported-review-queue__empty">
+                Chưa có report đánh giá nào phù hợp bộ lọc.
+              </p>
+            ) : null}
+            {visibleReviews.length > 0 ? (
+              <div className="admin-table-scroll">
+                <table className="admin-data-table admin-moderation-table">
+                  <thead>
+                    <tr>
+                      <th>Sản phẩm</th>
+                      <th>Shop</th>
+                      <th>Đánh giá</th>
+                      <th>Trạng thái</th>
+                      <th>Report gần nhất</th>
+                      <th className="admin-table-cell--actions">Thao tác</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {visibleReviews.map((review) => (
+                      <tr
+                        key={review.reviewId}
+                        className={
+                          reviewDetail?.id === review.reviewId
+                            ? 'admin-moderation-table__row--selected'
+                            : undefined
+                        }
+                      >
+                        <td>
+                          <AdminEntityLink
+                            href={`/admin/products/${review.productId}`}
+                            name={review.productName}
+                            imageUrl={review.productImageUrl}
+                            meta="Sản phẩm"
+                          />
+                        </td>
+                        <td>
+                          <AdminEntityLink
+                            href={`/admin/shops/${review.shopId}`}
+                            name={review.shopName}
+                            imageUrl={review.shopLogoUrl}
+                            meta="Shop"
+                          />
+                        </td>
+                        <td>
+                          <strong className="admin-table-primary">{review.rating} sao</strong>
+                          <small className="admin-table-subtext">
+                            {review.reportCount} báo cáo
+                          </small>
+                        </td>
+                        <td>
+                          <span
+                            className={`admin-badge ${review.visibility === 'VISIBLE' ? 'admin-badge--success' : 'admin-badge--danger'}`}
+                          >
+                            {review.visibility === 'VISIBLE' ? 'Đang hiển thị' : 'Đã ẩn'}
+                          </span>
+                        </td>
+                        <td>
+                          <time dateTime={review.latestReportedAt}>
+                            {new Date(review.latestReportedAt).toLocaleString('vi-VN')}
+                          </time>
+                        </td>
+                        <td className="admin-table-cell--actions">
+                          <div className="admin-table-actions">
+                            <button
+                              type="button"
+                              className="admin-icon-btn admin-icon-btn--secondary"
+                              aria-label={`Mở report đánh giá ${review.productName}`}
+                              title="Xem chi tiết"
+                              onClick={() => {
+                                setLookupReviewId(review.reviewId);
+                                void loadReviewDetail(review.reviewId);
+                              }}
+                            >
+                              <ModerationActionIcon name="details" />
+                            </button>
+                            <button
+                              type="button"
+                              className="admin-icon-btn admin-icon-btn--primary"
+                              aria-label={`Xử lý report đánh giá ${review.productName}`}
+                              title="Xử lý report"
+                              onClick={() => void openReviewAction(review.reviewId)}
+                            >
+                              <ModerationActionIcon name="process" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
                     ))}
-                  </div>
-                </section>
-
-                {caseDetail.targetDetails.chat ? (
-                  <section aria-labelledby="chat-evidence-title" className="admin-chat-evidence">
-                    <h3 id="chat-evidence-title" className="admin-section-title">Ngữ cảnh chat giới hạn</h3>
-                    <p>Chỉ hiển thị tối đa 20 tin nhắn gần nhất để phục vụ quyết định.</p>
-                    <ol>
-                      {caseDetail.targetDetails.chat.messages.map((message) => (
-                        <li key={`${message.senderUserId}-${message.sequence}`}>
-                          <strong>{message.senderLabel}</strong>
-                          <span>{message.content}</span>
-                          <time dateTime={message.createdAt}>{new Date(message.createdAt).toLocaleString('vi-VN')}</time>
+                  </tbody>
+                </table>
+              </div>
+            ) : null}
+            <footer className="admin-list-footer">
+              <span>Hiển thị {visibleReviews.length} report đã tải</span>
+              <span>Đã hiển thị hết kết quả</span>
+            </footer>
+          </section>
+          <section
+            className="admin-review-panel admin-moderation-review-panel admin-moderation-detail-section"
+            aria-label="Chi tiết report đánh giá"
+          >
+            <h3 className="admin-review-lookup__title">Tra cứu thủ công</h3>
+            <form onSubmit={handleLookupReview} className="admin-review-lookup">
+              <label htmlFor="review-id">Mã đánh giá</label>
+              <input
+                id="review-id"
+                className="admin-form-input"
+                value={lookupReviewId}
+                onChange={(event) => setLookupReviewId(event.target.value)}
+                placeholder="UUID đánh giá"
+              />
+              <button type="submit" className="admin-btn-action" disabled={isLoadingReview}>
+                {isLoadingReview ? 'Đang tìm…' : 'Tra cứu'}
+              </button>
+            </form>
+            {reviewError ? (
+              <p className="admin-inline-error" role="alert">
+                {reviewError}
+              </p>
+            ) : null}
+            {reviewDetail ? (
+              <article className="admin-review-detail" aria-labelledby="review-detail-title">
+                <h3 id="review-detail-title">Đánh giá trên sản phẩm</h3>
+                <AdminEntityLink
+                  href={`/admin/products/${reviewDetail.productId}`}
+                  name={reviewDetail.productName}
+                  imageUrl={reviewDetail.productImageUrl}
+                  meta="Sản phẩm"
+                />
+                <p>
+                  Người đánh giá:{' '}
+                  <AdminEntityLink
+                    href={`/admin/users/${reviewDetail.authorUserId}`}
+                    name={reviewDetail.authorDisplayName}
+                    meta="Người dùng"
+                  />{' '}
+                  · {reviewDetail.rating} sao · Trạng thái:{' '}
+                  {reviewDetail.visibility === 'VISIBLE' ? 'Hiển thị' : 'Đang ẩn'}
+                </p>
+                <blockquote>{reviewDetail.comment ?? 'Không có nội dung nhận xét.'}</blockquote>
+                {reviewDetail.sellerReportCount > 0 ? (
+                  <section
+                    className="admin-review-report-context"
+                    aria-labelledby="seller-report-context-title"
+                  >
+                    <h4 id="seller-report-context-title">
+                      Ngữ cảnh báo cáo từ người bán ({reviewDetail.sellerReportCount})
+                    </h4>
+                    <p>
+                      Chỉ hiển thị lý do và mô tả cần thiết cho quyết định; không hiển thị danh tính
+                      người bán.
+                    </p>
+                    <ul>
+                      {reviewDetail.sellerReports.map((report) => (
+                        <li key={report.id}>
+                          <span className="font-medium">
+                            {REASON_LABELS[report.reasonCode] ?? report.reasonCode}
+                          </span>
+                          {report.details ? <span> — {report.details}</span> : null}
+                          <small>{new Date(report.createdAt).toLocaleString('vi-VN')}</small>
                         </li>
                       ))}
-                    </ol>
+                    </ul>
                   </section>
                 ) : null}
-
-                <section aria-labelledby="events-title">
-                  <h3 id="events-title" className="admin-section-title">Nhật ký hoạt động</h3>
-                  {caseDetail.events.length === 0 ? <p>Chưa có hoạt động nào.</p> : (
-                    <ol className="admin-events-list">
-                      {caseDetail.events.map((event) => <li key={event.id} className="admin-event-item">{event.eventType} · {event.actorName ?? 'Hệ thống'} · {new Date(event.createdAt).toLocaleString('vi-VN')}{event.note ? `: ${event.note}` : ''}</li>)}
-                    </ol>
-                  )}
-                </section>
-
-                <section aria-labelledby="decision-title" className="admin-decision-box">
-                  <h3 id="decision-title">Ra quyết định kiểm duyệt</h3>
-                  <div className="admin-outcome-options" role="radiogroup" aria-label="Hành động xử lý">
-                    {caseDetail.targetType === 'CHAT_CONVERSATION' || caseDetail.targetType === 'CHAT_MESSAGE' ? (
-                      <>
-                        <label className="admin-outcome-pill"><input type="radio" name="outcome" checked={decisionOutcome === 'NO_ACTION'} onChange={() => setDecisionOutcome('NO_ACTION')} />Không xử lý</label>
-                        <label className="admin-outcome-pill"><input type="radio" name="outcome" checked={decisionOutcome === 'WARN_USER'} onChange={() => setDecisionOutcome('WARN_USER')} />Cảnh cáo</label>
-                        <label className="admin-outcome-pill"><input type="radio" name="outcome" checked={decisionOutcome === 'RESTRICT_CHAT_TEMPORARY'} onChange={() => setDecisionOutcome('RESTRICT_CHAT_TEMPORARY')} />Hạn chế tạm thời</label>
-                        <label className="admin-outcome-pill"><input type="radio" name="outcome" checked={decisionOutcome === 'RESTRICT_CHAT_INDEFINITE'} onChange={() => setDecisionOutcome('RESTRICT_CHAT_INDEFINITE')} />Hạn chế vô thời hạn</label>
-                        <label className="admin-outcome-pill"><input type="radio" name="outcome" checked={decisionOutcome === 'RESTORE_CHAT'} onChange={() => setDecisionOutcome('RESTORE_CHAT')} />Mở lại chat</label>
-                      </>
-                    ) : caseDetail.targetStatus === 'SUSPENDED' ? (
-                      <label className="admin-outcome-pill"><input type="radio" name="outcome" checked={decisionOutcome === 'RESTORE_TARGET'} onChange={() => setDecisionOutcome('RESTORE_TARGET')} />Khôi phục</label>
-                    ) : (
-                      <>
-                        <label className="admin-outcome-pill"><input type="radio" name="outcome" checked={decisionOutcome === 'SUSPEND_TARGET'} onChange={() => setDecisionOutcome('SUSPEND_TARGET')} />Đình chỉ</label>
-                        <label className="admin-outcome-pill"><input type="radio" name="outcome" checked={decisionOutcome === 'NO_ACTION'} onChange={() => setDecisionOutcome('NO_ACTION')} />Không xử lý</label>
-                      </>
-                    )}
+                <div className="admin-detail-action-row">
+                  <div>
+                    <h4>Ra quyết định</h4>
+                    <p>Chọn hành động và ghi lý do trong popup xử lý.</p>
                   </div>
-                  <div className="admin-form-stack">
-                    <label htmlFor="decision-reason">Lý do công khai (8–240 ký tự)</label>
-                    <textarea id="decision-reason" className="admin-form-input" value={decisionReason} onChange={(event) => setDecisionReason(event.target.value)} minLength={8} maxLength={240} rows={3} />
-                    <label htmlFor="decision-private-note">Ghi chú nội bộ {caseDetail.targetType === 'CHAT_CONVERSATION' || caseDetail.targetType === 'CHAT_MESSAGE' ? '(bắt buộc với quyết định chat)' : '(tùy chọn)'}</label>
-                    <textarea id="decision-private-note" className="admin-form-input" value={decisionPrivateNote} onChange={(event) => setDecisionPrivateNote(event.target.value)} maxLength={2000} rows={3} />
-                    {caseDetail.targetType === 'CHAT_CONVERSATION' || caseDetail.targetType === 'CHAT_MESSAGE' ? (
-                      <>
-                        <label htmlFor="restriction-until">Mở lại lúc (chỉ áp dụng hạn chế tạm thời)</label>
-                        <input id="restriction-until" className="admin-form-input" type="datetime-local" value={restrictionUntil} onChange={(event) => setRestrictionUntil(event.target.value)} disabled={decisionOutcome !== 'RESTRICT_CHAT_TEMPORARY'} />
-                      </>
-                    ) : null}
-                    <button ref={decisionButtonRef} type="button" className="admin-btn-action admin-btn-action--danger" onClick={openDecisionConfirmation} disabled={isMutating}>
-                      Xác nhận áp dụng quyết định
-                    </button>
-                  </div>
-                </section>
+                  <button
+                    type="button"
+                    className="admin-btn admin-btn-primary"
+                    onClick={() => void openReviewAction(reviewDetail.id)}
+                    disabled={isLoadingReview}
+                  >
+                    Xử lý report
+                  </button>
+                </div>
               </article>
             ) : null}
           </section>
         </section>
-      ) : (
-        <section id="moderation-reviews-panel" role="tabpanel" aria-labelledby="moderation-reviews-tab" className="admin-review-panel">
-          <h2>Kiểm duyệt đánh giá</h2>
-          <section className="admin-reported-review-queue" aria-labelledby="reported-reviews-title">
-            <div className="admin-reported-review-queue__header">
-              <div>
-                <h3 id="reported-reviews-title">Đánh giá được người bán báo cáo ({reportedReviews.length})</h3>
-                <p>Chọn một đánh giá để xem lý do báo cáo trước khi ra quyết định.</p>
-              </div>
-              <button type="button" className="admin-btn-action" onClick={() => void loadReportedReviews()} disabled={isLoadingReportedReviews}>
-                {isLoadingReportedReviews ? 'Đang tải…' : 'Làm mới'}
-              </button>
-            </div>
-            {reportedReviewsError ? <p className="admin-inline-error" role="alert">{reportedReviewsError}</p> : null}
-            {isLoadingReportedReviews && reportedReviews.length === 0 ? <p role="status">Đang tải đánh giá được báo cáo…</p> : null}
-            {!isLoadingReportedReviews && !reportedReviewsError && reportedReviews.length === 0 ? <p className="admin-reported-review-queue__empty">Chưa có đánh giá nào đang chờ xử lý từ người bán.</p> : null}
-            {reportedReviews.length > 0 ? (
-              <div className="admin-reported-review-list">
-                {reportedReviews.map((review) => (
-                  <button
-                    key={review.reviewId}
-                    type="button"
-                    className={`admin-reported-review-card ${reviewDetail?.id === review.reviewId ? 'admin-reported-review-card--selected' : ''}`}
-                    onClick={() => {
-                      setLookupReviewId(review.reviewId);
-                      void loadReviewDetail(review.reviewId);
-                    }}
-                  >
-                    <strong>{review.productName}</strong>
-                    <span>{review.shopName} · {review.rating} sao · {review.reportCount} báo cáo</span>
-                    <span>{review.comment ?? 'Không có nội dung nhận xét.'}</span>
-                  </button>
-                ))}
-              </div>
-            ) : null}
-          </section>
-          <h3 className="admin-review-lookup__title">Tra cứu thủ công</h3>
-          <form onSubmit={handleLookupReview} className="admin-review-lookup">
-            <label htmlFor="review-id">Mã đánh giá</label>
-            <input id="review-id" className="admin-form-input" value={lookupReviewId} onChange={(event) => setLookupReviewId(event.target.value)} placeholder="UUID đánh giá" />
-            <button type="submit" className="admin-btn-action" disabled={isLoadingReview}>{isLoadingReview ? 'Đang tìm…' : 'Tra cứu'}</button>
-          </form>
-          {reviewError ? <p className="admin-inline-error" role="alert">{reviewError}</p> : null}
-          {reviewDetail ? (
-            <article className="admin-review-detail" aria-labelledby="review-detail-title">
-              <h3 id="review-detail-title">Đánh giá trên sản phẩm: {reviewDetail.productName}</h3>
-              <p>Người đánh giá: {reviewDetail.authorDisplayName} · {reviewDetail.rating} sao · Trạng thái: {reviewDetail.visibility === 'VISIBLE' ? 'Hiển thị' : 'Đang ẩn'}</p>
-              <blockquote>{reviewDetail.comment ?? 'Không có nội dung nhận xét.'}</blockquote>
-              {reviewDetail.sellerReportCount > 0 ? (
-                <section className="admin-review-report-context" aria-labelledby="seller-report-context-title">
-                  <h4 id="seller-report-context-title">Ngữ cảnh báo cáo từ người bán ({reviewDetail.sellerReportCount})</h4>
-                  <p>Chỉ hiển thị lý do và mô tả cần thiết cho quyết định; không hiển thị danh tính người bán.</p>
-                  <ul>
-                    {reviewDetail.sellerReports.map((report) => (
-                      <li key={report.id}>
-                        <strong>{REASON_LABELS[report.reasonCode] ?? report.reasonCode}</strong>
-                        {report.details ? <span> — {report.details}</span> : null}
-                        <small>{new Date(report.createdAt).toLocaleString('vi-VN')}</small>
-                      </li>
-                    ))}
-                  </ul>
-                </section>
-              ) : null}
-              <label htmlFor="review-reason">Lý do kiểm duyệt (8–240 ký tự)</label>
-              <textarea id="review-reason" className="admin-form-input" value={reviewActionReason} onChange={(event) => setReviewActionReason(event.target.value)} minLength={8} maxLength={240} rows={3} />
-              <div className="admin-review-actions">
-                <button
-                  type="button"
-                  className={`admin-btn-action ${reviewDetail.visibility === 'VISIBLE' ? 'admin-btn-action--danger' : 'admin-btn-action--success'}`}
-                  onClick={(event) => openReviewConfirmation(reviewDetail.visibility === 'VISIBLE' ? 'HIDE' : 'RESTORE', event.currentTarget)}
-                  disabled={isLoadingReview}
-                >
-                  {reviewDetail.visibility === 'VISIBLE' ? 'Ẩn đánh giá vi phạm' : 'Khôi phục hiển thị đánh giá'}
-                </button>
-                {reviewDetail.visibility === 'VISIBLE' && reviewDetail.sellerReportCount > 0 ? (
-                  <button
-                    type="button"
-                    className="admin-btn-action"
-                    onClick={(event) => openReviewConfirmation('KEEP_VISIBLE', event.currentTarget)}
-                    disabled={isLoadingReview}
-                  >
-                    Giữ nguyên hiển thị
-                  </button>
-                ) : null}
-              </div>
-            </article>
-          ) : null}
+      ) : null}
+
+      {isDetailRoute ? (
+        <section className="admin-moderation-detail-route" aria-live="polite">
+          <AdminModerationCaseDetail
+            detail={caseDetail}
+            isLoading={isLoadingDetail}
+            actionError={actionError}
+            isMutating={isMutating}
+            reasonLabels={REASON_LABELS}
+            backHref="/admin/moderation"
+            onOpenAction={() => void openCaseAction()}
+          />
         </section>
-      )}
+      ) : null}
+
+      {actionDialog === 'case' && caseDetail ? (
+        <AdminModerationActionDialog
+          kind="case"
+          detail={caseDetail}
+          outcome={decisionOutcome}
+          reason={decisionReason}
+          privateNote={decisionPrivateNote}
+          restrictionUntil={restrictionUntil}
+          error={actionError}
+          isSubmitting={isMutating}
+          onOutcomeChange={setDecisionOutcome}
+          onReasonChange={setDecisionReason}
+          onPrivateNoteChange={setDecisionPrivateNote}
+          onRestrictionUntilChange={setRestrictionUntil}
+          onSubmit={openDecisionConfirmation}
+          onClose={() => setActionDialog(null)}
+        />
+      ) : null}
+
+      {actionDialog === 'review' && reviewDetail ? (
+        <AdminModerationActionDialog
+          kind="review"
+          detail={reviewDetail}
+          action={reviewAction}
+          reason={reviewActionReason}
+          error={reviewError}
+          isSubmitting={isLoadingReview}
+          onActionChange={setReviewAction}
+          onReasonChange={setReviewActionReason}
+          onSubmit={(trigger) => openReviewConfirmation(reviewAction, trigger)}
+          onClose={() => setActionDialog(null)}
+        />
+      ) : null}
 
       {confirmation ? (
         <div className="admin-confirmation-overlay" role="presentation">
-          <section className="admin-confirmation-dialog" role="alertdialog" aria-modal="true" aria-labelledby="moderation-confirmation-title" aria-describedby="moderation-confirmation-description">
+          <section
+            className="admin-confirmation-dialog"
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="moderation-confirmation-title"
+            aria-describedby="moderation-confirmation-description"
+          >
             <h2 id="moderation-confirmation-title">Xác nhận hành động</h2>
-            <p id="moderation-confirmation-description">{confirmation.label}. Thao tác này sẽ ghi lịch sử kiểm duyệt không thể sửa.</p>
+            <p id="moderation-confirmation-description">
+              {confirmation.label}. Thao tác này sẽ ghi lịch sử kiểm duyệt không thể sửa.
+            </p>
             <div className="admin-confirmation-actions">
-              <button type="button" className="admin-btn-action" onClick={closeConfirmation} disabled={isMutating}>Hủy</button>
-              <button ref={confirmationButtonRef} type="button" className="admin-btn-action admin-btn-action--danger" onClick={confirmAction} disabled={isMutating}>{isMutating ? 'Đang thực hiện…' : 'Xác nhận'}</button>
+              <button
+                type="button"
+                className="admin-btn-action"
+                onClick={closeConfirmation}
+                disabled={isMutating}
+              >
+                Hủy
+              </button>
+              <button
+                ref={confirmationButtonRef}
+                type="button"
+                className="admin-btn-action admin-btn-action--danger"
+                onClick={confirmAction}
+                disabled={isMutating}
+              >
+                {isMutating ? 'Đang thực hiện…' : 'Xác nhận'}
+              </button>
             </div>
           </section>
         </div>

@@ -129,6 +129,17 @@ describe('NotificationBell', () => {
     await waitFor(() => expect(listNotificationPopover).toHaveBeenCalled());
   });
 
+  it('keeps seller view-all navigation inside the seller dashboard', async () => {
+    const user = userEvent.setup();
+    render(<NotificationBell sellerDashboard />);
+    await user.click(await screen.findByRole('button', { name: 'Thông báo, 3 chưa đọc' }));
+
+    expect(screen.getByRole('link', { name: 'Xem tất cả' })).toHaveAttribute(
+      'href',
+      '/seller/notifications',
+    );
+  });
+
   it('opens the exact chat conversation before marking its aggregate notification read', async () => {
     const user = userEvent.setup();
     const openConversationFromNotification = vi.fn().mockResolvedValue(true);

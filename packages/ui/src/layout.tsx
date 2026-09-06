@@ -49,8 +49,63 @@ export function Grid({
 
 export const ResponsiveGrid = Grid;
 
+export function StorefrontContainer({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
+  return <div className={cn('sc-container sc-storefront-container', className)} {...props} />;
+}
+
 export function Section({ className, ...props }: HTMLAttributes<HTMLElement>) {
   return <section className={cn('sc-section', className)} {...props} />;
+}
+
+export function StorefrontSection({ className, ...props }: HTMLAttributes<HTMLElement>) {
+  return <section className={cn('sc-section sc-storefront-section', className)} {...props} />;
+}
+
+export function SectionHeader({
+  title,
+  subtitle,
+  action,
+  className,
+  id,
+  ...props
+}: Omit<HTMLAttributes<HTMLDivElement>, 'title'> & {
+  title: ReactNode;
+  subtitle?: ReactNode;
+  action?: ReactNode;
+}) {
+  return (
+    <div className={cn('sc-section-header', className)} {...props}>
+      <div>
+        <h2 className="sc-section-header__title" id={id}>
+          {title}
+        </h2>
+        {subtitle ? <p className="sc-section-header__subtitle">{subtitle}</p> : null}
+      </div>
+      {action ? <div className="sc-section-header__action">{action}</div> : null}
+    </div>
+  );
+}
+
+export function SellerShell({
+  sidebar,
+  header,
+  children,
+  className,
+  ...props
+}: HTMLAttributes<HTMLDivElement> & {
+  sidebar?: ReactNode;
+  header?: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <div className={cn('sc-seller-shell', className)} data-density="compact" {...props}>
+      {sidebar ? <aside className="sc-seller-shell__sidebar">{sidebar}</aside> : null}
+      <div className="sc-seller-shell__main">
+        {header ? <header className="sc-seller-shell__header">{header}</header> : null}
+        <div className="sc-seller-shell__content">{children}</div>
+      </div>
+    </div>
+  );
 }
 
 export const Main = forwardRef<HTMLElement, HTMLAttributes<HTMLElement>>(function Main(

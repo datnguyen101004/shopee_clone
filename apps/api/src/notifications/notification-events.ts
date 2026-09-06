@@ -259,3 +259,82 @@ export function voucherAssignedNotificationEvent(input: {
     ],
   };
 }
+
+export function campaignAnnouncementNotificationEvent(input: {
+  campaignId: string;
+  typeCode: string;
+  title: string;
+  enrollmentEndsAt: Date;
+  sellerOwnerIds: string[];
+  version?: number;
+}): NotifyEventInput {
+  return {
+    type: 'CAMPAIGN_ANNOUNCED',
+    referenceKey: `campaign:${input.campaignId}:v${input.version ?? 1}:announcement`,
+    recipients: input.sellerOwnerIds.map((userId) => ({
+      userId,
+      roleTag: 'seller',
+      title: `Chiến dịch ${input.typeCode} sắp diễn ra`,
+      body: `${input.title} đang mở lời mời tham gia. Hạn đăng ký: ${input.enrollmentEndsAt.toLocaleString('vi-VN')}.`,
+      metadata: {
+        targetUrl: `/seller/campaigns/${encodeURIComponent(input.campaignId)}`,
+        thumbnailUrl: null,
+        referenceId: input.campaignId,
+        amountMinor: null,
+        currency: null,
+      },
+    })),
+  };
+}
+
+export function homepageBannerCampaignTargetUnavailableEvent(input: {
+  bannerId: string;
+  campaignId: string;
+  reason: 'ENDED' | 'CANCELLED' | 'MISSING' | 'FETCH_FAILED';
+  adminUserIds: string[];
+}): NotifyEventInput {
+  return {
+    type: 'BANNER_CAMPAIGN_TARGET_UNAVAILABLE',
+    referenceKey: `homepage-banner:${input.bannerId}:campaign:${input.campaignId}:failure:${input.reason}`,
+    recipients: input.adminUserIds.map((userId) => ({
+      userId,
+      roleTag: 'admin',
+      title: 'Banner có đích chiến dịch không khả dụng',
+      body: `Banner ${input.bannerId.slice(0, 8)} không thể mở chiến dịch ${input.campaignId.slice(0, 8)} (${input.reason}).`,
+      metadata: {
+        targetUrl: '/admin/homepage',
+        thumbnailUrl: null,
+        referenceId: input.bannerId,
+        amountMinor: null,
+        currency: null,
+      },
+    })),
+  };
+}
+
+export function campaignEnrollmentReminderNotificationEvent(input: {
+  campaignId: string;
+  typeCode: string;
+  title: string;
+  enrollmentEndsAt: Date;
+  sellerOwnerIds: string[];
+  version?: number;
+}): NotifyEventInput {
+  return {
+    type: 'CAMPAIGN_ENROLLMENT_REMINDER',
+    referenceKey: `campaign:${input.campaignId}:v${input.version ?? 1}:enrollment-reminder`,
+    recipients: input.sellerOwnerIds.map((userId) => ({
+      userId,
+      roleTag: 'seller',
+      title: `Sắp hết hạn đăng ký ${input.typeCode}`,
+      body: `${input.title}: hãy hoàn tất lựa chọn tham gia trước ${input.enrollmentEndsAt.toLocaleString('vi-VN')}.`,
+      metadata: {
+        targetUrl: `/seller/campaigns/${encodeURIComponent(input.campaignId)}`,
+        thumbnailUrl: null,
+        referenceId: input.campaignId,
+        amountMinor: null,
+        currency: null,
+      },
+    })),
+  };
+}

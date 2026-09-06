@@ -33,6 +33,13 @@ export class ReturnProjector {
     return {
       returnReference: graph.id,
       orderReference: graph.orderId,
+      preview: {
+        productId: graph.items[0]?.orderLine.productId ?? graph.id,
+        productName: graph.items[0]?.orderLine.productName ?? 'Yêu cầu trả hàng',
+        productImageUrl: graph.items[0]?.orderLine.productImageUrl ?? null,
+        shopId: graph.shop.id,
+        shopName: graph.shop.name,
+      },
       status: graph.status,
       version: graph.version,
       reasonCode: graph.reasonCode,

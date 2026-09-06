@@ -1,4 +1,4 @@
-import { Badge, Container } from '@shopee-clone/ui';
+import { Badge, StorefrontContainer } from '@shopee-clone/ui';
 
 import {
   CatalogContent,
@@ -26,7 +26,7 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
 
   if (!response) {
     return (
-      <Container className="catalog-page">
+      <StorefrontContainer className="catalog-page">
         <header className="catalog-heading">
           <Badge variant="brand">SHOPEE CLONE</Badge>
           <h1>Khám phá sản phẩm</h1>
@@ -35,7 +35,7 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
           </p>
         </header>
         <CatalogErrorState retryHref={catalogSearchHref(requested)} />
-      </Container>
+      </StorefrontContainer>
     );
   }
 
@@ -55,7 +55,7 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
   ].some((value) => value !== null);
 
   return (
-    <Container className="catalog-page">
+    <StorefrontContainer className="catalog-page">
       <header className="catalog-heading">
         <Badge variant="brand">SHOPEE CLONE</Badge>
         <h1>{response.query.q ? `Kết quả cho “${response.query.q}”` : 'Khám phá sản phẩm'}</h1>
@@ -69,6 +69,6 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
           <CatalogEmptyState filtered={isFiltered} />
         )}
       </div>
-    </Container>
+    </StorefrontContainer>
   );
 }

@@ -32,10 +32,7 @@ import {
   UserStatus,
 } from '../generated/prisma/enums';
 import { PrismaService } from '../prisma/prisma.service';
-import {
-  AdminInvalidInputError,
-  AdminNotFoundError,
-} from './admin.errors';
+import { AdminInvalidInputError, AdminNotFoundError } from './admin.errors';
 import { recordPrivilegedAudit } from './privileged-audit.helper';
 import { SellerIdentityLifecycleService } from '../seller-identity/seller-identity-lifecycle.service';
 
@@ -47,7 +44,9 @@ export class ModerationConflictError extends Error {
 }
 
 export class ModerationIdempotencyConflictError extends Error {
-  constructor(message: string = 'The idempotency key has already been used with different request parameters.') {
+  constructor(
+    message: string = 'The idempotency key has already been used with different request parameters.',
+  ) {
     super(message);
     this.name = 'ModerationIdempotencyConflictError';
   }
@@ -57,7 +56,8 @@ export class ModerationIdempotencyConflictError extends Error {
 export class AdminModerationRepository {
   constructor(
     @Inject(PrismaService) private readonly prisma: PrismaService,
-    @Optional() @Inject(SellerIdentityLifecycleService)
+    @Optional()
+    @Inject(SellerIdentityLifecycleService)
     private readonly sellerLifecycle?: SellerIdentityLifecycleService,
   ) {}
 
@@ -77,7 +77,8 @@ export class AdminModerationRepository {
       } else if (query.targetType === 'SHOP') {
         where.shopId = query.targetId;
       } else if (query.targetType === 'CHAT_CONVERSATION' || query.targetType === 'CHAT_MESSAGE') {
-        if (query.targetType === 'CHAT_MESSAGE') where.reports = { some: { chatMessageId: query.targetId } };
+        if (query.targetType === 'CHAT_MESSAGE')
+          where.reports = { some: { chatMessageId: query.targetId } };
         else where.chatConversationId = query.targetId;
       } else {
         where.OR = [
@@ -117,6 +118,16 @@ export class AdminModerationRepository {
           },
         },
         reportedUser: { select: { id: true, displayName: true } },
+        product: {
+          select: {
+            images: {
+              take: 1,
+              orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }],
+              select: { url: true },
+            },
+          },
+        },
+        shop: { select: { logoUrl: true } },
       },
     });
 
@@ -130,15 +141,16 @@ export class AdminModerationRepository {
         return {
           id: c.id,
           targetType: c.targetType as unknown as 'PRODUCT' | 'SHOP',
-          targetId:
-            (c.targetType === ReportTargetType.CHAT_MESSAGE
-              ? ((snap?.messageId as string) ?? c.chatConversationId)
-              : (c.productId ?? c.shopId ?? c.chatConversationId ?? c.id))!,
+          targetId: (c.targetType === ReportTargetType.CHAT_MESSAGE
+            ? ((snap?.messageId as string) ?? c.chatConversationId)
+            : (c.productId ?? c.shopId ?? c.chatConversationId ?? c.id))!,
           targetName:
             (snap?.name as string) ??
-            (c.targetType === ReportTargetType.CHAT_MESSAGE || c.targetType === ReportTargetType.CHAT_CONVERSATION
+            (c.targetType === ReportTargetType.CHAT_MESSAGE ||
+            c.targetType === ReportTargetType.CHAT_CONVERSATION
               ? (c.reportedUser?.displayName ?? 'Báo cáo chat')
               : 'Unknown'),
+          targetImageUrl: c.product?.images[0]?.url ?? c.shop?.logoUrl ?? null,
           targetStatus: (snap?.status as string) ?? 'ACTIVE',
           status: c.status as unknown as 'OPEN' | 'IN_REVIEW' | 'RESOLVED',
           reportCount: c.reportCount,
@@ -194,7 +206,12 @@ export class AdminModerationRepository {
             slug: true,
             status: true,
             moderationStatus: true,
-            shop: { select: { id: true, name: true, slug: true, status: true } },
+            images: {
+              take: 1,
+              orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }],
+              select: { url: true },
+            },
+            shop: { select: { id: true, name: true, slug: true, status: true, logoUrl: true } },
           },
         },
         shop: {
@@ -204,6 +221,7 @@ export class AdminModerationRepository {
             slug: true,
             status: true,
             onboardingStatus: true,
+            logoUrl: true,
           },
         },
         chatConversation: {
@@ -249,8 +267,9 @@ export class AdminModerationRepository {
     if (c.targetType === ReportTargetType.PRODUCT) {
       targetDetails = {
         targetType: 'PRODUCT',
-        id: (c.productId ?? snap?.id as string)!,
+        id: (c.productId ?? (snap?.id as string))!,
         name: c.product?.name ?? (snap?.name as string) ?? 'Unknown',
+        imageUrl: c.product?.images[0]?.url ?? null,
         slug: c.product?.slug ?? (snap?.slug as string) ?? null,
         currentStatus: c.product?.status ?? 'UNKNOWN',
         moderationStatus: c.product?.moderationStatus ?? 'ACTIVE',
@@ -270,29 +289,29 @@ export class AdminModerationRepository {
         slug: null,
         currentStatus: reportedUser ? 'ACTIVE' : 'UNKNOWN',
         ownerUserId: reportedUser?.id,
-        chat: chat && reportedUser
-          ? {
-              conversationId: chat.id,
-              messageId: (snap?.messageId as string) ?? null,
-              reportedUserId: reportedUser.id,
-              reportedUserName: reportedUser.displayName,
-              messages: [...chat.messages]
-                .reverse()
-                .map((message) => ({
+        chat:
+          chat && reportedUser
+            ? {
+                conversationId: chat.id,
+                messageId: (snap?.messageId as string) ?? null,
+                reportedUserId: reportedUser.id,
+                reportedUserName: reportedUser.displayName,
+                messages: [...chat.messages].reverse().map((message) => ({
                   sequence: message.sequence,
                   senderUserId: message.senderUserId,
                   senderLabel: message.sender.displayName,
                   content: message.content,
                   createdAt: message.createdAt.toISOString(),
                 })),
-            }
-          : undefined,
+              }
+            : undefined,
       };
     } else {
       targetDetails = {
         targetType: 'SHOP',
-        id: (c.shopId ?? snap?.id as string)!,
+        id: (c.shopId ?? (snap?.id as string))!,
         name: c.shop?.name ?? (snap?.name as string) ?? 'Unknown',
+        imageUrl: c.shop?.logoUrl ?? null,
         slug: c.shop?.slug ?? (snap?.slug as string) ?? null,
         currentStatus: c.shop?.status ?? 'UNKNOWN',
         onboardingStatus: c.shop?.onboardingStatus ?? 'APPROVED',
@@ -302,15 +321,16 @@ export class AdminModerationRepository {
     return {
       id: c.id,
       targetType: c.targetType as unknown as 'PRODUCT' | 'SHOP',
-      targetId:
-        (c.targetType === ReportTargetType.CHAT_MESSAGE
-          ? ((snap?.messageId as string) ?? c.chatConversationId)
-          : (c.productId ?? c.shopId ?? c.chatConversationId ?? c.id))!,
+      targetId: (c.targetType === ReportTargetType.CHAT_MESSAGE
+        ? ((snap?.messageId as string) ?? c.chatConversationId)
+        : (c.productId ?? c.shopId ?? c.chatConversationId ?? c.id))!,
       targetName:
         (snap?.name as string) ??
-        (c.targetType === ReportTargetType.CHAT_MESSAGE || c.targetType === ReportTargetType.CHAT_CONVERSATION
+        (c.targetType === ReportTargetType.CHAT_MESSAGE ||
+        c.targetType === ReportTargetType.CHAT_CONVERSATION
           ? (c.reportedUser?.displayName ?? 'Báo cáo chat')
           : 'Unknown'),
+      targetImageUrl: c.product?.images[0]?.url ?? c.shop?.logoUrl ?? null,
       targetStatus: (snap?.status as string) ?? 'ACTIVE',
       status: c.status as unknown as 'OPEN' | 'IN_REVIEW' | 'RESOLVED',
       reportCount: c.reportCount,
@@ -383,7 +403,9 @@ export class AdminModerationRepository {
       }
 
       // 2. Lock case row before reading its version to serialize concurrent commands.
-      await tx.$queryRaw(Prisma.sql`SELECT id FROM moderation_cases WHERE id = ${caseId} FOR UPDATE`);
+      await tx.$queryRaw(
+        Prisma.sql`SELECT id FROM moderation_cases WHERE id = ${caseId} FOR UPDATE`,
+      );
       const targetCase = await tx.moderationCase.findUnique({
         where: { id: caseId },
       });
@@ -490,7 +512,9 @@ export class AdminModerationRepository {
       }
 
       // 2. Lock case row before reading its version to serialize concurrent commands.
-      await tx.$queryRaw(Prisma.sql`SELECT id FROM moderation_cases WHERE id = ${caseId} FOR UPDATE`);
+      await tx.$queryRaw(
+        Prisma.sql`SELECT id FROM moderation_cases WHERE id = ${caseId} FOR UPDATE`,
+      );
       const targetCase = await tx.moderationCase.findUnique({
         where: { id: caseId },
       });
@@ -581,7 +605,9 @@ export class AdminModerationRepository {
       }
 
       // 2. Lock case row before reading its version to serialize concurrent commands.
-      await tx.$queryRaw(Prisma.sql`SELECT id FROM moderation_cases WHERE id = ${caseId} FOR UPDATE`);
+      await tx.$queryRaw(
+        Prisma.sql`SELECT id FROM moderation_cases WHERE id = ${caseId} FOR UPDATE`,
+      );
       const targetCase = await tx.moderationCase.findUnique({
         where: { id: caseId },
         include: {
@@ -641,8 +667,8 @@ export class AdminModerationRepository {
         });
         const restrictionActive = Boolean(
           currentRestriction &&
-            !currentRestriction.restoredAt &&
-            (currentRestriction.restrictedUntil === null || currentRestriction.restrictedUntil > now),
+          !currentRestriction.restoredAt &&
+          (currentRestriction.restrictedUntil === null || currentRestriction.restrictedUntil > now),
         );
         previousTargetStatus = restrictionActive ? 'RESTRICTED' : 'ELIGIBLE';
         if (input.outcome === ModerationCaseOutcome.RESTRICT_CHAT_TEMPORARY) {
@@ -653,9 +679,12 @@ export class AdminModerationRepository {
           }
           chatRestrictionUntil = new Date(input.restrictionUntil);
           if (Number.isNaN(chatRestrictionUntil.getTime()) || chatRestrictionUntil <= now) {
-            throw new AdminInvalidInputError('Temporary chat restriction expiry must be in the future', {
-              invalidParameters: ['restrictionUntil'],
-            });
+            throw new AdminInvalidInputError(
+              'Temporary chat restriction expiry must be in the future',
+              {
+                invalidParameters: ['restrictionUntil'],
+              },
+            );
           }
           nextTargetStatus = 'RESTRICTED';
           privilegedAction = PrivilegedAction.UPDATE;
@@ -851,7 +880,13 @@ export class AdminModerationRepository {
               type: 'SYSTEM_NOTICE',
               title: notificationCopy.title,
               body: notificationCopy.body,
-              metadata: { targetUrl: '/account/notifications', thumbnailUrl: null, referenceId: caseId, amountMinor: null, currency: null },
+              metadata: {
+                targetUrl: '/account/notifications',
+                thumbnailUrl: null,
+                referenceId: caseId,
+                amountMinor: null,
+                currency: null,
+              },
               deduplicationKey: `chat-moderation:${decision.id}`,
               isRead: false,
               createdAt: now,
@@ -943,7 +978,11 @@ export class AdminModerationRepository {
         action: privilegedAction,
         reason: input.publicReason.trim(),
         beforeSummary: { status: targetCase.status, targetStatus: previousTargetStatus },
-        afterSummary: { status: ModerationCaseStatus.RESOLVED, targetStatus: nextTargetStatus, outcome: input.outcome },
+        afterSummary: {
+          status: ModerationCaseStatus.RESOLVED,
+          targetStatus: nextTargetStatus,
+          outcome: input.outcome,
+        },
         decisionId: decision.id,
         now,
       });

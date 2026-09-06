@@ -7,12 +7,13 @@ import type {
 } from '@shopee-clone/contracts';
 import { Fragment, useCallback, useEffect, useState } from 'react';
 
+import { AdminEntityLink } from '../../../../components/admin/admin-entity-link';
+import { EyeIcon } from '../../../../components/admin/admin-icons';
 import { useAuthSession } from '../../../../components/auth-session-provider';
 import {
   AUDIT_ACTION_LABELS,
   AUDIT_TARGET_LABELS,
   formatAuditDate,
-  getAuditTargetIdLabel,
   getAuditSummaryChanges,
 } from '../../../../lib/admin-audit-display';
 import { fetchAdminAudit } from '../../../../lib/admin-api';
@@ -23,6 +24,46 @@ const TARGET_TYPE_OPTIONS = Object.entries(AUDIT_TARGET_LABELS) as Array<
 const ACTION_OPTIONS = Object.entries(AUDIT_ACTION_LABELS) as Array<
   [AdminPrivilegedAction, string]
 >;
+
+function summaryText(event: AdminPrivilegedAuditEventSummary, key: string): string | undefined {
+  const after = event.afterSummary?.[key];
+  const before = event.beforeSummary?.[key];
+  return typeof after === 'string' ? after : typeof before === 'string' ? before : undefined;
+}
+
+function auditTarget(event: AdminPrivilegedAuditEventSummary) {
+  const href =
+    event.targetType === 'USER'
+      ? `/admin/users/${event.targetId}`
+      : event.targetType === 'SHOP'
+        ? `/admin/shops/${event.targetId}`
+        : event.targetType === 'CATEGORY'
+          ? `/admin/categories#admin-category-${event.targetId}`
+          : event.targetType === 'BANNER'
+            ? `/admin/homepage#admin-banner-${event.targetId}`
+            : event.targetType === 'HOMEPAGE_MODULE'
+              ? `/admin/homepage#admin-module-${event.targetId}`
+              : event.targetType === 'PRODUCT'
+                ? `/admin/products/${event.targetId}`
+                : event.targetType === 'MODERATION_CASE'
+                  ? `/admin/moderation/${event.targetId}`
+                  : event.targetType === 'RETURN_REQUEST'
+                    ? `/admin/returns/${event.targetId}`
+                    : `/admin/moderation?reviewId=${encodeURIComponent(event.targetId)}`;
+  const name =
+    event.targetName ??
+    summaryText(event, 'name') ??
+    summaryText(event, 'title') ??
+    summaryText(event, 'displayName') ??
+    AUDIT_TARGET_LABELS[event.targetType];
+  const imageUrl =
+    event.targetImageUrl ??
+    summaryText(event, 'imageUrl') ??
+    summaryText(event, 'logoUrl') ??
+    summaryText(event, 'primaryImageUrl') ??
+    summaryText(event, 'avatarUrl');
+  return { href, name, imageUrl };
+}
 
 export default function AdminAuditPage() {
   const { authenticatedFetch } = useAuthSession();
@@ -84,15 +125,9 @@ export default function AdminAuditPage() {
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-      <div>
-        <h1 style={{ fontSize: '24px', fontWeight: 700, color: '#111827' }}>Nhật ký kiểm toán</h1>
-        <p style={{ color: '#6b7280', fontSize: '14px', marginTop: '4px' }}>
-          Lưu vết bất biến mọi thao tác đặc quyền của quản trị viên.
-        </p>
-      </div>
-
+    <div className="admin-page admin-audit-page">
       <div
+        className="admin-toolbar admin-audit-toolbar"
         style={{
           background: '#ffffff',
           borderRadius: '12px',
@@ -104,7 +139,7 @@ export default function AdminAuditPage() {
           alignItems: 'center',
         }}
       >
-        <div>
+        <div className="admin-field">
           <label
             htmlFor="audit-target-type"
             style={{ fontSize: '13px', color: '#4b5563', marginRight: '6px' }}
@@ -112,6 +147,7 @@ export default function AdminAuditPage() {
             Đối tượng tác động:
           </label>
           <select
+            className="admin-control"
             id="audit-target-type"
             aria-label="Lọc theo đối tượng tác động"
             value={targetTypeFilter}
@@ -134,7 +170,7 @@ export default function AdminAuditPage() {
           </select>
         </div>
 
-        <div>
+        <div className="admin-field">
           <label
             htmlFor="audit-action"
             style={{ fontSize: '13px', color: '#4b5563', marginRight: '6px' }}
@@ -142,6 +178,7 @@ export default function AdminAuditPage() {
             Hành động:
           </label>
           <select
+            className="admin-control"
             id="audit-action"
             aria-label="Lọc theo hành động"
             value={actionFilter}
@@ -166,6 +203,7 @@ export default function AdminAuditPage() {
       </div>
 
       <div
+        className="admin-table-card"
         style={{
           background: '#ffffff',
           borderRadius: '12px',
@@ -175,18 +213,15 @@ export default function AdminAuditPage() {
         }}
       >
         {loading ? (
-          <div style={{ padding: '32px', textAlign: 'center', color: '#6b7280' }}>
-            Đang tải nhật ký kiểm toán...
-          </div>
+          <div className="admin-state-card__message">Đang tải nhật ký kiểm toán...</div>
         ) : error ? (
-          <div style={{ padding: '24px', color: '#ef4444' }}>{error}</div>
+          <div className="admin-state-card__message admin-state-card__message--error">{error}</div>
         ) : events.length === 0 ? (
-          <div style={{ padding: '32px', textAlign: 'center', color: '#6b7280' }}>
-            Chưa có bản ghi nhật ký nào.
-          </div>
+          <div className="admin-state-card__message">Chưa có bản ghi nhật ký nào.</div>
         ) : (
           <div style={{ overflowX: 'auto' }}>
             <table
+              className="admin-data-table admin-audit-table"
               style={{
                 width: '100%',
                 minWidth: '960px',
@@ -238,12 +273,11 @@ export default function AdminAuditPage() {
                           {formatAuditDate(event.createdAt)}
                         </td>
                         <td style={{ padding: '14px 16px' }}>
-                          <div style={{ fontWeight: 600, color: '#111827' }}>
-                            {event.actorDisplayName || 'Quản trị viên'}
-                          </div>
-                          <div style={{ fontSize: '12px', color: '#6b7280' }}>
-                            {event.actorEmail || event.actorUserId}
-                          </div>
+                          <AdminEntityLink
+                            href={`/admin/users/${event.actorUserId}`}
+                            name={event.actorDisplayName || 'Quản trị viên'}
+                            meta={event.actorEmail}
+                          />
                         </td>
                         <td style={{ padding: '14px 16px' }}>
                           <span
@@ -261,49 +295,34 @@ export default function AdminAuditPage() {
                             {AUDIT_ACTION_LABELS[event.action]}
                           </span>
                         </td>
-                        <td style={{ padding: '14px 16px', minWidth: '210px' }}>
-                          <div style={{ fontWeight: 600, color: '#374151' }}>
-                            {AUDIT_TARGET_LABELS[event.targetType]}
-                          </div>
-                          <div style={{ marginTop: '3px', fontSize: '11px', color: '#6b7280' }}>
-                            {getAuditTargetIdLabel(event.targetType)}
-                          </div>
-                          <code
-                            title={event.targetId}
-                            style={{
-                              display: 'block',
-                              marginTop: '2px',
-                              fontSize: '11px',
-                              color: '#374151',
-                              wordBreak: 'break-all',
-                            }}
-                          >
-                            {event.targetId}
-                          </code>
+                        <td style={{ padding: '14px 16px', minWidth: '230px' }}>
+                          {(() => {
+                            const target = auditTarget(event);
+                            return (
+                              <AdminEntityLink
+                                href={target.href}
+                                name={target.name}
+                                imageUrl={target.imageUrl}
+                                meta={AUDIT_TARGET_LABELS[event.targetType]}
+                              />
+                            );
+                          })()}
                         </td>
                         <td style={{ padding: '14px 16px', color: '#111827', maxWidth: '300px' }}>
                           {event.reason}
                         </td>
-                        <td
-                          style={{ padding: '14px 16px', textAlign: 'right', whiteSpace: 'nowrap' }}
-                        >
+                        <td className="admin-table-cell--actions admin-audit-actions-cell">
                           {changes.length > 0 ? (
                             <button
                               type="button"
+                              className="admin-icon-btn admin-icon-btn--secondary"
+                              aria-label={isExpanded ? 'Ẩn thay đổi' : 'Xem thay đổi'}
                               aria-controls={detailId}
                               aria-expanded={isExpanded}
+                              title={isExpanded ? 'Ẩn thay đổi' : 'Xem thay đổi'}
                               onClick={() => toggleExpand(event.id)}
-                              style={{
-                                padding: '4px 10px',
-                                fontSize: '12px',
-                                color: '#4f46e5',
-                                background: '#eef2ff',
-                                border: 'none',
-                                borderRadius: '6px',
-                                cursor: 'pointer',
-                              }}
                             >
-                              {isExpanded ? 'Ẩn thay đổi' : 'Xem thay đổi'}
+                              <EyeIcon aria-hidden="true" />
                             </button>
                           ) : (
                             <span style={{ fontSize: '12px', color: '#9ca3af' }}>

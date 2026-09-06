@@ -1,9 +1,12 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 describe('floating chat accessibility style contract', () => {
-  const css = readFileSync(path.join(process.cwd(), 'app/globals.css'), 'utf8');
+  const chatCssPath = path.join(process.cwd(), 'app/styles/storefront/chat.css');
+  const css = existsSync(chatCssPath)
+    ? readFileSync(chatCssPath, 'utf8').replace(/\r\n/g, '\n')
+    : readFileSync(path.join(process.cwd(), 'app/globals.css'), 'utf8').replace(/\r\n/g, '\n');
 
   it('keeps contact and message action hit areas at least 44 by 44 pixels', () => {
     const actionRule = css.slice(

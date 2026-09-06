@@ -163,6 +163,13 @@ export interface ReturnDeadline {
 export interface ReturnSummary {
   returnReference: string;
   orderReference: string;
+  preview?: {
+    productId: string;
+    productName: string;
+    productImageUrl: string | null;
+    shopId: string;
+    shopName: string;
+  };
   status: ReturnStatus;
   version: number;
   reasonCode: ReturnReasonCode;
@@ -439,6 +446,10 @@ function isAvailableAction(value: unknown): value is ReturnAvailableAction {
 }
 
 function isReturnSummaryShape(value: unknown, extra: string[] = []): value is ReturnSummary {
+  const preview =
+    value && typeof value === 'object' && !Array.isArray(value)
+      ? (value as Record<string, unknown>).preview
+      : undefined;
   return (
     record(value) &&
     exact(
@@ -454,10 +465,11 @@ function isReturnSummaryShape(value: unknown, extra: string[] = []): value is Re
         'updatedAt',
         'availableActions',
       ],
-      extra,
+      ['preview', ...extra],
     ) &&
     !!parseReturnReference(value.returnReference) &&
     !!parseReturnReference(value.orderReference) &&
+    (preview === undefined || isReturnPreview(preview)) &&
     has(RETURN_STATUSES, value.status) &&
     typeof value.version === 'number' &&
     Number.isSafeInteger(value.version) &&
@@ -468,6 +480,20 @@ function isReturnSummaryShape(value: unknown, extra: string[] = []): value is Re
     instant(value.updatedAt) &&
     Array.isArray(value.availableActions) &&
     value.availableActions.every(isAvailableAction)
+  );
+}
+
+function isReturnPreview(value: unknown): value is ReturnSummary['preview'] {
+  if (!record(value)) return false;
+  return (
+    exact(value, ['productId', 'productName', 'productImageUrl', 'shopId', 'shopName']) &&
+    !!parseReturnReference(value.productId) &&
+    typeof value.productName === 'string' &&
+    value.productName.length > 0 &&
+    (value.productImageUrl === null || typeof value.productImageUrl === 'string') &&
+    !!parseReturnReference(value.shopId) &&
+    typeof value.shopName === 'string' &&
+    value.shopName.length > 0
   );
 }
 
@@ -622,7 +648,7 @@ function isReturnDetailShape(value: unknown, extra: string[] = []): value is Ret
         'refund',
         'sellerPublicReason',
       ],
-      extra,
+      ['preview', ...extra],
     )
   )
     return false;

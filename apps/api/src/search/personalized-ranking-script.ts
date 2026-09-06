@@ -1,4 +1,5 @@
 import { PERSONALIZED_RANKING_SCRIPT_VERSION } from './search.versions';
+import { CAMPAIGN_RANKING_BOOST_MAX } from '../marketplace-campaigns/campaign-policy';
 
 /** Stable id used by every personalized relevance request. */
 export const PERSONALIZED_RANKING_SCRIPT_ID = `product-personalized-ranking-v${PERSONALIZED_RANKING_SCRIPT_VERSION}`;
@@ -37,6 +38,11 @@ double ratingCount = doc['rating_count'].size() == 0 ? 0.0 : finite((double) doc
 double soldCount = doc['sold_count'].size() == 0 ? 0.0 : finite((double) doc['sold_count'].value);
 double inventoryAvailable = doc['inventory_available'].size() == 0 ? 0.0 : finite((double) doc['inventory_available'].value);
 boolean promotionActive = doc['promotion_active'].size() > 0 && doc['promotion_active'].value;
+boolean campaignEligible = doc['campaign_eligible'].size() > 0 && doc['campaign_eligible'].value;
+long campaignStart = doc['campaign_active_from'].size() == 0 ? 0L : doc['campaign_active_from'].value.toInstant().toEpochMilli();
+long campaignEnd = doc['campaign_active_until'].size() == 0 ? 0L : doc['campaign_active_until'].value.toInstant().toEpochMilli();
+boolean campaignWindowOpen = campaignEligible && campaignStart <= (long) params.nowMillis && campaignEnd > (long) params.nowMillis;
+double campaignRank = campaignWindowOpen && doc['campaign_rank'].size() > 0 ? clamp((double) doc['campaign_rank'].value, 0.0, 2.0) : 0.0;
 double[] features = new double[] {
   affinity(profile.categoryAffinities, categoryId),
   affinity(profile.shopAffinities, shopId),
@@ -60,6 +66,9 @@ for (int i = 0; i < weights.size() && i < features.length; i++) {
   z += finite(((Number) weights[i]).doubleValue()) * features[i];
 }
 z = clamp(z, -60.0, 60.0);
+// A bounded campaign tier is applied after the learned personal score.
+// NORMAL (1) stays below FEATURED (2), and the total contribution is capped.
+z += (campaignRank / 2.0) * ${CAMPAIGN_RANKING_BOOST_MAX};
 double probability = z >= 0.0 ? 1.0 / (1.0 + Math.exp(-z)) : Math.exp(z) / (1.0 + Math.exp(z));
 double score = finite(probability) * 1000000.0 + clamp(lexical, 0.0, 1000000.0) * 0.001;
 return score != score || score < 0.0 || score == Double.POSITIVE_INFINITY || score == Double.NEGATIVE_INFINITY ? 0.0 : score;

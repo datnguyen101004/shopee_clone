@@ -53,11 +53,18 @@ async function json(
 
 export async function fetchSellerProducts(
   fetcher: AuthenticatedFetcher,
-  input: { cursor?: string; lifecycle?: SellerProductLifecycle } = {},
+  input: {
+    cursor?: string;
+    lifecycle?: SellerProductLifecycle;
+    campaign?: 'ACTIVE' | 'UPCOMING' | 'HISTORY';
+    campaignTypeCode?: string;
+  } = {},
 ): Promise<SellerProductPage> {
   const url = endpoint('/api/v1/seller/products');
   if (input.cursor) url.searchParams.set('cursor', input.cursor);
   if (input.lifecycle) url.searchParams.set('lifecycle', input.lifecycle);
+  if (input.campaign) url.searchParams.set('campaign', input.campaign);
+  if (input.campaignTypeCode) url.searchParams.set('campaignTypeCode', input.campaignTypeCode);
   const { body, status } = await json(fetcher, url, { method: 'GET' });
   if (!isSellerProductPage(body)) throw new RoleApiError('contract', status);
   return body;

@@ -26,6 +26,7 @@ describe('AdminAuditPage', () => {
           actorDisplayName: 'Kiểm duyệt viên',
           targetType: 'REVIEW',
           targetId: reviewId,
+          targetName: 'Đánh giá sản phẩm',
           action: 'HIDE',
           reason: 'Nội dung vi phạm quy định.',
           beforeSummary: { visibility: 'VISIBLE', name: 'Không thay đổi' },
@@ -40,16 +41,21 @@ describe('AdminAuditPage', () => {
   it('renders a friendly target and a structured before-and-after detail panel', async () => {
     render(<AdminAuditPage />);
 
-    expect(await screen.findByText(reviewId)).toBeInTheDocument();
-    expect(screen.getByText('Mã đánh giá')).toBeInTheDocument();
-    expect(screen.getByText(reviewId)).toBeInTheDocument();
+    expect(await screen.findByText('Đánh giá sản phẩm')).toBeInTheDocument();
+    expect(screen.queryByText(reviewId)).not.toBeInTheDocument();
+    expect(screen.getByTitle('Mở quản lý Đánh giá sản phẩm')).toHaveAttribute(
+      'href',
+      `/admin/moderation?reviewId=${reviewId}`,
+    );
     expect(screen.getByTitle('HIDE')).toHaveTextContent('Ẩn đánh giá');
 
     const detailsButton = screen.getByRole('button', { name: 'Xem thay đổi' });
     expect(detailsButton).toHaveAttribute('aria-expanded', 'false');
     fireEvent.click(detailsButton);
 
-    expect(await screen.findByRole('region', { name: 'Chi tiết thay đổi của Đánh giá' })).toBeInTheDocument();
+    expect(
+      await screen.findByRole('region', { name: 'Chi tiết thay đổi của Đánh giá' }),
+    ).toBeInTheDocument();
     expect(screen.getByText('Trạng thái hiển thị')).toBeInTheDocument();
     expect(screen.getByText('Hiển thị')).toBeInTheDocument();
     expect(screen.getByText('Đã ẩn')).toBeInTheDocument();
@@ -59,7 +65,7 @@ describe('AdminAuditPage', () => {
 
   it('passes the moderation target and action filters to the audit query', async () => {
     render(<AdminAuditPage />);
-    await screen.findByText(reviewId);
+    await screen.findByText('Đánh giá sản phẩm');
 
     fireEvent.change(screen.getByLabelText('Lọc theo đối tượng tác động'), {
       target: { value: 'MODERATION_CASE' },

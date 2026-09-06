@@ -1,8 +1,9 @@
 'use client';
 
 import type { SellerReviewReportReasonCode, SellerShopReviewSummary } from '@shopee-clone/contracts';
+import { ChevronDown, Search } from '@shopee-clone/ui';
 import Link from 'next/link';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { useAuthSession } from './auth-session-provider';
 import { listSellerShopReviews, SellerReviewReportApiError, submitSellerReviewReport } from '../lib/seller-review-report-api';
@@ -24,10 +25,14 @@ function reportStatusLabel(status: SellerShopReviewSummary['reportStatus']): str
   return null;
 }
 
+type ReviewSort = 'newest' | 'oldest' | 'highest-rating' | 'lowest-rating';
+
 export function SellerReviewManagement() {
   const { authenticatedFetch, state: authState } = useAuthSession();
   const isSeller = authState.status === 'authenticated' && authState.user.roles.includes('seller');
   const [reviews, setReviews] = useState<SellerShopReviewSummary[]>([]);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [sort, setSort] = useState<ReviewSort>('newest');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -65,6 +70,27 @@ export function SellerReviewManagement() {
     setConfirming(false);
     setDialogError(null);
   };
+
+  const visibleReviews = useMemo(() => {
+    const term = searchTerm.trim().toLocaleLowerCase('vi-VN');
+    const filtered = reviews.filter((review) => {
+      if (!term) return true;
+      return [review.productName, review.productId, review.comment ?? '']
+        .some((value) => value.toLocaleLowerCase('vi-VN').includes(term));
+    });
+
+    return [...filtered].sort((left, right) => {
+      if (sort === 'highest-rating' || sort === 'lowest-rating') {
+        const difference = right.rating - left.rating;
+        return (sort === 'highest-rating' ? difference : -difference)
+          || left.id.localeCompare(right.id);
+      }
+      const leftTime = Date.parse(left.updatedAt);
+      const rightTime = Date.parse(right.updatedAt);
+      return (sort === 'newest' ? rightTime - leftTime : leftTime - rightTime)
+        || left.id.localeCompare(right.id);
+    });
+  }, [reviews, searchTerm, sort]);
 
   const closeDialog = () => {
     if (submitting) return;
@@ -148,54 +174,97 @@ export function SellerReviewManagement() {
           <button type="button" onClick={() => void loadReviews()}>Thử lại</button>
         </p>
       ) : null}
+      <div className="seller-pl-toolbar seller-pl-toolbar--labeled seller-reviews-toolbar">
+        <div className="seller-pl-toolbar__filters">
+          <div className="seller-pl-search seller-reviews-search">
+            <Search className="seller-pl-search__icon" size={16} aria-hidden="true" />
+            <input
+              type="search"
+              aria-label="Tìm kiếm đánh giá"
+              placeholder="Tên sản phẩm hoặc nội dung"
+              value={searchTerm}
+              onChange={(event) => setSearchTerm(event.target.value)}
+            />
+          </div>
+          <div className="seller-pl-field seller-reviews-sort">
+            <label htmlFor="seller-reviews-sort">Sắp xếp</label>
+            <div className="seller-pl-select-wrap">
+              <select
+                id="seller-reviews-sort"
+                className="seller-pl-select"
+                value={sort}
+                onChange={(event) => setSort(event.target.value as ReviewSort)}
+              >
+                <option value="newest">Mới nhất</option>
+                <option value="oldest">Cũ nhất</option>
+                <option value="highest-rating">Đánh giá cao đến thấp</option>
+                <option value="lowest-rating">Đánh giá thấp đến cao</option>
+              </select>
+              <ChevronDown className="seller-pl-select__arrow" size={16} aria-hidden="true" />
+            </div>
+          </div>
+        </div>
+      </div>
       {loading ? <p className="seller-reviews__state" role="status">Đang tải đánh giá…</p> : null}
       {!loading && !error && reviews.length === 0 ? (
         <p className="seller-reviews__empty">Shop của bạn chưa có đánh giá nào.</p>
       ) : null}
       {reviews.length > 0 ? (
-        <section className="seller-reviews__list" aria-label="Danh sách đánh giá của shop">
-          {reviews.map((review) => {
-            const reportStatus = reportStatusLabel(review.reportStatus);
-            return (
-              <article key={review.id} className="seller-review-card">
-                <div className="seller-review-card__content">
-                  <Link href={`/products/${review.productId}`} className="seller-review-card__product">
-                    {review.productName}
-                  </Link>
-                  <p className="seller-review-card__rating" aria-label={`${review.rating} trên 5 sao`}>
-                    {'★'.repeat(review.rating)}{'☆'.repeat(5 - review.rating)}
-                  </p>
-                  <p className="seller-review-card__comment">
-                    {review.comment ?? 'Người mua không để lại nội dung nhận xét.'}
-                  </p>
-                  <p className="seller-review-card__date">
-                    Cập nhật {new Date(review.updatedAt).toLocaleString('vi-VN')}
-                  </p>
-                  {review.visibility === 'HIDDEN' ? (
-                    <p className="seller-review-card__status seller-review-card__status--hidden">
-                      Đánh giá này hiện đang bị ẩn công khai.
-                    </p>
-                  ) : null}
-                  {reportStatus ? (
-                    <p className="seller-review-card__status seller-review-card__status--reported">
-                      {reportStatus}
-                    </p>
-                  ) : null}
-                </div>
-                {review.visibility !== 'HIDDEN' ? (
-                  <button
-                    type="button"
-                    className="seller-review-card__report"
-                    disabled={review.reportStatus === 'OPEN'}
-                    onClick={() => openReportDialog(review)}
-                  >
-                    {review.reportStatus === 'OPEN' ? 'Đã báo cáo' : 'Báo cáo đánh giá'}
-                  </button>
-                ) : null}
-              </article>
-            );
-          })}
-        </section>
+        <>
+          {visibleReviews.length > 0 ? (
+            <section className="seller-reviews__list" aria-label="Danh sách đánh giá của shop">
+              {visibleReviews.map((review) => {
+                const reportStatus = reportStatusLabel(review.reportStatus);
+                return (
+                  <article key={review.id} className="seller-review-card">
+                    <div className="seller-review-card__content">
+                      <Link href={`/products/${review.productId}`} className="seller-review-card__product">
+                        {review.productName}
+                      </Link>
+                      <p className="seller-review-card__rating" aria-label={`${review.rating} trên 5 sao`}>
+                        {'★'.repeat(review.rating)}{'☆'.repeat(5 - review.rating)}
+                      </p>
+                      <p className="seller-review-card__comment">
+                        {review.comment ?? 'Người mua không để lại nội dung nhận xét.'}
+                      </p>
+                      <p className="seller-review-card__date">
+                        Cập nhật {new Date(review.updatedAt).toLocaleString('vi-VN')}
+                      </p>
+                      {review.visibility === 'HIDDEN' ? (
+                        <p className="seller-review-card__status seller-review-card__status--hidden">
+                          Đánh giá này hiện đang bị ẩn công khai.
+                        </p>
+                      ) : null}
+                      {reportStatus ? (
+                        <p className="seller-review-card__status seller-review-card__status--reported">
+                          {reportStatus}
+                        </p>
+                      ) : null}
+                    </div>
+                    {review.visibility !== 'HIDDEN' ? (
+                      <button
+                        type="button"
+                        className="seller-review-card__report"
+                        disabled={review.reportStatus === 'OPEN'}
+                        onClick={() => openReportDialog(review)}
+                      >
+                        {review.reportStatus === 'OPEN' ? 'Đã báo cáo' : 'Báo cáo đánh giá'}
+                      </button>
+                    ) : null}
+                  </article>
+                );
+              })}
+            </section>
+          ) : (
+            <p className="seller-reviews-filter-empty">Không tìm thấy đánh giá phù hợp với bộ lọc hiện tại.</p>
+          )}
+          <footer className="seller-pl-footer seller-reviews-footer">
+            <span className="seller-pl-footer__summary">
+              Hiển thị <strong>{visibleReviews.length}</strong> trong {reviews.length} đánh giá đã tải
+            </span>
+            <span className="seller-pl-footer__complete">Đã tải hết danh sách đánh giá</span>
+          </footer>
+        </>
       ) : null}
       {selectedReview ? (
         <div className="seller-review-report-dialog-backdrop" role="presentation">
@@ -222,18 +291,22 @@ export function SellerReviewManagement() {
             {dialogError ? <p role="alert" className="seller-review-report-dialog__error">{dialogError}</p> : null}
             {!confirming ? (
               <div className="seller-review-report-form">
-                <label htmlFor="seller-review-report-reason">
-                  Lý do báo cáo
-                  <select
-                    id="seller-review-report-reason"
-                    value={reasonCode}
-                    onChange={(event) => setReasonCode(event.target.value as SellerReviewReportReasonCode)}
-                  >
-                    {REPORT_REASONS.map((reason) => (
-                      <option key={reason.value} value={reason.value}>{reason.label}</option>
-                    ))}
-                  </select>
-                </label>
+                <div className="seller-pl-field">
+                  <label htmlFor="seller-review-report-reason">Lý do báo cáo</label>
+                  <div className="seller-pl-select-wrap">
+                    <select
+                      id="seller-review-report-reason"
+                      className="seller-pl-select"
+                      value={reasonCode}
+                      onChange={(event) => setReasonCode(event.target.value as SellerReviewReportReasonCode)}
+                    >
+                      {REPORT_REASONS.map((reason) => (
+                        <option key={reason.value} value={reason.value}>{reason.label}</option>
+                      ))}
+                    </select>
+                    <ChevronDown className="seller-pl-select__arrow" size={16} aria-hidden="true" />
+                  </div>
+                </div>
                 <label htmlFor="seller-review-report-details">
                   Mô tả thêm (không bắt buộc)
                   <textarea

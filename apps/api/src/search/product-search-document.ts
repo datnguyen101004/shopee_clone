@@ -37,6 +37,15 @@ export interface ProductSearchDocument {
   compare_at_price_minor: number | null;
   discount_basis_points: number;
   promotion_active: boolean;
+  campaign_id?: string | null;
+  campaign_type_code?: string | null;
+  campaign_importance_class?: 'NORMAL' | 'FEATURED' | null;
+  campaign_ranking_profile_version?: number | null;
+  campaign_policy_version?: number | null;
+  campaign_active_from?: string | null;
+  campaign_active_until?: string | null;
+  campaign_eligible?: boolean;
+  campaign_rank?: number;
   rating_average_basis_points: number;
   rating_count: number;
   sold_count: number;
@@ -151,6 +160,15 @@ export function productSearchMapping() {
       compare_at_price_minor: { type: 'long' },
       discount_basis_points: { type: 'integer' },
       promotion_active: { type: 'boolean' },
+      campaign_id: { type: 'keyword' },
+      campaign_type_code: { type: 'keyword' },
+      campaign_importance_class: { type: 'keyword' },
+      campaign_ranking_profile_version: { type: 'integer' },
+      campaign_policy_version: { type: 'integer' },
+      campaign_active_from: { type: 'date' },
+      campaign_active_until: { type: 'date' },
+      campaign_eligible: { type: 'boolean' },
+      campaign_rank: { type: 'integer' },
       rating_average_basis_points: { type: 'integer' },
       rating_count: { type: 'integer' },
       sold_count: { type: 'integer' },

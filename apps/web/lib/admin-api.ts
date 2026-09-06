@@ -10,6 +10,8 @@ import type {
   AdminPrivilegedAuditListResponse,
   AdminProductActionInput,
   AdminProductActionResult,
+  AdminProductListQuery,
+  AdminProductListResponse,
   AdminProductLookupResponse,
   AdminShopActionRequest,
   AdminShopListQuery,
@@ -296,6 +298,19 @@ export function lookupAdminProduct(
   const url = endpoint('/api/v1/admin/products/lookup');
   if (query.slug) url.searchParams.set('slug', query.slug);
   if (query.id) url.searchParams.set('id', query.id);
+  return requestJson(url, fetcher);
+}
+
+export function fetchAdminProducts(
+  fetcher: AuthenticatedFetcher,
+  query?: AdminProductListQuery,
+): Promise<AdminProductListResponse> {
+  const url = endpoint('/api/v1/admin/products');
+  if (query?.limit) url.searchParams.set('limit', String(query.limit));
+  if (query?.cursor) url.searchParams.set('cursor', query.cursor);
+  if (query?.q) url.searchParams.set('q', query.q);
+  if (query?.status) url.searchParams.set('status', query.status);
+  if (query?.moderationStatus) url.searchParams.set('moderationStatus', query.moderationStatus);
   return requestJson(url, fetcher);
 }
 

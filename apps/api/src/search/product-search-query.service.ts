@@ -3,11 +3,14 @@ import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import type { CatalogSearchSuggestion } from '@shopee-clone/contracts';
 
 import type { NormalizedCatalogQuery } from '../catalog/catalog-query';
+import { CAMPAIGN_RANKING_BOOST_MAX } from '../marketplace-campaigns/campaign-policy';
 import { BuyerProfileService } from '../recommendations/buyer-profile.service';
-import { RecommendationModelRepository } from '../recommendations/recommendation-model.repository';
+import {
+  isCompatibleRankingModel,
+  RecommendationModelRepository,
+} from '../recommendations/recommendation-model.repository';
 import {
   BUYER_PAIR_FEATURE_NAMES,
-  CURRENT_RECOMMENDATION_VERSIONS,
   type BuyerSearchProfileSnapshot,
 } from '../recommendations/recommendation.types';
 import { PERSONALIZED_RANKING_SCRIPT_ID } from './personalized-ranking-script';
@@ -331,6 +334,21 @@ function lexicalQuery(
           },
         },
         { filter: { term: { promotion_active: true } }, weight: 2 },
+        {
+          filter: {
+            bool: {
+              must: [
+                { term: { campaign_eligible: true } },
+                { range: { campaign_active_from: { lte: 'now' } } },
+                { range: { campaign_active_until: { gt: 'now' } } },
+              ],
+            },
+          },
+          // campaign_rank is server projected as 0, 1 or 2. Scaling by half
+          // keeps NORMAL below FEATURED and caps every profile at the same
+          // global contribution used by personalized ranking.
+          field_value_factor: { field: 'campaign_rank', factor: CAMPAIGN_RANKING_BOOST_MAX / 2, modifier: 'none', missing: 0 },
+        },
         {
           gauss: {
             product_created_at: {
@@ -679,10 +697,14 @@ function activeRankingModel(value: unknown): ActiveRankingModel | null {
     storedScriptVersion: value.storedScriptVersion,
   };
   if (
-    versions.productProjectionVersion !==
-      CURRENT_RECOMMENDATION_VERSIONS.productProjectionVersion ||
-    versions.featureSchemaVersion !== CURRENT_RECOMMENDATION_VERSIONS.featureSchemaVersion ||
-    versions.storedScriptVersion !== CURRENT_RECOMMENDATION_VERSIONS.storedScriptVersion
+    !Number.isSafeInteger(versions.productProjectionVersion) ||
+    !Number.isSafeInteger(versions.featureSchemaVersion) ||
+    !Number.isSafeInteger(versions.storedScriptVersion) ||
+    !isCompatibleRankingModel({
+      productProjectionVersion: versions.productProjectionVersion as number,
+      featureSchemaVersion: versions.featureSchemaVersion as number,
+      storedScriptVersion: versions.storedScriptVersion as number,
+    })
   ) {
     return null;
   }
@@ -783,10 +805,15 @@ export class ProductSearchQueryService {
     }
 
     let context: PersonalizedSearchContext | null = null;
+    let personalizationTimedOut = false;
     if (this.config.features.personalization && query.sort === 'relevance' && buyerId) {
       try {
         context = await this.resolvePersonalizedContext(buyerId);
       } catch {
+        // A profile/model timeout already consumed the latency budget. Keep
+        // the baseline fallback to one strict request instead of issuing the
+        // optional combined lexical pass as well.
+        personalizationTimedOut = true;
         this.logger.warn(
           `Catalogue search personalization fallback reason=profile-timeout index=${this.config.elasticsearch.productIndexAlias}`,
         );
@@ -804,7 +831,9 @@ export class ProductSearchQueryService {
         void error;
       }
     }
-    return this.executeSearchWithLexicalFallback(query, from, size);
+    return personalizationTimedOut
+      ? this.executeSearch(query, from, Math.max(size, MINIMUM_SEARCH_RESULTS), undefined, 'strict')
+      : this.executeSearchWithLexicalFallback(query, from, size);
   }
 
   private async executeSearchWithLexicalFallback(

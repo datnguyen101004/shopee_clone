@@ -1,0 +1,393 @@
+// Reference only: exported by Figma MCP; layout/text available offline; standalone assets unavailable (see assets-manifest.json).
+// Not production code. Adapt semantics, components and styles to the repository.
+const imgAvatar = "UNAVAILABLE_ASSET:assets/product-detail/avatar.png";
+const imgMainImage = "UNAVAILABLE_ASSET:assets/product-detail/main-image.png";
+const imgThumb0 = "UNAVAILABLE_ASSET:assets/product-detail/thumb0.png";
+const imgThumb1 = "UNAVAILABLE_ASSET:assets/product-detail/thumb1.png";
+const imgThumb2 = "UNAVAILABLE_ASSET:assets/product-detail/thumb2.png";
+const imgCircleX = "UNAVAILABLE_ASSET:assets/product-detail/circle-x.svg";
+const imgHome = "UNAVAILABLE_ASSET:assets/product-detail/home.svg";
+const imgPackage = "UNAVAILABLE_ASSET:assets/product-detail/package.svg";
+const imgShoppingCart = "UNAVAILABLE_ASSET:assets/product-detail/shopping-cart.svg";
+const imgUsers = "UNAVAILABLE_ASSET:assets/product-detail/users.svg";
+const imgBarChart = "UNAVAILABLE_ASSET:assets/product-detail/bar-chart.svg";
+const imgSettings = "UNAVAILABLE_ASSET:assets/product-detail/settings.svg";
+const imgBell = "UNAVAILABLE_ASSET:assets/product-detail/bell.svg";
+const imgChevronRight = "UNAVAILABLE_ASSET:assets/product-detail/chevron-right.svg";
+const imgPlus = "UNAVAILABLE_ASSET:assets/product-detail/plus.svg";
+const imgToggle = "UNAVAILABLE_ASSET:assets/product-detail/toggle.svg";
+const imgBold = "UNAVAILABLE_ASSET:assets/product-detail/bold.svg";
+const imgItalic = "UNAVAILABLE_ASSET:assets/product-detail/italic.svg";
+const imgUnderline = "UNAVAILABLE_ASSET:assets/product-detail/underline.svg";
+const imgAlignLeft = "UNAVAILABLE_ASSET:assets/product-detail/align-left.svg";
+const imgAlignCenter = "UNAVAILABLE_ASSET:assets/product-detail/align-center.svg";
+const imgAlignRight = "UNAVAILABLE_ASSET:assets/product-detail/align-right.svg";
+const imgImage = "UNAVAILABLE_ASSET:assets/product-detail/image.svg";
+const imgLink = "UNAVAILABLE_ASSET:assets/product-detail/link.svg";
+
+export default function ProductDetailPage() {
+  return (
+    <div className="bg-[#f9fafb] content-stretch flex items-start relative size-full" data-node-id="2:192" data-name="product-detail-page">
+      <div className="bg-white border-[#e5e7eb] border-r border-solid content-stretch flex flex-col gap-[32px] items-start p-[24px] relative self-stretch shrink-0 w-[260px]" data-node-id="2:193" data-name="sidebar">
+        <div className="content-stretch flex gap-[12px] items-center relative shrink-0 w-full" data-node-id="2:194" data-name="brand">
+          <div className="bg-[#2563eb] content-stretch flex flex-col items-center justify-center relative rounded-[8px] shrink-0 size-[36px]" data-node-id="2:195" data-name="logo-icon">
+            <div className="relative shrink-0 size-[20px]" data-node-id="2:463" data-name="circle-x">
+              <img alt="" className="absolute block inset-0 max-w-none size-full" src={imgCircleX} />
+            </div>
+          </div>
+          <div className="[word-break:break-word] content-stretch flex flex-col gap-[2px] items-start leading-[normal] not-italic relative shrink-0 whitespace-nowrap" data-node-id="2:197" data-name="logo-text">
+            <p className="font-['Inter:Bold'] font-bold relative shrink-0 text-[#111827] text-[16px]" data-node-id="2:198">
+              PM Admin
+            </p>
+            <p className="font-['Inter:Regular'] font-normal relative shrink-0 text-[#9ca3af] text-[11px] uppercase" data-node-id="2:199">
+              Hệ thống quản lý
+            </p>
+          </div>
+        </div>
+        <div className="content-stretch flex flex-col gap-[6px] items-start relative shrink-0 w-full" data-node-id="2:200" data-name="menu-stack">
+          <div className="content-stretch flex gap-[12px] items-center px-[16px] py-[12px] relative rounded-[8px] shrink-0 w-full" data-node-id="2:201" data-name="menu-item-Tổng quan">
+            <div className="content-stretch flex flex-col items-center justify-center overflow-clip relative shrink-0 size-[20px]" data-node-id="2:202" data-name="icon-wrapper">
+              <div className="relative shrink-0 size-[20px]" data-node-id="2:406" data-name="home">
+                <img alt="" className="absolute block inset-0 max-w-none size-full" src={imgHome} />
+              </div>
+            </div>
+            <p className="[word-break:break-word] font-['Inter:Medium'] font-medium leading-[normal] not-italic relative shrink-0 text-[#4b5563] text-[14px] whitespace-nowrap" data-node-id="2:204">
+              Tổng quan
+            </p>
+          </div>
+          <div className="bg-[#eff6ff] content-stretch flex gap-[12px] items-center px-[16px] py-[12px] relative rounded-[8px] shrink-0 w-full" data-node-id="2:205" data-name="menu-item-Sản phẩm">
+            <div className="content-stretch flex flex-col items-center justify-center overflow-clip relative shrink-0 size-[20px]" data-node-id="2:206" data-name="icon-wrapper">
+              <div className="relative shrink-0 size-[20px]" data-node-id="2:409" data-name="package">
+                <img alt="" className="absolute block inset-0 max-w-none size-full" src={imgPackage} />
+              </div>
+            </div>
+            <p className="[word-break:break-word] font-['Inter:Semi_Bold'] font-semibold leading-[normal] not-italic relative shrink-0 text-[#2563eb] text-[14px] whitespace-nowrap" data-node-id="2:208">
+              Sản phẩm
+            </p>
+          </div>
+          <div className="content-stretch flex gap-[12px] items-center px-[16px] py-[12px] relative rounded-[8px] shrink-0 w-full" data-node-id="2:209" data-name="menu-item-Đơn hàng">
+            <div className="content-stretch flex flex-col items-center justify-center overflow-clip relative shrink-0 size-[20px]" data-node-id="2:210" data-name="icon-wrapper">
+              <div className="relative shrink-0 size-[20px]" data-node-id="2:412" data-name="shopping-cart">
+                <img alt="" className="absolute block inset-0 max-w-none size-full" src={imgShoppingCart} />
+              </div>
+            </div>
+            <p className="[word-break:break-word] font-['Inter:Medium'] font-medium leading-[normal] not-italic relative shrink-0 text-[#4b5563] text-[14px] whitespace-nowrap" data-node-id="2:212">
+              Đơn hàng
+            </p>
+          </div>
+          <div className="content-stretch flex gap-[12px] items-center px-[16px] py-[12px] relative rounded-[8px] shrink-0 w-full" data-node-id="2:213" data-name="menu-item-Khách hàng">
+            <div className="content-stretch flex flex-col items-center justify-center overflow-clip relative shrink-0 size-[20px]" data-node-id="2:214" data-name="icon-wrapper">
+              <div className="relative shrink-0 size-[20px]" data-node-id="2:415" data-name="users">
+                <img alt="" className="absolute block inset-0 max-w-none size-full" src={imgUsers} />
+              </div>
+            </div>
+            <p className="[word-break:break-word] font-['Inter:Medium'] font-medium leading-[normal] not-italic relative shrink-0 text-[#4b5563] text-[14px] whitespace-nowrap" data-node-id="2:216">
+              Khách hàng
+            </p>
+          </div>
+          <div className="content-stretch flex gap-[12px] items-center px-[16px] py-[12px] relative rounded-[8px] shrink-0 w-full" data-node-id="2:217" data-name="menu-item-Báo cáo">
+            <div className="content-stretch flex flex-col items-center justify-center overflow-clip relative shrink-0 size-[20px]" data-node-id="2:218" data-name="icon-wrapper">
+              <div className="relative shrink-0 size-[20px]" data-node-id="2:418" data-name="bar-chart">
+                <img alt="" className="absolute block inset-0 max-w-none size-full" src={imgBarChart} />
+              </div>
+            </div>
+            <p className="[word-break:break-word] font-['Inter:Medium'] font-medium leading-[normal] not-italic relative shrink-0 text-[#4b5563] text-[14px] whitespace-nowrap" data-node-id="2:220">
+              Báo cáo
+            </p>
+          </div>
+          <div className="content-stretch flex gap-[12px] items-center px-[16px] py-[12px] relative rounded-[8px] shrink-0 w-full" data-node-id="2:221" data-name="menu-item-Cài đặt">
+            <div className="content-stretch flex flex-col items-center justify-center overflow-clip relative shrink-0 size-[20px]" data-node-id="2:222" data-name="icon-wrapper">
+              <div className="relative shrink-0 size-[20px]" data-node-id="2:421" data-name="settings">
+                <img alt="" className="absolute block inset-0 max-w-none size-full" src={imgSettings} />
+              </div>
+            </div>
+            <p className="[word-break:break-word] font-['Inter:Medium'] font-medium leading-[normal] not-italic relative shrink-0 text-[#4b5563] text-[14px] whitespace-nowrap" data-node-id="2:224">
+              Cài đặt
+            </p>
+          </div>
+        </div>
+      </div>
+      <div className="content-stretch flex flex-[1_0_0] flex-col items-start min-w-px relative self-stretch" data-node-id="2:225" data-name="main-content">
+        <div className="bg-white border-[#e5e7eb] border-b border-solid content-stretch flex items-center justify-between px-[32px] py-[18px] relative shrink-0 w-full" data-node-id="2:226" data-name="header">
+          <div className="[word-break:break-word] content-stretch flex flex-col gap-[4px] items-start leading-[normal] not-italic relative shrink-0 whitespace-nowrap" data-node-id="2:227" data-name="header-title-block">
+            <p className="font-['Inter:Bold'] font-bold relative shrink-0 text-[#111827] text-[20px]" data-node-id="2:228">
+              Bàn Phím Cơ Keychron K2
+            </p>
+            <p className="font-['Inter:Regular'] font-normal relative shrink-0 text-[#4b5563] text-[13px]" data-node-id="2:229">
+              Xem và cập nhật thông tin chi tiết sản phẩm
+            </p>
+          </div>
+          <div className="content-stretch flex gap-[12px] items-center relative shrink-0" data-node-id="2:230" data-name="profile">
+            <div className="bg-[#f9fafb] border border-[#e5e7eb] border-solid content-stretch flex flex-col items-center justify-center relative rounded-[20px] shrink-0 size-[40px]" data-node-id="2:231" data-name="notification-btn">
+              <div className="content-stretch flex flex-col items-center justify-center overflow-clip relative shrink-0 size-[18px]" data-node-id="2:232" data-name="icon-wrapper">
+                <div className="relative shrink-0 size-[18px]" data-node-id="2:424" data-name="bell">
+                  <img alt="" className="absolute block inset-0 max-w-none size-full" src={imgBell} />
+                </div>
+              </div>
+            </div>
+            <div className="bg-[#e5e7eb] h-[24px] relative shrink-0 w-px" data-node-id="2:234" data-name="divider" />
+            <div className="relative rounded-[18px] shrink-0 size-[36px]" data-node-id="2:235" data-name="avatar">
+              <img alt="" className="absolute inset-0 max-w-none object-cover pointer-events-none rounded-[18px] size-full" src={imgAvatar} />
+            </div>
+            <div className="[word-break:break-word] content-stretch flex flex-col items-start leading-[normal] not-italic relative shrink-0 whitespace-nowrap" data-node-id="2:236" data-name="user-info">
+              <p className="font-['Inter:Semi_Bold'] font-semibold relative shrink-0 text-[#111827] text-[14px]" data-node-id="2:237">
+                Minh Trần
+              </p>
+              <p className="font-['Inter:Regular'] font-normal relative shrink-0 text-[#9ca3af] text-[11px]" data-node-id="2:238">
+                Quản trị viên
+              </p>
+            </div>
+          </div>
+        </div>
+        <div className="content-stretch flex flex-col gap-[24px] items-start p-[32px] relative shrink-0 w-full" data-node-id="2:239" data-name="content-body">
+          <div className="content-stretch flex items-center justify-between relative shrink-0 w-full" data-node-id="2:240" data-name="detail-top-bar">
+            <div className="content-stretch flex flex-[1_0_0] gap-[8px] items-center min-w-px relative" data-node-id="2:241" data-name="breadcrumbs">
+              <p className="[word-break:break-word] font-['Inter:Regular'] font-normal leading-[normal] not-italic relative shrink-0 text-[#9ca3af] text-[13px] whitespace-nowrap" data-node-id="2:242">
+                Sản phẩm
+              </p>
+              <div className="content-stretch flex flex-col items-center justify-center overflow-clip relative shrink-0 size-[14px]" data-node-id="2:243" data-name="icon-wrapper">
+                <div className="relative shrink-0 size-[14px]" data-node-id="2:427" data-name="chevron-right">
+                  <img alt="" className="absolute block inset-0 max-w-none size-full" src={imgChevronRight} />
+                </div>
+              </div>
+              <p className="[word-break:break-word] font-['Inter:Regular'] font-normal leading-[normal] not-italic relative shrink-0 text-[#9ca3af] text-[13px] whitespace-nowrap" data-node-id="2:245">
+                Chi tiết sản phẩm
+              </p>
+              <div className="content-stretch flex flex-col items-center justify-center overflow-clip relative shrink-0 size-[14px]" data-node-id="2:246" data-name="icon-wrapper">
+                <div className="relative shrink-0 size-[14px]" data-node-id="2:430" data-name="chevron-right">
+                  <img alt="" className="absolute block inset-0 max-w-none size-full" src={imgChevronRight} />
+                </div>
+              </div>
+              <p className="[word-break:break-word] font-['Inter:Semi_Bold'] font-semibold leading-[normal] not-italic relative shrink-0 text-[#2563eb] text-[13px] whitespace-nowrap" data-node-id="2:248">
+                Bàn Phím Cơ Keychron K2
+              </p>
+            </div>
+            <div className="content-stretch flex gap-[12px] items-start relative shrink-0" data-node-id="2:249" data-name="action-buttons">
+              <div className="bg-white border border-[#e5e7eb] border-solid content-stretch flex h-[40px] items-center px-[20px] relative rounded-[8px] shrink-0" data-node-id="2:250" data-name="cancel-btn">
+                <p className="[word-break:break-word] font-['Inter:Semi_Bold'] font-semibold leading-[normal] not-italic relative shrink-0 text-[#4b5563] text-[14px] whitespace-nowrap" data-node-id="2:251">
+                  Hủy bỏ
+                </p>
+              </div>
+              <div className="bg-[#2563eb] content-stretch flex h-[40px] items-center px-[20px] relative rounded-[8px] shrink-0" data-node-id="2:252" data-name="save-btn">
+                <p className="[word-break:break-word] font-['Inter:Semi_Bold'] font-semibold leading-[normal] not-italic relative shrink-0 text-[14px] text-white whitespace-nowrap" data-node-id="2:253">
+                  Lưu thay đổi
+                </p>
+              </div>
+            </div>
+          </div>
+          <div className="content-stretch flex gap-[32px] items-start relative shrink-0 w-full" data-node-id="2:254" data-name="form-grid">
+            <div className="content-stretch flex flex-col gap-[16px] items-start relative shrink-0 w-[420px]" data-node-id="2:255" data-name="media-gallery">
+              <div className="border border-[#e5e7eb] border-solid h-[320px] relative rounded-[12px] shrink-0 w-full" data-node-id="2:256" data-name="main-image">
+                <img alt="" className="absolute inset-0 max-w-none object-cover pointer-events-none rounded-[12px] size-full" src={imgMainImage} />
+              </div>
+              <div className="content-stretch flex gap-[12px] items-start relative shrink-0 w-full" data-node-id="2:257" data-name="thumb-strip">
+                <div className="border-2 border-[#2563eb] border-solid h-[72px] relative rounded-[8px] shrink-0 w-[96px]" data-node-id="2:258" data-name="thumb-0">
+                  <img alt="" className="absolute inset-0 max-w-none object-cover pointer-events-none rounded-[8px] size-full" src={imgThumb0} />
+                </div>
+                <div className="border border-[#e5e7eb] border-solid h-[72px] relative rounded-[8px] shrink-0 w-[96px]" data-node-id="2:259" data-name="thumb-1">
+                  <img alt="" className="absolute inset-0 max-w-none object-cover pointer-events-none rounded-[8px] size-full" src={imgThumb1} />
+                </div>
+                <div className="border border-[#e5e7eb] border-solid h-[72px] relative rounded-[8px] shrink-0 w-[96px]" data-node-id="2:260" data-name="thumb-2">
+                  <img alt="" className="absolute inset-0 max-w-none object-cover pointer-events-none rounded-[8px] size-full" src={imgThumb2} />
+                </div>
+                <div className="bg-white border border-[#e5e7eb] border-dashed content-stretch flex flex-col gap-[4px] h-[72px] items-center justify-center relative rounded-[8px] shrink-0 w-[96px]" data-node-id="2:261" data-name="add-image-placeholder">
+                  <div className="content-stretch flex flex-col items-center justify-center overflow-clip relative shrink-0 size-[18px]" data-node-id="2:262" data-name="icon-wrapper">
+                    <div className="relative shrink-0 size-[18px]" data-node-id="2:433" data-name="plus">
+                      <img alt="" className="absolute block inset-0 max-w-none size-full" src={imgPlus} />
+                    </div>
+                  </div>
+                  <p className="[word-break:break-word] font-['Inter:Medium'] font-medium leading-[normal] not-italic relative shrink-0 text-[#9ca3af] text-[11px] whitespace-nowrap" data-node-id="2:264">
+                    Thêm ảnh
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div className="bg-white border border-[#e5e7eb] border-solid content-stretch flex flex-[1_0_0] flex-col gap-[20px] items-start min-w-px p-[24px] relative rounded-[12px]" data-node-id="2:265" data-name="form-info-card">
+              <p className="[word-break:break-word] font-['Inter:Bold'] font-bold leading-[normal] not-italic relative shrink-0 text-[#111827] text-[16px] whitespace-nowrap" data-node-id="2:266">
+                Thông tin chung
+              </p>
+              <div className="bg-[#e5e7eb] h-px relative shrink-0 w-full" data-node-id="2:267" data-name="divider" />
+              <div className="content-stretch flex flex-col gap-[6px] items-start relative shrink-0 w-full" data-node-id="2:268" data-name="field-Tên sản phẩm">
+                <p className="[word-break:break-word] font-['Inter:Semi_Bold'] font-semibold leading-[normal] not-italic relative shrink-0 text-[#111827] text-[13px] whitespace-nowrap" data-node-id="2:269">
+                  Tên sản phẩm
+                </p>
+                <div className="bg-white border border-[#e5e7eb] border-solid content-stretch flex h-[40px] items-center px-[16px] relative rounded-[8px] shrink-0 w-full" data-node-id="2:270" data-name="input-box">
+                  <p className="[word-break:break-word] flex-[1_0_0] font-['Inter:Regular'] font-normal leading-[normal] min-w-px not-italic relative text-[#111827] text-[14px]" data-node-id="2:271">
+                    Bàn Phím Cơ Keychron K2 V2 (Nhôm / Hotswap / Gateron Switch)
+                  </p>
+                </div>
+              </div>
+              <div className="content-stretch flex gap-[16px] items-start relative shrink-0 w-full" data-node-id="2:272" data-name="form-row-1">
+                <div className="content-stretch flex flex-[1_0_0] flex-col gap-[6px] items-start min-w-px relative" data-node-id="2:273" data-name="field-Mã sản phẩm (SKU)">
+                  <p className="[word-break:break-word] font-['Inter:Semi_Bold'] font-semibold leading-[normal] not-italic relative shrink-0 text-[#111827] text-[13px] whitespace-nowrap" data-node-id="2:274">
+                    Mã sản phẩm (SKU)
+                  </p>
+                  <div className="bg-white border border-[#e5e7eb] border-solid content-stretch flex h-[40px] items-center px-[16px] relative rounded-[8px] shrink-0 w-full" data-node-id="2:275" data-name="input-box">
+                    <p className="[word-break:break-word] flex-[1_0_0] font-['Inter:Regular'] font-normal leading-[normal] min-w-px not-italic relative text-[#111827] text-[14px]" data-node-id="2:276">
+                      KC-K2-01
+                    </p>
+                  </div>
+                </div>
+                <div className="content-stretch flex flex-[1_0_0] flex-col gap-[6px] items-start min-w-px relative" data-node-id="2:277" data-name="field-Thương hiệu">
+                  <p className="[word-break:break-word] font-['Inter:Semi_Bold'] font-semibold leading-[normal] not-italic relative shrink-0 text-[#111827] text-[13px] whitespace-nowrap" data-node-id="2:278">
+                    Thương hiệu
+                  </p>
+                  <div className="bg-white border border-[#e5e7eb] border-solid content-stretch flex h-[40px] items-center px-[16px] relative rounded-[8px] shrink-0 w-full" data-node-id="2:279" data-name="input-box">
+                    <p className="[word-break:break-word] flex-[1_0_0] font-['Inter:Regular'] font-normal leading-[normal] min-w-px not-italic relative text-[#111827] text-[14px]" data-node-id="2:280">
+                      Keychron
+                    </p>
+                  </div>
+                </div>
+              </div>
+              <div className="content-stretch flex gap-[16px] items-start relative shrink-0 w-full" data-node-id="2:281" data-name="form-row-2">
+                <div className="content-stretch flex flex-[1_0_0] flex-col gap-[6px] items-start min-w-px relative" data-node-id="2:282" data-name="field-Giá niêm yết (Gốc)">
+                  <p className="[word-break:break-word] font-['Inter:Semi_Bold'] font-semibold leading-[normal] not-italic relative shrink-0 text-[#111827] text-[13px] whitespace-nowrap" data-node-id="2:283">
+                    Giá niêm yết (Gốc)
+                  </p>
+                  <div className="bg-white border border-[#e5e7eb] border-solid content-stretch flex h-[40px] items-center px-[16px] relative rounded-[8px] shrink-0 w-full" data-node-id="2:284" data-name="input-box">
+                    <p className="[word-break:break-word] flex-[1_0_0] font-['Inter:Regular'] font-normal leading-[normal] min-w-px not-italic relative text-[#111827] text-[14px]" data-node-id="2:285">
+                      2,190,000 đ
+                    </p>
+                  </div>
+                </div>
+                <div className="content-stretch flex flex-[1_0_0] flex-col gap-[6px] items-start min-w-px relative" data-node-id="2:286" data-name="field-Giá khuyến mãi">
+                  <p className="[word-break:break-word] font-['Inter:Semi_Bold'] font-semibold leading-[normal] not-italic relative shrink-0 text-[#111827] text-[13px] whitespace-nowrap" data-node-id="2:287">
+                    Giá khuyến mãi
+                  </p>
+                  <div className="bg-white border border-[#e5e7eb] border-solid content-stretch flex h-[40px] items-center px-[16px] relative rounded-[8px] shrink-0 w-full" data-node-id="2:288" data-name="input-box">
+                    <p className="[word-break:break-word] flex-[1_0_0] font-['Inter:Regular'] font-normal leading-[normal] min-w-px not-italic relative text-[#111827] text-[14px]" data-node-id="2:289">
+                      1,890,000 đ
+                    </p>
+                  </div>
+                </div>
+              </div>
+              <div className="content-stretch flex gap-[16px] items-center relative shrink-0 w-full" data-node-id="2:290" data-name="form-row-3">
+                <div className="content-stretch flex flex-[1_0_0] flex-col gap-[6px] items-start min-w-px relative" data-node-id="2:291" data-name="field-Số lượng tồn kho">
+                  <p className="[word-break:break-word] font-['Inter:Semi_Bold'] font-semibold leading-[normal] not-italic relative shrink-0 text-[#111827] text-[13px] whitespace-nowrap" data-node-id="2:292">
+                    Số lượng tồn kho
+                  </p>
+                  <div className="bg-white border border-[#e5e7eb] border-solid content-stretch flex h-[40px] items-center px-[16px] relative rounded-[8px] shrink-0 w-full" data-node-id="2:293" data-name="input-box">
+                    <p className="[word-break:break-word] flex-[1_0_0] font-['Inter:Regular'] font-normal leading-[normal] min-w-px not-italic relative text-[#111827] text-[14px]" data-node-id="2:294">
+                      45
+                    </p>
+                  </div>
+                </div>
+                <div className="content-stretch flex flex-[1_0_0] flex-col gap-[6px] items-start min-w-px relative" data-node-id="2:295" data-name="status-switch-field">
+                  <p className="[word-break:break-word] font-['Inter:Semi_Bold'] font-semibold leading-[normal] not-italic relative shrink-0 text-[#111827] text-[13px] whitespace-nowrap" data-node-id="2:296">
+                    Trạng thái sản phẩm
+                  </p>
+                  <div className="content-stretch flex gap-[12px] h-[40px] items-center relative shrink-0" data-node-id="2:297" data-name="switch-row">
+                    <div className="h-[24px] relative shrink-0 w-[48px]" data-node-id="2:298" data-name="toggle">
+                      <img alt="" className="absolute block inset-0 max-w-none size-full" src={imgToggle} />
+                    </div>
+                    <p className="[word-break:break-word] font-['Inter:Medium'] font-medium leading-[normal] not-italic relative shrink-0 text-[#111827] text-[14px] whitespace-nowrap" data-node-id="2:300">
+                      Đang kinh doanh
+                    </p>
+                  </div>
+                </div>
+              </div>
+              <div className="content-stretch flex gap-[16px] items-start relative shrink-0 w-full" data-node-id="2:301" data-name="form-row-4">
+                <div className="content-stretch flex flex-[1_0_0] flex-col gap-[6px] items-start min-w-px relative" data-node-id="2:302" data-name="field-Trọng lượng (gram)">
+                  <p className="[word-break:break-word] font-['Inter:Semi_Bold'] font-semibold leading-[normal] not-italic relative shrink-0 text-[#111827] text-[13px] whitespace-nowrap" data-node-id="2:303">
+                    Trọng lượng (gram)
+                  </p>
+                  <div className="bg-white border border-[#e5e7eb] border-solid content-stretch flex h-[40px] items-center px-[16px] relative rounded-[8px] shrink-0 w-full" data-node-id="2:304" data-name="input-box">
+                    <p className="[word-break:break-word] flex-[1_0_0] font-['Inter:Regular'] font-normal leading-[normal] min-w-px not-italic relative text-[#111827] text-[14px]" data-node-id="2:305">
+                      790
+                    </p>
+                  </div>
+                </div>
+                <div className="content-stretch flex flex-[1_0_0] flex-col gap-[6px] items-start min-w-px relative" data-node-id="2:306" data-name="field-Kích thước (D x R x C cm)">
+                  <p className="[word-break:break-word] font-['Inter:Semi_Bold'] font-semibold leading-[normal] not-italic relative shrink-0 text-[#111827] text-[13px] whitespace-nowrap" data-node-id="2:307">
+                    Kích thước (D x R x C cm)
+                  </p>
+                  <div className="bg-white border border-[#e5e7eb] border-solid content-stretch flex h-[40px] items-center px-[16px] relative rounded-[8px] shrink-0 w-full" data-node-id="2:308" data-name="input-box">
+                    <p className="[word-break:break-word] flex-[1_0_0] font-['Inter:Regular'] font-normal leading-[normal] min-w-px not-italic relative text-[#111827] text-[14px]" data-node-id="2:309">
+                      31.3 x 12.9 x 3.8
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="bg-white border border-[#e5e7eb] border-solid content-stretch flex flex-col items-start overflow-clip relative rounded-[12px] shrink-0 w-full" data-node-id="2:310" data-name="tabs-section">
+            <div className="bg-[#f9fafb] border-[#e5e7eb] border-b border-solid content-stretch flex items-start relative shrink-0 w-full" data-node-id="2:311" data-name="tab-headers">
+              <div className="border-[#2563eb] border-b-3 border-solid content-stretch flex items-start px-[24px] py-[14px] relative shrink-0" data-node-id="2:312" data-name="tab-mota">
+                <p className="[word-break:break-word] font-['Inter:Semi_Bold'] font-semibold leading-[normal] not-italic relative shrink-0 text-[#2563eb] text-[14px] whitespace-nowrap" data-node-id="2:313">
+                  Mô tả sản phẩm
+                </p>
+              </div>
+              <div className="content-stretch flex items-start px-[24px] py-[14px] relative shrink-0" data-node-id="2:314" data-name="tab-specs">
+                <p className="[word-break:break-word] font-['Inter:Medium'] font-medium leading-[normal] not-italic relative shrink-0 text-[#4b5563] text-[14px] whitespace-nowrap" data-node-id="2:315">
+                  Thông số kỹ thuật
+                </p>
+              </div>
+              <div className="content-stretch flex items-start px-[24px] py-[14px] relative shrink-0" data-node-id="2:316" data-name="tab-reviews">
+                <p className="[word-break:break-word] font-['Inter:Medium'] font-medium leading-[normal] not-italic relative shrink-0 text-[#4b5563] text-[14px] whitespace-nowrap" data-node-id="2:317">
+                  Đánh giá (15)
+                </p>
+              </div>
+            </div>
+            <div className="content-stretch flex flex-col gap-[16px] items-start p-[24px] relative shrink-0 w-full" data-node-id="2:318" data-name="tab-content">
+              <div className="bg-[#f9fafb] content-stretch flex gap-[8px] items-center p-[8px] relative rounded-[8px] shrink-0 w-full" data-node-id="2:319" data-name="editor-toolbar">
+                <div className="content-stretch flex flex-col items-center justify-center overflow-clip relative shrink-0 size-[16px]" data-node-id="2:320" data-name="icon-wrapper">
+                  <div className="relative shrink-0 size-[16px]" data-node-id="2:436" data-name="bold">
+                    <img alt="" className="absolute block inset-0 max-w-none size-full" src={imgBold} />
+                  </div>
+                </div>
+                <div className="content-stretch flex flex-col items-center justify-center overflow-clip relative shrink-0 size-[16px]" data-node-id="2:322" data-name="icon-wrapper">
+                  <div className="relative shrink-0 size-[16px]" data-node-id="2:439" data-name="italic">
+                    <img alt="" className="absolute block inset-0 max-w-none size-full" src={imgItalic} />
+                  </div>
+                </div>
+                <div className="content-stretch flex flex-col items-center justify-center overflow-clip relative shrink-0 size-[16px]" data-node-id="2:324" data-name="icon-wrapper">
+                  <div className="relative shrink-0 size-[16px]" data-node-id="2:442" data-name="underline">
+                    <img alt="" className="absolute block inset-0 max-w-none size-full" src={imgUnderline} />
+                  </div>
+                </div>
+                <div className="bg-[#e5e7eb] h-[16px] relative shrink-0 w-px" data-node-id="2:326" data-name="Rectangle" />
+                <div className="content-stretch flex flex-col items-center justify-center overflow-clip relative shrink-0 size-[16px]" data-node-id="2:327" data-name="icon-wrapper">
+                  <div className="relative shrink-0 size-[16px]" data-node-id="2:445" data-name="align-left">
+                    <img alt="" className="absolute block inset-0 max-w-none size-full" src={imgAlignLeft} />
+                  </div>
+                </div>
+                <div className="content-stretch flex flex-col items-center justify-center overflow-clip relative shrink-0 size-[16px]" data-node-id="2:329" data-name="icon-wrapper">
+                  <div className="relative shrink-0 size-[16px]" data-node-id="2:448" data-name="align-center">
+                    <img alt="" className="absolute block inset-0 max-w-none size-full" src={imgAlignCenter} />
+                  </div>
+                </div>
+                <div className="content-stretch flex flex-col items-center justify-center overflow-clip relative shrink-0 size-[16px]" data-node-id="2:331" data-name="icon-wrapper">
+                  <div className="relative shrink-0 size-[16px]" data-node-id="2:451" data-name="align-right">
+                    <img alt="" className="absolute block inset-0 max-w-none size-full" src={imgAlignRight} />
+                  </div>
+                </div>
+                <div className="bg-[#e5e7eb] h-[16px] relative shrink-0 w-px" data-node-id="2:333" data-name="Rectangle" />
+                <div className="content-stretch flex flex-col items-center justify-center overflow-clip relative shrink-0 size-[16px]" data-node-id="2:334" data-name="icon-wrapper">
+                  <div className="relative shrink-0 size-[16px]" data-node-id="2:454" data-name="image">
+                    <img alt="" className="absolute block inset-0 max-w-none size-full" src={imgImage} />
+                  </div>
+                </div>
+                <div className="content-stretch flex flex-col items-center justify-center overflow-clip relative shrink-0 size-[16px]" data-node-id="2:336" data-name="icon-wrapper">
+                  <div className="relative shrink-0 size-[16px]" data-node-id="2:457" data-name="link">
+                    <img alt="" className="absolute block inset-0 max-w-none size-full" src={imgLink} />
+                  </div>
+                </div>
+              </div>
+              <div className="[word-break:break-word] content-stretch flex flex-col gap-[12px] items-start not-italic relative shrink-0 w-full" data-node-id="2:338" data-name="editor-body">
+                <p className="font-['Inter:Semi_Bold'] font-semibold leading-[normal] relative shrink-0 text-[#111827] text-[15px] w-full" data-node-id="2:339">
+                  Thiết kế nhỏ gọn, tối ưu hiệu năng
+                </p>
+                <p className="font-['Inter:Regular'] font-normal leading-[1.6] relative shrink-0 text-[#4b5563] text-[14px] w-full" data-node-id="2:340">
+                  Bàn phím cơ Keychron K2 phiên bản V2 giữ nguyên layout 84 phím (75%) tối ưu cho cả người dùng Mac và Windows. Hệ thống đèn LED nền sinh động kết hợp cùng khung nhôm chắc chắn mang đến trải nghiệm gõ phím cao cấp. Tính năng Hot-swappable dễ dàng thay thế switch mà không cần hàn mạch.
+                </p>
+                <p className="font-['Inter:Regular'] font-normal leading-[1.6] relative shrink-0 text-[#4b5563] text-[14px] w-full" data-node-id="2:341">
+                  Kết nối không dây bluetooth 5.1 bền bỉ với thời lượng pin cực khủng lên đến 4000mAh, cho thời gian làm việc liên tục đến vài tuần.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

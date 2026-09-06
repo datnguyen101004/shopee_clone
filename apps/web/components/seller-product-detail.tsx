@@ -120,6 +120,44 @@ export function SellerProductDetailView({ productId }: { productId: string }) {
         </div>
       </div>
 
+      <div className="seller-product-detail__overview-columns" aria-label="Thông tin cơ bản sản phẩm">
+        <div className="seller-product-detail__overview-card">
+          <span className="seller-product-detail__overview-label">Tên sản phẩm</span>
+          <strong className="seller-product-detail__overview-value">{product.name}</strong>
+          <small className="seller-product-detail__overview-hint">Mã: {product.slug}</small>
+        </div>
+        <div className="seller-product-detail__overview-card">
+          <span className="seller-product-detail__overview-label">Shop / Gian hàng</span>
+          <strong className="seller-product-detail__overview-value">
+            {state.user?.displayName || 'Gian hàng của bạn'}
+          </strong>
+          <small className="seller-product-detail__overview-hint">Chủ sở hữu sản phẩm</small>
+        </div>
+        <div className="seller-product-detail__overview-card">
+          <span className="seller-product-detail__overview-label">Trạng thái</span>
+          <div className="seller-product-detail__status-row">
+            <span className={`seller-product-status seller-product-status--${product.lifecycle}`}>
+              {lifecycleLabel(product.lifecycle)}
+            </span>
+            <span className={`seller-product-moderation-badge seller-product-moderation-badge--${product.moderationStatus}`}>
+              {product.moderationStatus === 'active' ? 'Đã duyệt' : 'Tạm ngưng'}
+            </span>
+          </div>
+          <small className="seller-product-detail__overview-hint">
+            Cập nhật: {new Date(product.updatedAt).toLocaleDateString('vi-VN')}
+          </small>
+        </div>
+        <div className="seller-product-detail__overview-card">
+          <span className="seller-product-detail__overview-label">Biến thể & Kho</span>
+          <strong className="seller-product-detail__overview-value">
+            {formatNumber(product.variants.length)} phân loại
+          </strong>
+          <small className="seller-product-detail__overview-hint">
+            Tổng tồn: {formatNumber(product.variants.reduce((total, variant) => total + variant.stock, 0))}
+          </small>
+        </div>
+      </div>
+
       <div className="seller-product-detail__hero">
         <div className="seller-product-detail__gallery">
           <div className="seller-product-detail__main-media">
@@ -140,6 +178,8 @@ export function SellerProductDetailView({ productId }: { productId: string }) {
           <div><dt>Số biến thể</dt><dd>{formatNumber(product.variants.length)}</dd></div>
           <div><dt>Tồn kho</dt><dd>{formatNumber(product.variants.reduce((total, variant) => total + variant.stock, 0))}</dd></div>
           <div><dt>Cập nhật lần cuối</dt><dd>{new Date(product.updatedAt).toLocaleString('vi-VN')}</dd></div>
+          <div><dt>Đã bán</dt><dd>{formatNumber(product.operationalSummary?.soldCount ?? 0)}</dd></div>
+          <div><dt>Đánh giá</dt><dd>{formatNumber(product.operationalSummary?.ratingCount ?? 0)} lượt</dd></div>
         </dl>
       </div>
 
@@ -172,6 +212,21 @@ export function SellerProductDetailView({ productId }: { productId: string }) {
               <tbody>{product.variants.map((variant) => <tr key={variant.id}><td>{variant.combination.join(' · ') || 'Mặc định'}</td><td>{variant.sku}</td><td>₫{formatNumber(variant.priceMinor)}</td><td>{formatNumber(variant.stock)}</td><td>v{variant.inventoryVersion ?? 0}</td><td>{formatNumber(variant.weightGrams)} g</td></tr>)}</tbody>
             </table>
           </div>
+        </section>
+        <section className="seller-product-detail__campaigns" aria-labelledby="seller-product-campaigns-title">
+          <h2 id="seller-product-campaigns-title">Chiến dịch tham gia</h2>
+          {product.campaigns?.length ? (
+            <div className="seller-product-campaign-list">
+              {product.campaigns.map((campaign) => (
+                <Link className="seller-product-campaign-card" key={campaign.campaignId} href={campaign.href}>
+                  <span className="seller-product-campaign-card__type">{campaign.type.displayName} · {campaign.type.importanceClass === 'FEATURED' ? 'Ưu tiên nổi bật' : 'Tiêu chuẩn'}</span>
+                  <strong>{campaign.title}</strong>
+                  <span>{campaign.group === 'ACTIVE' ? 'Đang chạy' : campaign.group === 'UPCOMING_LOCKED' ? 'Sắp diễn ra' : 'Lịch sử'} · giảm {campaign.discountBasisPoints / 100}%</span>
+                  <small>{new Date(campaign.startsAt).toLocaleString('vi-VN')} – {new Date(campaign.endsAt).toLocaleString('vi-VN')}</small>
+                </Link>
+              ))}
+            </div>
+          ) : <p>Chưa tham gia chiến dịch sàn nào.</p>}
         </section>
       </div>
     </section>

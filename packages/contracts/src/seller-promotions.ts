@@ -11,7 +11,6 @@ export type SellerPromotionState = (typeof SELLER_PROMOTION_STATES)[number];
 export type SellerVoucherState = (typeof SELLER_VOUCHER_STATES)[number];
 
 export interface SellerVoucherCreateRequest {
-  code: string;
   name: string;
   benefitType: SellerPromotionBenefit;
   fixedAmountMinor: number | null;
@@ -33,6 +32,7 @@ export interface SellerPromotionActionRequest { action: SellerPromotionAction; }
 export interface SellerVoucherSummary extends SellerVoucherCreateRequest {
   id: string;
   issuer: 'SHOP';
+  code: string;
   state: SellerVoucherState;
   usedCount: number;
   version: number;
@@ -77,8 +77,7 @@ export function isSellerVoucherDeleteResult(value: unknown): value is SellerVouc
 
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const cursor = /^[A-Za-z0-9_-]{1,512}$/;
-const code = /^[A-Z0-9][A-Z0-9-]{2,30}[A-Z0-9]$/;
-const voucherCreateKeys = ['code', 'name', 'benefitType', 'fixedAmountMinor', 'percentageBasisPoints', 'maximumDiscountMinor', 'minimumSpendMinor', 'startsAt', 'endsAt', 'usageLimit', 'perBuyerLimit', 'productIds'] as const;
+const voucherCreateKeys = ['name', 'benefitType', 'fixedAmountMinor', 'percentageBasisPoints', 'maximumDiscountMinor', 'minimumSpendMinor', 'startsAt', 'endsAt', 'usageLimit', 'perBuyerLimit', 'productIds'] as const;
 const discountCreateKeys = ['name', 'startsAt', 'endsAt', 'products'] as const;
 const instant = (value: unknown): value is string => typeof value === 'string' && Number.isFinite(Date.parse(value)) && new Date(value).toISOString() === value;
 const text = (value: unknown, max: number): value is string => typeof value === 'string' && value.trim().length > 0 && value.length <= max && ![...value].some((char) => char.charCodeAt(0) < 32);
@@ -96,7 +95,6 @@ const fail = (invalidParameters: string[], detail: string): SellerPromotionReque
   detail,
 });
 
-const CODE_DETAIL = 'Voucher code must be 4-32 characters using A-Z, 0-9, and optional hyphens.';
 const NAME_DETAIL = 'Promotion name is required (max 160 characters).';
 const SCHEDULE_DETAIL = 'Start time must be before end time and use ISO-8601 instants.';
 const BENEFIT_DETAIL = 'Benefit amount is invalid for the selected benefit type.';
@@ -111,8 +109,6 @@ export function inspectSellerVoucherCreateRequest(value: unknown): SellerPromoti
     if (!details.includes(detail)) details.push(detail);
   };
 
-  const normalizedCode = typeof value.code === 'string' ? value.code.trim().toUpperCase() : '';
-  if (typeof value.code !== 'string' || !code.test(normalizedCode)) push('code', CODE_DETAIL);
   if (!text(value.name, 160)) push('name', NAME_DETAIL);
   if (!SELLER_PROMOTION_BENEFITS.includes(value.benefitType as SellerPromotionBenefit)) push('benefitType', 'Benefit type must be FIXED_AMOUNT or PERCENTAGE.');
   if (!instant(value.startsAt)) push('startsAt', SCHEDULE_DETAIL);
@@ -156,7 +152,6 @@ export function inspectSellerVoucherCreateRequest(value: unknown): SellerPromoti
   return {
     ok: true,
     value: {
-      code: normalizedCode,
       name: (value.name as string).trim(),
       benefitType: value.benefitType as SellerPromotionBenefit,
       fixedAmountMinor: value.fixedAmountMinor as number | null,
@@ -187,7 +182,6 @@ export function inspectSellerVoucherUpdateRequest(value: unknown): SellerPromoti
     if (!invalidParameters.includes(field)) invalidParameters.push(field);
     if (!details.includes(detail)) details.push(detail);
   };
-  if (value.code !== undefined && (typeof value.code !== 'string' || !code.test(value.code.trim().toUpperCase()))) push('code', CODE_DETAIL);
   if (value.name !== undefined && !text(value.name, 160)) push('name', NAME_DETAIL);
   if (value.benefitType !== undefined && !SELLER_PROMOTION_BENEFITS.includes(value.benefitType as SellerPromotionBenefit)) {
     push('benefitType', 'Benefit type must be FIXED_AMOUNT or PERCENTAGE.');

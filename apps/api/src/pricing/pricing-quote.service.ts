@@ -33,7 +33,7 @@ import {
   PricingUnavailableError,
   PricingValidationError,
 } from './pricing.errors';
-import { ScheduledDiscountService } from './scheduled-discount.service';
+import { ScheduledDiscountService, type EffectivePriceBreakdown } from './scheduled-discount.service';
 
 interface VoucherHoldCountRow {
   voucherId: string;
@@ -106,6 +106,20 @@ const quoteCartSelect = {
 } satisfies Prisma.CartSelect;
 
 type QuoteCart = Prisma.CartGetPayload<{ select: typeof quoteCartSelect }>;
+
+function campaignPriceSnapshot(
+  discount: EffectivePriceBreakdown | undefined,
+): AuthoritativePricingLine['campaignPrice'] {
+  if (!discount || !discount.campaignId || discount.effectivePriceMinor >= discount.basePriceMinor) return undefined;
+  return {
+    sourceKind: discount.sourceKind ?? 'SHOP',
+    campaignId: discount.campaignId,
+    campaignTypeCode: discount.campaignTypeCode ?? null,
+    policyVersion: discount.policyVersion ?? null,
+    discountBasisPoints: discount.discountBasisPoints,
+    evaluatedAt: discount.evaluatedAt.toISOString(),
+  };
+}
 
 export interface PricingCheckoutLineFact {
   lineId: string;
@@ -225,6 +239,7 @@ export class PricingQuoteService {
         ...line,
         sellingUnitPriceMinor: discount.effectivePriceMinor,
         compareAtUnitPriceMinor: listPrice,
+        campaignPrice: campaignPriceSnapshot(discount),
       };
     });
     const selectedShopIds = new Set(lines.map((line) => line.shop.id));
@@ -329,6 +344,7 @@ export class PricingQuoteService {
         ...line,
         sellingUnitPriceMinor: discount.effectivePriceMinor,
         compareAtUnitPriceMinor: listPrice,
+        campaignPrice: campaignPriceSnapshot(discount),
       };
     });
     const { exclusions, snapshots } = facts;

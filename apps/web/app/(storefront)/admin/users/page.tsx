@@ -4,6 +4,7 @@ import type { AdminUserSummary } from '@shopee-clone/contracts';
 import { useCallback, useEffect, useState } from 'react';
 
 import { useAuthSession } from '../../../../components/auth-session-provider';
+import { AdminEntityLink } from '../../../../components/admin/admin-entity-link';
 import {
   adminErrorMessage,
   executeAdminUserAction,
@@ -101,16 +102,10 @@ export default function AdminUsersPage() {
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-      <div>
-        <h1 style={{ fontSize: '24px', fontWeight: 700, color: '#111827' }}>Quản lý Người dùng</h1>
-        <p style={{ color: '#6b7280', fontSize: '14px', marginTop: '4px' }}>
-          Tra cứu thông tin tài khoản và thay đổi trạng thái khóa/mở.
-        </p>
-      </div>
-
+    <div className="admin-page admin-users-page">
       {/* Filter Bar */}
       <div
+        className="admin-toolbar admin-users-toolbar"
         style={{
           background: '#ffffff',
           borderRadius: '12px',
@@ -124,10 +119,12 @@ export default function AdminUsersPage() {
         }}
       >
         <form
+          className="admin-toolbar__search"
           onSubmit={handleSearchSubmit}
           style={{ display: 'flex', gap: '10px', flex: 1, minWidth: '280px' }}
         >
           <input
+            className="admin-control admin-toolbar__search-input"
             type="text"
             placeholder="Tìm theo email hoặc tên..."
             value={search}
@@ -152,12 +149,12 @@ export default function AdminUsersPage() {
           </button>
         </form>
 
-        <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-          <div>
-            <label style={{ fontSize: '13px', color: '#4b5563', marginRight: '6px' }}>
-              Trạng thái:
-            </label>
+        <div className="admin-toolbar__filters">
+          <div className="admin-field">
+            <label htmlFor="admin-user-status">Trạng thái:</label>
             <select
+              id="admin-user-status"
+              className="admin-control"
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value as 'ALL' | 'ACTIVE' | 'SUSPENDED')}
               style={{
@@ -173,11 +170,11 @@ export default function AdminUsersPage() {
             </select>
           </div>
 
-          <div>
-            <label style={{ fontSize: '13px', color: '#4b5563', marginRight: '6px' }}>
-              Vai trò:
-            </label>
+          <div className="admin-field">
+            <label htmlFor="admin-user-role">Vai trò:</label>
             <select
+              id="admin-user-role"
+              className="admin-control"
               value={roleFilter}
               onChange={(e) =>
                 setRoleFilter(e.target.value as 'ALL' | 'buyer' | 'seller' | 'admin')
@@ -200,6 +197,7 @@ export default function AdminUsersPage() {
 
       {/* Users Table */}
       <div
+        className="admin-table-card admin-entity-list-card"
         style={{
           background: '#ffffff',
           borderRadius: '12px',
@@ -209,17 +207,14 @@ export default function AdminUsersPage() {
         }}
       >
         {loading ? (
-          <div style={{ padding: '32px', textAlign: 'center', color: '#6b7280' }}>
-            Đang tải danh sách người dùng...
-          </div>
+          <div className="admin-state-card__message">Đang tải danh sách người dùng...</div>
         ) : error ? (
-          <div style={{ padding: '24px', color: '#ef4444' }}>{error}</div>
+          <div className="admin-state-card__message admin-state-card__message--error">{error}</div>
         ) : users.length === 0 ? (
-          <div style={{ padding: '32px', textAlign: 'center', color: '#6b7280' }}>
-            Không tìm thấy người dùng nào phù hợp.
-          </div>
+          <div className="admin-state-card__message">Không tìm thấy người dùng nào phù hợp.</div>
         ) : (
           <table
+            className="admin-data-table"
             style={{
               width: '100%',
               borderCollapse: 'collapse',
@@ -246,16 +241,21 @@ export default function AdminUsersPage() {
             </thead>
             <tbody>
               {users.map((u) => (
-                <tr key={u.id} style={{ borderBottom: '1px solid #f3f4f6' }}>
+                <tr key={u.id}>
                   <td style={{ padding: '14px 16px' }}>
-                    <div style={{ fontWeight: 600, color: '#111827' }}>{u.displayName}</div>
-                    <div style={{ fontSize: '13px', color: '#6b7280' }}>{u.email}</div>
+                    <AdminEntityLink
+                      href={`/admin/users/${u.id}`}
+                      name={u.displayName}
+                      imageUrl={u.avatarUrl}
+                      meta={u.email}
+                    />
                   </td>
                   <td style={{ padding: '14px 16px', color: '#4b5563' }}>{u.phoneNumber || '—'}</td>
                   <td style={{ padding: '14px 16px' }}>
-                    <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+                    <div className="admin-badge-list">
                       {u.roles.map((r) => (
                         <span
+                          className={`admin-badge admin-badge--role-${r}`}
                           key={r}
                           style={{
                             fontSize: '11px',
@@ -275,6 +275,7 @@ export default function AdminUsersPage() {
                   </td>
                   <td style={{ padding: '14px 16px' }}>
                     <span
+                      className={`admin-badge ${u.status === 'ACTIVE' ? 'admin-badge--success' : 'admin-badge--danger'}`}
                       style={{
                         display: 'inline-block',
                         padding: '3px 10px',
@@ -292,11 +293,11 @@ export default function AdminUsersPage() {
                     {new Date(u.createdAt).toLocaleDateString('vi-VN')}
                   </td>
                   <td style={{ padding: '14px 16px', textAlign: 'right' }}>
-                    <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                    <div className="admin-table-actions">
                       {u.status === 'ACTIVE' ? (
                         <button
                           onClick={() => openModal(u, 'SUSPEND')}
-                          className="admin-btn-danger-outline"
+                          className="admin-btn admin-btn-danger-outline"
                           style={{
                             borderRadius: '6px',
                             cursor: 'pointer',
@@ -308,7 +309,7 @@ export default function AdminUsersPage() {
                       ) : (
                         <button
                           onClick={() => openModal(u, 'RESTORE')}
-                          className="admin-btn-success-outline"
+                          className="admin-btn admin-btn-success-outline"
                           style={{
                             borderRadius: '6px',
                             cursor: 'pointer',
@@ -330,6 +331,7 @@ export default function AdminUsersPage() {
       {/* Confirmation Modal */}
       {actionType && selectedUser && (
         <div
+          className="admin-dialog-backdrop"
           style={{
             position: 'fixed',
             inset: 0,
@@ -341,6 +343,7 @@ export default function AdminUsersPage() {
           }}
         >
           <div
+            className="admin-dialog"
             style={{
               background: '#ffffff',
               borderRadius: '12px',
@@ -371,9 +374,10 @@ export default function AdminUsersPage() {
               </p>
             ) : null}
 
-            <form onSubmit={handleActionSubmit}>
-              <div style={{ marginBottom: '16px' }}>
+            <form className="admin-dialog__form" onSubmit={handleActionSubmit}>
+              <div className="admin-field">
                 <label
+                  htmlFor="admin-user-action-reason"
                   style={{
                     display: 'block',
                     fontSize: '13px',
@@ -385,6 +389,8 @@ export default function AdminUsersPage() {
                   Lý do thao tác (Bắt buộc, 8 - 240 ký tự):
                 </label>
                 <textarea
+                  id="admin-user-action-reason"
+                  className="admin-control admin-control--textarea"
                   rows={3}
                   value={reason}
                   onChange={(e) => setReason(e.target.value)}
@@ -417,11 +423,12 @@ export default function AdminUsersPage() {
                 </div>
               )}
 
-              <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+              <div className="admin-dialog__actions">
                 <button
                   type="button"
                   onClick={closeModal}
                   disabled={submitting}
+                  className="admin-btn admin-btn-secondary"
                   style={{
                     padding: '8px 16px',
                     background: '#f3f4f6',
@@ -438,16 +445,7 @@ export default function AdminUsersPage() {
                 <button
                   type="submit"
                   disabled={submitting}
-                  style={{
-                    padding: '8px 16px',
-                    background: actionType === 'SUSPEND' ? '#dc2626' : '#ee4d2d',
-                    color: '#ffffff',
-                    border: 'none',
-                    borderRadius: '8px',
-                    fontWeight: 600,
-                    fontSize: '14px',
-                    cursor: 'pointer',
-                  }}
+                  className={`admin-btn ${actionType === 'SUSPEND' ? 'admin-btn-danger' : 'admin-btn-primary'}`}
                 >
                   {submitting ? 'Đang xử lý...' : 'Xác nhận'}
                 </button>

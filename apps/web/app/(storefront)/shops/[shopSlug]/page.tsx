@@ -1,5 +1,5 @@
 import { isCanonicalShopSlug, type ShopCatalogQuery } from '@shopee-clone/contracts';
-import { Badge, Container } from '@shopee-clone/ui';
+import { Badge, StorefrontContainer } from '@shopee-clone/ui';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
@@ -56,12 +56,12 @@ export default async function ShopStorefrontPage({ params, searchParams }: ShopP
   } catch (error) {
     if (error instanceof ShopStorefrontApiError && error.kind === 'not-found') notFound();
     return (
-      <Container className="shop-page shop-page__failure">
+      <StorefrontContainer className="shop-page shop-page__failure">
         <Badge variant="danger">TẠM THỜI GIÁN ĐOẠN</Badge>
         <h1>Chưa thể tải shop</h1>
         <p>Dịch vụ shop đang gặp sự cố. Vui lòng thử lại sau.</p>
         <Link href={shopStorefrontHref(shopSlug)}>Thử lại</Link>
-      </Container>
+      </StorefrontContainer>
     );
   }
 
@@ -90,7 +90,7 @@ export default async function ShopStorefrontPage({ params, searchParams }: ShopP
     : {};
 
   return (
-    <Container className="shop-page">
+    <StorefrontContainer className="shop-page">
       <nav className="shop-breadcrumb" aria-label="Điều hướng shop">
         <Link href="/">Trang chủ</Link>
         <span>/</span>
@@ -157,6 +157,6 @@ export default async function ShopStorefrontPage({ params, searchParams }: ShopP
           <Link href={shopStorefrontHref(shopSlug)}>Xóa bộ lọc và thử lại</Link>
         </section>
       )}
-    </Container>
+    </StorefrontContainer>
   );
 }

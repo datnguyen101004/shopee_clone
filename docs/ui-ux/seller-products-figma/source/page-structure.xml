@@ -1,0 +1,512 @@
+<canvas id="0:1" name="Page 1" x="0" y="0" width="0" height="0">
+  <frame id="2:5" name="product-list-page" x="-721" y="-451" width="1440" height="1024">
+    <frame id="2:6" name="sidebar" x="0" y="0" width="260" height="1024">
+      <frame id="2:7" name="brand" x="24" y="24" width="212" height="36">
+        <frame id="2:8" name="logo-icon" x="0" y="0" width="36" height="36">
+          <frame id="2:460" name="circle-x" x="8" y="8" width="20" height="20" />
+        </frame>
+        <frame id="2:10" name="logo-text" x="48" y="1" width="110" height="34">
+          <text id="2:11" name="PM Admin" x="0" y="0" width="80" height="19" />
+          <text id="2:12" name="Hệ thống quản lý" x="0" y="21" width="110" height="13" />
+        </frame>
+      </frame>
+      <frame id="2:13" name="menu-stack" x="24" y="92" width="212" height="294">
+        <frame id="2:14" name="menu-item-Tổng quan" x="0" y="0" width="212" height="44">
+          <frame id="2:15" name="icon-wrapper" x="16" y="12" width="20" height="20">
+            <frame id="2:346" name="home" x="0" y="0" width="20" height="20" />
+          </frame>
+          <text id="2:17" name="Tổng quan" x="48" y="13.5" width="71" height="17" />
+        </frame>
+        <frame id="2:18" name="menu-item-Sản phẩm" x="0" y="50" width="212" height="44">
+          <frame id="2:19" name="icon-wrapper" x="16" y="12" width="20" height="20">
+            <frame id="2:352" name="package" x="0" y="0" width="20" height="20" />
+          </frame>
+          <text id="2:21" name="Sản phẩm" x="48" y="13.5" width="68" height="17" />
+        </frame>
+        <frame id="2:22" name="menu-item-Đơn hàng" x="0" y="100" width="212" height="44">
+          <frame id="2:23" name="icon-wrapper" x="16" y="12" width="20" height="20">
+            <frame id="2:343" name="shopping-cart" x="0" y="0" width="20" height="20" />
+          </frame>
+          <text id="2:25" name="Đơn hàng" x="48" y="13.5" width="65" height="17" />
+        </frame>
+        <frame id="2:26" name="menu-item-Khách hàng" x="0" y="150" width="212" height="44">
+          <frame id="2:27" name="icon-wrapper" x="16" y="12" width="20" height="20">
+            <frame id="2:349" name="users" x="0" y="0" width="20" height="20" />
+          </frame>
+          <text id="2:29" name="Khách hàng" x="48" y="13.5" width="80" height="17" />
+        </frame>
+        <frame id="2:30" name="menu-item-Báo cáo" x="0" y="200" width="212" height="44">
+          <frame id="2:31" name="icon-wrapper" x="16" y="12" width="20" height="20">
+            <frame id="2:355" name="bar-chart" x="0" y="0" width="20" height="20" />
+          </frame>
+          <text id="2:33" name="Báo cáo" x="48" y="13.5" width="54" height="17" />
+        </frame>
+        <frame id="2:34" name="menu-item-Cài đặt" x="0" y="250" width="212" height="44">
+          <frame id="2:35" name="icon-wrapper" x="16" y="12" width="20" height="20">
+            <frame id="2:358" name="settings" x="0" y="0" width="20" height="20" />
+          </frame>
+          <text id="2:37" name="Cài đặt" x="48" y="13.5" width="48" height="17" />
+        </frame>
+      </frame>
+    </frame>
+    <frame id="2:38" name="main-content" x="260" y="0" width="1180" height="1024">
+      <frame id="2:39" name="header" x="0" y="0" width="1180" height="80">
+        <frame id="2:40" name="header-title-block" x="32" y="18" width="356" height="44">
+          <text id="2:41" name="Quản lý sản phẩm" x="0" y="0" width="174" height="24" />
+          <text id="2:42" name="Quản lý kho hàng, giá bán và trạng thái sản phẩm của bạn" x="0" y="28" width="356" height="16" />
+        </frame>
+        <frame id="2:43" name="profile" x="967" y="20" width="181" height="40">
+          <frame id="2:44" name="notification-btn" x="0" y="0" width="40" height="40">
+            <frame id="2:45" name="icon-wrapper" x="11" y="11" width="18" height="18">
+              <frame id="2:361" name="bell" x="0" y="0" width="18" height="18" />
+            </frame>
+          </frame>
+          <rounded-rectangle id="2:47" name="divider" x="52" y="8" width="1" height="24" />
+          <frame id="2:48" name="avatar" x="65" y="2" width="36" height="36" />
+          <frame id="2:49" name="user-info" x="113" y="5" width="68" height="30">
+            <text id="2:50" name="Minh Trần" x="0" y="0" width="68" height="17" />
+            <text id="2:51" name="Quản trị viên" x="0" y="17" width="66" height="13" />
+          </frame>
+        </frame>
+      </frame>
+      <frame id="2:52" name="content-body" x="0" y="80" width="1180" height="639">
+        <frame id="2:53" name="action-bar" x="32" y="32" width="1116" height="40">
+          <frame id="2:54" name="filters-group" x="0" y="0" width="711" height="40">
+            <frame id="2:55" name="search-input" x="0" y="0" width="320" height="40">
+              <frame id="2:56" name="icon-wrapper" x="16" y="12" width="16" height="16">
+                <frame id="2:364" name="search" x="0" y="0" width="16" height="16" />
+              </frame>
+              <text id="2:58" name="Tìm kiếm sản phẩm..." x="40" y="11.5" width="264" height="17" />
+            </frame>
+            <frame id="2:59" name="dropdown-category" x="332" y="0" width="169" height="40">
+              <text id="2:60" name="Danh mục: Tất cả" x="16" y="11.5" width="115" height="17" />
+              <frame id="2:61" name="icon-wrapper" x="139" y="13" width="14" height="14">
+                <frame id="2:367" name="chevron-down" x="0" y="0" width="14" height="14" />
+              </frame>
+            </frame>
+            <frame id="2:63" name="dropdown-status" x="513" y="0" width="198" height="40">
+              <text id="2:64" name="Trạng thái: Hoạt động" x="16" y="11.5" width="144" height="17" />
+              <frame id="2:65" name="icon-wrapper" x="168" y="13" width="14" height="14">
+                <frame id="2:370" name="chevron-down" x="0" y="0" width="14" height="14" />
+              </frame>
+            </frame>
+          </frame>
+          <frame id="2:67" name="add-product-btn" x="942" y="0" width="174" height="40">
+            <frame id="2:68" name="icon-wrapper" x="20" y="11" width="18" height="18">
+              <frame id="2:373" name="plus" x="0" y="0" width="18" height="18" />
+            </frame>
+            <text id="2:70" name="Thêm sản phẩm" x="46" y="11.5" width="108" height="17" />
+          </frame>
+        </frame>
+        <frame id="2:71" name="table-container" x="32" y="96" width="1116" height="511">
+          <frame id="2:72" name="table-header" x="0" y="0" width="1116" height="47">
+            <text id="2:73" name="Hình ảnh" x="24" y="16" width="80" height="15" />
+            <text id="2:74" name="Thông tin sản phẩm" x="104" y="16" width="348" height="15" />
+            <text id="2:75" name="Danh mục" x="452" y="16" width="150" height="15" />
+            <text id="2:76" name="Giá bán" x="602" y="16" width="150" height="15" />
+            <text id="2:77" name="Kho hàng" x="752" y="16" width="100" height="15" />
+            <text id="2:78" name="Trạng thái" x="852" y="16" width="140" height="15" />
+            <text id="2:79" name="Thao tác" x="992" y="16" width="100" height="15" />
+          </frame>
+          <frame id="2:80" name="table-row-0" x="0" y="47" width="1116" height="80">
+            <frame id="2:81" name="img-col" x="24" y="16" width="80" height="48">
+              <rounded-rectangle id="2:82" name="product-thumb" x="0" y="0" width="48" height="48" />
+            </frame>
+            <frame id="2:83" name="info-col" x="104" y="22" width="348" height="36">
+              <text id="2:84" name="Bàn Phím Cơ Keychron K2" x="0" y="0" width="348" height="17" />
+              <text id="2:85" name="SKU: KC-K2-01" x="0" y="21" width="348" height="15" />
+            </frame>
+            <text id="2:86" name="Bàn Phím" x="452" y="31.5" width="150" height="17" />
+            <text id="2:87" name="1,890,000 đ" x="602" y="31.5" width="150" height="17" />
+            <text id="2:88" name="45" x="752" y="31.5" width="100" height="17" />
+            <frame id="2:89" name="status-col" x="852" y="28.5" width="140" height="23">
+              <frame id="2:90" name="status-badge" x="0" y="0" width="77" height="23">
+                <text id="2:91" name="Hoạt động" x="8" y="4" width="61" height="15" />
+              </frame>
+            </frame>
+            <frame id="2:92" name="actions-col" x="992" y="24" width="100" height="32">
+              <frame id="2:93" name="edit-btn" x="24" y="0" width="32" height="32">
+                <frame id="2:94" name="icon-wrapper" x="8" y="8" width="16" height="16">
+                  <frame id="2:376" name="edit" x="0" y="0" width="16" height="16" />
+                </frame>
+              </frame>
+              <frame id="2:96" name="delete-btn" x="68" y="0" width="32" height="32">
+                <frame id="2:97" name="icon-wrapper" x="8" y="8" width="16" height="16">
+                  <frame id="2:379" name="trash" x="0" y="0" width="16" height="16" />
+                </frame>
+              </frame>
+            </frame>
+          </frame>
+          <frame id="2:99" name="table-row-1" x="0" y="127" width="1116" height="80">
+            <frame id="2:100" name="img-col" x="24" y="16" width="80" height="48">
+              <rounded-rectangle id="2:101" name="product-thumb" x="0" y="0" width="48" height="48" />
+            </frame>
+            <frame id="2:102" name="info-col" x="104" y="22" width="348" height="36">
+              <text id="2:103" name="Chuột Không Dây Logitech G Pro X" x="0" y="0" width="348" height="17" />
+              <text id="2:104" name="SKU: LT-GPX-W" x="0" y="21" width="348" height="15" />
+            </frame>
+            <text id="2:105" name="Chuột Gaming" x="452" y="31.5" width="150" height="17" />
+            <text id="2:106" name="3,290,000 đ" x="602" y="31.5" width="150" height="17" />
+            <text id="2:107" name="12" x="752" y="31.5" width="100" height="17" />
+            <frame id="2:108" name="status-col" x="852" y="28.5" width="140" height="23">
+              <frame id="2:109" name="status-badge" x="0" y="0" width="77" height="23">
+                <text id="2:110" name="Hoạt động" x="8" y="4" width="61" height="15" />
+              </frame>
+            </frame>
+            <frame id="2:111" name="actions-col" x="992" y="24" width="100" height="32">
+              <frame id="2:112" name="edit-btn" x="24" y="0" width="32" height="32">
+                <frame id="2:113" name="icon-wrapper" x="8" y="8" width="16" height="16">
+                  <frame id="2:382" name="edit" x="0" y="0" width="16" height="16" />
+                </frame>
+              </frame>
+              <frame id="2:115" name="delete-btn" x="68" y="0" width="32" height="32">
+                <frame id="2:116" name="icon-wrapper" x="8" y="8" width="16" height="16">
+                  <frame id="2:385" name="trash" x="0" y="0" width="16" height="16" />
+                </frame>
+              </frame>
+            </frame>
+          </frame>
+          <frame id="2:118" name="table-row-2" x="0" y="207" width="1116" height="80">
+            <frame id="2:119" name="img-col" x="24" y="16" width="80" height="48">
+              <rounded-rectangle id="2:120" name="product-thumb" x="0" y="0" width="48" height="48" />
+            </frame>
+            <frame id="2:121" name="info-col" x="104" y="22" width="348" height="36">
+              <text id="2:122" name="Màn Hình Dell UltraSharp 34 inch Curved" x="0" y="0" width="348" height="17" />
+              <text id="2:123" name="SKU: DELL-U3421WE" x="0" y="21" width="348" height="15" />
+            </frame>
+            <text id="2:124" name="Màn Hình" x="452" y="31.5" width="150" height="17" />
+            <text id="2:125" name="18,500,000 đ" x="602" y="31.5" width="150" height="17" />
+            <text id="2:126" name="8" x="752" y="31.5" width="100" height="17" />
+            <frame id="2:127" name="status-col" x="852" y="28.5" width="140" height="23">
+              <frame id="2:128" name="status-badge" x="0" y="0" width="77" height="23">
+                <text id="2:129" name="Hoạt động" x="8" y="4" width="61" height="15" />
+              </frame>
+            </frame>
+            <frame id="2:130" name="actions-col" x="992" y="24" width="100" height="32">
+              <frame id="2:131" name="edit-btn" x="24" y="0" width="32" height="32">
+                <frame id="2:132" name="icon-wrapper" x="8" y="8" width="16" height="16">
+                  <frame id="2:388" name="edit" x="0" y="0" width="16" height="16" />
+                </frame>
+              </frame>
+              <frame id="2:134" name="delete-btn" x="68" y="0" width="32" height="32">
+                <frame id="2:135" name="icon-wrapper" x="8" y="8" width="16" height="16">
+                  <frame id="2:391" name="trash" x="0" y="0" width="16" height="16" />
+                </frame>
+              </frame>
+            </frame>
+          </frame>
+          <frame id="2:137" name="table-row-3" x="0" y="287" width="1116" height="80">
+            <frame id="2:138" name="img-col" x="24" y="16" width="80" height="48">
+              <rounded-rectangle id="2:139" name="product-thumb" x="0" y="0" width="48" height="48" />
+            </frame>
+            <frame id="2:140" name="info-col" x="104" y="22" width="348" height="36">
+              <text id="2:141" name="Tai Nghe Sony WH-1000XM4" x="0" y="0" width="348" height="17" />
+              <text id="2:142" name="SKU: SN-XM4-B" x="0" y="21" width="348" height="15" />
+            </frame>
+            <text id="2:143" name="Tai Nghe" x="452" y="31.5" width="150" height="17" />
+            <text id="2:144" name="6,490,000 đ" x="602" y="31.5" width="150" height="17" />
+            <text id="2:145" name="0" x="752" y="31.5" width="100" height="17" />
+            <frame id="2:146" name="status-col" x="852" y="28.5" width="140" height="23">
+              <frame id="2:147" name="status-badge" x="0" y="0" width="118" height="23">
+                <text id="2:148" name="Ngưng hoạt động" x="8" y="4" width="102" height="15" />
+              </frame>
+            </frame>
+            <frame id="2:149" name="actions-col" x="992" y="24" width="100" height="32">
+              <frame id="2:150" name="edit-btn" x="24" y="0" width="32" height="32">
+                <frame id="2:151" name="icon-wrapper" x="8" y="8" width="16" height="16">
+                  <frame id="2:394" name="edit" x="0" y="0" width="16" height="16" />
+                </frame>
+              </frame>
+              <frame id="2:153" name="delete-btn" x="68" y="0" width="32" height="32">
+                <frame id="2:154" name="icon-wrapper" x="8" y="8" width="16" height="16">
+                  <frame id="2:397" name="trash" x="0" y="0" width="16" height="16" />
+                </frame>
+              </frame>
+            </frame>
+          </frame>
+          <frame id="2:156" name="table-row-4" x="0" y="367" width="1116" height="80">
+            <frame id="2:157" name="img-col" x="24" y="16" width="80" height="48">
+              <rounded-rectangle id="2:158" name="product-thumb" x="0" y="0" width="48" height="48" />
+            </frame>
+            <frame id="2:159" name="info-col" x="104" y="22" width="348" height="36">
+              <text id="2:160" name="Giá Đỡ Laptop Hợp Kim Nhôm" x="0" y="0" width="348" height="17" />
+              <text id="2:161" name="SKU: ST-ALU-02" x="0" y="21" width="348" height="15" />
+            </frame>
+            <text id="2:162" name="Phụ Kiện" x="452" y="31.5" width="150" height="17" />
+            <text id="2:163" name="450,000 đ" x="602" y="31.5" width="150" height="17" />
+            <text id="2:164" name="120" x="752" y="31.5" width="100" height="17" />
+            <frame id="2:165" name="status-col" x="852" y="28.5" width="140" height="23">
+              <frame id="2:166" name="status-badge" x="0" y="0" width="77" height="23">
+                <text id="2:167" name="Hoạt động" x="8" y="4" width="61" height="15" />
+              </frame>
+            </frame>
+            <frame id="2:168" name="actions-col" x="992" y="24" width="100" height="32">
+              <frame id="2:169" name="edit-btn" x="24" y="0" width="32" height="32">
+                <frame id="2:170" name="icon-wrapper" x="8" y="8" width="16" height="16">
+                  <frame id="2:400" name="edit" x="0" y="0" width="16" height="16" />
+                </frame>
+              </frame>
+              <frame id="2:172" name="delete-btn" x="68" y="0" width="32" height="32">
+                <frame id="2:173" name="icon-wrapper" x="8" y="8" width="16" height="16">
+                  <frame id="2:403" name="trash" x="0" y="0" width="16" height="16" />
+                </frame>
+              </frame>
+            </frame>
+          </frame>
+          <frame id="2:175" name="pagination" x="0" y="447" width="1116" height="64">
+            <text id="2:176" name="Hiển thị 1-5 trong 120 sản phẩm" x="24" y="24" width="198" height="16" />
+            <frame id="2:177" name="page-nav" x="820" y="16" width="272" height="32">
+              <frame id="2:178" name="prev-btn" x="0" y="0" width="61" height="32">
+                <text id="2:179" name="Trước" x="12" y="8" width="37" height="16" />
+              </frame>
+              <frame id="2:180" name="page-1" x="65" y="0" width="32" height="32">
+                <text id="2:181" name="1" x="12.5" y="8" width="7" height="16" />
+              </frame>
+              <frame id="2:182" name="page-2" x="101" y="0" width="32" height="32">
+                <text id="2:183" name="2" x="12" y="8" width="8" height="16" />
+              </frame>
+              <frame id="2:184" name="page-3" x="137" y="0" width="32" height="32">
+                <text id="2:185" name="3" x="11.5" y="8" width="9" height="16" />
+              </frame>
+              <text id="2:186" name="..." x="173" y="8" width="11" height="16" />
+              <frame id="2:187" name="page-last" x="188" y="0" width="32" height="32">
+                <text id="2:188" name="24" x="7.5" y="8" width="17" height="16" />
+              </frame>
+              <frame id="2:189" name="next-btn" x="224" y="0" width="48" height="32">
+                <text id="2:190" name="Sau" x="12" y="8" width="24" height="16" />
+              </frame>
+            </frame>
+          </frame>
+        </frame>
+      </frame>
+    </frame>
+  </frame>
+  <frame id="2:192" name="product-detail-page" x="759" y="-451" width="1440" height="1024">
+    <frame id="2:193" name="sidebar" x="0" y="0" width="260" height="1024">
+      <frame id="2:194" name="brand" x="24" y="24" width="212" height="36">
+        <frame id="2:195" name="logo-icon" x="0" y="0" width="36" height="36">
+          <frame id="2:463" name="circle-x" x="8" y="8" width="20" height="20" />
+        </frame>
+        <frame id="2:197" name="logo-text" x="48" y="1" width="110" height="34">
+          <text id="2:198" name="PM Admin" x="0" y="0" width="80" height="19" />
+          <text id="2:199" name="Hệ thống quản lý" x="0" y="21" width="110" height="13" />
+        </frame>
+      </frame>
+      <frame id="2:200" name="menu-stack" x="24" y="92" width="212" height="294">
+        <frame id="2:201" name="menu-item-Tổng quan" x="0" y="0" width="212" height="44">
+          <frame id="2:202" name="icon-wrapper" x="16" y="12" width="20" height="20">
+            <frame id="2:406" name="home" x="0" y="0" width="20" height="20" />
+          </frame>
+          <text id="2:204" name="Tổng quan" x="48" y="13.5" width="71" height="17" />
+        </frame>
+        <frame id="2:205" name="menu-item-Sản phẩm" x="0" y="50" width="212" height="44">
+          <frame id="2:206" name="icon-wrapper" x="16" y="12" width="20" height="20">
+            <frame id="2:409" name="package" x="0" y="0" width="20" height="20" />
+          </frame>
+          <text id="2:208" name="Sản phẩm" x="48" y="13.5" width="68" height="17" />
+        </frame>
+        <frame id="2:209" name="menu-item-Đơn hàng" x="0" y="100" width="212" height="44">
+          <frame id="2:210" name="icon-wrapper" x="16" y="12" width="20" height="20">
+            <frame id="2:412" name="shopping-cart" x="0" y="0" width="20" height="20" />
+          </frame>
+          <text id="2:212" name="Đơn hàng" x="48" y="13.5" width="65" height="17" />
+        </frame>
+        <frame id="2:213" name="menu-item-Khách hàng" x="0" y="150" width="212" height="44">
+          <frame id="2:214" name="icon-wrapper" x="16" y="12" width="20" height="20">
+            <frame id="2:415" name="users" x="0" y="0" width="20" height="20" />
+          </frame>
+          <text id="2:216" name="Khách hàng" x="48" y="13.5" width="80" height="17" />
+        </frame>
+        <frame id="2:217" name="menu-item-Báo cáo" x="0" y="200" width="212" height="44">
+          <frame id="2:218" name="icon-wrapper" x="16" y="12" width="20" height="20">
+            <frame id="2:418" name="bar-chart" x="0" y="0" width="20" height="20" />
+          </frame>
+          <text id="2:220" name="Báo cáo" x="48" y="13.5" width="54" height="17" />
+        </frame>
+        <frame id="2:221" name="menu-item-Cài đặt" x="0" y="250" width="212" height="44">
+          <frame id="2:222" name="icon-wrapper" x="16" y="12" width="20" height="20">
+            <frame id="2:421" name="settings" x="0" y="0" width="20" height="20" />
+          </frame>
+          <text id="2:224" name="Cài đặt" x="48" y="13.5" width="48" height="17" />
+        </frame>
+      </frame>
+    </frame>
+    <frame id="2:225" name="main-content" x="260" y="0" width="1180" height="1024">
+      <frame id="2:226" name="header" x="0" y="0" width="1180" height="80">
+        <frame id="2:227" name="header-title-block" x="32" y="18" width="270" height="44">
+          <text id="2:228" name="Bàn Phím Cơ Keychron K2" x="0" y="0" width="252" height="24" />
+          <text id="2:229" name="Xem và cập nhật thông tin chi tiết sản phẩm" x="0" y="28" width="270" height="16" />
+        </frame>
+        <frame id="2:230" name="profile" x="967" y="20" width="181" height="40">
+          <frame id="2:231" name="notification-btn" x="0" y="0" width="40" height="40">
+            <frame id="2:232" name="icon-wrapper" x="11" y="11" width="18" height="18">
+              <frame id="2:424" name="bell" x="0" y="0" width="18" height="18" />
+            </frame>
+          </frame>
+          <rounded-rectangle id="2:234" name="divider" x="52" y="8" width="1" height="24" />
+          <frame id="2:235" name="avatar" x="65" y="2" width="36" height="36" />
+          <frame id="2:236" name="user-info" x="113" y="5" width="68" height="30">
+            <text id="2:237" name="Minh Trần" x="0" y="0" width="68" height="17" />
+            <text id="2:238" name="Quản trị viên" x="0" y="17" width="66" height="13" />
+          </frame>
+        </frame>
+      </frame>
+      <frame id="2:239" name="content-body" x="0" y="80" width="1180" height="899">
+        <frame id="2:240" name="detail-top-bar" x="32" y="32" width="1116" height="40">
+          <frame id="2:241" name="breadcrumbs" x="0" y="12" width="892" height="16">
+            <text id="2:242" name="Sản phẩm" x="0" y="0" width="62" height="16" />
+            <frame id="2:243" name="icon-wrapper" x="70" y="1" width="14" height="14">
+              <frame id="2:427" name="chevron-right" x="0" y="0" width="14" height="14" />
+            </frame>
+            <text id="2:245" name="Chi tiết sản phẩm" x="92" y="0" width="108" height="16" />
+            <frame id="2:246" name="icon-wrapper" x="208" y="1" width="14" height="14">
+              <frame id="2:430" name="chevron-right" x="0" y="0" width="14" height="14" />
+            </frame>
+            <text id="2:248" name="Bàn Phím Cơ Keychron K2" x="230" y="0" width="163" height="16" />
+          </frame>
+          <frame id="2:249" name="action-buttons" x="892" y="0" width="224" height="40">
+            <frame id="2:250" name="cancel-btn" x="0" y="0" width="88" height="40">
+              <text id="2:251" name="Hủy bỏ" x="20" y="11.5" width="48" height="17" />
+            </frame>
+            <frame id="2:252" name="save-btn" x="100" y="0" width="124" height="40">
+              <text id="2:253" name="Lưu thay đổi" x="20" y="11.5" width="84" height="17" />
+            </frame>
+          </frame>
+        </frame>
+        <frame id="2:254" name="form-grid" x="32" y="96" width="1116" height="498">
+          <frame id="2:255" name="media-gallery" x="0" y="0" width="420" height="408">
+            <frame id="2:256" name="main-image" x="0" y="0" width="420" height="320" />
+            <frame id="2:257" name="thumb-strip" x="0" y="336" width="420" height="72">
+              <frame id="2:258" name="thumb-0" x="0" y="0" width="96" height="72" />
+              <frame id="2:259" name="thumb-1" x="108" y="0" width="96" height="72" />
+              <frame id="2:260" name="thumb-2" x="216" y="0" width="96" height="72" />
+              <frame id="2:261" name="add-image-placeholder" x="324" y="0" width="96" height="72">
+                <frame id="2:262" name="icon-wrapper" x="39" y="18.5" width="18" height="18">
+                  <frame id="2:433" name="plus" x="0" y="0" width="18" height="18" />
+                </frame>
+                <text id="2:264" name="Thêm ảnh" x="21.5" y="40.5" width="53" height="13" />
+              </frame>
+            </frame>
+          </frame>
+          <frame id="2:265" name="form-info-card" x="452" y="0" width="664" height="498">
+            <text id="2:266" name="Thông tin chung" x="24" y="24" width="128" height="19" />
+            <rounded-rectangle id="2:267" name="divider" x="24" y="63" width="616" height="1" />
+            <frame id="2:268" name="field-Tên sản phẩm" x="24" y="84" width="616" height="62">
+              <text id="2:269" name="Tên sản phẩm" x="0" y="0" width="88" height="16" />
+              <frame id="2:270" name="input-box" x="0" y="22" width="616" height="40">
+                <text id="2:271" name="Bàn Phím Cơ Keychron K2 V2 (Nhôm / Hotswap / Gateron Switch)" x="16" y="11.5" width="584" height="17" />
+              </frame>
+            </frame>
+            <frame id="2:272" name="form-row-1" x="24" y="166" width="616" height="62">
+              <frame id="2:273" name="field-Mã sản phẩm (SKU)" x="0" y="0" width="300" height="62">
+                <text id="2:274" name="Mã sản phẩm (SKU)" x="0" y="0" width="124" height="16" />
+                <frame id="2:275" name="input-box" x="0" y="22" width="300" height="40">
+                  <text id="2:276" name="KC-K2-01" x="16" y="11.5" width="268" height="17" />
+                </frame>
+              </frame>
+              <frame id="2:277" name="field-Thương hiệu" x="316" y="0" width="300" height="62">
+                <text id="2:278" name="Thương hiệu" x="0" y="0" width="80" height="16" />
+                <frame id="2:279" name="input-box" x="0" y="22" width="300" height="40">
+                  <text id="2:280" name="Keychron" x="16" y="11.5" width="268" height="17" />
+                </frame>
+              </frame>
+            </frame>
+            <frame id="2:281" name="form-row-2" x="24" y="248" width="616" height="62">
+              <frame id="2:282" name="field-Giá niêm yết (Gốc)" x="0" y="0" width="300" height="62">
+                <text id="2:283" name="Giá niêm yết (Gốc)" x="0" y="0" width="117" height="16" />
+                <frame id="2:284" name="input-box" x="0" y="22" width="300" height="40">
+                  <text id="2:285" name="2,190,000 đ" x="16" y="11.5" width="268" height="17" />
+                </frame>
+              </frame>
+              <frame id="2:286" name="field-Giá khuyến mãi" x="316" y="0" width="300" height="62">
+                <text id="2:287" name="Giá khuyến mãi" x="0" y="0" width="97" height="16" />
+                <frame id="2:288" name="input-box" x="0" y="22" width="300" height="40">
+                  <text id="2:289" name="1,890,000 đ" x="16" y="11.5" width="268" height="17" />
+                </frame>
+              </frame>
+            </frame>
+            <frame id="2:290" name="form-row-3" x="24" y="330" width="616" height="62">
+              <frame id="2:291" name="field-Số lượng tồn kho" x="0" y="0" width="300" height="62">
+                <text id="2:292" name="Số lượng tồn kho" x="0" y="0" width="107" height="16" />
+                <frame id="2:293" name="input-box" x="0" y="22" width="300" height="40">
+                  <text id="2:294" name="45" x="16" y="11.5" width="268" height="17" />
+                </frame>
+              </frame>
+              <frame id="2:295" name="status-switch-field" x="316" y="0" width="300" height="62">
+                <text id="2:296" name="Trạng thái sản phẩm" x="0" y="0" width="128" height="16" />
+                <frame id="2:297" name="switch-row" x="0" y="22" width="173" height="40">
+                  <frame id="2:298" name="toggle" x="0" y="8" width="48" height="24">
+                    <ellipse id="2:299" name="knob" x="26" y="2" width="20" height="20" />
+                  </frame>
+                  <text id="2:300" name="Đang kinh doanh" x="60" y="11.5" width="113" height="17" />
+                </frame>
+              </frame>
+            </frame>
+            <frame id="2:301" name="form-row-4" x="24" y="412" width="616" height="62">
+              <frame id="2:302" name="field-Trọng lượng (gram)" x="0" y="0" width="300" height="62">
+                <text id="2:303" name="Trọng lượng (gram)" x="0" y="0" width="122" height="16" />
+                <frame id="2:304" name="input-box" x="0" y="22" width="300" height="40">
+                  <text id="2:305" name="790" x="16" y="11.5" width="268" height="17" />
+                </frame>
+              </frame>
+              <frame id="2:306" name="field-Kích thước (D x R x C cm)" x="316" y="0" width="300" height="62">
+                <text id="2:307" name="Kích thước (D x R x C cm)" x="0" y="0" width="160" height="16" />
+                <frame id="2:308" name="input-box" x="0" y="22" width="300" height="40">
+                  <text id="2:309" name="31.3 x 12.9 x 3.8" x="16" y="11.5" width="268" height="17" />
+                </frame>
+              </frame>
+            </frame>
+          </frame>
+        </frame>
+        <frame id="2:310" name="tabs-section" x="32" y="618" width="1116" height="249">
+          <frame id="2:311" name="tab-headers" x="0" y="0" width="1116" height="45">
+            <frame id="2:312" name="tab-mota" x="0" y="0" width="156" height="45">
+              <text id="2:313" name="Mô tả sản phẩm" x="24" y="14" width="108" height="17" />
+            </frame>
+            <frame id="2:314" name="tab-specs" x="156" y="0" width="170" height="45">
+              <text id="2:315" name="Thông số kỹ thuật" x="24" y="14" width="122" height="17" />
+            </frame>
+            <frame id="2:316" name="tab-reviews" x="326" y="0" width="137" height="45">
+              <text id="2:317" name="Đánh giá (15)" x="24" y="14" width="89" height="17" />
+            </frame>
+          </frame>
+          <frame id="2:318" name="tab-content" x="0" y="45" width="1116" height="204">
+            <frame id="2:319" name="editor-toolbar" x="24" y="24" width="1068" height="32">
+              <frame id="2:320" name="icon-wrapper" x="8" y="8" width="16" height="16">
+                <frame id="2:436" name="bold" x="0" y="0" width="16" height="16" />
+              </frame>
+              <frame id="2:322" name="icon-wrapper" x="32" y="8" width="16" height="16">
+                <frame id="2:439" name="italic" x="0" y="0" width="16" height="16" />
+              </frame>
+              <frame id="2:324" name="icon-wrapper" x="56" y="8" width="16" height="16">
+                <frame id="2:442" name="underline" x="0" y="0" width="16" height="16" />
+              </frame>
+              <rounded-rectangle id="2:326" name="Rectangle" x="80" y="8" width="1" height="16" />
+              <frame id="2:327" name="icon-wrapper" x="89" y="8" width="16" height="16">
+                <frame id="2:445" name="align-left" x="0" y="0" width="16" height="16" />
+              </frame>
+              <frame id="2:329" name="icon-wrapper" x="113" y="8" width="16" height="16">
+                <frame id="2:448" name="align-center" x="0" y="0" width="16" height="16" />
+              </frame>
+              <frame id="2:331" name="icon-wrapper" x="137" y="8" width="16" height="16">
+                <frame id="2:451" name="align-right" x="0" y="0" width="16" height="16" />
+              </frame>
+              <rounded-rectangle id="2:333" name="Rectangle" x="161" y="8" width="1" height="16" />
+              <frame id="2:334" name="icon-wrapper" x="170" y="8" width="16" height="16">
+                <frame id="2:454" name="image" x="0" y="0" width="16" height="16" />
+              </frame>
+              <frame id="2:336" name="icon-wrapper" x="194" y="8" width="16" height="16">
+                <frame id="2:457" name="link" x="0" y="0" width="16" height="16" />
+              </frame>
+            </frame>
+            <frame id="2:338" name="editor-body" x="24" y="72" width="1068" height="108">
+              <text id="2:339" name="Thiết kế nhỏ gọn, tối ưu hiệu năng" x="0" y="0" width="1068" height="18" />
+              <text id="2:340" name="Bàn phím cơ Keychron K2 phiên bản V2 giữ nguyên layout 84 phím (75%) tối ưu cho cả người dùng Mac và Windows. Hệ thống đèn LED nền sinh động kết hợp cùng khung nhôm chắc chắn mang đến trải nghiệm gõ phím cao cấp. Tính năng Hot-swappable dễ dàng thay thế switch mà không cần hàn mạch." x="0" y="30" width="1068" height="44" />
+              <text id="2:341" name="Kết nối không dây bluetooth 5.1 bền bỉ với thời lượng pin cực khủng lên đến 4000mAh, cho thời gian làm việc liên tục đến vài tuần." x="0" y="86" width="1068" height="22" />
+            </frame>
+          </frame>
+        </frame>
+      </frame>
+    </frame>
+  </frame>
+</canvas>

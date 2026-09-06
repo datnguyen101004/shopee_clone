@@ -1,0 +1,288 @@
+{
+  "fileKey": "kkjtMBgWrOGGP0HrmEPy9W",
+  "capturedAt": "2026-09-05",
+  "assets": [
+    {
+      "path": "screenshots/product-list.png",
+      "nodeId": "2:5",
+      "status": "available",
+      "source": "get_design_context inline screenshot",
+      "width": 1024,
+      "height": 729,
+      "designWidth": 1440,
+      "designHeight": 1024,
+      "bytes": 82940,
+      "sha256": "801ae8f9862ad302bcbe61d1efc2ac8aabbbd1b55d3577ac7ca72e8ee72f6b36"
+    },
+    {
+      "path": "screenshots/product-detail.png",
+      "nodeId": "2:192",
+      "status": "available",
+      "source": "get_design_context inline screenshot",
+      "width": 1024,
+      "height": 729,
+      "designWidth": 1440,
+      "designHeight": 1024,
+      "bytes": 218493,
+      "sha256": "cf6a8b9d850a111bdc33554288cd74d9465750acb832391ee864a58e839c37e6"
+    },
+    {
+      "path": "assets/product-list/avatar.png",
+      "status": "unavailable",
+      "reason": "Asset endpoint returned HTTP 202 with empty body; MCP Starter call limit then reached.",
+      "projectResolution": "runtime-initials"
+    },
+    {
+      "path": "assets/product-list/product-thumb.png",
+      "status": "unavailable",
+      "reason": "Asset endpoint returned HTTP 202 with empty body; MCP Starter call limit then reached.",
+      "projectResolution": "runtime-product-media"
+    },
+    {
+      "path": "assets/product-list/product-thumb1.png",
+      "status": "unavailable",
+      "reason": "Asset endpoint returned HTTP 202 with empty body; MCP Starter call limit then reached.",
+      "projectResolution": "runtime-product-media"
+    },
+    {
+      "path": "assets/product-list/product-thumb2.png",
+      "status": "unavailable",
+      "reason": "Asset endpoint returned HTTP 202 with empty body; MCP Starter call limit then reached.",
+      "projectResolution": "runtime-product-media"
+    },
+    {
+      "path": "assets/product-list/product-thumb3.png",
+      "status": "unavailable",
+      "reason": "Asset endpoint returned HTTP 202 with empty body; MCP Starter call limit then reached.",
+      "projectResolution": "runtime-product-media"
+    },
+    {
+      "path": "assets/product-list/product-thumb4.png",
+      "status": "unavailable",
+      "reason": "Asset endpoint returned HTTP 202 with empty body; MCP Starter call limit then reached.",
+      "projectResolution": "runtime-product-media"
+    },
+    {
+      "path": "assets/product-list/circle-x.svg",
+      "status": "unavailable",
+      "reason": "Asset endpoint returned HTTP 202 with empty body; MCP Starter call limit then reached.",
+      "projectResolution": "project-library-substitute"
+    },
+    {
+      "path": "assets/product-list/home.svg",
+      "status": "unavailable",
+      "reason": "Asset endpoint returned HTTP 202 with empty body; MCP Starter call limit then reached.",
+      "projectResolution": "project-library-substitute"
+    },
+    {
+      "path": "assets/product-list/package.svg",
+      "status": "unavailable",
+      "reason": "Asset endpoint returned HTTP 202 with empty body; MCP Starter call limit then reached.",
+      "projectResolution": "project-library-substitute"
+    },
+    {
+      "path": "assets/product-list/shopping-cart.svg",
+      "status": "unavailable",
+      "reason": "Asset endpoint returned HTTP 202 with empty body; MCP Starter call limit then reached.",
+      "projectResolution": "project-library-substitute"
+    },
+    {
+      "path": "assets/product-list/users.svg",
+      "status": "unavailable",
+      "reason": "Asset endpoint returned HTTP 202 with empty body; MCP Starter call limit then reached.",
+      "projectResolution": "project-library-substitute"
+    },
+    {
+      "path": "assets/product-list/bar-chart.svg",
+      "status": "unavailable",
+      "reason": "Asset endpoint returned HTTP 202 with empty body; MCP Starter call limit then reached.",
+      "projectResolution": "project-library-substitute"
+    },
+    {
+      "path": "assets/product-list/settings.svg",
+      "status": "unavailable",
+      "reason": "Asset endpoint returned HTTP 202 with empty body; MCP Starter call limit then reached.",
+      "projectResolution": "project-library-substitute"
+    },
+    {
+      "path": "assets/product-list/bell.svg",
+      "status": "unavailable",
+      "reason": "Asset endpoint returned HTTP 202 with empty body; MCP Starter call limit then reached.",
+      "projectResolution": "project-library-substitute"
+    },
+    {
+      "path": "assets/product-list/search.svg",
+      "status": "unavailable",
+      "reason": "Asset endpoint returned HTTP 202 with empty body; MCP Starter call limit then reached.",
+      "projectResolution": "project-library-substitute"
+    },
+    {
+      "path": "assets/product-list/chevron-down.svg",
+      "status": "unavailable",
+      "reason": "Asset endpoint returned HTTP 202 with empty body; MCP Starter call limit then reached.",
+      "projectResolution": "project-library-substitute"
+    },
+    {
+      "path": "assets/product-list/plus.svg",
+      "status": "unavailable",
+      "reason": "Asset endpoint returned HTTP 202 with empty body; MCP Starter call limit then reached.",
+      "projectResolution": "project-library-substitute"
+    },
+    {
+      "path": "assets/product-list/edit.svg",
+      "status": "unavailable",
+      "reason": "Asset endpoint returned HTTP 202 with empty body; MCP Starter call limit then reached.",
+      "projectResolution": "project-library-substitute"
+    },
+    {
+      "path": "assets/product-list/trash.svg",
+      "status": "unavailable",
+      "reason": "Asset endpoint returned HTTP 202 with empty body; MCP Starter call limit then reached.",
+      "projectResolution": "project-library-substitute"
+    },
+    {
+      "path": "assets/product-detail/avatar.png",
+      "status": "unavailable",
+      "reason": "Asset endpoint returned HTTP 202 with empty body; MCP Starter call limit then reached.",
+      "projectResolution": "runtime-initials"
+    },
+    {
+      "path": "assets/product-detail/main-image.png",
+      "status": "unavailable",
+      "reason": "Asset endpoint returned HTTP 202 with empty body; MCP Starter call limit then reached.",
+      "projectResolution": "runtime-product-media"
+    },
+    {
+      "path": "assets/product-detail/thumb0.png",
+      "status": "unavailable",
+      "reason": "Asset endpoint returned HTTP 202 with empty body; MCP Starter call limit then reached.",
+      "projectResolution": "runtime-product-media"
+    },
+    {
+      "path": "assets/product-detail/thumb1.png",
+      "status": "unavailable",
+      "reason": "Asset endpoint returned HTTP 202 with empty body; MCP Starter call limit then reached.",
+      "projectResolution": "runtime-product-media"
+    },
+    {
+      "path": "assets/product-detail/thumb2.png",
+      "status": "unavailable",
+      "reason": "Asset endpoint returned HTTP 202 with empty body; MCP Starter call limit then reached.",
+      "projectResolution": "runtime-product-media"
+    },
+    {
+      "path": "assets/product-detail/circle-x.svg",
+      "status": "unavailable",
+      "reason": "Asset endpoint returned HTTP 202 with empty body; MCP Starter call limit then reached.",
+      "projectResolution": "project-library-substitute"
+    },
+    {
+      "path": "assets/product-detail/home.svg",
+      "status": "unavailable",
+      "reason": "Asset endpoint returned HTTP 202 with empty body; MCP Starter call limit then reached.",
+      "projectResolution": "project-library-substitute"
+    },
+    {
+      "path": "assets/product-detail/package.svg",
+      "status": "unavailable",
+      "reason": "Asset endpoint returned HTTP 202 with empty body; MCP Starter call limit then reached.",
+      "projectResolution": "project-library-substitute"
+    },
+    {
+      "path": "assets/product-detail/shopping-cart.svg",
+      "status": "unavailable",
+      "reason": "Asset endpoint returned HTTP 202 with empty body; MCP Starter call limit then reached.",
+      "projectResolution": "project-library-substitute"
+    },
+    {
+      "path": "assets/product-detail/users.svg",
+      "status": "unavailable",
+      "reason": "Asset endpoint returned HTTP 202 with empty body; MCP Starter call limit then reached.",
+      "projectResolution": "project-library-substitute"
+    },
+    {
+      "path": "assets/product-detail/bar-chart.svg",
+      "status": "unavailable",
+      "reason": "Asset endpoint returned HTTP 202 with empty body; MCP Starter call limit then reached.",
+      "projectResolution": "project-library-substitute"
+    },
+    {
+      "path": "assets/product-detail/settings.svg",
+      "status": "unavailable",
+      "reason": "Asset endpoint returned HTTP 202 with empty body; MCP Starter call limit then reached.",
+      "projectResolution": "project-library-substitute"
+    },
+    {
+      "path": "assets/product-detail/bell.svg",
+      "status": "unavailable",
+      "reason": "Asset endpoint returned HTTP 202 with empty body; MCP Starter call limit then reached.",
+      "projectResolution": "project-library-substitute"
+    },
+    {
+      "path": "assets/product-detail/chevron-right.svg",
+      "status": "unavailable",
+      "reason": "Asset endpoint returned HTTP 202 with empty body; MCP Starter call limit then reached.",
+      "projectResolution": "project-library-substitute"
+    },
+    {
+      "path": "assets/product-detail/plus.svg",
+      "status": "unavailable",
+      "reason": "Asset endpoint returned HTTP 202 with empty body; MCP Starter call limit then reached.",
+      "projectResolution": "project-library-substitute"
+    },
+    {
+      "path": "assets/product-detail/toggle.svg",
+      "status": "unavailable",
+      "reason": "Asset endpoint returned HTTP 202 with empty body; MCP Starter call limit then reached.",
+      "projectResolution": "replace-with-lifecycle-badge-and-actions"
+    },
+    {
+      "path": "assets/product-detail/bold.svg",
+      "status": "unavailable",
+      "reason": "Asset endpoint returned HTTP 202 with empty body; MCP Starter call limit then reached.",
+      "projectResolution": "omit-unsupported-rich-text-toolbar"
+    },
+    {
+      "path": "assets/product-detail/italic.svg",
+      "status": "unavailable",
+      "reason": "Asset endpoint returned HTTP 202 with empty body; MCP Starter call limit then reached.",
+      "projectResolution": "omit-unsupported-rich-text-toolbar"
+    },
+    {
+      "path": "assets/product-detail/underline.svg",
+      "status": "unavailable",
+      "reason": "Asset endpoint returned HTTP 202 with empty body; MCP Starter call limit then reached.",
+      "projectResolution": "omit-unsupported-rich-text-toolbar"
+    },
+    {
+      "path": "assets/product-detail/align-left.svg",
+      "status": "unavailable",
+      "reason": "Asset endpoint returned HTTP 202 with empty body; MCP Starter call limit then reached.",
+      "projectResolution": "omit-unsupported-rich-text-toolbar"
+    },
+    {
+      "path": "assets/product-detail/align-center.svg",
+      "status": "unavailable",
+      "reason": "Asset endpoint returned HTTP 202 with empty body; MCP Starter call limit then reached.",
+      "projectResolution": "omit-unsupported-rich-text-toolbar"
+    },
+    {
+      "path": "assets/product-detail/align-right.svg",
+      "status": "unavailable",
+      "reason": "Asset endpoint returned HTTP 202 with empty body; MCP Starter call limit then reached.",
+      "projectResolution": "omit-unsupported-rich-text-toolbar"
+    },
+    {
+      "path": "assets/product-detail/image.svg",
+      "status": "unavailable",
+      "reason": "Asset endpoint returned HTTP 202 with empty body; MCP Starter call limit then reached.",
+      "projectResolution": "omit-unsupported-rich-text-toolbar"
+    },
+    {
+      "path": "assets/product-detail/link.svg",
+      "status": "unavailable",
+      "reason": "Asset endpoint returned HTTP 202 with empty body; MCP Starter call limit then reached.",
+      "projectResolution": "omit-unsupported-rich-text-toolbar"
+    }
+  ]
+}

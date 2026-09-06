@@ -78,4 +78,32 @@ describe('SellerInventoryManagement', () => {
     render(<SellerInventoryManagement />);
     expect(await screen.findByText(/chỉ hiển thị sản phẩm đang bán/i)).toBeInTheDocument();
   });
+
+  it('filters by product or SKU and sorts the loaded balances', async () => {
+    const olderItem = {
+      ...item,
+      variantId: '00000000-0000-4000-8000-000000000003',
+      productName: 'Áo len',
+      sku: 'SKU-AO-LEN',
+      quantityOnHand: 30,
+      availableQuantity: 30,
+      updatedAt: '2026-07-18T00:00:00.000Z',
+    };
+    fetchInventory.mockResolvedValue({ items: [item, olderItem], nextCursor: null });
+    render(<SellerInventoryManagement />);
+
+    expect(await screen.findByText('Gương')).toBeInTheDocument();
+    const search = screen.getByRole('searchbox', { name: 'Tìm kiếm tồn kho' });
+    fireEvent.change(search, { target: { value: 'SKU-AO' } });
+    expect(screen.getByText('Áo len')).toBeInTheDocument();
+    expect(screen.queryByText('Gương')).not.toBeInTheDocument();
+
+    fireEvent.change(search, { target: { value: '' } });
+    const sort = screen.getByRole('combobox', { name: 'Sắp xếp' });
+    fireEvent.change(sort, { target: { value: 'oldest' } });
+    expect(screen.getAllByRole('row')[1]).toHaveTextContent('Áo len');
+
+    fireEvent.change(sort, { target: { value: 'quantity' } });
+    expect(screen.getAllByRole('row')[1]).toHaveTextContent('Áo len');
+  });
 });

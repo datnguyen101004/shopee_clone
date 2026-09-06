@@ -1,0 +1,36 @@
+# Bài học từ phản hồi Seller UI
+
+Phạm vi: các lần đồng bộ Seller theo Sản phẩm và migration Admin theo Seller ngày 05/09/2026. Quy tắc đang áp dụng nằm trong [UI-SPEC.md](UI-SPEC.md). Không dùng nhật ký này làm danh sách tính năng mới hay bằng chứng nghiệm thu.
+
+| Phản hồi / lỗi | Nguyên nhân hoặc bằng chứng | Quy tắc phòng lặp |
+| --- | --- | --- |
+| Tồn kho vẫn khác Sản phẩm dù được báo đã đồng bộ | Ảnh trước đó có filter card lớn, header uppercase, kiểu action/spacing khác; chỉ chung shell/màu chưa đủ | Đối chiếu từng vùng theo format và ghi rõ cấu trúc đã/chưa di trú |
+| Thêm label làm search và dropdown lệch hàng | Cụm filters vẫn `align-items: center` trong khi label làm dropdown cao hơn search | Căn đáy cả hai cấp flex desktop; kiểm tra control bounds, đồng thời kiểm tra lại stretch ở mobile |
+| Dropdown ở các màn được gắn cùng class nhưng chưa chắc cùng UI | `globals.css` có selector domain cho select/label và `seller-products.css` có override; unit tests không kiểm tra cascade | Xem computed styles và render; sửa ownership/specificity, không lấy tên class làm bằng chứng |
+| “21/21”, “49/49 tests passed” được dùng cạnh khẳng định UI đã chuẩn | Các lệnh đã chạy là component tests trong jsdom/typecheck, chưa có đối chiếu render tương ứng | Báo kết quả hành vi và thị giác riêng; không đánh dấu nghiệm thu thị giác bằng test chức năng |
+| Thay đổi Trả hàng lan sang Buyer/Admin | Queue và detail dùng chung `return-workflows.tsx`; nhánh role cần được xem xét khi đưa `seller-pl-*` vào | Giới hạn variant/styles ở Seller; kiểm tra consumer khác khi thay markup dùng chung |
+| Bỏ checkbox sắp hết hàng; label dropdown nằm ngoài option | Đây là yêu cầu trực tiếp, thay thế quyết định UI trước | Duy trì yêu cầu trong UI-SPEC, không đưa checkbox hoặc tiền tố option trở lại khi sao chép từ mẫu cũ |
+| Các màn vận hành vẫn có filter card riêng dù đã dùng token Sản phẩm | Selector legacy của từng domain vẫn bọc toolbar bằng border/padding; đổi màu không thể làm cấu trúc giống mẫu | Đưa filter vào `seller-pl-toolbar` + `seller-pl-toolbar__filters`, reset bề mặt legacy trong scope Seller và nối danh sách với footer dùng chung |
+| Đánh giá/khuyến mãi thiếu thao tác tìm kiếm và form voucher khó quét | Đánh giá chỉ hiển thị card; khuyến mãi có status filter nhưng chưa có tìm kiếm/sort và form voucher là một dải field phẳng | Dùng search/sort trên dữ liệu đã tải; footer phải tách số hiển thị và tổng đã tải; chia form voucher thành các section có heading, field grid và actions |
+| Voucher dùng lại hành vi hoặc nhãn cũ sau chỉnh sửa | Người dùng đã chốt popup sửa tại chỗ, mã do backend sinh, nhãn Sản phẩm áp dụng và Hủy trước Lưu | Dùng chung form, đối chiếu phần Voucher trong UI-SPEC; không đưa nhãn ID, điều hướng trung gian hoặc chọn giờ trở lại |
+| Seller chuyển Chat từ nút nổi vào menu quản lý | Người dùng yêu cầu Chat là một mục cạnh các màn quản lý; widget cũ là floating dùng chung | Dùng trang `/seller/chat`, ẩn trigger nổi trong Seller; kiểm tra variant nhúng, attention và đích thông báo, giữ phạm vi Buyer riêng |
+
+Nếu còn thiếu bằng chứng render, giữ trạng thái chưa xác minh trong task. Chỉ thêm bài học khi có phản hồi thực hoặc lỗi được xác nhận; không tích lũy quy định cho rủi ro giả định.
+
+## Migration Admin chưa giống Seller
+
+Chẩn đoán ngày 05/09/2026: web chạy được, Seller shell được đo trong trình duyệt ở 1440×1000; Admin dừng ở yêu cầu đăng nhập. Các sai lệch Admin dưới đây được xác định từ code, không phải ảnh sau đăng nhập. Đây là bằng chứng tại thời điểm kiểm tra, không khẳng định lỗi còn tồn tại sau các lần sửa tiếp theo.
+
+| Lỗi xác nhận | Bằng chứng trong repo | Phòng lặp |
+| --- | --- | --- |
+| Reset padding root không khớp HTML | `admin-center-layout.tsx` đặt `admin-page-frame admin-workspace` cùng root; `admin-workspace.css` dùng `.admin-workspace .admin-page-frame`, nên không reset `padding: 24px 32px` legacy trong `globals.css` | Kiểm tra selector match đúng phần tử, không chỉ sự tồn tại của rule |
+| Toolbar Người dùng giữ bố cục cũ | Layout thêm `.admin-content__body`; selector `.admin-content > div > div[style*='flex-wrap']` thiếu một cấp so với toolbar trong `admin/users/page.tsx` | Kiểm tra consumer sau khi thêm wrapper; dùng class/component toolbar có nghĩa thay vì dò inline style và số cấp div |
+| Đổi theme nhưng thông số shell vẫn khác | Seller content padding 32px, header title 20px và bell SVG 16px không viền; Admin CSS có padding ngang 40px, title 18px, bell 20px có viền; spec Admin lại ghi H1 24px | Chốt thông số theo mẫu/yêu cầu, giải quyết mâu thuẫn spec và đối chiếu từng vùng; không coi màu xanh là migration layout |
+| App trả HTTP 200 nhưng chưa xem được trang Admin | Trình duyệt hiển thị “Cần đăng nhập”; role gate chặn trước Admin shell | Báo riêng runtime hoạt động, so sánh code và xác minh UI có quyền; không đánh dấu nghiệm thu toàn bộ từ shell Seller hoặc màn guest |
+| Kiểm duyệt vẫn bị xem là chưa migration dù đã dùng shell Admin | Màn này còn toolbar/tab và hai panel mang cấu trúc legacy; chỉ đổi surface/card không đủ để giống nhịp Seller | Sở hữu toolbar bằng class semantic, đưa tab lên canvas, dùng surface hai panel và kiểm tra cả trạng thái chưa chọn lẫn chi tiết case |
+| Kiểm soát sản phẩm vẫn chỉ là tra cứu từng slug | API chỉ có lookup nên UI không thể hiển thị toàn bộ sản phẩm; migration layout không thể bù thiếu data contract | Thêm list contract/API theo cursor và search/filter thật, nối bảng với footer tải thêm; giữ endpoint lookup cho consumer tương thích |
+| Admin sản phẩm còn filter vòng đời và nút Tìm kiếm dù màn chỉ cần catalog đang hoạt động | UI vẫn giữ state/status select và submit CTA từ bản list đầu; filter kiểm duyệt không phản hồi ngay khi đổi | Endpoint list ép `status=ACTIVE`; bỏ filter vòng đời/nút submit, giữ ô search dùng Enter và cho select kiểm duyệt áp dụng ngay |
+| Admin kiểm duyệt còn hai tab legacy | Case và review được đặt trong tab “Hồ sơ vi phạm”/“Kiểm duyệt đánh giá”, không khớp report workspace Seller-style | Gộp về một toolbar report: search mã, loại report, trạng thái, đối tượng, thời gian; chuyển report đánh giá thành một loại report và giữ nguyên panel/action nghiệp vụ |
+| Cột Hạn xử lý của Admin Trả hàng bị lệch và thiếu hành động | Header và dòng dữ liệu dùng các template grid độc lập; khi bổ sung cột hành động, các cột cuối không còn cùng track | Khai báo một grid template dùng chung cho header và row; luôn có cột Hành động ở cuối với icon có nhãn truy cập, Xử lý trỏ tới vùng quyết định và Xem chi tiết trỏ tới detail |
+| Cột cuối của Admin Sản phẩm, Kiểm duyệt và Nhật ký bị nằm ngoài card ở desktop | Các bảng nhiều cột giữ `min-width` lớn hơn phần content sau khi trừ sidebar/gutter; action vẫn tồn tại trong DOM nhưng bị cắt khỏi viewport | Ở desktop, dùng `table-layout: fixed` và phân bổ track theo phần trăm trong card; chỉ giữ overflow ngang ở breakpoint hẹp, đồng thời giữ action column có đủ bề rộng cho thao tác |
+| Thao tác dạng chữ ở Sản phẩm, Banner và Nhật ký làm cột cuối khó căn đồng bộ | Kích thước nút phụ thuộc độ dài nhãn và action cell không có một primitive chung | Dùng `admin-icon-btn` 32px, màu theo ý nghĩa hành động, `aria-label`/`title` đầy đủ và căn phải trong action cell có divider |

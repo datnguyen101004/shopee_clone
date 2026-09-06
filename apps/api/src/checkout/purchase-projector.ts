@@ -2,6 +2,7 @@ import {
   CHECKOUT_VERSION,
   parsePurchaseResult,
   type CheckoutAddressSnapshot,
+  type CampaignPriceSnapshot,
   type ShippingBreakdown,
   type PurchaseResult,
 } from '@shopee-clone/contracts';
@@ -86,6 +87,9 @@ export class PurchaseProjector {
             line.merchandiseVoucherDiscountMinor,
           ),
           payableMerchandiseMinor: checkedMoneyFromBigInt(line.payableMerchandiseMinor),
+          ...(line.campaignPriceSnapshot
+            ? { campaignPrice: jsonObject<CampaignPriceSnapshot>(line.campaignPriceSnapshot) }
+            : {}),
           productName: line.productName,
           productImageUrl: line.productImageUrl,
           variantName: line.variantName,

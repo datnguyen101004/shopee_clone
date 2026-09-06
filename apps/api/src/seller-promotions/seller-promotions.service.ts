@@ -1,4 +1,4 @@
-import { createHash, randomUUID } from 'node:crypto';
+import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { Inject, Injectable, Optional } from '@nestjs/common';
 import { Prisma } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
@@ -116,7 +116,17 @@ export class SellerPromotionsService {
       if (existing) { if (existing.requestDigest !== digest) throw new SellerPromotionIdempotencyConflictError(); return { summary: existing.response as unknown as SellerVoucherSummary, created: false as const }; }
       const products = await tx.product.findMany({ where: { id: { in: input.productIds }, shopId: shop.id, deletedAt: null }, select: { id: true } });
       if (products.length !== input.productIds.length) throw new SellerPromotionValidationError(['productIds'], 'One or more product IDs are invalid for this shop.');
-      const voucher = await tx.voucher.create({ data: { code: input.code, name: input.name, issuer: 'SHOP', shopId: shop.id, benefitType: input.benefitType, fixedAmountMinor: input.fixedAmountMinor === null ? null : BigInt(input.fixedAmountMinor), percentageBasisPoints: input.percentageBasisPoints, maximumDiscountMinor: input.maximumDiscountMinor === null ? null : BigInt(input.maximumDiscountMinor), minimumSpendMinor: BigInt(input.minimumSpendMinor), startsAt: new Date(input.startsAt), endsAt: new Date(input.endsAt), isEnabled: true, usageLimit: input.usageLimit, perBuyerLimit: input.perBuyerLimit, productScopes: { createMany: { data: input.productIds.map((productId) => ({ productId })) } } }, include: this.voucherInclude });
+      const voucher = await (async () => {
+        for (let attempt = 0; attempt < 5; attempt += 1) {
+          const code = `SHOP-${randomBytes(5).toString('hex').toUpperCase()}`;
+          try {
+            return await tx.voucher.create({ data: { code, name: input.name, issuer: 'SHOP', shopId: shop.id, benefitType: input.benefitType, fixedAmountMinor: input.fixedAmountMinor === null ? null : BigInt(input.fixedAmountMinor), percentageBasisPoints: input.percentageBasisPoints, maximumDiscountMinor: input.maximumDiscountMinor === null ? null : BigInt(input.maximumDiscountMinor), minimumSpendMinor: BigInt(input.minimumSpendMinor), startsAt: new Date(input.startsAt), endsAt: new Date(input.endsAt), isEnabled: true, usageLimit: input.usageLimit, perBuyerLimit: input.perBuyerLimit, productScopes: { createMany: { data: input.productIds.map((productId) => ({ productId })) } } }, include: this.voucherInclude });
+          } catch (error) {
+            if ((error as { code?: string } | null)?.code !== 'P2002' || attempt === 4) throw error;
+          }
+        }
+        throw new SellerPromotionUnavailableError();
+      })();
       const createdSummary = this.voucherSummary(voucher, new Date());
       await tx.sellerPromotionCommand.create({ data: { id: randomUUID(), shopId: shop.id, resource: 'VOUCHER', resourceId: voucher.id, idempotencyKey, requestDigest: digest, response: createdSummary as unknown as Prisma.InputJsonValue } });
       return { summary: createdSummary, created: true as const, voucherId: voucher.id, code: voucher.code, shopId: shop.id };
@@ -141,10 +151,10 @@ export class SellerPromotionsService {
   async updateVoucher(userId: string, id: string, expectedVersion: number, input: SellerVoucherUpdateRequest): Promise<SellerVoucherSummary> {
     const shop = await this.shopFor(userId);
     return this.prisma.$transaction(async (tx) => {
-      const current = await tx.voucher.findFirst({ where: { id, shopId: shop.id, issuer: 'SHOP' }, include: this.voucherInclude }); if (!current) throw new SellerPromotionNotFoundError(); if (current.version !== expectedVersion) throw new SellerPromotionStaleError(current.version); if (current.usedCount > 0 && ['code', 'benefitType', 'fixedAmountMinor', 'percentageBasisPoints', 'maximumDiscountMinor', 'minimumSpendMinor', 'productIds'].some((key) => Object.hasOwn(input, key))) throw new SellerPromotionConflictError('REDEEMED_FIELDS_IMMUTABLE', 'Redeemed voucher economics cannot be edited.');
+      const current = await tx.voucher.findFirst({ where: { id, shopId: shop.id, issuer: 'SHOP' }, include: this.voucherInclude }); if (!current) throw new SellerPromotionNotFoundError(); if (current.version !== expectedVersion) throw new SellerPromotionStaleError(current.version); if (current.usedCount > 0 && ['benefitType', 'fixedAmountMinor', 'percentageBasisPoints', 'maximumDiscountMinor', 'minimumSpendMinor', 'productIds'].some((key) => Object.hasOwn(input, key))) throw new SellerPromotionConflictError('REDEEMED_FIELDS_IMMUTABLE', 'Redeemed voucher economics cannot be edited.');
       const startsAt = input.startsAt ? new Date(input.startsAt) : current.startsAt; const endsAt = input.endsAt ? new Date(input.endsAt) : current.endsAt; if (!(startsAt < endsAt)) throw new SellerPromotionValidationError(['startsAt', 'endsAt'], 'Start time must be before end time.'); const usageLimit = input.usageLimit ?? current.usageLimit; if (usageLimit < current.usedCount || usageLimit < 1) throw new SellerPromotionValidationError(['usageLimit'], 'Usage limit cannot be lower than already redeemed uses.');
       const productIds = input.productIds ?? current.productScopes.map((scope) => scope.productId); const products = await tx.product.findMany({ where: { id: { in: productIds }, shopId: shop.id, deletedAt: null }, select: { id: true } }); if (products.length !== productIds.length) throw new SellerPromotionValidationError(['productIds'], 'One or more product IDs are invalid for this shop.');
-      const updated = await tx.voucher.updateMany({ where: { id, shopId: shop.id, issuer: 'SHOP', version: expectedVersion, usedCount: { lte: usageLimit } }, data: { ...(input.code === undefined ? {} : { code: input.code }), ...(input.name === undefined ? {} : { name: input.name }), ...(input.benefitType === undefined ? {} : { benefitType: input.benefitType }), ...(input.fixedAmountMinor === undefined ? {} : { fixedAmountMinor: input.fixedAmountMinor === null ? null : BigInt(input.fixedAmountMinor) }), ...(input.percentageBasisPoints === undefined ? {} : { percentageBasisPoints: input.percentageBasisPoints }), ...(input.maximumDiscountMinor === undefined ? {} : { maximumDiscountMinor: input.maximumDiscountMinor === null ? null : BigInt(input.maximumDiscountMinor) }), ...(input.minimumSpendMinor === undefined ? {} : { minimumSpendMinor: BigInt(input.minimumSpendMinor) }), startsAt, endsAt, usageLimit, ...(input.perBuyerLimit === undefined ? {} : { perBuyerLimit: input.perBuyerLimit }), version: { increment: 1 } } });
+      const updated = await tx.voucher.updateMany({ where: { id, shopId: shop.id, issuer: 'SHOP', version: expectedVersion, usedCount: { lte: usageLimit } }, data: { ...(input.name === undefined ? {} : { name: input.name }), ...(input.benefitType === undefined ? {} : { benefitType: input.benefitType }), ...(input.fixedAmountMinor === undefined ? {} : { fixedAmountMinor: input.fixedAmountMinor === null ? null : BigInt(input.fixedAmountMinor) }), ...(input.percentageBasisPoints === undefined ? {} : { percentageBasisPoints: input.percentageBasisPoints }), ...(input.maximumDiscountMinor === undefined ? {} : { maximumDiscountMinor: input.maximumDiscountMinor === null ? null : BigInt(input.maximumDiscountMinor) }), ...(input.minimumSpendMinor === undefined ? {} : { minimumSpendMinor: BigInt(input.minimumSpendMinor) }), startsAt, endsAt, usageLimit, ...(input.perBuyerLimit === undefined ? {} : { perBuyerLimit: input.perBuyerLimit }), version: { increment: 1 } } });
       if (updated.count !== 1) {
         const latest = await tx.voucher.findFirst({ where: { id, shopId: shop.id, issuer: 'SHOP' }, select: { version: true } });
         if (!latest) throw new SellerPromotionNotFoundError();
@@ -235,6 +245,7 @@ export class SellerPromotionsService {
         if (conflict) throw new SellerPromotionConflictError('DISCOUNT_OVERLAP');
       }
       const updated = await tx.shopDiscountCampaign.update({ where: { id }, data: { ...(input.name === undefined ? {} : { name: input.name }), startsAt, endsAt, products: { deleteMany: {}, create: products } , version: { increment: 1 } }, include: this.campaignInclude });
+      await this.syncCampaignReservations(tx, id, shop.id, products, startsAt, endsAt, updated.isEnabled && updated.archivedAt === null);
       return this.discountSummary(updated, now);
     }).catch((error) => {
       if (error instanceof SellerPromotionNotFoundError || error instanceof SellerPromotionValidationError || error instanceof SellerPromotionConflictError || error instanceof SellerPromotionStaleError) throw error;
@@ -248,8 +259,22 @@ export class SellerPromotionsService {
     for (const productId of [...new Set(productIds)].sort()) await tx.$executeRaw(Prisma.sql`SELECT pg_advisory_xact_lock(hashtextextended(${productId}, 0))`);
   }
 
+  private async syncCampaignReservations(
+    tx: Prisma.TransactionClient,
+    campaignId: string,
+    shopId: string,
+    products: ReadonlyArray<{ productId: string; discountBasisPoints: number }>,
+    startsAt: Date,
+    endsAt: Date,
+    enabled: boolean,
+  ): Promise<void> {
+    await tx.productPromotionReservation.updateMany({ where: { shopCampaignId: campaignId }, data: { isEnabled: false } });
+    if (!enabled) return;
+    await tx.productPromotionReservation.createMany({ data: products.map((product) => ({ id: randomUUID(), productId: product.productId, shopId, source: 'SHOP_CAMPAIGN', shopCampaignId: campaignId, discountBasisPoints: product.discountBasisPoints, startsAt, endsAt })) });
+  }
+
   async createDiscount(userId: string, input: SellerDiscountCreateRequest, idempotencyKey: string): Promise<SellerDiscountSummary> {
-    const shop = await this.shopFor(userId); const digest = jsonDigest(input); return this.prisma.$transaction(async (tx) => { const existing = await tx.sellerPromotionCommand.findUnique({ where: { shopId_idempotencyKey: { shopId: shop.id, idempotencyKey } } }); if (existing) { if (existing.requestDigest !== digest) throw new SellerPromotionIdempotencyConflictError(); return existing.response as unknown as SellerDiscountSummary; } await this.lockProducts(tx, input.products.map((product) => product.productId)); await this.validateCampaignProducts(tx, shop.id, input.products); const conflict = await tx.shopDiscountProduct.findFirst({ where: { productId: { in: input.products.map((product) => product.productId) }, campaign: { shopId: shop.id, isEnabled: true, archivedAt: null, startsAt: { lt: new Date(input.endsAt) }, endsAt: { gt: new Date(input.startsAt) } } } }); if (conflict) throw new SellerPromotionConflictError('DISCOUNT_OVERLAP'); const campaign = await tx.shopDiscountCampaign.create({ data: { id: randomUUID(), shopId: shop.id, name: input.name, startsAt: new Date(input.startsAt), endsAt: new Date(input.endsAt), products: { create: input.products } }, include: this.campaignInclude }); const summary = this.discountSummary(campaign, new Date()); await tx.sellerPromotionCommand.create({ data: { id: randomUUID(), shopId: shop.id, resource: 'DISCOUNT', resourceId: campaign.id, idempotencyKey, requestDigest: digest, response: summary as unknown as Prisma.InputJsonValue } }); return summary; }).catch((error) => { if (error instanceof SellerPromotionValidationError || error instanceof SellerPromotionConflictError || error instanceof SellerPromotionIdempotencyConflictError) throw error; throw new SellerPromotionUnavailableError(); });
+    const shop = await this.shopFor(userId); const digest = jsonDigest(input); return this.prisma.$transaction(async (tx) => { const existing = await tx.sellerPromotionCommand.findUnique({ where: { shopId_idempotencyKey: { shopId: shop.id, idempotencyKey } } }); if (existing) { if (existing.requestDigest !== digest) throw new SellerPromotionIdempotencyConflictError(); return existing.response as unknown as SellerDiscountSummary; } await this.lockProducts(tx, input.products.map((product) => product.productId)); await this.validateCampaignProducts(tx, shop.id, input.products); const conflict = await tx.shopDiscountProduct.findFirst({ where: { productId: { in: input.products.map((product) => product.productId) }, campaign: { shopId: shop.id, isEnabled: true, archivedAt: null, startsAt: { lt: new Date(input.endsAt) }, endsAt: { gt: new Date(input.startsAt) } } } }); if (conflict) throw new SellerPromotionConflictError('DISCOUNT_OVERLAP'); const campaign = await tx.shopDiscountCampaign.create({ data: { id: randomUUID(), shopId: shop.id, name: input.name, startsAt: new Date(input.startsAt), endsAt: new Date(input.endsAt), products: { create: input.products } }, include: this.campaignInclude }); await this.syncCampaignReservations(tx, campaign.id, shop.id, input.products, campaign.startsAt, campaign.endsAt, true); const summary = this.discountSummary(campaign, new Date()); await tx.sellerPromotionCommand.create({ data: { id: randomUUID(), shopId: shop.id, resource: 'DISCOUNT', resourceId: campaign.id, idempotencyKey, requestDigest: digest, response: summary as unknown as Prisma.InputJsonValue } }); return summary; }).catch((error) => { if (error instanceof SellerPromotionValidationError || error instanceof SellerPromotionConflictError || error instanceof SellerPromotionIdempotencyConflictError) throw error; if (error?.code === '23P01') throw new SellerPromotionConflictError('DISCOUNT_OVERLAP'); throw new SellerPromotionUnavailableError(); });
   }
 
   async actionDiscount(userId: string, id: string, expectedVersion: number, action: SellerPromotionAction, idempotencyKey: string): Promise<SellerDiscountSummary> {
@@ -269,6 +294,7 @@ export class SellerPromotionsService {
         if (conflict) throw new SellerPromotionConflictError('DISCOUNT_OVERLAP');
       }
       const updated = await tx.shopDiscountCampaign.update({ where: { id }, data: action === 'ARCHIVE' ? { archivedAt: now, isEnabled: false, version: { increment: 1 } } : action === 'PAUSE' ? { isEnabled: false, version: { increment: 1 } } : { isEnabled: true, version: { increment: 1 } }, include: this.campaignInclude });
+      await this.syncCampaignReservations(tx, id, shop.id, updated.products, updated.startsAt, updated.endsAt, updated.isEnabled && updated.archivedAt === null);
       const summary = this.discountSummary(updated, now);
       await tx.sellerPromotionCommand.create({ data: { id: randomUUID(), shopId: shop.id, resource: 'DISCOUNT', resourceId: id, idempotencyKey, requestDigest: digest, response: summary as unknown as Prisma.InputJsonValue } });
       return summary;

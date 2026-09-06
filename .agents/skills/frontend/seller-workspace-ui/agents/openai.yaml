@@ -1,0 +1,4 @@
+interface:
+  display_name: "Seller Workspace UI"
+  short_description: "Chuẩn UI quản lý Seller xanh dương và trắng"
+  default_prompt: "Dùng $seller-workspace-ui để đồng bộ màn Seller được yêu cầu theo chuẩn UI của project."

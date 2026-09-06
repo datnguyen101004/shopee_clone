@@ -1,3 +1,8 @@
+import {
+  isSellerProductCampaignSummary,
+} from './campaigns';
+import type { SellerProductCampaignEntry, SellerProductCampaignSummary } from './campaigns';
+
 export const SELLER_PRODUCT_DEFAULT_PAGE_SIZE = 20;
 export const SELLER_PRODUCT_MAX_PAGE_SIZE = 50;
 export const SELLER_PRODUCT_TITLE_MAX_LENGTH = 240;
@@ -11,6 +16,8 @@ export const sellerProductLifecycleValues = ['draft', 'published', 'hidden', 'ar
 export const sellerProductModerationValues = ['active', 'suspended'] as const;
 export type SellerProductLifecycle = (typeof sellerProductLifecycleValues)[number];
 export type SellerProductModerationStatus = (typeof sellerProductModerationValues)[number];
+export const sellerProductCampaignFilterValues = ['ACTIVE', 'UPCOMING', 'HISTORY'] as const;
+export type SellerProductCampaignFilter = (typeof sellerProductCampaignFilterValues)[number];
 
 export interface SellerProductCategory {
   id: string;
@@ -139,6 +146,17 @@ export interface SellerProductDetail extends SellerProductUpsertRequest {
   variants: SellerProductVariant[];
   createdAt: string;
   updatedAt: string;
+  /** Bounded, typed platform campaign visibility for seller operations. */
+  campaigns?: SellerProductCampaignEntry[];
+  operationalSummary?: {
+    variantCount: number;
+    stockQuantity: number;
+    soldCount: number;
+    ratingAverageBasisPoints: number;
+    ratingCount: number;
+    minPriceMinor: number | null;
+    maxPriceMinor: number | null;
+  };
 }
 
 export interface SellerProductSummary {
@@ -152,6 +170,10 @@ export interface SellerProductSummary {
   variantCount: number;
   stockQuantity: number;
   updatedAt: string;
+  operationalPriceRange?: { minPriceMinor: number | null; maxPriceMinor: number | null };
+  sellerPromotionSummary?: { activeCount: number; upcomingCount: number };
+  campaigns?: SellerProductCampaignSummary[];
+  additionalCampaignCount?: number;
 }
 
 export interface SellerProductPage {
@@ -163,6 +185,8 @@ export interface SellerProductPageQuery {
   cursor: string | null;
   limit: number;
   lifecycle: SellerProductLifecycle | null;
+  campaign: SellerProductCampaignFilter | null;
+  campaignTypeCode: string | null;
 }
 
 export interface SellerProductLifecycleRequest {
@@ -265,7 +289,22 @@ function canonicalDate(value: unknown): value is string {
 }
 
 export function isSellerProductPage(value: unknown): value is SellerProductPage {
-  return isRecord(value) && exactKeys(value, ['items', 'nextCursor']) && Array.isArray(value.items) && (value.nextCursor === null || isCanonicalSellerProductId(value.nextCursor)) && value.items.every((item) => isRecord(item) && exactKeys(item, ['id', 'slug', 'name', 'categoryName', 'lifecycle', 'moderationStatus', 'primaryMediaUrl', 'variantCount', 'stockQuantity', 'updatedAt']) && isCanonicalSellerProductId(item.id) && typeof item.slug === 'string' && typeof item.name === 'string' && typeof item.categoryName === 'string' && sellerProductLifecycleValues.includes(item.lifecycle as SellerProductLifecycle) && sellerProductModerationValues.includes(item.moderationStatus as SellerProductModerationStatus) && (item.primaryMediaUrl === null || typeof item.primaryMediaUrl === 'string') && nonNegativeInteger(item.variantCount) && nonNegativeInteger(item.stockQuantity) && canonicalDate(item.updatedAt));
+  if (!isRecord(value) || !exactKeys(value, ['items', 'nextCursor']) || !Array.isArray(value.items) || (value.nextCursor !== null && !isCanonicalSellerProductId(value.nextCursor))) return false;
+  return value.items.every((item) => {
+    if (!isRecord(item)) return false;
+    const allowedKeys = ['id', 'slug', 'name', 'categoryName', 'lifecycle', 'moderationStatus', 'primaryMediaUrl', 'variantCount', 'stockQuantity', 'updatedAt', 'operationalPriceRange', 'sellerPromotionSummary', 'campaigns', 'additionalCampaignCount'];
+    if (Object.keys(item).some((key) => !allowedKeys.includes(key))) return false;
+    if (!['id', 'slug', 'name', 'categoryName', 'lifecycle', 'moderationStatus', 'primaryMediaUrl', 'variantCount', 'stockQuantity', 'updatedAt'].every((key) => Object.hasOwn(item, key))) return false;
+    if (!isCanonicalSellerProductId(item.id) || typeof item.slug !== 'string' || typeof item.name !== 'string' || typeof item.categoryName !== 'string' || !sellerProductLifecycleValues.includes(item.lifecycle as SellerProductLifecycle) || !sellerProductModerationValues.includes(item.moderationStatus as SellerProductModerationStatus) || (item.primaryMediaUrl !== null && typeof item.primaryMediaUrl !== 'string') || !nonNegativeInteger(item.variantCount) || !nonNegativeInteger(item.stockQuantity) || !canonicalDate(item.updatedAt)) return false;
+    if (item.operationalPriceRange !== undefined) {
+      if (!isRecord(item.operationalPriceRange) || !exactKeys(item.operationalPriceRange, ['minPriceMinor', 'maxPriceMinor']) || (item.operationalPriceRange.minPriceMinor !== null && !nonNegativeInteger(item.operationalPriceRange.minPriceMinor)) || (item.operationalPriceRange.maxPriceMinor !== null && !nonNegativeInteger(item.operationalPriceRange.maxPriceMinor))) return false;
+    }
+    if (item.sellerPromotionSummary !== undefined) {
+      if (!isRecord(item.sellerPromotionSummary) || !exactKeys(item.sellerPromotionSummary, ['activeCount', 'upcomingCount']) || !nonNegativeInteger(item.sellerPromotionSummary.activeCount) || !nonNegativeInteger(item.sellerPromotionSummary.upcomingCount)) return false;
+    }
+    if (item.campaigns !== undefined && (!Array.isArray(item.campaigns) || item.campaigns.length > 3 || !item.campaigns.every(isSellerProductCampaignSummary))) return false;
+    return item.additionalCampaignCount === undefined || nonNegativeInteger(item.additionalCampaignCount);
+  });
 }
 
 export function isSellerProductCategories(value: unknown): value is SellerProductCategory[] {
@@ -305,12 +344,14 @@ export function isSellerProductDetail(value: unknown): value is SellerProductDet
   }) && Array.isArray(value.variants) && value.variants.every((variant) => isRecord(variant) && typeof variant.sku === 'string' && variant.sku.trim().length > 0 && variant.sku.length <= 80) && isCanonicalSellerProductId(value.id) && sellerProductLifecycleValues.includes(value.lifecycle as SellerProductLifecycle) && sellerProductModerationValues.includes(value.moderationStatus as SellerProductModerationStatus) && (value.moderationReason === null || typeof value.moderationReason === 'string') && canonicalDate(value.createdAt) && canonicalDate(value.updatedAt);
 }
 
-export function parseSellerProductPageQuery(value: { cursor?: string | string[]; limit?: string | string[]; lifecycle?: string | string[] }): SellerProductPageQuery | null {
+export function parseSellerProductPageQuery(value: { cursor?: string | string[]; limit?: string | string[]; lifecycle?: string | string[]; campaign?: string | string[]; campaignTypeCode?: string | string[] }): SellerProductPageQuery | null {
   const one = (item: string | string[] | undefined) => typeof item === 'string' ? item : undefined;
   const cursor = one(value.cursor) ?? null;
   const limitText = one(value.limit);
   const lifecycle = one(value.lifecycle) ?? null;
+  const campaign = one(value.campaign) ?? null;
+  const campaignTypeCode = one(value.campaignTypeCode) ?? null;
   const limit = limitText === undefined ? SELLER_PRODUCT_DEFAULT_PAGE_SIZE : Number(limitText);
-  if ((cursor !== null && !isCanonicalSellerProductId(cursor)) || !Number.isSafeInteger(limit) || limit < 1 || limit > SELLER_PRODUCT_MAX_PAGE_SIZE || (lifecycle !== null && !sellerProductLifecycleValues.includes(lifecycle as SellerProductLifecycle))) return null;
-  return { cursor, limit, lifecycle: lifecycle as SellerProductLifecycle | null };
+  if ((cursor !== null && !isCanonicalSellerProductId(cursor)) || !Number.isSafeInteger(limit) || limit < 1 || limit > SELLER_PRODUCT_MAX_PAGE_SIZE || (lifecycle !== null && !sellerProductLifecycleValues.includes(lifecycle as SellerProductLifecycle)) || (campaign !== null && !sellerProductCampaignFilterValues.includes(campaign as SellerProductCampaignFilter)) || (campaignTypeCode !== null && !/^[A-Z][A-Z0-9_]{1,63}$/.test(campaignTypeCode))) return null;
+  return { cursor, limit, lifecycle: lifecycle as SellerProductLifecycle | null, campaign: campaign as SellerProductCampaignFilter | null, campaignTypeCode };
 }

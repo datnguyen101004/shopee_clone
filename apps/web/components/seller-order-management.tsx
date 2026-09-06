@@ -11,9 +11,11 @@ import type {
   SellerOrderRejectionReason,
   SellerOrderSummary,
 } from '@shopee-clone/contracts';
+import { formatSellerOrderVersionEtag } from '@shopee-clone/contracts';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { ChevronDown, Search } from '@shopee-clone/ui';
 import {
   executeSellerOrderAction,
   fetchSellerOrder,
@@ -24,6 +26,7 @@ import { marketplaceMediaUrl } from '../lib/marketplace-media-url';
 import { useAuthSession } from './auth-session-provider';
 
 const money = (value: number) => `${new Intl.NumberFormat('vi-VN').format(value)}₫`;
+type OrderSort = 'newest' | 'oldest' | 'highest-price' | 'lowest-price';
 const statusLabels: Record<string, string> = {
   PENDING_CONFIRMATION: 'Chờ xác nhận',
   AWAITING_PICKUP: 'Chờ đơn vị vận chuyển lấy hàng',
@@ -48,7 +51,7 @@ const actionLabels: Record<SellerOrderAction, string> = {
   START_PREPARING: 'Bắt đầu chuẩn bị',
   MARK_READY_FOR_PICKUP: 'Sẵn sàng lấy hàng',
   HAND_OFF: 'Bàn giao vận chuyển',
-  REJECT: 'Từ chối đơn',
+  REJECT: 'Hủy đơn',
 };
 const reasonLabels: Record<SellerOrderRejectionReason, string> = {
   OUT_OF_STOCK: 'Hết hàng',
@@ -68,46 +71,27 @@ function ErrorState({ error, retry }: { error: string; retry: () => void }) {
     </div>
   );
 }
-function OrderCard({ item }: { item: SellerOrderSummary }) {
+function OrderProductCell({ item }: { item: SellerOrderSummary }) {
+  const firstLine = item.lines[0];
   return (
-    <Link className="seller-order-card" href={`/seller/orders/${item.orderReference}`}>
-      <div className="seller-order-card__top">
-        <strong>Đơn #{item.orderReference.slice(0, 8).toUpperCase()}</strong>
-        <span>{statusLabels[item.status] ?? item.status}</span>
-      </div>
-      <div className="seller-order-card__body">
-        <div className="seller-order-card__items">
-          {item.lines.slice(0, 3).map((line) => (
-            <div className="seller-order-line" key={line.lineId}>
-              {line.productImageUrl ? (
-                <img src={marketplaceMediaUrl(line.productImageUrl)} alt="" />
-              ) : (
-                <span className="seller-order-line__fallback">Ảnh</span>
-              )}
-              <span>
-                <b>{line.productName}</b>
-                <small>
-                  {line.variantName} · x{line.quantity}
-                </small>
-              </span>
-            </div>
-          ))}
-        </div>
-        <div className="seller-order-card__total">
-          <small>{fulfillmentLabels[item.fulfillmentState]}</small>
-          <b>{money(item.payableTotalMinor)}</b>
-          <span>{item.itemQuantity} sản phẩm</span>
-        </div>
-      </div>
-      <div className="seller-order-card__bottom">
-        {item.deadline.confirmationOverdue || item.deadline.handoffOverdue ? (
-          <em>Quá hạn xử lý</em>
-        ) : (
-          <span>{new Date(item.createdAt).toLocaleString('vi-VN')}</span>
-        )}
-        <span>{item.availableActions.length} thao tác khả dụng</span>
-      </div>
-    </Link>
+    <span className="seller-order-table-product">
+      {firstLine?.productImageUrl ? (
+        <img
+          src={marketplaceMediaUrl(firstLine.productImageUrl)}
+          alt=""
+          className="seller-order-table-product__image"
+        />
+      ) : (
+        <span className="seller-order-table-product__fallback">Ảnh</span>
+      )}
+      <span className="seller-order-table-product__copy">
+        <strong>{firstLine?.productName ?? `${item.lineCount} sản phẩm`}</strong>
+        <small>
+          {firstLine ? `${firstLine.variantName} · ${firstLine.variantSku}` : 'Nhiều sản phẩm'}
+          {item.lineCount > 1 ? ` · +${item.lineCount - 1} sản phẩm` : ''}
+        </small>
+      </span>
+    </span>
   );
 }
 
@@ -124,6 +108,13 @@ export function SellerOrderQueueScreen() {
   const [page, setPage] = useState<SellerOrderListResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [sort, setSort] = useState<OrderSort>('newest');
+  const [selected, setSelected] = useState<{
+    order: SellerOrderSummary;
+    available: SellerOrderAvailableAction;
+  } | null>(null);
+  const [pendingAction, setPendingAction] = useState(false);
   const load = useCallback(
     async (cursor?: string, append = false) => {
       if (state.status !== 'authenticated') return;
@@ -131,7 +122,9 @@ export function SellerOrderQueueScreen() {
       setError(null);
       try {
         const next = await fetchSellerOrders(authenticatedFetch, { status, fulfillment, cursor });
-        setPage((previous) => append && previous ? { ...next, items: [...previous.items, ...next.items] } : next);
+        setPage((previous) =>
+          append && previous ? { ...next, items: [...previous.items, ...next.items] } : next,
+        );
       } catch (cause) {
         setError(
           cause instanceof RoleApiError
@@ -151,10 +144,81 @@ export function SellerOrderQueueScreen() {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void load();
   }, [load]);
+
+  const visibleItems = useMemo(() => {
+    const term = searchTerm.trim().toLocaleLowerCase('vi-VN');
+    const filtered = (page?.items ?? []).filter((item) => {
+      if (!term) return true;
+      const searchable = [
+        item.orderReference,
+        item.purchaseReference,
+        ...item.lines.flatMap((line) => [line.productName, line.variantName, line.variantSku]),
+      ];
+      return searchable.some((value) => value.toLocaleLowerCase('vi-VN').includes(term));
+    });
+
+    return [...filtered].sort((left, right) => {
+      if (sort === 'highest-price' || sort === 'lowest-price') {
+        const difference = right.payableTotalMinor - left.payableTotalMinor;
+        return (
+          (sort === 'highest-price' ? difference : -difference) ||
+          left.orderReference.localeCompare(right.orderReference)
+        );
+      }
+      const leftTime = Date.parse(left.createdAt);
+      const rightTime = Date.parse(right.createdAt);
+      return (
+        (sort === 'newest' ? rightTime - leftTime : leftTime - rightTime) ||
+        left.orderReference.localeCompare(right.orderReference)
+      );
+    });
+  }, [page?.items, searchTerm, sort]);
   const changeFilter = (nextStatus: SellerOrderQueueFilter) => {
     setStatus(nextStatus);
     setPage(null);
     router.replace(`/seller/orders?status=${nextStatus}&fulfillment=${fulfillment}`);
+  };
+
+  const submitQueueAction = async (input: SellerOrderActionRequest) => {
+    if (!selected) return;
+    setPendingAction(true);
+    setError(null);
+    try {
+      const result = await executeSellerOrderAction(
+        authenticatedFetch,
+        selected.order.orderReference,
+        formatSellerOrderVersionEtag(
+          selected.order.orderVersion,
+          selected.order.fulfillmentVersion,
+        ),
+        input,
+      );
+      setPage((current) =>
+        current
+          ? {
+              ...current,
+              items: current.items.map((item) =>
+                item.orderReference === selected.order.orderReference
+                  ? result.data.order.summary
+                  : item,
+              ),
+            }
+          : current,
+      );
+      setSelected(null);
+    } catch (cause) {
+      setError(
+        cause instanceof RoleApiError
+          ? (cause.problem?.detail ??
+              (cause.status === 409
+                ? 'Đơn đã thay đổi, dữ liệu đã được làm mới.'
+                : 'Không thể thực hiện thao tác.'))
+          : 'Không thể thực hiện thao tác.',
+      );
+      if (cause instanceof RoleApiError && cause.status === 409) void load();
+    } finally {
+      setPendingAction(false);
+    }
   };
   if (state.status !== 'authenticated')
     return (
@@ -173,14 +237,6 @@ export function SellerOrderQueueScreen() {
   ];
   return (
     <section className="seller-orders-page">
-      <header className="seller-orders-heading">
-        <div>
-          <p className="seller-orders-eyebrow">SELLER CENTER</p>
-          <h1>Đơn hàng</h1>
-          <p>Shop xác nhận đơn và theo dõi quá trình lấy hàng của đơn vị vận chuyển.</p>
-        </div>
-        <span className="seller-orders-count">{page?.items.length ?? 0} đơn</span>
-      </header>
       <div className="seller-orders-tabs" role="tablist">
         {tabs.map(([value, label]) => (
           <button
@@ -194,26 +250,60 @@ export function SellerOrderQueueScreen() {
           </button>
         ))}
       </div>
-      <div className="seller-orders-filters">
-        <label>
-          Trạng thái chuẩn bị
-          <select
-            value={fulfillment}
-            onChange={(event) => {
-              const next = event.target.value as SellerOrderFulfillmentFilter;
-              setFulfillment(next);
-              setPage(null);
-              router.replace(`/seller/orders?status=${status}&fulfillment=${next}`);
-            }}
-          >
-            <option value="ALL">Tất cả</option>
-            {Object.entries(fulfillmentLabels).map(([value, label]) => (
-              <option key={value} value={value}>
-                {label}
-              </option>
-            ))}
-          </select>
-        </label>
+      <div className="seller-pl-toolbar seller-pl-toolbar--labeled seller-orders-filters">
+        <div className="seller-pl-toolbar__filters">
+          <div className="seller-pl-search seller-orders-search">
+            <Search className="seller-pl-search__icon" size={16} aria-hidden="true" />
+            <input
+              type="search"
+              aria-label="Tìm kiếm đơn hàng"
+              placeholder="Mã đơn hoặc sản phẩm"
+              value={searchTerm}
+              onChange={(event) => setSearchTerm(event.target.value)}
+            />
+          </div>
+          <div className="seller-pl-field">
+            <label htmlFor="seller-orders-fulfillment">Trạng thái chuẩn bị</label>
+            <div className="seller-pl-select-wrap">
+              <select
+                id="seller-orders-fulfillment"
+                className="seller-pl-select"
+                value={fulfillment}
+                onChange={(event) => {
+                  const next = event.target.value as SellerOrderFulfillmentFilter;
+                  setFulfillment(next);
+                  setPage(null);
+                  router.replace(`/seller/orders?status=${status}&fulfillment=${next}`);
+                }}
+              >
+                <option value="ALL">Tất cả</option>
+                {Object.entries(fulfillmentLabels).map(([value, label]) => (
+                  <option key={value} value={value}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown className="seller-pl-select__arrow" size={16} aria-hidden="true" />
+            </div>
+          </div>
+          <div className="seller-pl-field seller-orders-sort">
+            <label htmlFor="seller-orders-sort">Sắp xếp</label>
+            <div className="seller-pl-select-wrap">
+              <select
+                id="seller-orders-sort"
+                className="seller-pl-select"
+                value={sort}
+                onChange={(event) => setSort(event.target.value as OrderSort)}
+              >
+                <option value="newest">Mới nhất</option>
+                <option value="oldest">Cũ nhất</option>
+                <option value="highest-price">Giá cao đến thấp</option>
+                <option value="lowest-price">Giá thấp đến cao</option>
+              </select>
+              <ChevronDown className="seller-pl-select__arrow" size={16} aria-hidden="true" />
+            </div>
+          </div>
+        </div>
       </div>
       {loading ? (
         <p className="seller-orders-state">Đang tải đơn hàng…</p>
@@ -223,19 +313,119 @@ export function SellerOrderQueueScreen() {
         <p className="seller-orders-state">Chưa có đơn hàng phù hợp.</p>
       ) : (
         <>
-          <div className="seller-orders-list">
-            {page.items.map((item) => (
-              <OrderCard key={item.orderReference} item={item} />
-            ))}
+          <div className="seller-pl-table-stack seller-orders-table-stack">
+            <div className="seller-pl-table-card seller-orders-table-card">
+              <div className="seller-pl-table-scroll">
+                <table className="seller-pl-table seller-orders-table">
+                  <thead>
+                    <tr>
+                      <th>Mã đơn</th>
+                      <th>Sản phẩm</th>
+                      <th>Số lượng</th>
+                      <th>Tổng tiền</th>
+                      <th>Trạng thái</th>
+                      <th>Ngày tạo</th>
+                      <th>Thao tác</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {visibleItems.length ? (
+                      visibleItems.map((item) => {
+                        const availableActions = item.availableActions.filter(
+                          ({ action }) => action === 'CONFIRM' || action === 'REJECT',
+                        );
+                        return (
+                          <tr className="seller-order-table-row" key={item.orderReference}>
+                            <td>
+                              <Link
+                                className="seller-order-table-reference"
+                                href={`/seller/orders/${item.orderReference}`}
+                              >
+                                #{item.orderReference.slice(0, 8).toUpperCase()}
+                              </Link>
+                              <small className="seller-order-table-subtext">
+                                #{item.purchaseReference.slice(0, 8).toUpperCase()}
+                              </small>
+                            </td>
+                            <td>
+                              <Link
+                                className="seller-order-table-product-link"
+                                href={`/seller/orders/${item.orderReference}`}
+                              >
+                                <OrderProductCell item={item} />
+                              </Link>
+                            </td>
+                            <td>{item.itemQuantity}</td>
+                            <td>
+                              <strong>{money(item.payableTotalMinor)}</strong>
+                            </td>
+                            <td>
+                              <span className="seller-order-badge" data-status={item.status}>
+                                {statusLabels[item.status] ?? item.status}
+                              </span>
+                              <small className="seller-order-table-subtext">
+                                {fulfillmentLabels[item.fulfillmentState]}
+                              </small>
+                            </td>
+                            <td>{new Date(item.createdAt).toLocaleDateString('vi-VN')}</td>
+                            <td>
+                              <div className="seller-order-row-actions">
+                                {availableActions.length ? (
+                                  availableActions.map((available) => (
+                                    <button
+                                      type="button"
+                                      key={available.action}
+                                      data-action={available.action}
+                                      onClick={() => setSelected({ order: item, available })}
+                                    >
+                                      {actionLabels[available.action]}
+                                    </button>
+                                  ))
+                                ) : (
+                                  <span className="seller-order-table-subtext">—</span>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    ) : (
+                      <tr>
+                        <td className="seller-order-table__empty" colSpan={7}>
+                          Không tìm thấy đơn hàng phù hợp.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            <footer className="seller-pl-footer seller-orders-footer">
+              <div className="seller-pl-footer__summary">
+                Hiển thị <strong>{visibleItems.length}</strong> trong{' '}
+                <strong>{page.items.length}</strong> đơn hàng đã tải
+              </div>
+              {page.page.nextCursor ? (
+                <button
+                  className="seller-pl-btn-loadmore"
+                  type="button"
+                  onClick={() => void load(page.page.nextCursor!, true)}
+                >
+                  Tải thêm
+                </button>
+              ) : (
+                <span className="seller-pl-footer__complete">Đã tải hết danh sách đơn hàng</span>
+              )}
+            </footer>
           </div>
-          {page.page.nextCursor ? (
-            <button
-              className="seller-orders-more"
-              type="button"
-              onClick={() => void load(page.page.nextCursor!, true)}
-            >
-              Tải thêm
-            </button>
+          {selected ? (
+            <ActionDialog
+              action={selected.available.action}
+              available={selected.available}
+              pending={pendingAction}
+              onCancel={() => setSelected(null)}
+              onSubmit={(input) => void submitQueueAction(input)}
+            />
           ) : null}
         </>
       )}
@@ -277,21 +467,26 @@ function ActionDialog({
         </p>
         {reject ? (
           <>
-            <label>
-              Lý do
-              <select
-                value={reasonCode}
-                onChange={(event) =>
-                  setReasonCode(event.target.value as SellerOrderRejectionReason)
-                }
-              >
-                {available.reasonCodes.map((code) => (
-                  <option key={code} value={code}>
-                    {reasonLabels[code]}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <div className="seller-pl-field">
+              <label htmlFor="seller-order-rejection-reason">Lý do</label>
+              <div className="seller-pl-select-wrap">
+                <select
+                  id="seller-order-rejection-reason"
+                  className="seller-pl-select"
+                  value={reasonCode}
+                  onChange={(event) =>
+                    setReasonCode(event.target.value as SellerOrderRejectionReason)
+                  }
+                >
+                  {available.reasonCodes.map((code) => (
+                    <option key={code} value={code}>
+                      {reasonLabels[code]}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown className="seller-pl-select__arrow" size={16} aria-hidden="true" />
+              </div>
+            </div>
             {reasonCode === 'OTHER' ? (
               <label>
                 Mô tả lý do
@@ -315,7 +510,7 @@ function ActionDialog({
             className={
               reject ? 'seller-order-button seller-order-button--danger' : 'seller-order-button'
             }
-          disabled={pending || (reject && reasonCode === 'OTHER' && !reasonNote.trim())}
+            disabled={pending || (reject && reasonCode === 'OTHER' && !reasonNote.trim())}
             onClick={() =>
               onSubmit({
                 action,
@@ -438,22 +633,20 @@ export function SellerOrderDetailScreen({
         </div>
       ) : null}
       <div className="seller-order-progress">
-        {['PENDING_CONFIRMATION', 'READY_FOR_PICKUP', 'HANDED_OFF'].map(
-          (stateName) => (
-            <span
-              className={
-                order.summary.fulfillmentState === stateName
-                  ? 'is-current'
-                  : order.fulfillmentTimeline.some((event) => event.state === stateName)
-                    ? 'is-done'
-                    : ''
-              }
-              key={stateName}
-            >
-              {fulfillmentLabels[stateName]}
-            </span>
-          ),
-        )}
+        {['PENDING_CONFIRMATION', 'READY_FOR_PICKUP', 'HANDED_OFF'].map((stateName) => (
+          <span
+            className={
+              order.summary.fulfillmentState === stateName
+                ? 'is-current'
+                : order.fulfillmentTimeline.some((event) => event.state === stateName)
+                  ? 'is-done'
+                  : ''
+            }
+            key={stateName}
+          >
+            {fulfillmentLabels[stateName]}
+          </span>
+        ))}
       </div>
       <div className="seller-order-detail__grid">
         <div className="seller-order-detail__main">
@@ -467,7 +660,7 @@ export function SellerOrderDetailScreen({
                   <span className="seller-order-line__fallback">Ảnh</span>
                 )}
                 <div>
-                  <strong>{line.productName}</strong>
+                  <span className="font-medium">{line.productName}</span>
                   <span>
                     {line.variantName} · SKU {line.variantSku}
                   </span>
@@ -475,22 +668,23 @@ export function SellerOrderDetailScreen({
                     x{line.quantity} · {money(line.unitPriceMinor)}
                   </span>
                 </div>
-                <b>{money(line.payableLineMinor)}</b>
+                <span className="font-medium">{money(line.payableLineMinor)}</span>
               </div>
             ))}
           </section>
           <section className="seller-order-panel">
             <h2>Địa chỉ giao hàng</h2>
             <p>
-              <strong>{order.address.recipientName}</strong> · {order.address.phoneNumber}
+              <span className="font-medium">{order.address.recipientName}</span> ·{' '}
+              {order.address.phoneNumber}
             </p>
             <p>
               {order.address.addressLine}, {order.address.ward}, {order.address.district},{' '}
               {order.address.province}
             </p>
-              <p>
-                Dịch vụ: {order.shipping.service} · {order.shipping.provider}
-              </p>
+            <p>
+              Dịch vụ: {order.shipping.service} · {order.shipping.provider}
+            </p>
             {order.buyerNote ? <p>Ghi chú: {order.buyerNote}</p> : null}
           </section>
           <section className="seller-order-panel">
@@ -498,7 +692,7 @@ export function SellerOrderDetailScreen({
             <ol className="seller-order-timeline">
               {order.fulfillmentTimeline.map((event) => (
                 <li key={event.id}>
-                  <strong>{fulfillmentLabels[event.state]}</strong>
+                  <span className="font-medium">{fulfillmentLabels[event.state]}</span>
                   <span>
                     {new Date(event.occurredAt).toLocaleString('vi-VN')} ·{' '}
                     {event.actorType === 'SELLER' ? 'Shop' : event.actorType}
@@ -520,8 +714,8 @@ export function SellerOrderDetailScreen({
               <dt>Giảm giá</dt>
               <dd>-{money(order.voucherDiscountMinor)}</dd>
               <dt className="seller-order-total">
-                <b>Tổng cộng</b>
-                <b>{money(order.payableTotalMinor)}</b>
+                <span className="font-semibold">Tổng cộng</span>
+                <span className="font-semibold">{money(order.payableTotalMinor)}</span>
               </dt>
             </dl>
           </section>
@@ -530,7 +724,7 @@ export function SellerOrderDetailScreen({
             <p>
               {order.summary.deadline.confirmationOverdue ||
               order.summary.deadline.handoffOverdue ? (
-                <strong className="seller-order-overdue">Đã quá hạn</strong>
+                <span className="seller-order-overdue font-medium">Đã quá hạn</span>
               ) : (
                 'Trong hạn'
               )}
@@ -543,9 +737,16 @@ export function SellerOrderDetailScreen({
             <section className="seller-order-panel">
               <h2>Vận chuyển</h2>
               <p>
-                Mã vận đơn: <strong>{order.shipment.trackingCode}</strong>
+                Mã vận đơn: <span className="font-medium">{order.shipment.trackingCode}</span>
               </p>
-              <p>Trạng thái: {order.shipment.status === 'OUT_FOR_DELIVERY' ? 'Đang giao' : order.shipment.status === 'DELIVERED' ? 'Đã giao' : 'Chờ lấy hàng'}</p>
+              <p>
+                Trạng thái:{' '}
+                {order.shipment.status === 'OUT_FOR_DELIVERY'
+                  ? 'Đang giao'
+                  : order.shipment.status === 'DELIVERED'
+                    ? 'Đã giao'
+                    : 'Chờ lấy hàng'}
+              </p>
             </section>
           ) : null}
           {!printOnly && actions.length ? (

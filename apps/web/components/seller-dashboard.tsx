@@ -1,9 +1,14 @@
 'use client';
 
-import type { SellerAnalyticsGranularity, SellerDashboardResponse } from '@shopee-clone/contracts';
+import type {
+  SellerAnalyticsGranularity,
+  SellerDashboardResponse,
+  SellerOrderSummary,
+} from '@shopee-clone/contracts';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { fetchSellerDashboard } from '../lib/seller-analytics-api';
+import { fetchSellerOrders } from '../lib/seller-orders-api';
 import { RoleApiError } from '../lib/role-api';
 import { marketplaceMediaUrl } from '../lib/marketplace-media-url';
 import { DateTimeLocalPicker } from './datetime-local-picker';
@@ -73,6 +78,25 @@ function FaChartPie({ className }: { className?: string }) {
 const money = (value: number) => `${new Intl.NumberFormat('vi-VN').format(value)} đ`;
 const count = (value: number) => new Intl.NumberFormat('vi-VN').format(value);
 const isoDate = (date: Date) => date.toISOString().slice(0, 10);
+const orderStatusLabels: Record<string, string> = {
+  PENDING_CONFIRMATION: 'Chờ xác nhận',
+  AWAITING_PICKUP: 'Chờ lấy hàng',
+  SHIPPING: 'Đang giao',
+  DELIVERED: 'Đã giao',
+  CANCELLED: 'Đã hủy',
+  RETURN_REQUESTED: 'Yêu cầu trả hàng',
+  RETURNED: 'Đã trả hàng',
+  REFUNDED: 'Đã hoàn tiền',
+};
+
+function chartLabel(bucket: string, index: number): string {
+  const date = new Date(`${bucket}T00:00:00`);
+  if (!Number.isNaN(date.getTime())) {
+    const day = date.getDay();
+    return day === 0 ? 'CN' : `T${day + 1}`;
+  }
+  return `N${index + 1}`;
+}
 
 function defaultRange(): { from: string; to: string } {
   const to = new Date();
@@ -102,6 +126,7 @@ export function SellerDashboard() {
   const [to, setTo] = useState(initial.to);
   const [granularity, setGranularity] = useState<SellerAnalyticsGranularity>('DAY');
   const [data, setData] = useState<SellerDashboardResponse | null>(null);
+  const [recentOrders, setRecentOrders] = useState<SellerOrderSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -110,7 +135,15 @@ export function SellerDashboard() {
     setLoading(true);
     setError(null);
     try {
-      setData(await fetchSellerDashboard(authenticatedFetch, { from, to, granularity }));
+      const next = await fetchSellerDashboard(authenticatedFetch, { from, to, granularity });
+      setData(next);
+      try {
+        const orders = await fetchSellerOrders(authenticatedFetch, { status: 'ALL', limit: 5 });
+        setRecentOrders(orders.items.slice(0, 5));
+      } catch {
+        // Analytics remains useful when the order queue is temporarily unavailable.
+        setRecentOrders([]);
+      }
     } catch (cause) {
       setError(
         cause instanceof RoleApiError
@@ -143,8 +176,7 @@ export function SellerDashboard() {
 
   return (
     <section className="seller-dashboard-page">
-      {/* Header & Filter Card */}
-      <header className="seller-dashboard-heading">
+      <header className="seller-dashboard-heading seller-dashboard-heading--filters">
         <div className="seller-dashboard-heading__info">
           <p className="seller-dashboard-eyebrow">KÊNH NGƯỜI BÁN</p>
           <h1>Tổng quan shop</h1>
@@ -152,43 +184,48 @@ export function SellerDashboard() {
             Số liệu tiền hàng và vận hành theo múi giờ {data?.range.timeZone ?? 'Asia/Ho_Chi_Minh'}.
           </p>
         </div>
-        <div className="seller-dashboard-filters">
-          <div className="seller-dashboard-date">
-            <span className="seller-filter-label">Từ ngày</span>
-            <DateTimeLocalPicker
-              mode="date"
-              showClear={false}
-              aria-label="Từ ngày"
-              value={from}
-              onChange={setFrom}
-            />
+        <details className="seller-dashboard-filter-details">
+          <summary>Tuỳ chỉnh dữ liệu</summary>
+          <div className="seller-dashboard-filters">
+            <div className="seller-dashboard-date">
+              <span className="seller-filter-label">Từ ngày</span>
+              <DateTimeLocalPicker
+                mode="date"
+                showClear={false}
+                aria-label="Từ ngày"
+                value={from}
+                onChange={setFrom}
+              />
+            </div>
+            <div className="seller-dashboard-date">
+              <span className="seller-filter-label">Đến ngày</span>
+              <DateTimeLocalPicker
+                mode="date"
+                showClear={false}
+                aria-label="Đến ngày"
+                value={to}
+                onChange={setTo}
+              />
+            </div>
+            <label className="seller-dashboard-select-label">
+              <span className="seller-filter-label">Nhóm theo</span>
+              <select
+                value={granularity}
+                onChange={(event) =>
+                  setGranularity(event.target.value as SellerAnalyticsGranularity)
+                }
+                className="seller-filter-select"
+              >
+                <option value="DAY">Ngày</option>
+                <option value="WEEK">Tuần</option>
+                <option value="MONTH">Tháng</option>
+              </select>
+            </label>
+            <button type="button" className="seller-filter-btn" onClick={() => void load()}>
+              Cập nhật
+            </button>
           </div>
-          <div className="seller-dashboard-date">
-            <span className="seller-filter-label">Đến ngày</span>
-            <DateTimeLocalPicker
-              mode="date"
-              showClear={false}
-              aria-label="Đến ngày"
-              value={to}
-              onChange={setTo}
-            />
-          </div>
-          <label className="seller-dashboard-select-label">
-            <span className="seller-filter-label">Nhóm theo</span>
-            <select
-              value={granularity}
-              onChange={(event) => setGranularity(event.target.value as SellerAnalyticsGranularity)}
-              className="seller-filter-select"
-            >
-              <option value="DAY">Ngày</option>
-              <option value="WEEK">Tuần</option>
-              <option value="MONTH">Tháng</option>
-            </select>
-          </label>
-          <button type="button" className="seller-filter-btn" onClick={() => void load()}>
-            Cập nhật
-          </button>
-        </div>
+        </details>
       </header>
 
       {/* Loading & Error States */}
@@ -206,28 +243,27 @@ export function SellerDashboard() {
         </div>
       ) : data ? (
         <>
-          {/* Section: KPI Summary Cards */}
           <div className="seller-dashboard-kpis">
             <article className="seller-kpi-card seller-kpi-card--revenue">
               <div className="seller-kpi-card__head">
-                <span>Tiền hàng</span>
+                <span>Doanh thu</span>
                 <div className="seller-kpi-icon seller-kpi-icon--revenue" aria-hidden="true">
                   <FaMoneyBillWave />
                 </div>
               </div>
               <strong>{money(data.kpis.merchandiseRevenueMinor)}</strong>
-              <small>Không bao gồm phí ship/quyết toán</small>
+              <small className="seller-kpi-trend">Theo khoảng thời gian đã chọn</small>
             </article>
 
             <article className="seller-kpi-card seller-kpi-card--orders">
               <div className="seller-kpi-card__head">
-                <span>Đơn hợp lệ</span>
+                <span>Đơn hàng</span>
                 <div className="seller-kpi-icon seller-kpi-icon--orders" aria-hidden="true">
                   <FaClipboardCheck />
                 </div>
               </div>
               <strong>{count(data.kpis.eligibleOrderCount)}</strong>
-              <small>Đã xác nhận, đang giao hoặc đã giao</small>
+              <small className="seller-kpi-trend">Đơn hợp lệ trong kỳ</small>
             </article>
 
             <article className="seller-kpi-card seller-kpi-card--units">
@@ -238,7 +274,7 @@ export function SellerDashboard() {
                 </div>
               </div>
               <strong>{count(data.kpis.unitsSold)}</strong>
-              <small>Từ snapshot đơn hàng</small>
+              <small className="seller-kpi-trend">Sản phẩm đã bán trong kỳ</small>
             </article>
 
             <article className="seller-kpi-card seller-kpi-card--conversion">
@@ -249,22 +285,21 @@ export function SellerDashboard() {
                 </div>
               </div>
               <strong>Chưa có dữ liệu</strong>
-              <small>Chưa có tracking lượt truy cập</small>
+              <small className="seller-kpi-trend">Chưa có tracking lượt truy cập</small>
             </article>
           </div>
 
-          {/* Section: Chart & Top Selling Products */}
-          <div className="seller-dashboard-grid">
-            {/* Revenue Bar Chart */}
+          <div className="seller-dashboard-grid seller-dashboard-grid--overview">
             <section className="seller-dashboard-panel seller-dashboard-chart">
               <div className="seller-dashboard-panel-heading">
-                <h2>Doanh thu theo thời gian</h2>
-                <span className="seller-panel-badge">
-                  {data.range.from} → {data.range.to}
-                </span>
+                <div>
+                  <h2>Doanh thu</h2>
+                  <p>7 ngày gần nhất</p>
+                </div>
+                <span className="seller-panel-badge">Tuần này</span>
               </div>
               <div className="seller-dashboard-bars" aria-label="Biểu đồ doanh thu">
-                {data.timeSeries.map((point) => (
+                {data.timeSeries.slice(-7).map((point, index) => (
                   <div
                     className="seller-dashboard-bar"
                     key={point.bucket}
@@ -278,13 +313,74 @@ export function SellerDashboard() {
                         )}%`,
                       }}
                     />
-                    <small>{point.bucket.slice(5)}</small>
+                    <small>{chartLabel(point.bucket, index)}</small>
                   </div>
                 ))}
               </div>
             </section>
 
-            {/* Top 10 Best Sellers */}
+            <section className="seller-dashboard-goal-card" aria-label="Mục tiêu doanh thu">
+              <div>
+                <span className="seller-dashboard-goal-card__eyebrow">MỤC TIÊU THÁNG</span>
+                <h2>Tiến độ doanh thu</h2>
+              </div>
+              <div
+                className="seller-dashboard-goal-ring"
+                aria-label="Chưa có mục tiêu được thiết lập"
+              >
+                <strong>—</strong>
+                <span>Chưa thiết lập</span>
+              </div>
+              <p>Thiết lập mục tiêu tháng để theo dõi tiến độ doanh thu của shop.</p>
+            </section>
+          </div>
+
+          <section className="seller-dashboard-panel seller-dashboard-recent-orders">
+            <div className="seller-dashboard-panel-heading">
+              <h2>Đơn hàng gần đây</h2>
+              <Link href="/seller/orders" className="seller-dashboard-panel-link">
+                Xem tất cả
+              </Link>
+            </div>
+            {recentOrders.length ? (
+              <div
+                className="seller-dashboard-orders-table"
+                role="table"
+                aria-label="Đơn hàng gần đây"
+              >
+                <div
+                  className="seller-dashboard-orders-row seller-dashboard-orders-row--head"
+                  role="row"
+                >
+                  <span>Mã đơn</span>
+                  <span>Sản phẩm</span>
+                  <span>Giá trị</span>
+                  <span>Trạng thái</span>
+                </div>
+                {recentOrders.map((order) => (
+                  <Link
+                    className="seller-dashboard-orders-row"
+                    href={`/seller/orders/${order.orderReference}`}
+                    key={order.orderReference}
+                    role="row"
+                  >
+                    <span>#{order.orderReference.slice(0, 8).toUpperCase()}</span>
+                    <span>{order.lines[0]?.productName ?? `${order.lineCount} sản phẩm`}</span>
+                    <span>{money(order.payableTotalMinor)}</span>
+                    <span
+                      className={`seller-dashboard-order-status seller-dashboard-order-status--${order.status.toLowerCase()}`}
+                    >
+                      {orderStatusLabels[order.status] ?? order.status}
+                    </span>
+                  </Link>
+                ))}
+              </div>
+            ) : (
+              <p className="seller-dashboard-empty">Chưa có đơn hàng gần đây.</p>
+            )}
+          </section>
+
+          <div className="seller-dashboard-secondary-grid">
             <section className="seller-dashboard-panel">
               <div className="seller-dashboard-panel-heading">
                 <h2>Sản phẩm bán chạy</h2>
@@ -301,10 +397,10 @@ export function SellerDashboard() {
                             href={`/products/${item.productId}`}
                             className="seller-product-link"
                           >
-                            <strong>{item.productName}</strong>
+                            <span className="font-medium">{item.productName}</span>
                           </Link>
                         ) : (
-                          <strong>{item.productName}</strong>
+                          <span className="font-medium">{item.productName}</span>
                         )}
                         <span>
                           {count(item.unitsSold)} sản phẩm · {money(item.merchandiseRevenueMinor)}
@@ -319,38 +415,37 @@ export function SellerDashboard() {
                 </p>
               )}
             </section>
-          </div>
 
-          {/* Section: Low Stock Warning */}
-          <section className="seller-dashboard-panel">
-            <div className="seller-dashboard-panel-heading">
-              <h2>Sắp hết hàng</h2>
-              <span className="seller-panel-badge">Ngưỡng ≤ {data.lowStock.threshold}</span>
-            </div>
-            {data.lowStock.items.length ? (
-              <div className="seller-dashboard-low-stock">
-                {data.lowStock.items.map((item) => (
-                  <div key={item.variantId} className="seller-low-stock-item">
-                    <SellerDashboardImage src={item.productImageUrl} alt={item.productName} />
-                    <div className="seller-product-item-info">
-                      <Link
-                        href={`/seller/inventory?productId=${item.productId}`}
-                        className="seller-product-link"
-                      >
-                        <strong>{item.productName}</strong>
-                      </Link>
-                      <span>
-                        {item.variantName} · {item.sku}
-                      </span>
-                    </div>
-                    <b className="seller-stock-badge">{count(item.availableQuantity)}</b>
-                  </div>
-                ))}
+            <section className="seller-dashboard-panel">
+              <div className="seller-dashboard-panel-heading">
+                <h2>Sắp hết hàng</h2>
+                <span className="seller-panel-badge">Ngưỡng ≤ {data.lowStock.threshold}</span>
               </div>
-            ) : (
-              <p className="seller-dashboard-empty">Không có biến thể nào sắp hết hàng.</p>
-            )}
-          </section>
+              {data.lowStock.items.length ? (
+                <div className="seller-dashboard-low-stock">
+                  {data.lowStock.items.map((item) => (
+                    <div key={item.variantId} className="seller-low-stock-item">
+                      <SellerDashboardImage src={item.productImageUrl} alt={item.productName} />
+                      <div className="seller-product-item-info">
+                        <Link
+                          href={`/seller/inventory?productId=${item.productId}`}
+                          className="seller-product-link"
+                        >
+                          <span className="font-medium">{item.productName}</span>
+                        </Link>
+                        <span>
+                          {item.variantName} · {item.sku}
+                        </span>
+                      </div>
+                      <b className="seller-stock-badge">{count(item.availableQuantity)}</b>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="seller-dashboard-empty">Không có biến thể nào sắp hết hàng.</p>
+              )}
+            </section>
+          </div>
         </>
       ) : null}
     </section>

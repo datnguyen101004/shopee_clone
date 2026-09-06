@@ -4,6 +4,7 @@ import type { AdminShopSummary } from '@shopee-clone/contracts';
 import { useCallback, useEffect, useState } from 'react';
 
 import { useAuthSession } from '../../../../components/auth-session-provider';
+import { AdminEntityLink } from '../../../../components/admin/admin-entity-link';
 import {
   adminErrorMessage,
   executeAdminShopAction,
@@ -118,21 +119,13 @@ export default function AdminShopsPage() {
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-      <div>
-        <h1 style={{ fontSize: '24px', fontWeight: 700, color: '#111827' }}>
-          Quản lý Cửa hàng (Shops)
-        </h1>
-        <p style={{ color: '#6b7280', fontSize: '14px', marginTop: '4px' }}>
-          Xét duyệt hồ sơ đăng ký mở shop, quản lý trạng thái hoạt động và tạm khóa vi phạm.
-        </p>
-      </div>
-
+    <div className="admin-page admin-shops-page">
       {/* Filter Bar */}
       <div
+        className="admin-toolbar admin-shops-toolbar"
         style={{
           background: '#ffffff',
-          borderRadius: '12px',
+          borderRadius: 'var(--sc-radius-card, 2px)',
           padding: '16px 20px',
           boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
           display: 'flex',
@@ -143,10 +136,12 @@ export default function AdminShopsPage() {
         }}
       >
         <form
+          className="admin-toolbar__search"
           onSubmit={handleSearchSubmit}
           style={{ display: 'flex', gap: '10px', flex: 1, minWidth: '280px' }}
         >
           <input
+            className="admin-control admin-toolbar__search-input"
             type="text"
             placeholder="Tìm theo tên shop hoặc slug..."
             value={search}
@@ -155,7 +150,7 @@ export default function AdminShopsPage() {
               flex: 1,
               padding: '8px 12px',
               border: '1px solid #d1d5db',
-              borderRadius: '8px',
+              borderRadius: 'var(--sc-radius-button, 2px)',
               fontSize: '14px',
             }}
           />
@@ -171,12 +166,12 @@ export default function AdminShopsPage() {
           </button>
         </form>
 
-        <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-          <div>
-            <label style={{ fontSize: '13px', color: '#4b5563', marginRight: '6px' }}>
-              Trạng thái bán:
-            </label>
+        <div className="admin-toolbar__filters">
+          <div className="admin-field">
+            <label htmlFor="admin-shop-status">Trạng thái bán:</label>
             <select
+              id="admin-shop-status"
+              className="admin-control"
               value={statusFilter}
               onChange={(e) =>
                 setStatusFilter(e.target.value as 'ALL' | 'ACTIVE' | 'INACTIVE' | 'SUSPENDED')
@@ -195,11 +190,11 @@ export default function AdminShopsPage() {
             </select>
           </div>
 
-          <div>
-            <label style={{ fontSize: '13px', color: '#4b5563', marginRight: '6px' }}>
-              Xét duyệt:
-            </label>
+          <div className="admin-field">
+            <label htmlFor="admin-shop-onboarding">Xét duyệt:</label>
             <select
+              id="admin-shop-onboarding"
+              className="admin-control"
               value={onboardingFilter}
               onChange={(e) =>
                 setOnboardingFilter(
@@ -224,26 +219,24 @@ export default function AdminShopsPage() {
 
       {/* Shops Table */}
       <div
+        className="admin-table-card admin-entity-list-card"
         style={{
           background: '#ffffff',
-          borderRadius: '12px',
+          borderRadius: 'var(--sc-radius-card, 2px)',
           boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
           overflow: 'hidden',
           border: '1px solid #f3f4f6',
         }}
       >
         {loading ? (
-          <div style={{ padding: '32px', textAlign: 'center', color: '#6b7280' }}>
-            Đang tải danh sách shop...
-          </div>
+          <div className="admin-state-card__message">Đang tải danh sách shop...</div>
         ) : error ? (
-          <div style={{ padding: '24px', color: '#ef4444' }}>{error}</div>
+          <div className="admin-state-card__message admin-state-card__message--error">{error}</div>
         ) : shops.length === 0 ? (
-          <div style={{ padding: '32px', textAlign: 'center', color: '#6b7280' }}>
-            Không tìm thấy cửa hàng nào phù hợp.
-          </div>
+          <div className="admin-state-card__message">Không tìm thấy cửa hàng nào phù hợp.</div>
         ) : (
           <table
+            className="admin-data-table"
             style={{
               width: '100%',
               borderCollapse: 'collapse',
@@ -270,17 +263,22 @@ export default function AdminShopsPage() {
             </thead>
             <tbody>
               {shops.map((s) => (
-                <tr key={s.id} style={{ borderBottom: '1px solid #f3f4f6' }}>
+                <tr key={s.id}>
                   <td style={{ padding: '14px 16px' }}>
-                    <div style={{ fontWeight: 600, color: '#111827' }}>{s.name}</div>
-                    <div style={{ fontSize: '13px', color: '#6b7280' }}>/shops/{s.slug}</div>
+                    <AdminEntityLink
+                      href={`/admin/shops/${s.id}`}
+                      name={s.name}
+                      imageUrl={s.logoUrl}
+                      meta={`/${s.slug}`}
+                    />
                   </td>
                   <td style={{ padding: '14px 16px' }}>
                     <span
+                      className={`admin-badge ${s.status === 'ACTIVE' ? 'admin-badge--success' : s.status === 'SUSPENDED' ? 'admin-badge--danger' : 'admin-badge--neutral'}`}
                       style={{
                         display: 'inline-block',
                         padding: '3px 10px',
-                        borderRadius: '12px',
+                        borderRadius: 'var(--sc-radius-card, 2px)',
                         fontSize: '12px',
                         fontWeight: 600,
                         background:
@@ -306,10 +304,11 @@ export default function AdminShopsPage() {
                   </td>
                   <td style={{ padding: '14px 16px' }}>
                     <span
+                      className={`admin-badge ${s.onboardingStatus === 'APPROVED' ? 'admin-badge--success' : s.onboardingStatus === 'REJECTED' ? 'admin-badge--danger' : 'admin-badge--warning'}`}
                       style={{
                         display: 'inline-block',
                         padding: '3px 10px',
-                        borderRadius: '12px',
+                        borderRadius: 'var(--sc-radius-card, 2px)',
                         fontSize: '12px',
                         fontWeight: 600,
                         background:
@@ -347,12 +346,12 @@ export default function AdminShopsPage() {
                     {new Date(s.updatedAt).toLocaleDateString('vi-VN')}
                   </td>
                   <td style={{ padding: '14px 16px', textAlign: 'right' }}>
-                    <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                    <div className="admin-table-actions">
                       {s.onboardingStatus === 'PENDING_APPROVAL' && (
                         <>
                           <button
                             onClick={() => openModal(s, 'APPROVE')}
-                            className="admin-btn-success-outline"
+                            className="admin-btn admin-btn-success-outline"
                             style={{
                               borderRadius: '6px',
                               cursor: 'pointer',
@@ -363,7 +362,7 @@ export default function AdminShopsPage() {
                           </button>
                           <button
                             onClick={() => openModal(s, 'REJECT')}
-                            className="admin-btn-danger-outline"
+                            className="admin-btn admin-btn-danger-outline"
                             style={{
                               borderRadius: '6px',
                               cursor: 'pointer',
@@ -380,7 +379,7 @@ export default function AdminShopsPage() {
                           {s.status === 'ACTIVE' ? (
                             <button
                               onClick={() => openModal(s, 'SUSPEND')}
-                              className="admin-btn-danger-outline"
+                              className="admin-btn admin-btn-danger-outline"
                               style={{
                                 borderRadius: '6px',
                                 cursor: 'pointer',
@@ -392,7 +391,7 @@ export default function AdminShopsPage() {
                           ) : (
                             <button
                               onClick={() => openModal(s, 'RESTORE')}
-                              className="admin-btn-success-outline"
+                              className="admin-btn admin-btn-success-outline"
                               style={{
                                 borderRadius: '6px',
                                 cursor: 'pointer',
@@ -416,6 +415,7 @@ export default function AdminShopsPage() {
       {/* Confirmation Modal */}
       {actionType && selectedShop && (
         <div
+          className="admin-dialog-backdrop"
           style={{
             position: 'fixed',
             inset: 0,
@@ -427,9 +427,10 @@ export default function AdminShopsPage() {
           }}
         >
           <div
+            className="admin-dialog"
             style={{
               background: '#ffffff',
-              borderRadius: '12px',
+              borderRadius: 'var(--sc-radius-card, 2px)',
               padding: '24px',
               maxWidth: '480px',
               width: '90%',
@@ -465,9 +466,10 @@ export default function AdminShopsPage() {
               </p>
             ) : null}
 
-            <form onSubmit={handleActionSubmit}>
-              <div style={{ marginBottom: '16px' }}>
+            <form className="admin-dialog__form" onSubmit={handleActionSubmit}>
+              <div className="admin-field">
                 <label
+                  htmlFor="admin-shop-action-reason"
                   style={{
                     display: 'block',
                     fontSize: '13px',
@@ -479,6 +481,8 @@ export default function AdminShopsPage() {
                   Lý do quyết định (Bắt buộc, 8 - 240 ký tự):
                 </label>
                 <textarea
+                  id="admin-shop-action-reason"
+                  className="admin-control admin-control--textarea"
                   rows={3}
                   value={reason}
                   onChange={(e) => setReason(e.target.value)}
@@ -486,7 +490,7 @@ export default function AdminShopsPage() {
                   style={{
                     width: '100%',
                     padding: '8px 12px',
-                    borderRadius: '8px',
+                    borderRadius: 'var(--sc-radius-button, 2px)',
                     border: '1px solid #d1d5db',
                     fontSize: '14px',
                   }}
@@ -511,17 +515,18 @@ export default function AdminShopsPage() {
                 </div>
               )}
 
-              <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+              <div className="admin-dialog__actions">
                 <button
                   type="button"
                   onClick={closeModal}
                   disabled={submitting}
+                  className="admin-btn admin-btn-secondary"
                   style={{
                     padding: '8px 16px',
                     background: '#f3f4f6',
                     color: '#4b5563',
                     border: 'none',
-                    borderRadius: '8px',
+                    borderRadius: 'var(--sc-radius-button, 2px)',
                     fontWeight: 600,
                     fontSize: '14px',
                     cursor: 'pointer',
@@ -532,16 +537,9 @@ export default function AdminShopsPage() {
                 <button
                   type="submit"
                   disabled={submitting}
+                  className={`admin-btn ${actionType === 'SUSPEND' || actionType === 'REJECT' ? 'admin-btn-danger' : 'admin-btn-primary'}`}
                   style={{
                     padding: '8px 16px',
-                    background:
-                      actionType === 'SUSPEND' || actionType === 'REJECT' ? '#dc2626' : '#ee4d2d',
-                    color: '#ffffff',
-                    border: 'none',
-                    borderRadius: '8px',
-                    fontWeight: 600,
-                    fontSize: '14px',
-                    cursor: 'pointer',
                   }}
                 >
                   {submitting ? 'Đang xử lý...' : 'Xác nhận'}

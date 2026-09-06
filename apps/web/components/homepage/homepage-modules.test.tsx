@@ -148,4 +148,33 @@ describe('HomepageModules', () => {
       'product-card__image--fallback',
     );
   });
+
+  it('unifies layout composition with StorefrontContainer, StorefrontSection, and SectionHeader', () => {
+    const { container } = render(<HomepageModules modules={modules} />);
+
+    // Container
+    const flowContainer = container.querySelector('.sc-storefront-container.home-flow');
+    expect(flowContainer).toBeInTheDocument();
+
+    // Sections
+    const sections = container.querySelectorAll('.sc-storefront-section');
+    expect(sections).toHaveLength(6);
+
+    // Section headers
+    const sectionHeaders = container.querySelectorAll('.sc-section-header');
+    expect(sectionHeaders).toHaveLength(5); // categories, flash-sale, top-selling, mall, daily-recommendations
+
+    // Check accessibility binding between section and heading id
+    sections.forEach((sec) => {
+      const labelledBy = sec.getAttribute('aria-labelledby');
+      expect(labelledBy).toBeTruthy();
+      expect(container.querySelector(`#${labelledBy}`)).toBeInTheDocument();
+    });
+
+    // Check flash badge inside flash-sale section header
+    const flashSection = container.querySelector('[data-module-type="flash-sale"]');
+    expect(flashSection).toBeInTheDocument();
+    expect(flashSection?.querySelector('.homepage-section-title--flash')).toBeInTheDocument();
+    expect(flashSection?.textContent).toContain('FLASH');
+  });
 });

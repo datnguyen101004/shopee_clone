@@ -1,7 +1,7 @@
 'use client';
 
 import { CHECKOUT_NOTE_MAX_LENGTH, SHIPPING_SERVICES } from '@shopee-clone/contracts';
-import { Container } from '@shopee-clone/ui';
+import { StorefrontContainer } from '@shopee-clone/ui';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useRef, useState } from 'react';
@@ -45,35 +45,35 @@ export function CheckoutScreen() {
 
   if (auth.state.status === 'guest' || cart.state.status === 'unauthenticated') {
     return (
-      <Container className="checkout-page">
+      <StorefrontContainer className="checkout-page">
         <section className="checkout-state">
           <h1>Đăng nhập để thanh toán</h1>
           <p>Đơn hàng chỉ được tạo cho tài khoản đã đăng nhập.</p>
           <Link href="/login?returnTo=%2Fcheckout">Đăng nhập</Link>
         </section>
-      </Container>
+      </StorefrontContainer>
     );
   }
 
   if (auth.state.status === 'loading' || cart.state.status === 'loading') {
     return (
-      <Container className="checkout-page" aria-busy="true">
+      <StorefrontContainer className="checkout-page" aria-busy="true">
         <section className="checkout-state" role="status">
           Đang tải thông tin thanh toán…
         </section>
-      </Container>
+      </StorefrontContainer>
     );
   }
 
   if (!currentCart || currentCart.summary.selectedValidLineCount === 0) {
     return (
-      <Container className="checkout-page">
+      <StorefrontContainer className="checkout-page">
         <section className="checkout-state">
           <h1>Không có sản phẩm để thanh toán</h1>
           <p>Hãy chọn ít nhất một sản phẩm hợp lệ trong giỏ hàng.</p>
           <Link href="/cart">Quay lại giỏ hàng</Link>
         </section>
-      </Container>
+      </StorefrontContainer>
     );
   }
 
@@ -171,7 +171,7 @@ export function CheckoutScreen() {
   }
 
   return (
-    <Container className="checkout-page">
+    <StorefrontContainer className="checkout-page">
       <header className="checkout-heading">
         <div>
           <p>THANH TOÁN AN TOÀN</p>
@@ -203,9 +203,9 @@ export function CheckoutScreen() {
             </label>
             {preview ? (
               <address>
-                <strong>
+                <span className="font-medium">
                   {preview.address.recipientName} · {preview.address.phoneNumber}
-                </strong>
+                </span>
                 <span>
                   {preview.address.addressLine}, {preview.address.ward}, {preview.address.district},{' '}
                   {preview.address.province}
@@ -236,7 +236,7 @@ export function CheckoutScreen() {
           <section className="checkout-card checkout-shop" key={shop.shop.id}>
             <header>
               <span>Shop</span>
-              <strong>{shop.shop.name}</strong>
+              <span className="font-medium">{shop.shop.name}</span>
               <ChatNowButton shopId={shop.shop.id} ownerUserId={shop.shop.ownerUserId} />
             </header>
             <div className="checkout-lines">
@@ -248,7 +248,7 @@ export function CheckoutScreen() {
                     <span className="checkout-line-placeholder">S</span>
                   )}
                   <div>
-                    <strong>{line.productName}</strong>
+                    <span className="font-medium">{line.productName}</span>
                     <small>
                       Phân loại: {line.variantName} · x{line.quantity}
                     </small>
@@ -259,7 +259,7 @@ export function CheckoutScreen() {
                         ? money(line.listUnitPriceMinor)
                         : ''}
                     </del>
-                    <strong>{money(line.payableMerchandiseMinor)}</strong>
+                    <span className="font-medium">{money(line.payableMerchandiseMinor)}</span>
                   </div>
                 </article>
               ))}
@@ -306,7 +306,7 @@ export function CheckoutScreen() {
             </div>
             <footer>
               <span>Tổng shop</span>
-              <strong>{money(shop.payableTotalMinor)}</strong>
+              <span className="font-semibold">{money(shop.payableTotalMinor)}</span>
             </footer>
           </section>
         ))}
@@ -323,7 +323,7 @@ export function CheckoutScreen() {
               key={`${voucher.slot}-${voucher.shopId ?? 'platform'}`}
               className={voucher.status === 'APPLIED' ? 'is-applied' : 'is-rejected'}
             >
-              <strong>{voucher.code}</strong> ·{' '}
+              <span className="font-medium">{voucher.code}</span> ·{' '}
               {voucher.status === 'APPLIED'
                 ? `Đã giảm ${money(voucher.discountMinor)}`
                 : 'Không còn đủ điều kiện'}
@@ -395,13 +395,13 @@ export function CheckoutScreen() {
       <aside className="checkout-total" aria-label="Tổng thanh toán">
         <div>
           <span>Tổng tiền hàng</span>
-          <strong>{preview ? money(preview.summary.merchandiseSubtotalMinor) : '—'}</strong>
+          <span>{preview ? money(preview.summary.merchandiseSubtotalMinor) : '—'}</span>
           <span>Phí vận chuyển</span>
-          <strong>{preview ? money(preview.summary.shippingPayableMinor) : '—'}</strong>
+          <span>{preview ? money(preview.summary.shippingPayableMinor) : '—'}</span>
           <span>Voucher giảm</span>
-          <strong>{preview ? `−${money(preview.summary.voucherDiscountMinor)}` : '—'}</strong>
+          <span>{preview ? `−${money(preview.summary.voucherDiscountMinor)}` : '—'}</span>
           <span>Tổng thanh toán</span>
-          <b>{preview ? money(preview.summary.payableTotalMinor) : 'Đang tính…'}</b>
+          <span className="checkout-payable-total font-semibold">{preview ? money(preview.summary.payableTotalMinor) : 'Đang tính…'}</span>
         </div>
         <button type="button" disabled={!canSubmit || submitting} onClick={() => void submit()}>
           {submitting
@@ -413,6 +413,6 @@ export function CheckoutScreen() {
               : 'Đặt hàng'}
         </button>
       </aside>
-    </Container>
+    </StorefrontContainer>
   );
 }

@@ -109,6 +109,31 @@ export class AdminShopActionDto implements AdminShopActionRequest {
   reason!: string;
 }
 
+export class AdminProductListQueryDto {
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(ADMIN_MAX_LIMIT)
+  limit?: number = ADMIN_DEFAULT_LIMIT;
+
+  @IsOptional()
+  @IsString()
+  cursor?: string;
+
+  @IsOptional()
+  @IsString()
+  q?: string;
+
+  @IsOptional()
+  @IsIn(['DRAFT', 'ACTIVE', 'HIDDEN', 'ARCHIVED'])
+  status?: 'DRAFT' | 'ACTIVE' | 'HIDDEN' | 'ARCHIVED';
+
+  @IsOptional()
+  @IsIn(['ACTIVE', 'SUSPENDED'])
+  moderationStatus?: 'ACTIVE' | 'SUSPENDED';
+}
+
 export class CreateAdminCategoryDto implements CreateAdminCategoryRequest {
   @IsString()
   @MinLength(2)
@@ -206,14 +231,45 @@ export class CreateAdminBannerDto implements CreateAdminBannerRequest {
   @MaxLength(120)
   altText!: string;
 
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
-  href!: string;
+  href?: string;
 
   @IsString()
   @IsNotEmpty()
   @MaxLength(50)
   theme!: string;
+
+  @IsOptional()
+  @IsIn(['CAMPAIGN', 'PRODUCT', 'SHOP', 'CATEGORY', 'SEARCH', 'URL'])
+  targetType?: 'CAMPAIGN' | 'PRODUCT' | 'SHOP' | 'CATEGORY' | 'SEARCH' | 'URL';
+
+  @IsOptional()
+  @IsUUID()
+  targetId?: string | null;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  targetQuery?: string | null;
+
+  @IsOptional()
+  @IsString()
+  displayFrom?: string | null;
+
+  @IsOptional()
+  @IsString()
+  displayUntil?: string | null;
+
+  @IsOptional()
+  @IsBoolean()
+  isEnabled?: boolean;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  priority?: number;
 
   @IsOptional()
   @Type(() => Number)
@@ -255,6 +311,37 @@ export class UpdateAdminBannerDto implements UpdateAdminBannerRequest {
   @IsString()
   @MaxLength(50)
   theme?: string;
+
+  @IsOptional()
+  @IsIn(['CAMPAIGN', 'PRODUCT', 'SHOP', 'CATEGORY', 'SEARCH', 'URL'])
+  targetType?: 'CAMPAIGN' | 'PRODUCT' | 'SHOP' | 'CATEGORY' | 'SEARCH' | 'URL';
+
+  @IsOptional()
+  @IsUUID()
+  targetId?: string | null;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  targetQuery?: string | null;
+
+  @IsOptional()
+  @IsString()
+  displayFrom?: string | null;
+
+  @IsOptional()
+  @IsString()
+  displayUntil?: string | null;
+
+  @IsOptional()
+  @IsBoolean()
+  isEnabled?: boolean;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  priority?: number;
 
   @IsOptional()
   @Type(() => Number)

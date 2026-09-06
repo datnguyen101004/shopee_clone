@@ -104,11 +104,9 @@ describe('SellerShopManagement', () => {
     expect(screen.getByText(/không được bán/)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Mở bán' })).not.toBeInTheDocument();
     expect(screen.getByTestId('seller-shop-profile-view')).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'Cập nhật hồ sơ' }));
-    expect(
-      screen.getAllByLabelText('Địa chỉ chi tiết').map((input) => input.getAttribute('value')),
-    ).toEqual(['12 Nguyễn Huệ', '12 Nguyễn Huệ']);
-    await userEvent.click(screen.getByRole('button', { name: 'Hủy' }));
+    expect(screen.getByRole('button', { name: 'Lưu hồ sơ' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Địa chỉ cụ thể')).toHaveValue('12 Nguyễn Huệ');
+    expect(screen.queryByRole('switch', { name: 'Trạng thái hoạt động' })).not.toBeInTheDocument();
     expect(window.localStorage.setItem).not.toHaveBeenCalled();
   });
 
@@ -154,8 +152,9 @@ describe('SellerShopManagement', () => {
     });
     render(<SellerShopManagement surface="buyer-registration" />);
     expect(await screen.findByText(/Lý do từ chối/)).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'Cập nhật hồ sơ' }));
-    await userEvent.click(screen.getByRole('button', { name: 'Sửa và gửi lại đăng ký' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Lưu hồ sơ' }));
+    expect(screen.getByRole('dialog')).toHaveTextContent('Bạn có chắc chắn muốn thay đổi');
+    await userEvent.click(screen.getByRole('button', { name: 'Xác nhận thay đổi' }));
     expect(updateRegistration).toHaveBeenCalledTimes(1);
     expect(screen.queryByRole('button', { name: 'Mở bán' })).not.toBeInTheDocument();
   });
@@ -187,22 +186,13 @@ describe('SellerShopManagement', () => {
     render(<SellerShopManagement surface="seller-management" />);
     await screen.findByRole('heading', { name: 'Legacy Shop' });
 
-    await userEvent.click(screen.getByRole('button', { name: 'Cập nhật hồ sơ' }));
-
-    expect(screen.getAllByLabelText('Người nhận')).toEqual(
-      expect.arrayContaining([expect.objectContaining({ value: defaultAddress.recipientName })]),
-    );
-    expect(
-      screen.getAllByLabelText('Địa chỉ chi tiết').map((input) => input.getAttribute('value')),
-    ).toEqual([defaultAddress.addressLine, defaultAddress.addressLine]);
-
     fireEvent.submit(screen.getByRole('button', { name: 'Lưu hồ sơ' }).closest('form')!);
 
     expect(await screen.findByRole('status')).toHaveTextContent('điện thoại liên hệ');
     expect(updateShop).not.toHaveBeenCalled();
   });
 
-  it('pauses and resumes an approved shop without changing seller access', async () => {
+  it('edits the approved shop status after confirming the profile changes', async () => {
     const approved = {
       id: '00000000-0000-4000-8000-000000000104',
       slug: 'approved-shop',
@@ -230,16 +220,19 @@ describe('SellerShopManagement', () => {
     accountRoles = ['buyer', 'seller'];
     render(<SellerShopManagement surface="seller-management" />);
 
-    const pauseButton = await screen.findByRole('button', { name: 'Tạm ngừng bán' });
-    await userEvent.click(pauseButton);
-    expect(updateShop).toHaveBeenNthCalledWith(1, expect.anything(), { status: 'inactive' });
-    expect(await screen.findByRole('button', { name: 'Mở bán' })).toBeInTheDocument();
-    expect(screen.getByText('Shop đã tạm ngừng bán.')).toBeInTheDocument();
-
-    await userEvent.click(screen.getByRole('button', { name: 'Mở bán' }));
-    expect(updateShop).toHaveBeenNthCalledWith(2, expect.anything(), { status: 'active' });
-    expect(await screen.findByRole('button', { name: 'Tạm ngừng bán' })).toBeInTheDocument();
-    expect(screen.getByText('Shop đã mở bán.')).toBeInTheDocument();
+    const statusToggle = await screen.findByRole('switch', { name: 'Trạng thái hoạt động' });
+    expect(statusToggle).toHaveAttribute('aria-checked', 'true');
+    await userEvent.click(statusToggle);
+    expect(statusToggle).toHaveAttribute('aria-checked', 'false');
+    await userEvent.click(screen.getByRole('button', { name: 'Lưu hồ sơ' }));
+    expect(updateShop).not.toHaveBeenCalled();
+    await userEvent.click(screen.getByRole('button', { name: 'Xác nhận thay đổi' }));
+    expect(updateShop).toHaveBeenNthCalledWith(
+      1,
+      expect.anything(),
+      expect.objectContaining({ status: 'inactive' }),
+    );
+    expect(screen.getByText('Đã cập nhật hồ sơ shop.')).toBeInTheDocument();
   });
   it('recovers from a duplicate registration response without losing the form', async () => {
     fetchWorkspace.mockResolvedValue({ shop: null, defaultAddress });
@@ -257,6 +250,7 @@ describe('SellerShopManagement', () => {
     );
     fireEvent.submit(form);
 
+    await userEvent.click(screen.getByRole('button', { name: 'Xác nhận thay đổi' }));
     expect(await screen.findByRole('status')).toHaveTextContent('Slug');
     expect(createShop).toHaveBeenCalledTimes(1);
   });

@@ -2,7 +2,7 @@ import { BuyerOrderDetailScreen } from '../../../../../components/orders/buyer-o
 
 export default async function BuyerOrderDetailPage({
   params,
-}: PageProps<'/account/orders/[orderReference]'>) {
+}: { params: Promise<{ orderReference: string }> }) {
   const { orderReference } = await params;
   return <BuyerOrderDetailScreen orderReference={orderReference} />;
 }

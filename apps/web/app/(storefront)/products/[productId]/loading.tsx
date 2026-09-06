@@ -1,8 +1,8 @@
-import { Container } from '@shopee-clone/ui';
+import { StorefrontContainer } from '@shopee-clone/ui';
 
 export default function ProductDetailLoading() {
   return (
-    <Container
+    <StorefrontContainer
       className="product-detail-page product-detail-loading"
       aria-busy="true"
       aria-label="Đang tải sản phẩm"
@@ -10,6 +10,6 @@ export default function ProductDetailLoading() {
       <span />
       <span />
       <span />
-    </Container>
+    </StorefrontContainer>
   );
 }

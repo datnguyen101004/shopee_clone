@@ -64,6 +64,8 @@ export interface AdminDashboardResponse {
 
 export interface AdminUserSummary {
   id: string;
+  /** Reserved for profile media when the user profile service exposes it. */
+  avatarUrl?: string | null;
   email: string;
   displayName: string;
   phoneNumber: string | null;
@@ -93,6 +95,7 @@ export interface AdminUserActionRequest {
 
 export interface AdminShopSummary {
   id: string;
+  logoUrl?: string | null;
   ownerUserId: string;
   slug: string;
   name: string;
@@ -170,9 +173,20 @@ export interface AdminBannerSummary {
   description?: string;
   imageUrl: string | null;
   altText: string;
-  href: string;
+  href?: string;
   theme: string;
-  sortOrder: number;
+  targetType?: 'CAMPAIGN' | 'PRODUCT' | 'SHOP' | 'CATEGORY' | 'SEARCH' | 'URL';
+  targetId?: string | null;
+  targetName?: string;
+  targetImageUrl?: string | null;
+  targetQuery?: string | null;
+  targetAvailable?: boolean;
+  displayFrom?: string | null;
+  displayUntil?: string | null;
+  isEnabled?: boolean;
+  priority?: number;
+  /** Legacy alias retained during the expand/contract rollout. */
+  sortOrder?: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -187,8 +201,15 @@ export interface CreateAdminBannerRequest {
   description?: string;
   imageUrl?: string | null;
   altText: string;
-  href: string;
+  href?: string;
   theme: string;
+  targetType?: 'CAMPAIGN' | 'PRODUCT' | 'SHOP' | 'CATEGORY' | 'SEARCH' | 'URL';
+  targetId?: string | null;
+  targetQuery?: string | null;
+  displayFrom?: string | null;
+  displayUntil?: string | null;
+  isEnabled?: boolean;
+  priority?: number;
   sortOrder?: number;
 }
 
@@ -200,6 +221,13 @@ export interface UpdateAdminBannerRequest {
   altText?: string;
   href?: string;
   theme?: string;
+  targetType?: 'CAMPAIGN' | 'PRODUCT' | 'SHOP' | 'CATEGORY' | 'SEARCH' | 'URL';
+  targetId?: string | null;
+  targetQuery?: string | null;
+  displayFrom?: string | null;
+  displayUntil?: string | null;
+  isEnabled?: boolean;
+  priority?: number;
   sortOrder?: number;
 }
 
@@ -241,6 +269,8 @@ export interface AdminPrivilegedAuditEventSummary {
   actorDisplayName?: string;
   targetType: AdminPrivilegedTargetType;
   targetId: string;
+  targetName?: string;
+  targetImageUrl?: string | null;
   action: AdminPrivilegedAction;
   reason: string;
   beforeSummary: Record<string, unknown> | null;
@@ -300,6 +330,40 @@ export interface AdminProductDetail {
 export interface AdminProductLookupResponse {
   adminVersion: typeof ADMIN_VERSION;
   product: AdminProductDetail | null;
+}
+
+export interface AdminProductListItem {
+  id: string;
+  shopId?: string;
+  categoryId?: string;
+  shopName: string;
+  shopSlug: string;
+  categoryName: string;
+  categorySlug: string;
+  slug: string;
+  name: string;
+  status: 'DRAFT' | 'ACTIVE' | 'HIDDEN' | 'ARCHIVED';
+  moderationStatus: 'ACTIVE' | 'SUSPENDED';
+  primaryImageUrl: string | null;
+  minPrice: number | null;
+  maxPrice: number | null;
+  stockQuantity: number;
+  variantCount: number;
+  soldCount: number;
+  updatedAt: string;
+}
+
+export interface AdminProductListQuery {
+  limit?: number;
+  cursor?: string;
+  q?: string;
+  status?: 'DRAFT' | 'ACTIVE' | 'HIDDEN' | 'ARCHIVED';
+  moderationStatus?: 'ACTIVE' | 'SUSPENDED';
+}
+
+export interface AdminProductListResponse {
+  items: AdminProductListItem[];
+  nextCursor: string | null;
 }
 
 export interface AdminProductActionInput {

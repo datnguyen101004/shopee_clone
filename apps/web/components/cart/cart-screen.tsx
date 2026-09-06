@@ -8,7 +8,7 @@ import type {
   PricingQuoteShop,
 } from '@shopee-clone/contracts';
 import { CHECKOUT_DRAFT_VERSION } from '@shopee-clone/contracts';
-import { Container } from '@shopee-clone/ui';
+import { StorefrontContainer } from '@shopee-clone/ui';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
@@ -151,7 +151,7 @@ function CartLineRow({ line, pricingLine }: { line: CartLine; pricingLine?: Pric
         {line.product.href ? (
           <Link href={line.product.href}>{line.product.name}</Link>
         ) : (
-          <strong>{line.product.name}</strong>
+          <span className="font-medium">{line.product.name}</span>
         )}
         <span>Phân loại: {line.variant.name}</span>
         {line.issues.map((issue) => (
@@ -161,7 +161,7 @@ function CartLineRow({ line, pricingLine }: { line: CartLine; pricingLine?: Pric
         ))}
       </div>
       <div className="cart-line__price">
-        <strong>{formatCurrency(pricingLine?.sellingUnitPriceMinor ?? line.unitPriceMinor)}</strong>
+        <span className="font-medium">{formatCurrency(pricingLine?.sellingUnitPriceMinor ?? line.unitPriceMinor)}</span>
         {pricingLine && pricingLine.listUnitPriceMinor > pricingLine.sellingUnitPriceMinor ? (
           <>
             <del>{formatCurrency(pricingLine.listUnitPriceMinor)}</del>
@@ -211,9 +211,9 @@ function CartLineRow({ line, pricingLine }: { line: CartLine; pricingLine?: Pric
         </button>
         <small>Còn {line.availableQuantity}</small>
       </div>
-      <strong className="cart-line__subtotal">
+      <span className="cart-line__subtotal font-semibold">
         {formatCurrency(pricingLine?.merchandiseSubtotalMinor ?? line.lineSubtotalMinor)}
-      </strong>
+      </span>
       <button
         className="cart-line__remove"
         type="button"
@@ -260,7 +260,7 @@ function ShopGroup({
             {group.shop.name}
           </Link>
         ) : (
-          <strong id={`cart-shop-${group.shop.id}`}>{group.shop.name}</strong>
+          <span className="font-medium" id={`cart-shop-${group.shop.id}`}>{group.shop.name}</span>
         )}
         <ChatNowButton shopId={group.shop.id} ownerUserId={quotedShop?.shop.ownerUserId} />
       </header>
@@ -302,7 +302,7 @@ function ShopGroup({
           <span>Giảm mã shop: −{formatCurrency(quotedShop.shopVoucherDiscountMinor)}</span>
           <span>Giảm mã Shopee: −{formatCurrency(quotedShop.platformVoucherDiscountMinor)}</span>
           <span>Phí vận chuyển: {formatCurrency(quotedShop.shippingPayableMinor)}</span>
-          <strong>Tổng shop: {formatCurrency(quotedShop.payableTotalMinor)}</strong>
+          <span className="font-semibold">Tổng shop: {formatCurrency(quotedShop.payableTotalMinor)}</span>
         </footer>
       ) : null}
     </section>
@@ -367,7 +367,7 @@ export function CartScreen() {
 
   if (auth.state.status === 'guest' || cart.state.status === 'unauthenticated') {
     return (
-      <Container className="cart-page">
+      <StorefrontContainer className="cart-page">
         <div className="cart-state">
           <span className="cart-state__icon" aria-hidden="true">
             🛒
@@ -376,24 +376,24 @@ export function CartScreen() {
           <p>Giỏ hàng được lưu riêng theo tài khoản để bạn có thể tiếp tục mua sắm an toàn.</p>
           <Link href="/login?returnTo=%2Fcart">Đăng nhập</Link>
         </div>
-      </Container>
+      </StorefrontContainer>
     );
   }
 
   if (auth.state.status === 'loading' || cart.state.status === 'loading') {
     return (
-      <Container className="cart-page" aria-busy="true">
+      <StorefrontContainer className="cart-page" aria-busy="true">
         <div className="cart-state" role="status">
           Đang tải giỏ hàng…
         </div>
-      </Container>
+      </StorefrontContainer>
     );
   }
 
   const current = currentCart;
   if (!current) {
     return (
-      <Container className="cart-page">
+      <StorefrontContainer className="cart-page">
         <div className="cart-state is-error" role="alert">
           <h1>Chưa thể tải giỏ hàng</h1>
           <p>Dữ liệu giỏ hàng trên máy chủ tạm thời không khả dụng.</p>
@@ -401,13 +401,13 @@ export function CartScreen() {
             Thử lại
           </button>
         </div>
-      </Container>
+      </StorefrontContainer>
     );
   }
 
   if (current.summary.distinctLineCount === 0) {
     return (
-      <Container className="cart-page">
+      <StorefrontContainer className="cart-page">
         <div className="cart-state">
           <span className="cart-state__icon" aria-hidden="true">
             🛒
@@ -416,7 +416,7 @@ export function CartScreen() {
           <p>Sản phẩm bạn thêm sẽ được lưu an toàn trên máy chủ.</p>
           <Link href="/">Tiếp tục mua sắm</Link>
         </div>
-      </Container>
+      </StorefrontContainer>
     );
   }
 
@@ -453,7 +453,7 @@ export function CartScreen() {
       : ['Hãy hoàn tất các điều kiện trước khi mua hàng.'];
 
   return (
-    <Container className="cart-page">
+    <StorefrontContainer className="cart-page">
       <div className="cart-page__heading">
         <div>
           <p>GIỎ HÀNG · {current.summary.distinctLineCount} SẢN PHẨM</p>
@@ -537,7 +537,7 @@ export function CartScreen() {
           ) : (
             <>
               <span>Tổng thanh toán</span>
-              <strong>Chưa khả dụng</strong>
+              <span>Chưa khả dụng</span>
               <ul className="cart-summary__blockers" aria-label="Lý do chưa thể mua hàng">
                 {displayedPurchaseBlockers.map((message) => (
                   <li key={message}>{message}</li>
@@ -577,6 +577,6 @@ export function CartScreen() {
           Mua hàng
         </button>
       </aside>
-    </Container>
+    </StorefrontContainer>
   );
 }

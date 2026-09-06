@@ -4,6 +4,7 @@ import type { AdminCategorySummary, AdminCategoryTreeNode } from '@shopee-clone/
 import { useCallback, useEffect, useState } from 'react';
 
 import { FolderIcon, FolderOpenIcon, TagIcon } from '../../../../components/admin/admin-icons';
+import { AdminEntityLink } from '../../../../components/admin/admin-entity-link';
 import { useAuthSession } from '../../../../components/auth-session-provider';
 import {
   createAdminCategory,
@@ -123,8 +124,10 @@ export default function AdminCategoriesPage() {
 
   const renderTreeNodes = (nodes: AdminCategoryTreeNode[], depth = 0) => {
     return nodes.map((node) => (
-      <div key={node.id} style={{ display: 'flex', flexDirection: 'column' }}>
+      <div key={node.id} className="admin-category-tree__node">
         <div
+          id={`admin-category-${node.id}`}
+          className={`admin-category-tree__row admin-category-tree__row--depth-${Math.min(depth, 2)}`}
           style={{
             display: 'flex',
             alignItems: 'center',
@@ -135,27 +138,22 @@ export default function AdminCategoriesPage() {
             paddingLeft: `${16 + depth * 28}px`,
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <div
-              style={{
-                color: depth === 0 ? '#ee4d2d' : depth === 1 ? '#d97706' : '#6b7280',
-                display: 'flex',
-                alignItems: 'center',
-              }}
-            >
-              {depth === 0 ? (
-                <FolderOpenIcon size={18} />
-              ) : depth === 1 ? (
-                <FolderIcon size={17} />
-              ) : (
-                <TagIcon size={15} />
-              )}
-            </div>
+          <div className="admin-category-tree__identity">
             <div>
-              <span style={{ fontWeight: 600, color: '#111827' }}>{node.name}</span>
-              <span style={{ fontSize: '12px', color: '#6b7280', marginLeft: '8px' }}>
-                ({node.slug})
-              </span>
+              <AdminEntityLink
+                href={`/admin/categories#admin-category-${node.id}`}
+                name={node.name}
+                meta={node.slug}
+                fallbackIcon={
+                  depth === 0 ? (
+                    <FolderOpenIcon size={18} />
+                  ) : depth === 1 ? (
+                    <FolderIcon size={17} />
+                  ) : (
+                    <TagIcon size={15} />
+                  )
+                }
+              />
               {!node.isActive && (
                 <span
                   style={{
@@ -174,14 +172,15 @@ export default function AdminCategoriesPage() {
             </div>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+          <div className="admin-category-tree__meta">
             <span style={{ fontSize: '13px', color: '#6b7280' }}>
               {node.productCount} sản phẩm • Thứ tự: {node.sortOrder}
             </span>
 
-            <div style={{ display: 'flex', gap: '6px' }}>
+            <div className="admin-category-tree__actions">
               {depth < 2 && (
                 <button
+                  className="admin-btn admin-btn-soft admin-btn-small"
                   onClick={() => openCreateModal(node.id)}
                   style={{
                     padding: '3px 8px',
@@ -197,6 +196,7 @@ export default function AdminCategoriesPage() {
                 </button>
               )}
               <button
+                className="admin-btn admin-btn-secondary admin-btn-small"
                 onClick={() => openEditModal(node)}
                 style={{
                   padding: '3px 8px',
@@ -211,6 +211,7 @@ export default function AdminCategoriesPage() {
                 Sửa
               </button>
               <button
+                className="admin-btn admin-btn-danger-outline admin-btn-small"
                 onClick={() => handleDelete(node)}
                 style={{
                   padding: '3px 8px',
@@ -233,23 +234,15 @@ export default function AdminCategoriesPage() {
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-        <div>
-          <h1 style={{ fontSize: '24px', fontWeight: 700, color: '#111827' }}>
-            Quản lý Cây Danh mục
-          </h1>
-          <p style={{ color: '#6b7280', fontSize: '14px', marginTop: '4px' }}>
-            Tổ chức phân cấp ngành hàng tối đa 3 cấp, sắp xếp thứ tự hiển thị và kiểm soát liên kết
-            sản phẩm.
-          </p>
-        </div>
+    <div className="admin-page admin-categories-page">
+      <div className="admin-page-actions">
         <button onClick={() => openCreateModal()} className="admin-btn admin-btn-primary">
           + Thêm Danh mục gốc
         </button>
       </div>
 
       <div
+        className="admin-table-card admin-category-tree-card"
         style={{
           background: '#ffffff',
           borderRadius: '12px',
@@ -259,13 +252,11 @@ export default function AdminCategoriesPage() {
         }}
       >
         {loading ? (
-          <div style={{ padding: '32px', textAlign: 'center', color: '#6b7280' }}>
-            Đang tải cây danh mục...
-          </div>
+          <div className="admin-state-card__message">Đang tải cây danh mục...</div>
         ) : error ? (
-          <div style={{ padding: '24px', color: '#ef4444' }}>{error}</div>
+          <div className="admin-state-card__message admin-state-card__message--error">{error}</div>
         ) : tree.length === 0 ? (
-          <div style={{ padding: '32px', textAlign: 'center', color: '#6b7280' }}>
+          <div className="admin-state-card__message">
             Chưa có danh mục nào. Hãy tạo danh mục đầu tiên!
           </div>
         ) : (
@@ -276,6 +267,7 @@ export default function AdminCategoriesPage() {
       {/* Modal */}
       {modalMode && (
         <div
+          className="admin-dialog-backdrop"
           style={{
             position: 'fixed',
             inset: 0,
@@ -287,6 +279,7 @@ export default function AdminCategoriesPage() {
           }}
         >
           <div
+            className="admin-dialog"
             style={{
               background: '#ffffff',
               borderRadius: '12px',
@@ -305,10 +298,11 @@ export default function AdminCategoriesPage() {
             </h2>
 
             <form
+              className="admin-dialog__form admin-category-form"
               onSubmit={handleFormSubmit}
               style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}
             >
-              <div>
+              <div className="admin-field">
                 <label
                   style={{
                     display: 'block',
@@ -321,6 +315,7 @@ export default function AdminCategoriesPage() {
                   Tên danh mục:
                 </label>
                 <input
+                  className="admin-control"
                   type="text"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
@@ -336,7 +331,7 @@ export default function AdminCategoriesPage() {
                 />
               </div>
 
-              <div>
+              <div className="admin-field">
                 <label
                   style={{
                     display: 'block',
@@ -349,6 +344,7 @@ export default function AdminCategoriesPage() {
                   Slug định danh (kebab-case):
                 </label>
                 <input
+                  className="admin-control"
                   type="text"
                   value={slug}
                   onChange={(e) => setSlug(e.target.value)}
@@ -364,7 +360,7 @@ export default function AdminCategoriesPage() {
                 />
               </div>
 
-              <div>
+              <div className="admin-field">
                 <label
                   style={{
                     display: 'block',
@@ -377,6 +373,7 @@ export default function AdminCategoriesPage() {
                   Danh mục cha (Trực thuộc):
                 </label>
                 <select
+                  className="admin-control"
                   value={parentId}
                   onChange={(e) => setParentId(e.target.value)}
                   style={{
@@ -398,8 +395,8 @@ export default function AdminCategoriesPage() {
                 </select>
               </div>
 
-              <div style={{ display: 'flex', gap: '16px' }}>
-                <div style={{ flex: 1 }}>
+              <div className="admin-category-form__row">
+                <div className="admin-field">
                   <label
                     style={{
                       display: 'block',
@@ -412,6 +409,7 @@ export default function AdminCategoriesPage() {
                     Thứ tự hiển thị:
                   </label>
                   <input
+                    className="admin-control"
                     type="number"
                     value={sortOrder}
                     onChange={(e) => setSortOrder(Number(e.target.value))}
@@ -426,9 +424,11 @@ export default function AdminCategoriesPage() {
                 </div>
 
                 <div
+                  className="admin-checkbox-field"
                   style={{ display: 'flex', alignItems: 'center', marginTop: '20px', gap: '8px' }}
                 >
                   <input
+                    className="admin-checkbox-control"
                     type="checkbox"
                     id="isActiveCheck"
                     checked={isActive}
@@ -463,6 +463,7 @@ export default function AdminCategoriesPage() {
               )}
 
               <div
+                className="admin-dialog__actions"
                 style={{
                   display: 'flex',
                   gap: '12px',
@@ -474,6 +475,7 @@ export default function AdminCategoriesPage() {
                   type="button"
                   onClick={closeModal}
                   disabled={submitting}
+                  className="admin-btn admin-btn-secondary"
                   style={{
                     padding: '8px 16px',
                     background: '#f3f4f6',
@@ -490,15 +492,9 @@ export default function AdminCategoriesPage() {
                 <button
                   type="submit"
                   disabled={submitting}
+                  className="admin-btn admin-btn-primary"
                   style={{
                     padding: '8px 16px',
-                    background: '#ee4d2d',
-                    color: '#ffffff',
-                    border: 'none',
-                    borderRadius: '8px',
-                    fontWeight: 600,
-                    fontSize: '14px',
-                    cursor: 'pointer',
                   }}
                 >
                   {submitting ? 'Đang lưu...' : 'Lưu danh mục'}

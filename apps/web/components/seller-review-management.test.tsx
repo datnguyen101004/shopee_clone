@@ -89,4 +89,44 @@ describe('SellerReviewManagement', () => {
     expect(screen.getByText('Đánh giá này hiện đang bị ẩn công khai.')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /báo cáo/i })).not.toBeInTheDocument();
   });
+
+  it('searches loaded reviews and sorts by rating', async () => {
+    const user = userEvent.setup();
+    vi.mocked(listSellerShopReviews).mockResolvedValue({
+      items: [
+        {
+          id: reviewId,
+          productId: '123e4567-e89b-12d3-a456-426614174002',
+          productName: 'Áo khoác của shop',
+          rating: 2,
+          comment: 'Nội dung đánh giá cần xem xét',
+          visibility: 'VISIBLE',
+          reportStatus: 'NOT_REPORTED',
+          createdAt: '2026-08-21T12:00:00.000Z',
+          updatedAt: '2026-08-21T12:00:00.000Z',
+        },
+        {
+          id: '123e4567-e89b-12d3-a456-426614174003',
+          productId: '123e4567-e89b-12d3-a456-426614174004',
+          productName: 'Giày thể thao của shop',
+          rating: 5,
+          comment: 'Đóng gói tốt',
+          visibility: 'VISIBLE',
+          reportStatus: 'NOT_REPORTED',
+          createdAt: '2026-08-22T12:00:00.000Z',
+          updatedAt: '2026-08-22T12:00:00.000Z',
+        },
+      ],
+    });
+
+    render(<SellerReviewManagement />);
+    await screen.findByText('Giày thể thao của shop');
+    await user.selectOptions(screen.getByLabelText('Sắp xếp'), 'highest-rating');
+    const cards = screen.getAllByRole('article');
+    expect(cards[0]).toHaveTextContent('Giày thể thao của shop');
+    await user.type(screen.getByLabelText('Tìm kiếm đánh giá'), 'Áo khoác');
+    expect(screen.getByText('Áo khoác của shop')).toBeInTheDocument();
+    expect(screen.queryByText('Giày thể thao của shop')).not.toBeInTheDocument();
+    expect(screen.getByText(/đánh giá đã tải/)).toHaveTextContent('Hiển thị 1 trong 2 đánh giá đã tải');
+  });
 });

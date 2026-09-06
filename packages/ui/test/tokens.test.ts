@@ -26,6 +26,7 @@ describe('design tokens', () => {
       'forms.tsx',
       'index.ts',
       'layout.tsx',
+      'product-card.tsx',
       'skeleton.tsx',
       'states.tsx',
       'toast.tsx',

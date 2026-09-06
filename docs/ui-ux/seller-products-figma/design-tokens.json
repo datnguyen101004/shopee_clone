@@ -1,0 +1,89 @@
+{
+  "provenance": "Observed in get_design_context for 2:5 and 2:192; values describe Figma, not existing code tokens",
+  "scope": "Seller Products proposed theme only",
+  "color": {
+    "primary": "#2563eb",
+    "activeSurface": "#eff6ff",
+    "canvas": "#f9fafb",
+    "surface": "#ffffff",
+    "border": "#e5e7eb",
+    "text": "#111827",
+    "textSecondary": "#4b5563",
+    "textMuted": "#9ca3af",
+    "successSurface": "#dcfce7",
+    "successText": "#15803d",
+    "dangerSurface": "#fee2e2",
+    "dangerText": "#b91c1c"
+  },
+  "font": {
+    "family": "Inter",
+    "weights": [
+      400,
+      500,
+      600,
+      700
+    ],
+    "sizesPx": [
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      20
+    ],
+    "descriptionLineHeight": 1.6,
+    "otherLineHeight": "normal (reference)"
+  },
+  "radiusPx": {
+    "card": 12,
+    "inputButtonNavMainImage": 8,
+    "thumbnailBadgePageIconAction": 6
+  },
+  "layoutPx": {
+    "canvas": [
+      1440,
+      1024
+    ],
+    "sidebarWidth": 260,
+    "headerHeight": 80,
+    "sidebarPadding": 24,
+    "bodyPadding": 32,
+    "sectionGap": 24,
+    "controlHeight": 40,
+    "tableRowHeight": 80,
+    "tableHeaderHeight": 47,
+    "tableFooterHeight": 64,
+    "tableHorizontalPadding": 24,
+    "tableColumnWidths": [
+      80,
+      348,
+      150,
+      150,
+      100,
+      140,
+      100
+    ],
+    "galleryWidth": 420,
+    "formWidth": 664,
+    "detailColumnGap": 32,
+    "mainImage": [
+      420,
+      320
+    ],
+    "thumb": [
+      96,
+      72
+    ],
+    "fieldColumnGap": 16,
+    "fieldRowGap": 20
+  },
+  "unverified": [
+    "hover",
+    "focus styling",
+    "animation",
+    "mobile/tablet breakpoints",
+    "prototype interactions",
+    "other tab panels"
+  ]
+}

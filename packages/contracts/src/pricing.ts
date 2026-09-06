@@ -29,6 +29,23 @@ export interface PublicScheduledPriceBreakdown {
   compareAtPriceMinor: number | null;
   discountBasisPoints: number;
   campaignId: string;
+  sourceKind?: 'SHOP' | 'MARKETPLACE' | null;
+  campaignTypeCode?: string | null;
+  policyVersion?: number | null;
+  campaignImportanceClass?: 'NORMAL' | 'FEATURED' | null;
+  rankingProfileKey?: string | null;
+  campaignActiveFrom?: string | null;
+  campaignActiveUntil?: string | null;
+  evaluatedAt: string;
+}
+
+/** Immutable promotion source captured in checkout/order line snapshots. */
+export interface CampaignPriceSnapshot {
+  sourceKind: 'SHOP' | 'MARKETPLACE';
+  campaignId: string;
+  campaignTypeCode: string | null;
+  policyVersion: number | null;
+  discountBasisPoints: number;
   evaluatedAt: string;
 }
 
@@ -104,6 +121,13 @@ export function isPublicScheduledPriceBreakdown(
     (item.discountBasisPoints as number) <= 9000 &&
     typeof item.campaignId === 'string' &&
     item.campaignId.length > 0 &&
+    (item.sourceKind === undefined || item.sourceKind === null || item.sourceKind === 'SHOP' || item.sourceKind === 'MARKETPLACE') &&
+    (item.campaignTypeCode === undefined || item.campaignTypeCode === null || (typeof item.campaignTypeCode === 'string' && /^[A-Z][A-Z0-9_]{1,63}$/.test(item.campaignTypeCode))) &&
+    (item.policyVersion === undefined || item.policyVersion === null || (Number.isSafeInteger(item.policyVersion) && (item.policyVersion as number) >= 1)) &&
+    (item.campaignImportanceClass === undefined || item.campaignImportanceClass === null || item.campaignImportanceClass === 'NORMAL' || item.campaignImportanceClass === 'FEATURED') &&
+    (item.rankingProfileKey === undefined || item.rankingProfileKey === null || (typeof item.rankingProfileKey === 'string' && /^[A-Z][A-Z0-9_]{1,79}$/.test(item.rankingProfileKey))) &&
+    (item.campaignActiveFrom === undefined || item.campaignActiveFrom === null || (typeof item.campaignActiveFrom === 'string' && Number.isFinite(Date.parse(item.campaignActiveFrom)))) &&
+    (item.campaignActiveUntil === undefined || item.campaignActiveUntil === null || (typeof item.campaignActiveUntil === 'string' && Number.isFinite(Date.parse(item.campaignActiveUntil)))) &&
     typeof item.evaluatedAt === 'string' &&
     Number.isFinite(Date.parse(item.evaluatedAt)) &&
     (item.effectivePriceMinor as number) < (item.basePriceMinor as number)
@@ -249,6 +273,7 @@ export interface PricingQuoteLine {
   platformVoucherDiscountMinor: number;
   merchandiseVoucherDiscountMinor: number;
   payableMerchandiseMinor: number;
+  campaignPrice?: CampaignPriceSnapshot;
 }
 
 export interface MockShippingBreakdown {
@@ -559,6 +584,16 @@ function isAddress(value: unknown): value is PricingQuoteAddress {
   );
 }
 
+export function isCampaignPriceSnapshot(value: unknown): value is CampaignPriceSnapshot {
+  if (!isRecord(value) || !hasExactKeys(value, ['sourceKind', 'campaignId', 'campaignTypeCode', 'policyVersion', 'discountBasisPoints', 'evaluatedAt'])) return false;
+  return (value.sourceKind === 'SHOP' || value.sourceKind === 'MARKETPLACE') &&
+    typeof value.campaignId === 'string' && value.campaignId.length > 0 &&
+    (value.campaignTypeCode === null || typeof value.campaignTypeCode === 'string') &&
+    (value.policyVersion === null || (Number.isSafeInteger(value.policyVersion) && (value.policyVersion as number) >= 1)) &&
+    Number.isSafeInteger(value.discountBasisPoints) && (value.discountBasisPoints as number) >= 1 && (value.discountBasisPoints as number) <= 9000 &&
+    typeof value.evaluatedAt === 'string' && Number.isFinite(Date.parse(value.evaluatedAt));
+}
+
 function isLine(value: unknown): value is PricingQuoteLine {
   if (
     !isRecord(value) ||
@@ -578,7 +613,7 @@ function isLine(value: unknown): value is PricingQuoteLine {
       'platformVoucherDiscountMinor',
       'merchandiseVoucherDiscountMinor',
       'payableMerchandiseMinor',
-    ]) ||
+    ], ['campaignPrice']) ||
     !isUuid(value.lineId) ||
     !isUuid(value.productId) ||
     !isUuid(value.variantId) ||
@@ -598,6 +633,7 @@ function isLine(value: unknown): value is PricingQuoteLine {
   )
     return false;
 
+  if (value.campaignPrice !== undefined && !isCampaignPriceSnapshot(value.campaignPrice)) return false;
   const shipmentWeight = safeMultiply(value.unitWeightGrams, value.quantity);
   const listSubtotal = safeMultiply(value.listUnitPriceMinor, value.quantity);
   const merchandiseSubtotal = safeMultiply(value.sellingUnitPriceMinor, value.quantity);

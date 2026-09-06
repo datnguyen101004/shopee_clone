@@ -1,0 +1,33 @@
+{
+  "provenance": "Project adaptation requested after offline Figma export; not new Figma observations",
+  "scope": "Seller Products only",
+  "fontFamily": "existing --sc-font-sans / Be Vietnam Pro",
+  "primary": "#2563eb",
+  "primaryHover": "#1d4ed8",
+  "primaryActive": "#1e40af",
+  "secondaryHover": "#f3f4f6",
+  "focus": {
+    "color": "#2563eb",
+    "widthPx": 2,
+    "offsetPx": 2
+  },
+  "disabledOpacity": 0.55,
+  "colorTransitionMs": 120,
+  "breakpointsPx": {
+    "mobileBelow": 768,
+    "drawerBelow": 1200
+  },
+  "bodyPaddingPx": {
+    "mobile": 16,
+    "tablet": 24,
+    "desktop": 32
+  },
+  "touchTargetMinPx": 44,
+  "modal": {
+    "maxWidthPx": 480,
+    "paddingPx": 24,
+    "radiusPx": 12,
+    "overlay": "rgba(17,24,39,.4)"
+  },
+  "referenceDesktopGeometry": "design-tokens.json"
+}

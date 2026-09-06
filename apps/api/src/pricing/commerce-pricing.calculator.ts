@@ -11,6 +11,7 @@ import {
   type ShippingServiceCode,
   type ShopShippingServiceSelection,
   type DemoCarrierShippingBreakdown,
+  type CampaignPriceSnapshot,
 } from '@shopee-clone/contracts';
 import { Inject, Injectable, Optional } from '@nestjs/common';
 
@@ -32,6 +33,7 @@ export interface AuthoritativePricingLine {
   unitWeightGrams: number;
   sellingUnitPriceMinor: bigint;
   compareAtUnitPriceMinor: bigint | null;
+  campaignPrice?: CampaignPriceSnapshot;
   shop: {
     id: string;
     ownerUserId: string;
@@ -81,6 +83,7 @@ function pricingLine(input: AuthoritativePricingLine): PricingQuoteLine {
     platformVoucherDiscountMinor: 0,
     merchandiseVoucherDiscountMinor: 0,
     payableMerchandiseMinor: merchandiseSubtotalMinor,
+    ...(input.campaignPrice ? { campaignPrice: input.campaignPrice } : {}),
   };
 }
 

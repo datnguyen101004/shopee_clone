@@ -1,0 +1,216 @@
+{
+  "version": "1.31.0",
+  "usage": "Project-adapted substitutes, not exports of the original Figma vectors. Static SVGs use neutral stroke; use library components via packages/ui exports for currentColor/theming.",
+  "assets": [
+    {
+      "component": "CircleX",
+      "path": "adapted-assets/icons/circle-x.svg",
+      "source": "Installed lucide-react",
+      "originalFigmaAsset": false
+    },
+    {
+      "component": "House",
+      "path": "adapted-assets/icons/house.svg",
+      "source": "Installed lucide-react",
+      "originalFigmaAsset": false
+    },
+    {
+      "component": "Package",
+      "path": "adapted-assets/icons/package.svg",
+      "source": "Installed lucide-react",
+      "originalFigmaAsset": false
+    },
+    {
+      "component": "ShoppingCart",
+      "path": "adapted-assets/icons/shopping-cart.svg",
+      "source": "Installed lucide-react",
+      "originalFigmaAsset": false
+    },
+    {
+      "component": "Users",
+      "path": "adapted-assets/icons/users.svg",
+      "source": "Installed lucide-react",
+      "originalFigmaAsset": false
+    },
+    {
+      "component": "ChartColumn",
+      "path": "adapted-assets/icons/chart-column.svg",
+      "source": "Installed lucide-react",
+      "originalFigmaAsset": false
+    },
+    {
+      "component": "Settings",
+      "path": "adapted-assets/icons/settings.svg",
+      "source": "Installed lucide-react",
+      "originalFigmaAsset": false
+    },
+    {
+      "component": "Bell",
+      "path": "adapted-assets/icons/bell.svg",
+      "source": "Installed lucide-react",
+      "originalFigmaAsset": false
+    },
+    {
+      "component": "Search",
+      "path": "adapted-assets/icons/search.svg",
+      "source": "Installed lucide-react",
+      "originalFigmaAsset": false
+    },
+    {
+      "component": "ChevronDown",
+      "path": "adapted-assets/icons/chevron-down.svg",
+      "source": "Installed lucide-react",
+      "originalFigmaAsset": false
+    },
+    {
+      "component": "Plus",
+      "path": "adapted-assets/icons/plus.svg",
+      "source": "Installed lucide-react",
+      "originalFigmaAsset": false
+    },
+    {
+      "component": "SquarePen",
+      "path": "adapted-assets/icons/square-pen.svg",
+      "source": "Installed lucide-react",
+      "originalFigmaAsset": false
+    },
+    {
+      "component": "Trash2",
+      "path": "adapted-assets/icons/trash2.svg",
+      "source": "Installed lucide-react",
+      "originalFigmaAsset": false
+    },
+    {
+      "component": "ChevronRight",
+      "path": "adapted-assets/icons/chevron-right.svg",
+      "source": "Installed lucide-react",
+      "originalFigmaAsset": false
+    },
+    {
+      "component": "Bold",
+      "path": "adapted-assets/icons/bold.svg",
+      "source": "Installed lucide-react",
+      "originalFigmaAsset": false
+    },
+    {
+      "component": "Italic",
+      "path": "adapted-assets/icons/italic.svg",
+      "source": "Installed lucide-react",
+      "originalFigmaAsset": false
+    },
+    {
+      "component": "Underline",
+      "path": "adapted-assets/icons/underline.svg",
+      "source": "Installed lucide-react",
+      "originalFigmaAsset": false
+    },
+    {
+      "component": "AlignLeft",
+      "path": "adapted-assets/icons/align-left.svg",
+      "source": "Installed lucide-react",
+      "originalFigmaAsset": false
+    },
+    {
+      "component": "AlignCenter",
+      "path": "adapted-assets/icons/align-center.svg",
+      "source": "Installed lucide-react",
+      "originalFigmaAsset": false
+    },
+    {
+      "component": "AlignRight",
+      "path": "adapted-assets/icons/align-right.svg",
+      "source": "Installed lucide-react",
+      "originalFigmaAsset": false
+    },
+    {
+      "component": "Image",
+      "path": "adapted-assets/icons/image.svg",
+      "source": "Installed lucide-react",
+      "originalFigmaAsset": false
+    },
+    {
+      "component": "Link",
+      "path": "adapted-assets/icons/link.svg",
+      "source": "Installed lucide-react",
+      "originalFigmaAsset": false
+    },
+    {
+      "component": "Store",
+      "path": "adapted-assets/icons/store.svg",
+      "source": "Installed lucide-react",
+      "originalFigmaAsset": false
+    },
+    {
+      "component": "ImageOff",
+      "path": "adapted-assets/icons/image-off.svg",
+      "source": "Installed lucide-react",
+      "originalFigmaAsset": false
+    },
+    {
+      "component": "CircleUserRound",
+      "path": "adapted-assets/icons/circle-user-round.svg",
+      "source": "Installed lucide-react",
+      "originalFigmaAsset": false
+    },
+    {
+      "component": "LoaderCircle",
+      "path": "adapted-assets/icons/loader-circle.svg",
+      "source": "Installed lucide-react",
+      "originalFigmaAsset": false
+    },
+    {
+      "component": "Eye",
+      "path": "adapted-assets/icons/eye.svg",
+      "source": "Installed lucide-react",
+      "originalFigmaAsset": false
+    },
+    {
+      "component": "EyeOff",
+      "path": "adapted-assets/icons/eye-off.svg",
+      "source": "Installed lucide-react",
+      "originalFigmaAsset": false
+    },
+    {
+      "component": "X",
+      "path": "adapted-assets/icons/x.svg",
+      "source": "Installed lucide-react",
+      "originalFigmaAsset": false
+    },
+    {
+      "component": "Menu",
+      "path": "adapted-assets/icons/menu.svg",
+      "source": "Installed lucide-react",
+      "originalFigmaAsset": false
+    },
+    {
+      "component": "Star",
+      "path": "adapted-assets/icons/star.svg",
+      "source": "Installed lucide-react",
+      "originalFigmaAsset": false
+    },
+    {
+      "component": "TriangleAlert",
+      "path": "adapted-assets/icons/triangle-alert.svg",
+      "source": "Installed lucide-react",
+      "originalFigmaAsset": false
+    },
+    {
+      "component": "RotateCcw",
+      "path": "adapted-assets/icons/rotate-ccw.svg",
+      "source": "Installed lucide-react",
+      "originalFigmaAsset": false
+    },
+    {
+      "component": "Upload",
+      "path": "adapted-assets/icons/upload.svg",
+      "source": "Installed lucide-react",
+      "originalFigmaAsset": false
+    },
+    {
+      "component": "CircleCheck",
+      "path": "adapted-assets/icons/circle-check.svg",
+      "source": "Installed lucide-react",
+      "originalFigmaAsset": false
+    }
+  ]
+}

@@ -139,7 +139,12 @@ export function DateTimeLocalPicker({
       const preferred = mode === 'date' ? 280 : 420;
       const width = Math.min(preferred, Math.max(260, window.innerWidth - 16));
       const left = Math.min(Math.max(8, rect.left), window.innerWidth - width - 8);
-      const top = Math.min(rect.bottom + 4, window.innerHeight - 8);
+      const popoverHeight = rootRef.current?.getBoundingClientRect().height ?? (mode === 'date' ? 340 : 380);
+      const below = rect.bottom + 4;
+      const above = rect.top - popoverHeight - 4;
+      const top = below + popoverHeight <= window.innerHeight - 8
+        ? below
+        : Math.max(8, above);
       setCoords({ top, left, width });
     };
     place();

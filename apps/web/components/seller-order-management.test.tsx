@@ -2,7 +2,12 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import type { SellerOrderDetailResponse, SellerOrderListResponse } from '@shopee-clone/contracts';
 import { SellerOrderDetailScreen, SellerOrderQueueScreen } from './seller-order-management';
 
-const apiMocks = vi.hoisted(() => ({ fetchOrders: vi.fn(), fetchOrder: vi.fn(), execute: vi.fn(), authenticatedFetch: vi.fn() }));
+const apiMocks = vi.hoisted(() => ({
+  fetchOrders: vi.fn(),
+  fetchOrder: vi.fn(),
+  execute: vi.fn(),
+  authenticatedFetch: vi.fn(),
+}));
 
 const orderReference = '00000000-0000-4000-8000-000000000001';
 const baseSummary = {
@@ -20,48 +25,194 @@ const baseSummary = {
   itemQuantity: 1,
   payableTotalMinor: 10000,
   shippingService: 'STANDARD' as const,
-  deadline: { confirmationAt: '2026-08-19T00:00:00.000Z', handoffAt: null, confirmationOverdue: false, handoffOverdue: false },
-  lines: [{ lineId: 'line-1', productId: '00000000-0000-4000-8000-000000000004', variantId: '00000000-0000-4000-8000-000000000005', productName: 'Bình nước', productImageUrl: null, variantName: 'Mặc định', variantSku: 'SKU-1', quantity: 1, unitPriceMinor: 10000, payableLineMinor: 10000, weightGrams: 100 }],
-  availableActions: [{ action: 'REJECT' as const, reasonCodes: ['OUT_OF_STOCK' as const, 'OTHER' as const] }],
+  deadline: {
+    confirmationAt: '2026-08-19T00:00:00.000Z',
+    handoffAt: null,
+    confirmationOverdue: false,
+    handoffOverdue: false,
+  },
+  lines: [
+    {
+      lineId: 'line-1',
+      productId: '00000000-0000-4000-8000-000000000004',
+      variantId: '00000000-0000-4000-8000-000000000005',
+      productName: 'Bình nước',
+      productImageUrl: null,
+      variantName: 'Mặc định',
+      variantSku: 'SKU-1',
+      quantity: 1,
+      unitPriceMinor: 10000,
+      payableLineMinor: 10000,
+      weightGrams: 100,
+    },
+  ],
+  availableActions: [
+    { action: 'CONFIRM' as const, reasonCodes: [] },
+    { action: 'REJECT' as const, reasonCodes: ['OUT_OF_STOCK' as const, 'OTHER' as const] },
+  ],
 };
 const detail: SellerOrderDetailResponse = {
-  sellerOrderVersion: 'seller-orders-v1', currency: 'VND', order: {
+  sellerOrderVersion: 'seller-orders-v1',
+  currency: 'VND',
+  order: {
     summary: baseSummary,
     shop: { id: baseSummary.shopId, slug: 'shop', name: 'Shop', pickupAddress: null },
     buyerNote: '',
-    address: { recipientName: 'Người nhận', phoneNumber: '0912345678', province: 'Hà Nội', district: 'Quận 1', ward: 'Phường 1', addressLine: 'Số 1' },
-    shipping: { provider: 'MOCK', version: 'mock-v1', shopId: baseSummary.shopId, originProvince: 'Hà Nội', destinationProvince: 'Hà Nội', zone: 'SAME_PROVINCE', shipmentWeightGrams: 100, service: 'STANDARD', estimatedDaysMin: 1, estimatedDaysMax: 2, baseFeeMinor: 0, zoneSurchargeMinor: 0, weightSurchargeMinor: 0, shippingFeeMinor: 0 },
-    listSubtotalMinor: 10000, productDiscountMinor: 0, merchandiseSubtotalMinor: 10000, voucherDiscountMinor: 0, shippingPayableMinor: 0, payableTotalMinor: 10000,
-    fulfillmentTimeline: [{ id: 'event-1', previousState: null, state: 'PENDING_CONFIRMATION', version: 0, actorType: 'SYSTEM', actorUserId: null, action: 'ORDER_CREATED', reasonCode: 'ORDER_CREATED', reasonNote: null, late: false, occurredAt: '2026-08-18T00:00:00.000Z' }],
-    orderTimeline: [], shipment: null,
+    address: {
+      recipientName: 'Người nhận',
+      phoneNumber: '0912345678',
+      province: 'Hà Nội',
+      district: 'Quận 1',
+      ward: 'Phường 1',
+      addressLine: 'Số 1',
+    },
+    shipping: {
+      provider: 'MOCK',
+      version: 'mock-v1',
+      shopId: baseSummary.shopId,
+      originProvince: 'Hà Nội',
+      destinationProvince: 'Hà Nội',
+      zone: 'SAME_PROVINCE',
+      shipmentWeightGrams: 100,
+      service: 'STANDARD',
+      estimatedDaysMin: 1,
+      estimatedDaysMax: 2,
+      baseFeeMinor: 0,
+      zoneSurchargeMinor: 0,
+      weightSurchargeMinor: 0,
+      shippingFeeMinor: 0,
+    },
+    listSubtotalMinor: 10000,
+    productDiscountMinor: 0,
+    merchandiseSubtotalMinor: 10000,
+    voucherDiscountMinor: 0,
+    shippingPayableMinor: 0,
+    payableTotalMinor: 10000,
+    fulfillmentTimeline: [
+      {
+        id: 'event-1',
+        previousState: null,
+        state: 'PENDING_CONFIRMATION',
+        version: 0,
+        actorType: 'SYSTEM',
+        actorUserId: null,
+        action: 'ORDER_CREATED',
+        reasonCode: 'ORDER_CREATED',
+        reasonNote: null,
+        late: false,
+        occurredAt: '2026-08-18T00:00:00.000Z',
+      },
+    ],
+    orderTimeline: [],
+    shipment: null,
   },
 };
-const list: SellerOrderListResponse = { sellerOrderVersion: 'seller-orders-v1', items: [baseSummary], page: { limit: 20, nextCursor: null } };
+const list: SellerOrderListResponse = {
+  sellerOrderVersion: 'seller-orders-v1',
+  items: [baseSummary],
+  page: { limit: 20, nextCursor: null },
+};
+const secondSummary = {
+  ...baseSummary,
+  orderReference: '00000000-0000-4000-8000-000000000006',
+  purchaseReference: '00000000-0000-4000-8000-000000000007',
+  createdAt: '2026-08-19T00:00:00.000Z',
+  updatedAt: '2026-08-19T00:00:00.000Z',
+  payableTotalMinor: 20000,
+  lines: [{ ...baseSummary.lines[0], productName: 'Áo len', variantSku: 'SKU-AO-LEN' }],
+};
 
 apiMocks.fetchOrders.mockResolvedValue(list);
 apiMocks.fetchOrder.mockResolvedValue({ data: detail, etag: '"seller-order-0-0"' });
 apiMocks.execute.mockResolvedValue({ data: detail, etag: '"seller-order-0-0"' });
 
-vi.mock('../lib/seller-orders-api', () => ({ fetchSellerOrders: apiMocks.fetchOrders, fetchSellerOrder: apiMocks.fetchOrder, executeSellerOrderAction: apiMocks.execute }));
-vi.mock('../lib/role-api', () => ({ RoleApiError: class RoleApiError extends Error { status = 0; problem?: { detail?: string }; constructor() { super(); } } }));
-vi.mock('./auth-session-provider', () => ({ useAuthSession: () => ({ state: { status: 'authenticated', user: { roles: ['buyer', 'seller'] } }, authenticatedFetch: apiMocks.authenticatedFetch }) }));
-vi.mock('next/navigation', () => ({ useRouter: () => ({ replace: vi.fn() }), useSearchParams: () => new URLSearchParams() }));
+vi.mock('../lib/seller-orders-api', () => ({
+  fetchSellerOrders: apiMocks.fetchOrders,
+  fetchSellerOrder: apiMocks.fetchOrder,
+  executeSellerOrderAction: apiMocks.execute,
+}));
+vi.mock('../lib/role-api', () => ({
+  RoleApiError: class RoleApiError extends Error {
+    status = 0;
+    problem?: { detail?: string };
+    constructor() {
+      super();
+    }
+  },
+}));
+vi.mock('./auth-session-provider', () => ({
+  useAuthSession: () => ({
+    state: { status: 'authenticated', user: { roles: ['buyer', 'seller'] } },
+    authenticatedFetch: apiMocks.authenticatedFetch,
+  }),
+}));
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ replace: vi.fn() }),
+  useSearchParams: () => new URLSearchParams(),
+}));
 
 describe('Seller order management', () => {
   beforeEach(() => vi.clearAllMocks());
   afterEach(() => cleanup());
 
-  it('renders an owned queue card and server-declared action count', async () => {
+  it('renders an owned queue table with confirm and cancel actions', async () => {
     render(<SellerOrderQueueScreen />);
     expect(await screen.findByText('Bình nước')).toBeInTheDocument();
-    expect(screen.getByText('1 thao tác khả dụng')).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: 'Mã đơn' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Xác nhận đơn' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Hủy đơn' })).toBeInTheDocument();
+  });
+
+  it('executes a queue action with the row version and refreshes the row', async () => {
+    render(<SellerOrderQueueScreen />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Xác nhận đơn' }));
+    const dialog = screen.getByRole('dialog');
+    fireEvent.click(screen.getByRole('button', { name: /^Xác nhận$/ }));
+
+    await waitFor(() =>
+      expect(apiMocks.execute).toHaveBeenCalledWith(
+        apiMocks.authenticatedFetch,
+        orderReference,
+        '"seller-order-0-0"',
+        { action: 'CONFIRM' },
+      ),
+    );
+    expect(dialog).not.toBeInTheDocument();
+  });
+
+  it('searches loaded orders and sorts by price or creation time', async () => {
+    apiMocks.fetchOrders.mockResolvedValueOnce({
+      ...list,
+      items: [baseSummary, secondSummary],
+    });
+    render(<SellerOrderQueueScreen />);
+    expect(await screen.findByText('Áo len')).toBeInTheDocument();
+
+    const search = screen.getByRole('searchbox', { name: 'Tìm kiếm đơn hàng' });
+    fireEvent.change(search, { target: { value: 'SKU-AO' } });
+    expect(screen.getByText('Áo len')).toBeInTheDocument();
+    expect(screen.queryByText('Bình nước')).not.toBeInTheDocument();
+
+    fireEvent.change(search, { target: { value: '' } });
+    const sort = screen.getByRole('combobox', { name: 'Sắp xếp' });
+    fireEvent.change(sort, { target: { value: 'highest-price' } });
+    let rows = screen
+      .getAllByRole('row')
+      .filter((row) => row.classList.contains('seller-order-table-row'));
+    expect(rows[0]).toHaveTextContent('Áo len');
+
+    fireEvent.change(sort, { target: { value: 'oldest' } });
+    rows = screen
+      .getAllByRole('row')
+      .filter((row) => row.classList.contains('seller-order-table-row'));
+    expect(rows[0]).toHaveTextContent('Bình nước');
   });
 
   it('requires a controlled rejection reason before submitting', async () => {
     render(<SellerOrderDetailScreen orderReference={orderReference} />);
     await waitFor(() => expect(apiMocks.fetchOrder).toHaveBeenCalled());
-    expect(await screen.findByText('Từ chối đơn')).toBeInTheDocument();
-    fireEvent.click(screen.getByText('Từ chối đơn'));
+    expect(await screen.findByText('Hủy đơn')).toBeInTheDocument();
+    fireEvent.click(screen.getByText('Hủy đơn'));
     expect(screen.getByRole('dialog')).toBeInTheDocument();
     fireEvent.change(screen.getByRole('combobox'), { target: { value: 'OTHER' } });
     expect(screen.getByText('Xác nhận')).toBeDisabled();

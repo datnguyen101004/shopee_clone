@@ -190,6 +190,7 @@ export class OrderWriter {
             platformVoucherDiscountMinor: money(line.platformVoucherDiscountMinor),
             merchandiseVoucherDiscountMinor: money(line.merchandiseVoucherDiscountMinor),
             payableMerchandiseMinor: money(line.payableMerchandiseMinor),
+            ...(line.campaignPrice ? { campaignPriceSnapshot: json(line.campaignPrice) } : {}),
           },
         });
       }

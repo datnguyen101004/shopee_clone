@@ -290,6 +290,7 @@ Các lệnh E2E và kiểm tra database có yêu cầu môi trường riêng; xe
 | Người dùng | Tìm kiếm, quản lý trạng thái, cấp/thu hồi quyền và ghi nhận lý do thao tác |
 | Gian hàng  | Duyệt/từ chối đăng ký, xem hồ sơ, tạm ngưng và khôi phục shop              |
 | Nội dung   | Kiểm soát sản phẩm, quản lý danh mục, banner và các khối trang chủ         |
+| Chiến dịch | Chọn loại STANDARD, FLASH_SALE hoặc CHEAPEST_DEALS; publish/cancel, mời seller và theo dõi tham gia |
 | Kiểm duyệt | Xử lý tố cáo sản phẩm/shop/đánh giá/tin nhắn, lưu hồ sơ và kết quả xử lý   |
 | Tranh chấp | Xem yêu cầu trả hàng, bằng chứng và đưa ra quyết định theo quyền admin     |
 | Audit      | Tra cứu nhật ký thao tác đặc quyền, đối tượng, lý do và thay đổi           |
@@ -319,6 +320,14 @@ Các lệnh E2E và kiểm tra database có yêu cầu môi trường riêng; xe
 ![Hàng đợi kiểm duyệt và tố cáo](docs/images/features/admin-moderation.png)
 
 </details>
+
+Quản trị viên có thể tạo chiến dịch tại `/admin/campaigns`, chọn loại chương trình và xem preview trước khi publish. `FLASH_SALE` được registry đánh dấu `FEATURED`; các loại còn lại dùng importance `NORMAL`. Sau khi publish, type, importance và ranking profile được snapshot và khóa; mọi profile đều chịu global cap khi đưa vào ranking.
+
+**Campaign flow**
+
+- Seller mở `/seller/campaigns` để xem các chiến dịch đủ điều kiện, nhận thông báo trước hạn đăng ký, chọn sản phẩm và mức giảm riêng cho từng sản phẩm, hoặc từ chối/rút lui trước cutoff. Chi tiết sản phẩm tại `/seller/products/[productId]` hiển thị các campaign đang chạy, sắp tới và lịch sử.
+- Buyer truy cập `/banner/:bannerId` để xem nội dung, lịch và sản phẩm đang bán. Kệ Flash Sale trên trang chủ chỉ lấy sản phẩm từ campaign `FLASH_SALE` đang active và dùng cùng nguồn giá authoritative với catalog, cart và checkout.
+- Reservation dùng cửa sổ thời gian nửa kín `[startsAt, endsAt)` để chặn một sản phẩm tham gia hai chương trình trùng thời gian, bao gồm cả promotion của shop.
 
 <details>
 <summary>Tranh chấp trả hàng và nhật ký kiểm toán</summary>

@@ -1,6 +1,6 @@
 'use client';
 
-import { ButtonLink, Container, ErrorState } from '@shopee-clone/ui';
+import { ButtonLink, ErrorState, StorefrontContainer } from '@shopee-clone/ui';
 import Link from 'next/link';
 import * as nextNav from 'next/navigation';
 import type { ReactNode } from 'react';
@@ -75,7 +75,7 @@ export function AccountWorkspace({
   const displayName = auth.state.status === 'authenticated' ? auth.state.user.displayName : 'Người dùng';
 
   return (
-    <Container className="buyer-account-page">
+    <StorefrontContainer className="buyer-account-page">
       <div className="shopee-account-container">
         <aside className="shopee-account-sidebar">
           {/* User profile brief header */}
@@ -210,7 +210,7 @@ export function AccountWorkspace({
           {children}
         </main>
       </div>
-    </Container>
+    </StorefrontContainer>
   );
 }
 

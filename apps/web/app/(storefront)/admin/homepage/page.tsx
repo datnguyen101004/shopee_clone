@@ -1,9 +1,16 @@
 'use client';
 
-import type { AdminBannerSummary, AdminHomepageModuleSummary } from '@shopee-clone/contracts';
+import type {
+  AdminBannerSummary,
+  AdminHomepageModuleSummary,
+  CampaignAdminSummary,
+  HomepageBannerTargetType,
+} from '@shopee-clone/contracts';
 import { useCallback, useEffect, useState } from 'react';
 
 import { useAuthSession } from '../../../../components/auth-session-provider';
+import { AdminEntityLink } from '../../../../components/admin/admin-entity-link';
+import { EditIcon, TrashIcon } from '../../../../components/admin/admin-icons';
 import {
   createAdminBanner,
   deleteAdminBanner,
@@ -13,11 +20,37 @@ import {
   updateAdminBanner,
   updateAdminHomepageModule,
 } from '../../../../lib/admin-api';
+import { fetchAdminCampaigns } from '../../../../lib/campaigns-api';
+
+function adminBannerTarget(banner: AdminBannerSummary, activeCampaigns: CampaignAdminSummary[]) {
+  if (!banner.targetId) return null;
+  const campaign =
+    banner.targetType === 'CAMPAIGN'
+      ? activeCampaigns.find((item) => item.id === banner.targetId)
+      : undefined;
+  const labels: Record<string, string> = {
+    PRODUCT: 'Sản phẩm đích',
+    SHOP: 'Shop đích',
+    CATEGORY: 'Danh mục đích',
+    CAMPAIGN: campaign?.title ?? 'Chiến dịch đích',
+  };
+  const name = banner.targetName ?? labels[banner.targetType ?? ''] ?? 'Đối tượng đích';
+  const href =
+    banner.targetType === 'CAMPAIGN'
+      ? `/admin/campaigns/${banner.targetId}`
+      : banner.targetType === 'PRODUCT'
+        ? `/admin/products/${banner.targetId}`
+        : banner.targetType === 'SHOP'
+          ? `/admin/shops/${banner.targetId}`
+          : `/admin/categories#admin-category-${banner.targetId}`;
+  return { href, name, imageUrl: banner.targetImageUrl };
+}
 
 export default function AdminHomepageConfigPage() {
   const { authenticatedFetch } = useAuthSession();
   const [banners, setBanners] = useState<AdminBannerSummary[]>([]);
   const [modules, setModules] = useState<AdminHomepageModuleSummary[]>([]);
+  const [activeCampaigns, setActiveCampaigns] = useState<CampaignAdminSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -28,12 +61,17 @@ export default function AdminHomepageConfigPage() {
   const [bannerModalMode, setBannerModalMode] = useState<'CREATE' | 'EDIT' | null>(null);
   const [editingBanner, setEditingBanner] = useState<AdminBannerSummary | null>(null);
   const [bannerTitle, setBannerTitle] = useState('');
-  const [bannerHref, setBannerHref] = useState('');
+  const [bannerTargetType, setBannerTargetType] = useState<HomepageBannerTargetType>('URL');
+  const [bannerTargetId, setBannerTargetId] = useState('');
+  const [bannerTargetQuery, setBannerTargetQuery] = useState('/');
   const [bannerImageUrl, setBannerImageUrl] = useState('');
   const [bannerAltText, setBannerAltText] = useState('');
   const [bannerTheme, setBannerTheme] = useState('brand');
   const [bannerEyebrow, setBannerEyebrow] = useState('');
   const [bannerSortOrder, setBannerSortOrder] = useState<number>(0);
+  const [bannerDisplayFrom, setBannerDisplayFrom] = useState('');
+  const [bannerDisplayUntil, setBannerDisplayUntil] = useState('');
+  const [bannerEnabled, setBannerEnabled] = useState(true);
   const [bannerSubmitting, setBannerSubmitting] = useState(false);
   const [bannerError, setBannerError] = useState<string | null>(null);
 
@@ -54,10 +92,12 @@ export default function AdminHomepageConfigPage() {
     Promise.all([
       fetchAdminBanners(authenticatedFetch),
       fetchAdminHomepageModules(authenticatedFetch),
+      fetchAdminCampaigns(authenticatedFetch, '?state=ACTIVE&limit=50'),
     ])
-      .then(([bannersRes, modulesRes]) => {
+      .then(([bannersRes, modulesRes, campaignsRes]) => {
         setBanners(bannersRes.items);
         setModules(modulesRes.items);
+        setActiveCampaigns(campaignsRes.items);
         setLoading(false);
       })
       .catch((err) => {
@@ -75,12 +115,17 @@ export default function AdminHomepageConfigPage() {
     setBannerModalMode('CREATE');
     setEditingBanner(null);
     setBannerTitle('');
-    setBannerHref('/');
+    setBannerTargetType('URL');
+    setBannerTargetId('');
+    setBannerTargetQuery('/');
     setBannerImageUrl('');
     setBannerAltText('');
     setBannerTheme('brand');
     setBannerEyebrow('');
     setBannerSortOrder(0);
+    setBannerDisplayFrom('');
+    setBannerDisplayUntil('');
+    setBannerEnabled(true);
     setBannerError(null);
   };
 
@@ -88,21 +133,29 @@ export default function AdminHomepageConfigPage() {
     setBannerModalMode('EDIT');
     setEditingBanner(b);
     setBannerTitle(b.title);
-    setBannerHref(b.href);
+    setBannerTargetType(b.targetType ?? 'URL');
+    setBannerTargetId(b.targetId ?? '');
+    setBannerTargetQuery(b.targetQuery ?? b.href ?? '/');
     setBannerImageUrl(b.imageUrl || '');
     setBannerAltText(b.altText);
     setBannerTheme(b.theme);
     setBannerEyebrow(b.eyebrow || '');
-    setBannerSortOrder(b.sortOrder);
+    setBannerSortOrder(b.sortOrder ?? b.priority ?? 0);
+    setBannerDisplayFrom(b.displayFrom ? b.displayFrom.slice(0, 16) : '');
+    setBannerDisplayUntil(b.displayUntil ? b.displayUntil.slice(0, 16) : '');
+    setBannerEnabled(b.isEnabled !== false);
     setBannerError(null);
   };
 
   const handleBannerSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!bannerHref.startsWith('/') || bannerHref.startsWith('//') || bannerHref.includes('://')) {
-      setBannerError(
-        'Đường dẫn phải là relative path hợp lệ (bắt đầu bằng / và không chứa domain ngoài)',
-      );
+    const needsId = ['CAMPAIGN', 'PRODUCT', 'SHOP', 'CATEGORY'].includes(bannerTargetType);
+    if (needsId && !bannerTargetId.trim()) {
+      setBannerError('Vui lòng chọn đối tượng đích cho banner.');
+      return;
+    }
+    if (!needsId && !bannerTargetQuery.trim()) {
+      setBannerError('Vui lòng nhập giá trị đích đến.');
       return;
     }
 
@@ -110,24 +163,50 @@ export default function AdminHomepageConfigPage() {
     setBannerError(null);
 
     try {
+      const previousTargetType = editingBanner?.targetType ?? 'URL';
+      const previousTargetValue = ['CAMPAIGN', 'PRODUCT', 'SHOP', 'CATEGORY'].includes(
+        previousTargetType,
+      )
+        ? (editingBanner?.targetId ?? '')
+        : (editingBanner?.targetQuery ?? editingBanner?.href ?? '');
+      const nextTargetValue = needsId ? bannerTargetId.trim() : bannerTargetQuery.trim();
+      const targetChanged =
+        bannerModalMode === 'CREATE' ||
+        previousTargetType !== bannerTargetType ||
+        previousTargetValue !== nextTargetValue;
+      const targetFields = targetChanged
+        ? {
+            targetType: bannerTargetType,
+            targetId: needsId ? bannerTargetId.trim() : null,
+            targetQuery: needsId ? null : bannerTargetQuery.trim(),
+          }
+        : {};
       if (bannerModalMode === 'CREATE') {
         await createAdminBanner(authenticatedFetch, {
           title: bannerTitle.trim(),
-          href: bannerHref.trim(),
           imageUrl: bannerImageUrl.trim() || null,
           altText: bannerAltText.trim() || bannerTitle.trim(),
           theme: bannerTheme.trim(),
           eyebrow: bannerEyebrow.trim() || undefined,
+          ...targetFields,
+          displayFrom: bannerDisplayFrom ? new Date(bannerDisplayFrom).toISOString() : null,
+          displayUntil: bannerDisplayUntil ? new Date(bannerDisplayUntil).toISOString() : null,
+          isEnabled: bannerEnabled,
+          priority: Number(bannerSortOrder),
           sortOrder: Number(bannerSortOrder),
         });
       } else if (bannerModalMode === 'EDIT' && editingBanner) {
         await updateAdminBanner(authenticatedFetch, editingBanner.id, {
           title: bannerTitle.trim(),
-          href: bannerHref.trim(),
           imageUrl: bannerImageUrl.trim() || null,
           altText: bannerAltText.trim() || bannerTitle.trim(),
           theme: bannerTheme.trim(),
           eyebrow: bannerEyebrow.trim() || undefined,
+          ...targetFields,
+          displayFrom: bannerDisplayFrom ? new Date(bannerDisplayFrom).toISOString() : null,
+          displayUntil: bannerDisplayUntil ? new Date(bannerDisplayUntil).toISOString() : null,
+          isEnabled: bannerEnabled,
+          priority: Number(bannerSortOrder),
           sortOrder: Number(bannerSortOrder),
         });
       }
@@ -185,66 +264,37 @@ export default function AdminHomepageConfigPage() {
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-      <div>
-        <h1 style={{ fontSize: '24px', fontWeight: 700, color: '#111827' }}>
-          Cấu hình Trang chủ & Banner
-        </h1>
-        <p style={{ color: '#6b7280', fontSize: '14px', marginTop: '4px' }}>
-          Quản lý banner chiến dịch và bật/tắt, sắp xếp các module hiển thị trên trang chủ
-          Marketplace.
-        </p>
-      </div>
-
+    <div className="admin-page admin-homepage-page">
       {/* Tabs */}
-      <div style={{ display: 'flex', gap: '8px', borderBottom: '1px solid #e5e7eb' }}>
+      <div className="admin-tabs" role="tablist" aria-label="Cấu hình trang chủ">
         <button
+          className={`admin-tab-btn ${activeTab === 'BANNERS' ? 'admin-tab-btn--active' : ''}`}
           onClick={() => setActiveTab('BANNERS')}
-          style={{
-            padding: '10px 18px',
-            border: 'none',
-            background: 'none',
-            fontWeight: 600,
-            fontSize: '14px',
-            color: activeTab === 'BANNERS' ? '#ee4d2d' : '#6b7280',
-            borderBottom: activeTab === 'BANNERS' ? '2px solid #ee4d2d' : '2px solid transparent',
-            cursor: 'pointer',
-          }}
         >
           Banner Chiến dịch ({banners.length})
         </button>
         <button
+          className={`admin-tab-btn ${activeTab === 'MODULES' ? 'admin-tab-btn--active' : ''}`}
           onClick={() => setActiveTab('MODULES')}
-          style={{
-            padding: '10px 18px',
-            border: 'none',
-            background: 'none',
-            fontWeight: 600,
-            fontSize: '14px',
-            color: activeTab === 'MODULES' ? '#ee4d2d' : '#6b7280',
-            borderBottom: activeTab === 'MODULES' ? '2px solid #ee4d2d' : '2px solid transparent',
-            cursor: 'pointer',
-          }}
         >
           Cấu hình Modules ({modules.length})
         </button>
       </div>
 
       {loading ? (
-        <div style={{ padding: '32px', textAlign: 'center', color: '#6b7280' }}>
-          Đang tải dữ liệu cấu hình...
-        </div>
+        <div className="admin-state-card__message">Đang tải dữ liệu cấu hình...</div>
       ) : error ? (
-        <div style={{ padding: '24px', color: '#ef4444' }}>{error}</div>
+        <div className="admin-state-card__message admin-state-card__message--error">{error}</div>
       ) : activeTab === 'BANNERS' ? (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+        <div className="admin-homepage-list">
+          <div className="admin-page-actions">
             <button onClick={openCreateBannerModal} className="admin-btn admin-btn-primary">
               + Thêm Banner mới
             </button>
           </div>
 
           <div
+            className="admin-table-card"
             style={{
               background: '#ffffff',
               borderRadius: '12px',
@@ -254,11 +304,10 @@ export default function AdminHomepageConfigPage() {
             }}
           >
             {banners.length === 0 ? (
-              <div style={{ padding: '32px', textAlign: 'center', color: '#6b7280' }}>
-                Chưa có banner nào.
-              </div>
+              <div className="admin-state-card__message">Chưa có banner nào.</div>
             ) : (
               <table
+                className="admin-data-table admin-homepage-table admin-homepage-banner-table"
                 style={{
                   width: '100%',
                   borderCollapse: 'collapse',
@@ -276,7 +325,7 @@ export default function AdminHomepageConfigPage() {
                     }}
                   >
                     <th style={{ padding: '12px 16px' }}>Tiêu đề & Nhãn</th>
-                    <th style={{ padding: '12px 16px' }}>Đích đến (Href)</th>
+                    <th style={{ padding: '12px 16px' }}>Đối tượng đích</th>
                     <th style={{ padding: '12px 16px' }}>Giao diện (Theme)</th>
                     <th style={{ padding: '12px 16px' }}>Thứ tự</th>
                     <th style={{ padding: '12px 16px', textAlign: 'right' }}>Thao tác</th>
@@ -284,47 +333,65 @@ export default function AdminHomepageConfigPage() {
                 </thead>
                 <tbody>
                   {banners.map((b) => (
-                    <tr key={b.id} style={{ borderBottom: '1px solid #f3f4f6' }}>
+                    <tr
+                      key={b.id}
+                      id={`admin-banner-${b.id}`}
+                      style={{ borderBottom: '1px solid #f3f4f6' }}
+                    >
                       <td style={{ padding: '14px 16px' }}>
-                        <div style={{ fontWeight: 600, color: '#111827' }}>{b.title}</div>
-                        {b.eyebrow && (
-                          <div style={{ fontSize: '12px', color: '#ee4d2d' }}>{b.eyebrow}</div>
+                        <AdminEntityLink
+                          href={`#admin-banner-${b.id}`}
+                          name={b.title}
+                          imageUrl={b.imageUrl}
+                          meta={b.eyebrow}
+                        />
+                      </td>
+                      <td style={{ padding: '14px 16px', color: '#4b5563' }}>
+                        <div>{b.targetType ?? 'URL'}</div>
+                        {(() => {
+                          const target = adminBannerTarget(b, activeCampaigns);
+                          return target ? (
+                            <AdminEntityLink
+                              href={target.href}
+                              name={target.name}
+                              imageUrl={target.imageUrl}
+                              meta={
+                                b.targetAvailable === false ? 'Không khả dụng' : 'Mở trong Admin'
+                              }
+                            />
+                          ) : (
+                            <small>{b.targetQuery ?? 'Không có đối tượng quản lý'}</small>
+                          );
+                        })()}
+                        {b.targetType === 'CAMPAIGN' && b.targetAvailable === false && (
+                          <div className="admin-badge admin-badge--warning">
+                            Mục tiêu không khả dụng
+                          </div>
                         )}
                       </td>
-                      <td style={{ padding: '14px 16px', color: '#4b5563' }}>{b.href}</td>
                       <td style={{ padding: '14px 16px', color: '#6b7280' }}>{b.theme}</td>
                       <td style={{ padding: '14px 16px', color: '#111827', fontWeight: 600 }}>
                         {b.sortOrder}
                       </td>
-                      <td style={{ padding: '14px 16px', textAlign: 'right' }}>
-                        <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                      <td className="admin-table-cell--actions admin-homepage-actions-cell">
+                        <div className="admin-table-actions admin-homepage-row-actions">
                           <button
+                            type="button"
+                            className="admin-icon-btn admin-icon-btn--secondary"
+                            aria-label={`Sửa banner ${b.title}`}
+                            title="Sửa banner"
                             onClick={() => openEditBannerModal(b)}
-                            style={{
-                              padding: '4px 10px',
-                              fontSize: '12px',
-                              color: '#4b5563',
-                              background: '#f3f4f6',
-                              border: 'none',
-                              borderRadius: '6px',
-                              cursor: 'pointer',
-                            }}
                           >
-                            Sửa
+                            <EditIcon aria-hidden="true" />
                           </button>
                           <button
+                            type="button"
+                            className="admin-icon-btn admin-icon-btn--danger"
+                            aria-label={`Xóa banner ${b.title}`}
+                            title="Xóa banner"
                             onClick={() => handleDeleteBanner(b)}
-                            style={{
-                              padding: '4px 10px',
-                              fontSize: '12px',
-                              color: '#dc2626',
-                              background: '#fee2e2',
-                              border: 'none',
-                              borderRadius: '6px',
-                              cursor: 'pointer',
-                            }}
                           >
-                            Xóa
+                            <TrashIcon aria-hidden="true" />
                           </button>
                         </div>
                       </td>
@@ -337,6 +404,7 @@ export default function AdminHomepageConfigPage() {
         </div>
       ) : (
         <div
+          className="admin-table-card"
           style={{
             background: '#ffffff',
             borderRadius: '12px',
@@ -346,6 +414,7 @@ export default function AdminHomepageConfigPage() {
           }}
         >
           <table
+            className="admin-data-table admin-homepage-table admin-homepage-module-table"
             style={{
               width: '100%',
               borderCollapse: 'collapse',
@@ -371,10 +440,9 @@ export default function AdminHomepageConfigPage() {
             </thead>
             <tbody>
               {modules.map((m) => (
-                <tr key={m.id} style={{ borderBottom: '1px solid #f3f4f6' }}>
+                <tr key={m.id} id={`admin-module-${m.id}`}>
                   <td style={{ padding: '14px 16px' }}>
-                    <div style={{ fontWeight: 600, color: '#111827' }}>{m.key}</div>
-                    <div style={{ fontSize: '12px', color: '#6b7280' }}>{m.type}</div>
+                    <AdminEntityLink href={`#admin-module-${m.id}`} name={m.key} meta={m.type} />
                   </td>
                   <td style={{ padding: '14px 16px' }}>
                     <div style={{ color: '#111827' }}>{m.title}</div>
@@ -384,6 +452,7 @@ export default function AdminHomepageConfigPage() {
                   </td>
                   <td style={{ padding: '14px 16px' }}>
                     <span
+                      className={`admin-badge ${m.isEnabled ? 'admin-badge--success' : 'admin-badge--danger'}`}
                       style={{
                         display: 'inline-block',
                         padding: '3px 10px',
@@ -398,21 +467,15 @@ export default function AdminHomepageConfigPage() {
                     </span>
                   </td>
                   <td style={{ padding: '14px 16px', fontWeight: 600 }}>{m.sortOrder}</td>
-                  <td style={{ padding: '14px 16px', textAlign: 'right' }}>
+                  <td className="admin-table-cell--actions admin-homepage-actions-cell">
                     <button
+                      type="button"
+                      className="admin-icon-btn admin-icon-btn--secondary"
+                      aria-label={`Cài đặt module ${m.key}`}
+                      title="Cài đặt module"
                       onClick={() => openEditModuleModal(m)}
-                      style={{
-                        padding: '4px 10px',
-                        fontSize: '12px',
-                        color: '#4f46e5',
-                        background: '#eef2ff',
-                        border: 'none',
-                        borderRadius: '6px',
-                        cursor: 'pointer',
-                        fontWeight: 600,
-                      }}
                     >
-                      Cài đặt
+                      <EditIcon aria-hidden="true" />
                     </button>
                   </td>
                 </tr>
@@ -425,6 +488,7 @@ export default function AdminHomepageConfigPage() {
       {/* Banner Modal */}
       {bannerModalMode && (
         <div
+          className="admin-dialog-backdrop"
           style={{
             position: 'fixed',
             inset: 0,
@@ -436,6 +500,7 @@ export default function AdminHomepageConfigPage() {
           }}
         >
           <div
+            className="admin-dialog"
             style={{
               background: '#ffffff',
               borderRadius: '12px',
@@ -454,10 +519,18 @@ export default function AdminHomepageConfigPage() {
             </h2>
 
             <form
+              className="admin-dialog__form admin-banner-form"
               onSubmit={handleBannerSubmit}
               style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}
             >
-              <div>
+              {editingBanner?.targetType === 'CAMPAIGN' &&
+                editingBanner.targetAvailable === false && (
+                  <div className="admin-alert admin-alert--warning" role="alert">
+                    Chiến dịch hiện tại không còn hoạt động. Bạn vẫn có thể sửa nội dung banner; hãy
+                    chọn một chiến dịch ACTIVE mới để khôi phục liên kết.
+                  </div>
+                )}
+              <div className="admin-field">
                 <label
                   style={{
                     display: 'block',
@@ -470,6 +543,7 @@ export default function AdminHomepageConfigPage() {
                   Tiêu đề banner:
                 </label>
                 <input
+                  className="admin-control"
                   type="text"
                   value={bannerTitle}
                   onChange={(e) => setBannerTitle(e.target.value)}
@@ -485,7 +559,7 @@ export default function AdminHomepageConfigPage() {
                 />
               </div>
 
-              <div>
+              <div className="admin-field">
                 <label
                   style={{
                     display: 'block',
@@ -495,13 +569,17 @@ export default function AdminHomepageConfigPage() {
                     marginBottom: '4px',
                   }}
                 >
-                  Đích đến (Relative URL bắt đầu bằng /):
+                  Kiểu đối tượng đích:
                 </label>
-                <input
-                  type="text"
-                  value={bannerHref}
-                  onChange={(e) => setBannerHref(e.target.value)}
-                  placeholder="/search?q=sale"
+                <select
+                  className="admin-control"
+                  value={bannerTargetType}
+                  onChange={(e) => {
+                    const next = e.target.value as HomepageBannerTargetType;
+                    setBannerTargetType(next);
+                    setBannerTargetId('');
+                    setBannerTargetQuery(next === 'URL' ? '/' : '');
+                  }}
                   style={{
                     width: '100%',
                     padding: '8px 12px',
@@ -509,11 +587,127 @@ export default function AdminHomepageConfigPage() {
                     border: '1px solid #d1d5db',
                     fontSize: '14px',
                   }}
-                  required
+                >
+                  <option value="CAMPAIGN">Chiến dịch</option>
+                  <option value="PRODUCT">Sản phẩm</option>
+                  <option value="SHOP">Shop</option>
+                  <option value="CATEGORY">Danh mục</option>
+                  <option value="SEARCH">Tìm kiếm</option>
+                  <option value="URL">Đường dẫn nội bộ</option>
+                </select>
+              </div>
+
+              {bannerTargetType === 'CAMPAIGN' ? (
+                <div className="admin-field">
+                  <label
+                    style={{
+                      display: 'block',
+                      fontSize: '13px',
+                      fontWeight: 600,
+                      color: '#374151',
+                      marginBottom: '4px',
+                    }}
+                  >
+                    Chiến dịch đang hoạt động:
+                  </label>
+                  <select
+                    className="admin-control"
+                    value={bannerTargetId}
+                    onChange={(e) => setBannerTargetId(e.target.value)}
+                    required
+                  >
+                    <option value="">Chọn chiến dịch</option>
+                    {editingBanner?.targetType === 'CAMPAIGN' &&
+                      editingBanner.targetId &&
+                      !activeCampaigns.some(
+                        (campaign) => campaign.id === editingBanner.targetId,
+                      ) && (
+                        <option value={editingBanner.targetId} disabled>
+                          Chiến dịch hiện tại không còn ACTIVE
+                        </option>
+                      )}
+                    {activeCampaigns.map((campaign) => (
+                      <option key={campaign.id} value={campaign.id}>
+                        {campaign.title} · {campaign.type.displayName}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              ) : ['PRODUCT', 'SHOP', 'CATEGORY'].includes(bannerTargetType) ? (
+                <div className="admin-field">
+                  <label
+                    style={{
+                      display: 'block',
+                      fontSize: '13px',
+                      fontWeight: 600,
+                      color: '#374151',
+                      marginBottom: '4px',
+                    }}
+                  >
+                    ID đối tượng:
+                  </label>
+                  <input
+                    className="admin-control"
+                    type="text"
+                    value={bannerTargetId}
+                    onChange={(e) => setBannerTargetId(e.target.value)}
+                    placeholder="UUID của đối tượng"
+                    required
+                  />
+                </div>
+              ) : (
+                <div className="admin-field">
+                  <label
+                    style={{
+                      display: 'block',
+                      fontSize: '13px',
+                      fontWeight: 600,
+                      color: '#374151',
+                      marginBottom: '4px',
+                    }}
+                  >
+                    {bannerTargetType === 'SEARCH' ? 'Từ khóa tìm kiếm:' : 'Đường dẫn nội bộ:'}
+                  </label>
+                  <input
+                    className="admin-control"
+                    type="text"
+                    value={bannerTargetQuery}
+                    onChange={(e) => setBannerTargetQuery(e.target.value)}
+                    placeholder={bannerTargetType === 'SEARCH' ? 'sale hè 2026' : '/search?q=sale'}
+                    required
+                  />
+                </div>
+              )}
+
+              <div className="admin-field">
+                <label
+                  style={{
+                    display: 'block',
+                    fontSize: '13px',
+                    fontWeight: 600,
+                    color: '#374151',
+                    marginBottom: '4px',
+                  }}
+                >
+                  Nhãn phụ (Eyebrow):
+                </label>
+                <input
+                  className="admin-control"
+                  type="text"
+                  value={bannerEyebrow}
+                  onChange={(e) => setBannerEyebrow(e.target.value)}
+                  placeholder="Nhãn ngắn hiển thị trên banner"
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    borderRadius: '6px',
+                    border: '1px solid #d1d5db',
+                    fontSize: '14px',
+                  }}
                 />
               </div>
 
-              <div>
+              <div className="admin-field">
                 <label
                   style={{
                     display: 'block',
@@ -526,6 +720,7 @@ export default function AdminHomepageConfigPage() {
                   URL Ảnh (Media relative hoặc S3):
                 </label>
                 <input
+                  className="admin-control"
                   type="text"
                   value={bannerImageUrl}
                   onChange={(e) => setBannerImageUrl(e.target.value)}
@@ -540,8 +735,18 @@ export default function AdminHomepageConfigPage() {
                 />
               </div>
 
-              <div style={{ display: 'flex', gap: '16px' }}>
-                <div style={{ flex: 1 }}>
+              <div className="admin-homepage-banner-preview" aria-label="Xem trước banner">
+                <span className="admin-inline-accent">Xem trước</span>
+                <strong>{bannerTitle.trim() || 'Tiêu đề banner'}</strong>
+                <small>
+                  {bannerTargetType} ·{' '}
+                  {bannerTargetId ? 'Đã chọn đối tượng' : bannerTargetQuery || 'Chưa chọn đích'}
+                </small>
+                {bannerImageUrl.trim() ? <img src={bannerImageUrl.trim()} alt="" /> : null}
+              </div>
+
+              <div className="admin-dialog__field-row">
+                <div className="admin-field">
                   <label
                     style={{
                       display: 'block',
@@ -554,6 +759,7 @@ export default function AdminHomepageConfigPage() {
                     Giao diện (Theme):
                   </label>
                   <input
+                    className="admin-control"
                     type="text"
                     value={bannerTheme}
                     onChange={(e) => setBannerTheme(e.target.value)}
@@ -566,7 +772,7 @@ export default function AdminHomepageConfigPage() {
                     }}
                   />
                 </div>
-                <div style={{ width: '100px' }}>
+                <div className="admin-field admin-field--compact">
                   <label
                     style={{
                       display: 'block',
@@ -579,6 +785,7 @@ export default function AdminHomepageConfigPage() {
                     Thứ tự:
                   </label>
                   <input
+                    className="admin-control"
                     type="number"
                     value={bannerSortOrder}
                     onChange={(e) => setBannerSortOrder(Number(e.target.value))}
@@ -592,6 +799,60 @@ export default function AdminHomepageConfigPage() {
                   />
                 </div>
               </div>
+
+              <div className="admin-dialog__field-row">
+                <label className="admin-field" style={{ display: 'block' }}>
+                  <span
+                    style={{
+                      display: 'block',
+                      fontSize: '13px',
+                      fontWeight: 600,
+                      color: '#374151',
+                      marginBottom: '4px',
+                    }}
+                  >
+                    Hiển thị từ:
+                  </span>
+                  <input
+                    className="admin-control"
+                    type="datetime-local"
+                    value={bannerDisplayFrom}
+                    onChange={(e) => setBannerDisplayFrom(e.target.value)}
+                  />
+                </label>
+                <label className="admin-field" style={{ display: 'block' }}>
+                  <span
+                    style={{
+                      display: 'block',
+                      fontSize: '13px',
+                      fontWeight: 600,
+                      color: '#374151',
+                      marginBottom: '4px',
+                    }}
+                  >
+                    Hiển thị đến:
+                  </span>
+                  <input
+                    className="admin-control"
+                    type="datetime-local"
+                    value={bannerDisplayUntil}
+                    onChange={(e) => setBannerDisplayUntil(e.target.value)}
+                  />
+                </label>
+              </div>
+
+              <label
+                className="admin-checkbox-field"
+                style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+              >
+                <input
+                  className="admin-checkbox-control"
+                  type="checkbox"
+                  checked={bannerEnabled}
+                  onChange={(e) => setBannerEnabled(e.target.checked)}
+                />
+                <span>Cho phép hiển thị banner</span>
+              </label>
 
               {bannerError && (
                 <div
@@ -608,6 +869,7 @@ export default function AdminHomepageConfigPage() {
               )}
 
               <div
+                className="admin-dialog__actions"
                 style={{
                   display: 'flex',
                   gap: '12px',
@@ -619,6 +881,7 @@ export default function AdminHomepageConfigPage() {
                   type="button"
                   onClick={() => setBannerModalMode(null)}
                   disabled={bannerSubmitting}
+                  className="admin-btn admin-btn-secondary"
                   style={{
                     padding: '8px 16px',
                     background: '#f3f4f6',
@@ -635,9 +898,9 @@ export default function AdminHomepageConfigPage() {
                 <button
                   type="submit"
                   disabled={bannerSubmitting}
+                  className="admin-btn admin-btn-primary"
                   style={{
                     padding: '8px 16px',
-                    background: '#ee4d2d',
                     color: '#ffffff',
                     border: 'none',
                     borderRadius: '8px',
@@ -657,6 +920,7 @@ export default function AdminHomepageConfigPage() {
       {/* Module Edit Modal */}
       {editingModule && (
         <div
+          className="admin-dialog-backdrop"
           style={{
             position: 'fixed',
             inset: 0,
@@ -668,6 +932,7 @@ export default function AdminHomepageConfigPage() {
           }}
         >
           <div
+            className="admin-dialog"
             style={{
               background: '#ffffff',
               borderRadius: '12px',
@@ -684,10 +949,11 @@ export default function AdminHomepageConfigPage() {
             </h2>
 
             <form
+              className="admin-dialog__form admin-module-form"
               onSubmit={handleModuleSubmit}
               style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}
             >
-              <div>
+              <div className="admin-field">
                 <label
                   style={{
                     display: 'block',
@@ -700,6 +966,7 @@ export default function AdminHomepageConfigPage() {
                   Tiêu đề module:
                 </label>
                 <input
+                  className="admin-control"
                   type="text"
                   value={moduleTitle}
                   onChange={(e) => setModuleTitle(e.target.value)}
@@ -714,7 +981,7 @@ export default function AdminHomepageConfigPage() {
                 />
               </div>
 
-              <div>
+              <div className="admin-field">
                 <label
                   style={{
                     display: 'block',
@@ -727,6 +994,7 @@ export default function AdminHomepageConfigPage() {
                   Phụ đề (Subtitle):
                 </label>
                 <input
+                  className="admin-control"
                   type="text"
                   value={moduleSubtitle}
                   onChange={(e) => setModuleSubtitle(e.target.value)}
@@ -740,8 +1008,8 @@ export default function AdminHomepageConfigPage() {
                 />
               </div>
 
-              <div style={{ display: 'flex', gap: '16px' }}>
-                <div style={{ flex: 1 }}>
+              <div className="admin-dialog__field-row">
+                <div className="admin-field">
                   <label
                     style={{
                       display: 'block',
@@ -754,6 +1022,7 @@ export default function AdminHomepageConfigPage() {
                     Thứ tự hiển thị:
                   </label>
                   <input
+                    className="admin-control"
                     type="number"
                     value={moduleSortOrder}
                     onChange={(e) => setModuleSortOrder(Number(e.target.value))}
@@ -768,9 +1037,11 @@ export default function AdminHomepageConfigPage() {
                 </div>
 
                 <div
+                  className="admin-checkbox-field"
                   style={{ display: 'flex', alignItems: 'center', marginTop: '20px', gap: '8px' }}
                 >
                   <input
+                    className="admin-checkbox-control"
                     type="checkbox"
                     id="moduleEnabledCheck"
                     checked={moduleEnabled}
@@ -805,6 +1076,7 @@ export default function AdminHomepageConfigPage() {
               )}
 
               <div
+                className="admin-dialog__actions"
                 style={{
                   display: 'flex',
                   gap: '12px',
@@ -816,6 +1088,7 @@ export default function AdminHomepageConfigPage() {
                   type="button"
                   onClick={() => setEditingModule(null)}
                   disabled={moduleSubmitting}
+                  className="admin-btn admin-btn-secondary"
                   style={{
                     padding: '8px 16px',
                     background: '#f3f4f6',
@@ -832,9 +1105,9 @@ export default function AdminHomepageConfigPage() {
                 <button
                   type="submit"
                   disabled={moduleSubmitting}
+                  className="admin-btn admin-btn-primary"
                   style={{
                     padding: '8px 16px',
-                    background: '#ee4d2d',
                     color: '#ffffff',
                     border: 'none',
                     borderRadius: '8px',

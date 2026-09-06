@@ -1,0 +1,321 @@
+{
+  "authority": "User requested project-compatible completion; these are deliberate adaptations, not recovered Figma assets",
+  "originalCount": 43,
+  "resolutions": [
+    {
+      "originalExpectedPath": "assets/product-list/avatar.png",
+      "originalAssetAvailable": false,
+      "resolution": "runtime-initials",
+      "dataSource": "AuthUser.displayName (no avatar URL in contract)",
+      "fallback": "adapted-assets/icons/circle-user-round.svg"
+    },
+    {
+      "originalExpectedPath": "assets/product-list/product-thumb.png",
+      "originalAssetAvailable": false,
+      "resolution": "runtime-product-media",
+      "dataSource": "SellerProductSummary.primaryMediaUrl or SellerProductDetail.media, via marketplaceMediaUrl",
+      "fallback": "adapted-assets/icons/image-off.svg"
+    },
+    {
+      "originalExpectedPath": "assets/product-list/product-thumb1.png",
+      "originalAssetAvailable": false,
+      "resolution": "runtime-product-media",
+      "dataSource": "SellerProductSummary.primaryMediaUrl or SellerProductDetail.media, via marketplaceMediaUrl",
+      "fallback": "adapted-assets/icons/image-off.svg"
+    },
+    {
+      "originalExpectedPath": "assets/product-list/product-thumb2.png",
+      "originalAssetAvailable": false,
+      "resolution": "runtime-product-media",
+      "dataSource": "SellerProductSummary.primaryMediaUrl or SellerProductDetail.media, via marketplaceMediaUrl",
+      "fallback": "adapted-assets/icons/image-off.svg"
+    },
+    {
+      "originalExpectedPath": "assets/product-list/product-thumb3.png",
+      "originalAssetAvailable": false,
+      "resolution": "runtime-product-media",
+      "dataSource": "SellerProductSummary.primaryMediaUrl or SellerProductDetail.media, via marketplaceMediaUrl",
+      "fallback": "adapted-assets/icons/image-off.svg"
+    },
+    {
+      "originalExpectedPath": "assets/product-list/product-thumb4.png",
+      "originalAssetAvailable": false,
+      "resolution": "runtime-product-media",
+      "dataSource": "SellerProductSummary.primaryMediaUrl or SellerProductDetail.media, via marketplaceMediaUrl",
+      "fallback": "adapted-assets/icons/image-off.svg"
+    },
+    {
+      "originalExpectedPath": "assets/product-list/circle-x.svg",
+      "originalAssetAvailable": false,
+      "resolution": "project-library-substitute",
+      "component": "Store",
+      "localAsset": "adapted-assets/icons/store.svg",
+      "pixelIdenticalToFigma": false
+    },
+    {
+      "originalExpectedPath": "assets/product-list/home.svg",
+      "originalAssetAvailable": false,
+      "resolution": "project-library-substitute",
+      "component": "House",
+      "localAsset": "adapted-assets/icons/house.svg",
+      "pixelIdenticalToFigma": false
+    },
+    {
+      "originalExpectedPath": "assets/product-list/package.svg",
+      "originalAssetAvailable": false,
+      "resolution": "project-library-substitute",
+      "component": "Package",
+      "localAsset": "adapted-assets/icons/package.svg",
+      "pixelIdenticalToFigma": false
+    },
+    {
+      "originalExpectedPath": "assets/product-list/shopping-cart.svg",
+      "originalAssetAvailable": false,
+      "resolution": "project-library-substitute",
+      "component": "ShoppingCart",
+      "localAsset": "adapted-assets/icons/shopping-cart.svg",
+      "pixelIdenticalToFigma": false
+    },
+    {
+      "originalExpectedPath": "assets/product-list/users.svg",
+      "originalAssetAvailable": false,
+      "resolution": "project-library-substitute",
+      "component": "Users",
+      "localAsset": "adapted-assets/icons/users.svg",
+      "pixelIdenticalToFigma": false
+    },
+    {
+      "originalExpectedPath": "assets/product-list/bar-chart.svg",
+      "originalAssetAvailable": false,
+      "resolution": "project-library-substitute",
+      "component": "ChartColumn",
+      "localAsset": "adapted-assets/icons/chart-column.svg",
+      "pixelIdenticalToFigma": false
+    },
+    {
+      "originalExpectedPath": "assets/product-list/settings.svg",
+      "originalAssetAvailable": false,
+      "resolution": "project-library-substitute",
+      "component": "Settings",
+      "localAsset": "adapted-assets/icons/settings.svg",
+      "pixelIdenticalToFigma": false
+    },
+    {
+      "originalExpectedPath": "assets/product-list/bell.svg",
+      "originalAssetAvailable": false,
+      "resolution": "project-library-substitute",
+      "component": "Bell",
+      "localAsset": "adapted-assets/icons/bell.svg",
+      "pixelIdenticalToFigma": false
+    },
+    {
+      "originalExpectedPath": "assets/product-list/search.svg",
+      "originalAssetAvailable": false,
+      "resolution": "project-library-substitute",
+      "component": "Search",
+      "localAsset": "adapted-assets/icons/search.svg",
+      "pixelIdenticalToFigma": false
+    },
+    {
+      "originalExpectedPath": "assets/product-list/chevron-down.svg",
+      "originalAssetAvailable": false,
+      "resolution": "project-library-substitute",
+      "component": "ChevronDown",
+      "localAsset": "adapted-assets/icons/chevron-down.svg",
+      "pixelIdenticalToFigma": false
+    },
+    {
+      "originalExpectedPath": "assets/product-list/plus.svg",
+      "originalAssetAvailable": false,
+      "resolution": "project-library-substitute",
+      "component": "Plus",
+      "localAsset": "adapted-assets/icons/plus.svg",
+      "pixelIdenticalToFigma": false
+    },
+    {
+      "originalExpectedPath": "assets/product-list/edit.svg",
+      "originalAssetAvailable": false,
+      "resolution": "project-library-substitute",
+      "component": "SquarePen",
+      "localAsset": "adapted-assets/icons/square-pen.svg",
+      "pixelIdenticalToFigma": false
+    },
+    {
+      "originalExpectedPath": "assets/product-list/trash.svg",
+      "originalAssetAvailable": false,
+      "resolution": "project-library-substitute",
+      "component": "Trash2",
+      "localAsset": "adapted-assets/icons/trash2.svg",
+      "pixelIdenticalToFigma": false
+    },
+    {
+      "originalExpectedPath": "assets/product-detail/avatar.png",
+      "originalAssetAvailable": false,
+      "resolution": "runtime-initials",
+      "dataSource": "AuthUser.displayName (no avatar URL in contract)",
+      "fallback": "adapted-assets/icons/circle-user-round.svg"
+    },
+    {
+      "originalExpectedPath": "assets/product-detail/main-image.png",
+      "originalAssetAvailable": false,
+      "resolution": "runtime-product-media",
+      "dataSource": "SellerProductSummary.primaryMediaUrl or SellerProductDetail.media, via marketplaceMediaUrl",
+      "fallback": "adapted-assets/icons/image-off.svg"
+    },
+    {
+      "originalExpectedPath": "assets/product-detail/thumb0.png",
+      "originalAssetAvailable": false,
+      "resolution": "runtime-product-media",
+      "dataSource": "SellerProductSummary.primaryMediaUrl or SellerProductDetail.media, via marketplaceMediaUrl",
+      "fallback": "adapted-assets/icons/image-off.svg"
+    },
+    {
+      "originalExpectedPath": "assets/product-detail/thumb1.png",
+      "originalAssetAvailable": false,
+      "resolution": "runtime-product-media",
+      "dataSource": "SellerProductSummary.primaryMediaUrl or SellerProductDetail.media, via marketplaceMediaUrl",
+      "fallback": "adapted-assets/icons/image-off.svg"
+    },
+    {
+      "originalExpectedPath": "assets/product-detail/thumb2.png",
+      "originalAssetAvailable": false,
+      "resolution": "runtime-product-media",
+      "dataSource": "SellerProductSummary.primaryMediaUrl or SellerProductDetail.media, via marketplaceMediaUrl",
+      "fallback": "adapted-assets/icons/image-off.svg"
+    },
+    {
+      "originalExpectedPath": "assets/product-detail/circle-x.svg",
+      "originalAssetAvailable": false,
+      "resolution": "project-library-substitute",
+      "component": "Store",
+      "localAsset": "adapted-assets/icons/store.svg",
+      "pixelIdenticalToFigma": false
+    },
+    {
+      "originalExpectedPath": "assets/product-detail/home.svg",
+      "originalAssetAvailable": false,
+      "resolution": "project-library-substitute",
+      "component": "House",
+      "localAsset": "adapted-assets/icons/house.svg",
+      "pixelIdenticalToFigma": false
+    },
+    {
+      "originalExpectedPath": "assets/product-detail/package.svg",
+      "originalAssetAvailable": false,
+      "resolution": "project-library-substitute",
+      "component": "Package",
+      "localAsset": "adapted-assets/icons/package.svg",
+      "pixelIdenticalToFigma": false
+    },
+    {
+      "originalExpectedPath": "assets/product-detail/shopping-cart.svg",
+      "originalAssetAvailable": false,
+      "resolution": "project-library-substitute",
+      "component": "ShoppingCart",
+      "localAsset": "adapted-assets/icons/shopping-cart.svg",
+      "pixelIdenticalToFigma": false
+    },
+    {
+      "originalExpectedPath": "assets/product-detail/users.svg",
+      "originalAssetAvailable": false,
+      "resolution": "project-library-substitute",
+      "component": "Users",
+      "localAsset": "adapted-assets/icons/users.svg",
+      "pixelIdenticalToFigma": false
+    },
+    {
+      "originalExpectedPath": "assets/product-detail/bar-chart.svg",
+      "originalAssetAvailable": false,
+      "resolution": "project-library-substitute",
+      "component": "ChartColumn",
+      "localAsset": "adapted-assets/icons/chart-column.svg",
+      "pixelIdenticalToFigma": false
+    },
+    {
+      "originalExpectedPath": "assets/product-detail/settings.svg",
+      "originalAssetAvailable": false,
+      "resolution": "project-library-substitute",
+      "component": "Settings",
+      "localAsset": "adapted-assets/icons/settings.svg",
+      "pixelIdenticalToFigma": false
+    },
+    {
+      "originalExpectedPath": "assets/product-detail/bell.svg",
+      "originalAssetAvailable": false,
+      "resolution": "project-library-substitute",
+      "component": "Bell",
+      "localAsset": "adapted-assets/icons/bell.svg",
+      "pixelIdenticalToFigma": false
+    },
+    {
+      "originalExpectedPath": "assets/product-detail/chevron-right.svg",
+      "originalAssetAvailable": false,
+      "resolution": "project-library-substitute",
+      "component": "ChevronRight",
+      "localAsset": "adapted-assets/icons/chevron-right.svg",
+      "pixelIdenticalToFigma": false
+    },
+    {
+      "originalExpectedPath": "assets/product-detail/plus.svg",
+      "originalAssetAvailable": false,
+      "resolution": "project-library-substitute",
+      "component": "Plus",
+      "localAsset": "adapted-assets/icons/plus.svg",
+      "pixelIdenticalToFigma": false
+    },
+    {
+      "originalExpectedPath": "assets/product-detail/toggle.svg",
+      "originalAssetAvailable": false,
+      "resolution": "replace-with-lifecycle-badge-and-actions",
+      "details": "No binary lifecycle toggle; see PROJECT-ADAPTATION.md section 4"
+    },
+    {
+      "originalExpectedPath": "assets/product-detail/bold.svg",
+      "originalAssetAvailable": false,
+      "resolution": "omit-unsupported-rich-text-toolbar",
+      "details": "Use TextareaField bound to description string"
+    },
+    {
+      "originalExpectedPath": "assets/product-detail/italic.svg",
+      "originalAssetAvailable": false,
+      "resolution": "omit-unsupported-rich-text-toolbar",
+      "details": "Use TextareaField bound to description string"
+    },
+    {
+      "originalExpectedPath": "assets/product-detail/underline.svg",
+      "originalAssetAvailable": false,
+      "resolution": "omit-unsupported-rich-text-toolbar",
+      "details": "Use TextareaField bound to description string"
+    },
+    {
+      "originalExpectedPath": "assets/product-detail/align-left.svg",
+      "originalAssetAvailable": false,
+      "resolution": "omit-unsupported-rich-text-toolbar",
+      "details": "Use TextareaField bound to description string"
+    },
+    {
+      "originalExpectedPath": "assets/product-detail/align-center.svg",
+      "originalAssetAvailable": false,
+      "resolution": "omit-unsupported-rich-text-toolbar",
+      "details": "Use TextareaField bound to description string"
+    },
+    {
+      "originalExpectedPath": "assets/product-detail/align-right.svg",
+      "originalAssetAvailable": false,
+      "resolution": "omit-unsupported-rich-text-toolbar",
+      "details": "Use TextareaField bound to description string"
+    },
+    {
+      "originalExpectedPath": "assets/product-detail/image.svg",
+      "originalAssetAvailable": false,
+      "resolution": "omit-unsupported-rich-text-toolbar",
+      "details": "Use TextareaField bound to description string"
+    },
+    {
+      "originalExpectedPath": "assets/product-detail/link.svg",
+      "originalAssetAvailable": false,
+      "resolution": "omit-unsupported-rich-text-toolbar",
+      "details": "Use TextareaField bound to description string"
+    }
+  ]
+}

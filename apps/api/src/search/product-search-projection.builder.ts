@@ -92,6 +92,7 @@ export function buildProductSearchProjection(
       ?.compareAtPriceMinor ?? null;
   const promotionActive = compareAtPriceMinor !== null;
   const scheduledPrice = representative.offer.scheduledPrice;
+  const representativeDiscount = discounts.get(representative.offer.id);
   const discountBasisPoints =
     scheduledPrice?.discountBasisPoints ??
     staticDiscountBasisPoints(effectivePriceMinor, compareAtPriceMinor);
@@ -133,6 +134,19 @@ export function buildProductSearchProjection(
       compare_at_price_minor: compareAtPriceMinor,
       discount_basis_points: discountBasisPoints,
       promotion_active: promotionActive,
+      campaign_eligible: Boolean(representativeDiscount?.campaignId),
+      ...(representativeDiscount?.campaignId
+        ? {
+            campaign_id: representativeDiscount.campaignId,
+            campaign_type_code: representativeDiscount.campaignTypeCode,
+            campaign_importance_class: representativeDiscount.campaignImportanceClass ?? (representativeDiscount.campaignTypeCode === 'FLASH_SALE' ? 'FEATURED' as const : 'NORMAL' as const),
+            campaign_ranking_profile_version: representativeDiscount.policyVersion ?? 1,
+            campaign_policy_version: representativeDiscount.policyVersion,
+            campaign_active_from: representativeDiscount.campaignActiveFrom?.toISOString() ?? null,
+            campaign_active_until: representativeDiscount.campaignActiveUntil?.toISOString() ?? null,
+            campaign_rank: representativeDiscount.campaignImportanceClass === 'FEATURED' || representativeDiscount.campaignTypeCode === 'FLASH_SALE' ? 2 : 1,
+          }
+        : { campaign_id: null, campaign_type_code: null, campaign_importance_class: null, campaign_ranking_profile_version: null, campaign_policy_version: null, campaign_active_from: null, campaign_active_until: null, campaign_rank: 0 }),
       rating_average_basis_points: validInteger(product.ratingAverageBasisPoints) ?? 0,
       rating_count: validInteger(product.ratingCount) ?? 0,
       sold_count: validInteger(product.soldCount) ?? 0,

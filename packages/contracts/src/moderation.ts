@@ -1,4 +1,9 @@
-export const REPORT_TARGET_TYPES = ['PRODUCT', 'SHOP', 'CHAT_CONVERSATION', 'CHAT_MESSAGE'] as const;
+export const REPORT_TARGET_TYPES = [
+  'PRODUCT',
+  'SHOP',
+  'CHAT_CONVERSATION',
+  'CHAT_MESSAGE',
+] as const;
 export type ReportTargetType = (typeof REPORT_TARGET_TYPES)[number];
 
 export const PRODUCT_REPORT_REASON_CODES = [
@@ -171,6 +176,7 @@ export interface ModerationCaseSummary {
   targetType: ReportTargetType;
   targetId: string;
   targetName: string;
+  targetImageUrl?: string | null;
   targetStatus: string;
   status: ModerationCaseStatus;
   reportCount: number;
@@ -220,6 +226,7 @@ export interface ModerationCaseTargetDetails {
   id: string;
   targetType: ReportTargetType;
   name: string;
+  imageUrl?: string | null;
   slug: string | null;
   currentStatus: string;
   moderationStatus?: string;
@@ -302,6 +309,7 @@ export interface AdminReviewDetail {
   id: string;
   productId: string;
   productName: string;
+  productImageUrl?: string | null;
   authorUserId: string;
   authorDisplayName: string;
   rating: number;
@@ -366,8 +374,10 @@ export interface AdminReportedReviewSummary {
   reviewId: string;
   productId: string;
   productName: string;
+  productImageUrl?: string | null;
   shopId: string;
   shopName: string;
+  shopLogoUrl?: string | null;
   rating: number;
   comment: string | null;
   visibility: 'VISIBLE' | 'HIDDEN';
@@ -437,7 +447,11 @@ const HTTPS_URL_REGEX = /^https:\/\/[^\s$.?#].[^\s]*$/i;
 const isRecord = (val: unknown): val is Record<string, unknown> =>
   typeof val === 'object' && val !== null && !Array.isArray(val);
 
-const exact = (value: Record<string, unknown>, required: string[], optional: string[] = []): boolean => {
+const exact = (
+  value: Record<string, unknown>,
+  required: string[],
+  optional: string[] = [],
+): boolean => {
   const allowedKeys = new Set([...required, ...optional]);
   return (
     required.every((key) => Object.hasOwn(value, key)) &&
@@ -465,7 +479,9 @@ export function isReportReasonCode(val: unknown): val is ReportReasonCode {
 }
 
 export function isValidProductReportReason(val: unknown): val is ProductReportReasonCode {
-  return typeof val === 'string' && PRODUCT_REPORT_REASON_CODES.includes(val as ProductReportReasonCode);
+  return (
+    typeof val === 'string' && PRODUCT_REPORT_REASON_CODES.includes(val as ProductReportReasonCode)
+  );
 }
 
 export function isValidShopReportReason(val: unknown): val is ShopReportReasonCode {
@@ -481,11 +497,16 @@ export function isModerationCaseStatus(val: unknown): val is ModerationCaseStatu
 }
 
 export function isModerationDecisionOutcome(val: unknown): val is ModerationDecisionOutcome {
-  return typeof val === 'string' && MODERATION_DECISION_OUTCOMES.includes(val as ModerationDecisionOutcome);
+  return (
+    typeof val === 'string' &&
+    MODERATION_DECISION_OUTCOMES.includes(val as ModerationDecisionOutcome)
+  );
 }
 
 export function isModerationCaseEventType(val: unknown): val is ModerationCaseEventType {
-  return typeof val === 'string' && MODERATION_CASE_EVENT_TYPES.includes(val as ModerationCaseEventType);
+  return (
+    typeof val === 'string' && MODERATION_CASE_EVENT_TYPES.includes(val as ModerationCaseEventType)
+  );
 }
 
 export function isSellerNoticeAction(val: unknown): val is SellerNoticeAction {
@@ -493,7 +514,10 @@ export function isSellerNoticeAction(val: unknown): val is SellerNoticeAction {
 }
 
 export function isSellerReviewReportReasonCode(val: unknown): val is SellerReviewReportReasonCode {
-  return typeof val === 'string' && SELLER_REVIEW_REPORT_REASON_CODES.includes(val as SellerReviewReportReasonCode);
+  return (
+    typeof val === 'string' &&
+    SELLER_REVIEW_REPORT_REASON_CODES.includes(val as SellerReviewReportReasonCode)
+  );
 }
 
 export function isValidSellerReviewReportDetails(val: unknown): val is string {
@@ -539,7 +563,10 @@ export function isValidEvidenceUrlList(val: unknown): val is string[] {
 }
 
 export function parseCreateReportRequest(val: unknown): CreateReportRequest | null {
-  if (!isRecord(val) || !exact(val, ['targetType', 'targetId', 'reasonCode', 'details'], ['evidenceUrls'])) {
+  if (
+    !isRecord(val) ||
+    !exact(val, ['targetType', 'targetId', 'reasonCode', 'details'], ['evidenceUrls'])
+  ) {
     return null;
   }
   if (!isReportTargetType(val.targetType) || !isCanonicalUuid(val.targetId)) {
@@ -562,11 +589,15 @@ export function parseCreateReportRequest(val: unknown): CreateReportRequest | nu
     targetId: val.targetId,
     reasonCode: val.reasonCode,
     details: (val.details as string).trim(),
-    ...(val.evidenceUrls !== undefined ? { evidenceUrls: (val.evidenceUrls as string[]).map((u) => u.trim()) } : {}),
+    ...(val.evidenceUrls !== undefined
+      ? { evidenceUrls: (val.evidenceUrls as string[]).map((u) => u.trim()) }
+      : {}),
   };
 }
 
-export function parseCreateSellerReviewReportRequest(val: unknown): CreateSellerReviewReportRequest | null {
+export function parseCreateSellerReviewReportRequest(
+  val: unknown,
+): CreateSellerReviewReportRequest | null {
   if (!isRecord(val) || !exact(val, ['reasonCode'], ['details'])) {
     return null;
   }
@@ -618,7 +649,21 @@ export function parseReporterReportListQuery(val: unknown): ReporterReportListQu
 export function parseModerationCaseListQuery(val: unknown): ModerationCaseListQuery | null {
   if (
     !isRecord(val) ||
-    !exact(val, [], ['limit', 'cursor', 'status', 'targetType', 'targetId', 'searchId', 'reasonCode', 'assignedAdminId', 'assignedState'])
+    !exact(
+      val,
+      [],
+      [
+        'limit',
+        'cursor',
+        'status',
+        'targetType',
+        'targetId',
+        'searchId',
+        'reasonCode',
+        'assignedAdminId',
+        'assignedState',
+      ],
+    )
   ) {
     return null;
   }
@@ -665,7 +710,8 @@ export function parseModerationCaseListQuery(val: unknown): ModerationCaseListQu
   }
   let assignedState: 'ALL' | 'ASSIGNED' | 'UNASSIGNED' | 'ASSIGNED_TO_ME' | undefined;
   if (val.assignedState !== undefined) {
-    if (!['ALL', 'ASSIGNED', 'UNASSIGNED', 'ASSIGNED_TO_ME'].includes(val.assignedState as string)) return null;
+    if (!['ALL', 'ASSIGNED', 'UNASSIGNED', 'ASSIGNED_TO_ME'].includes(val.assignedState as string))
+      return null;
     assignedState = val.assignedState as 'ALL' | 'ASSIGNED' | 'UNASSIGNED' | 'ASSIGNED_TO_ME';
   }
   return {
@@ -688,7 +734,8 @@ export function parseAssignModerationCaseRequest(val: unknown): AssignModeration
   if (val.assignedAdminId !== null && !isCanonicalUuid(val.assignedAdminId)) {
     return null;
   }
-  const version = typeof val.expectedVersion === 'number' ? val.expectedVersion : Number(val.expectedVersion);
+  const version =
+    typeof val.expectedVersion === 'number' ? val.expectedVersion : Number(val.expectedVersion);
   if (!Number.isInteger(version) || version < 0) {
     return null;
   }
@@ -698,14 +745,17 @@ export function parseAssignModerationCaseRequest(val: unknown): AssignModeration
   };
 }
 
-export function parseAddModerationCaseNoteRequest(val: unknown): AddModerationCaseNoteRequest | null {
+export function parseAddModerationCaseNoteRequest(
+  val: unknown,
+): AddModerationCaseNoteRequest | null {
   if (!isRecord(val) || !exact(val, ['note', 'expectedVersion'])) {
     return null;
   }
   if (!isValidPrivateNote(val.note)) {
     return null;
   }
-  const version = typeof val.expectedVersion === 'number' ? val.expectedVersion : Number(val.expectedVersion);
+  const version =
+    typeof val.expectedVersion === 'number' ? val.expectedVersion : Number(val.expectedVersion);
   if (!Number.isInteger(version) || version < 0) {
     return null;
   }
@@ -715,24 +765,39 @@ export function parseAddModerationCaseNoteRequest(val: unknown): AddModerationCa
   };
 }
 
-export function parseCreateModerationDecisionRequest(val: unknown): CreateModerationDecisionRequest | null {
+export function parseCreateModerationDecisionRequest(
+  val: unknown,
+): CreateModerationDecisionRequest | null {
   if (
     !isRecord(val) ||
-    !exact(val, ['outcome', 'publicReason', 'expectedVersion'], ['privateNote', 'reversesDecisionId', 'restrictionUntil'])
+    !exact(
+      val,
+      ['outcome', 'publicReason', 'expectedVersion'],
+      ['privateNote', 'reversesDecisionId', 'restrictionUntil'],
+    )
   ) {
     return null;
   }
   if (!isModerationDecisionOutcome(val.outcome) || !isValidPublicReason(val.publicReason)) {
     return null;
   }
-  const version = typeof val.expectedVersion === 'number' ? val.expectedVersion : Number(val.expectedVersion);
+  const version =
+    typeof val.expectedVersion === 'number' ? val.expectedVersion : Number(val.expectedVersion);
   if (!Number.isInteger(version) || version < 0) {
     return null;
   }
-  if (val.privateNote !== undefined && val.privateNote !== null && !isValidPrivateNote(val.privateNote)) {
+  if (
+    val.privateNote !== undefined &&
+    val.privateNote !== null &&
+    !isValidPrivateNote(val.privateNote)
+  ) {
     return null;
   }
-  if (val.reversesDecisionId !== undefined && val.reversesDecisionId !== null && !isCanonicalUuid(val.reversesDecisionId)) {
+  if (
+    val.reversesDecisionId !== undefined &&
+    val.reversesDecisionId !== null &&
+    !isCanonicalUuid(val.reversesDecisionId)
+  ) {
     return null;
   }
   if (
@@ -748,8 +813,12 @@ export function parseCreateModerationDecisionRequest(val: unknown): CreateModera
     outcome: val.outcome,
     publicReason: (val.publicReason as string).trim(),
     expectedVersion: version,
-    ...(val.privateNote !== undefined && val.privateNote !== null ? { privateNote: (val.privateNote as string).trim() } : {}),
-    ...(val.reversesDecisionId !== undefined && val.reversesDecisionId !== null ? { reversesDecisionId: val.reversesDecisionId } : {}),
+    ...(val.privateNote !== undefined && val.privateNote !== null
+      ? { privateNote: (val.privateNote as string).trim() }
+      : {}),
+    ...(val.reversesDecisionId !== undefined && val.reversesDecisionId !== null
+      ? { reversesDecisionId: val.reversesDecisionId }
+      : {}),
     ...(val.restrictionUntil !== undefined && val.restrictionUntil !== null
       ? { restrictionUntil: val.restrictionUntil as string }
       : {}),
@@ -766,7 +835,8 @@ export function parseAdminReviewActionRequest(val: unknown): AdminReviewActionRe
   if (!isValidPublicReason(val.reason)) {
     return null;
   }
-  const version = typeof val.expectedVersion === 'number' ? val.expectedVersion : Number(val.expectedVersion);
+  const version =
+    typeof val.expectedVersion === 'number' ? val.expectedVersion : Number(val.expectedVersion);
   if (!Number.isInteger(version) || version < 0) {
     return null;
   }
@@ -777,14 +847,17 @@ export function parseAdminReviewActionRequest(val: unknown): AdminReviewActionRe
   };
 }
 
-export function parseSellerModerationNoticeListQuery(val: unknown): SellerModerationNoticeListQuery | null {
+export function parseSellerModerationNoticeListQuery(
+  val: unknown,
+): SellerModerationNoticeListQuery | null {
   if (!isRecord(val) || !exact(val, [], ['limit', 'cursor', 'unreadOnly'])) {
     return null;
   }
   let limit: number | undefined;
   if (val.limit !== undefined) {
     const rawLimit = typeof val.limit === 'number' ? val.limit : Number(val.limit);
-    if (!Number.isInteger(rawLimit) || rawLimit < 1 || rawLimit > SELLER_NOTICES_MAX_LIMIT) return null;
+    if (!Number.isInteger(rawLimit) || rawLimit < 1 || rawLimit > SELLER_NOTICES_MAX_LIMIT)
+      return null;
     limit = rawLimit;
   }
   let cursor: string | undefined;
@@ -814,7 +887,11 @@ export function parseSellerModerationNoticeListQuery(val: unknown): SellerModera
 export function parseModerationProblemDetails(val: unknown): ModerationProblemDetails | null {
   if (
     !isRecord(val) ||
-    !exact(val, ['type', 'title', 'status', 'detail'], ['invalidParameters', 'currentVersion', 'currentCase', 'retryAfterSeconds'])
+    !exact(
+      val,
+      ['type', 'title', 'status', 'detail'],
+      ['invalidParameters', 'currentVersion', 'currentCase', 'retryAfterSeconds'],
+    )
   ) {
     return null;
   }

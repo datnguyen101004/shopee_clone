@@ -2,13 +2,9 @@ import {
   ADMIN_REASON_MAX_LENGTH,
   ADMIN_REASON_MIN_LENGTH,
   ADMIN_VERSION,
-
-  isAllowedMediaUrl,
   isCategorySlug,
   isIsoDateString,
   isValidAdminReason,
-  isValidBannerDestination,
-  type AdminBannerSummary,
   type AdminCategoryListResponse,
   type AdminCategorySummary,
   type AdminCategoryTreeNode,
@@ -19,6 +15,8 @@ import {
   type AdminPrivilegedAuditListResponse,
   type AdminProductActionInput,
   type AdminProductActionResult,
+  type AdminProductListQuery,
+  type AdminProductListResponse,
   type AdminProductLookupResponse,
   type AdminShopActionRequest,
   type AdminShopListQuery,
@@ -28,11 +26,8 @@ import {
   type AdminUserListQuery,
   type AdminUserListResponse,
   type AdminUserSummary,
-  type CreateAdminBannerRequest,
   type CreateAdminCategoryRequest,
-  type ReorderAdminBannersRequest,
   type ReorderAdminCategoriesRequest,
-  type UpdateAdminBannerRequest,
   type UpdateAdminCategoryRequest,
   type UpdateAdminHomepageModuleSettingsRequest,
 } from '@shopee-clone/contracts';
@@ -61,7 +56,8 @@ import { SellerIdentityLifecycleService } from '../seller-identity/seller-identi
 export class AdminService {
   constructor(
     @Inject(AdminRepository) private readonly repository: AdminRepository,
-    @Optional() @Inject(SellerIdentityLifecycleService)
+    @Optional()
+    @Inject(SellerIdentityLifecycleService)
     private readonly sellerLifecycle?: SellerIdentityLifecycleService,
   ) {}
 
@@ -126,9 +122,19 @@ export class AdminService {
 
       if (this.sellerLifecycle) {
         if (input.action === 'SUSPEND') {
-          await this.sellerLifecycle.suspendUserInTransaction(tx, actorUserId, targetUserId, input.reason);
+          await this.sellerLifecycle.suspendUserInTransaction(
+            tx,
+            actorUserId,
+            targetUserId,
+            input.reason,
+          );
         } else {
-          await this.sellerLifecycle.restoreUserInTransaction(tx, actorUserId, targetUserId, input.reason);
+          await this.sellerLifecycle.restoreUserInTransaction(
+            tx,
+            actorUserId,
+            targetUserId,
+            input.reason,
+          );
         }
         const updated = await this.repository.findUserById(targetUserId, tx);
         if (!updated) throw new AdminNotFoundError('User');
@@ -297,9 +303,19 @@ export class AdminService {
 
       if (this.sellerLifecycle) {
         if (input.action === 'SUSPEND') {
-          await this.sellerLifecycle.suspendShopInTransaction(tx, actorUserId, targetShopId, input.reason);
+          await this.sellerLifecycle.suspendShopInTransaction(
+            tx,
+            actorUserId,
+            targetShopId,
+            input.reason,
+          );
         } else {
-          await this.sellerLifecycle.restoreShopInTransaction(tx, actorUserId, targetShopId, input.reason);
+          await this.sellerLifecycle.restoreShopInTransaction(
+            tx,
+            actorUserId,
+            targetShopId,
+            input.reason,
+          );
         }
         const updated = await this.repository.findShopById(targetShopId, tx);
         if (!updated) throw new AdminNotFoundError('Shop');
@@ -695,223 +711,6 @@ export class AdminService {
     });
   }
 
-  async listBanners(): Promise<AdminBannerSummary[]> {
-    const rows = await this.repository.listBanners();
-    return rows.map((b) => ({
-      id: b.id,
-      eyebrow: b.eyebrow ?? undefined,
-      title: b.title,
-      description: b.description ?? undefined,
-      imageUrl: b.imageUrl,
-      altText: b.altText ?? '',
-      href: b.destinationPath,
-      theme: b.themeKey,
-      sortOrder: b.sortOrder,
-      createdAt: b.id, // fallback or stable
-      updatedAt: b.id,
-    }));
-  }
-
-  async createBanner(
-    actorUserId: string,
-    input: CreateAdminBannerRequest,
-  ): Promise<AdminBannerSummary> {
-    if (!isValidBannerDestination(input.href)) {
-      throw new AdminInvalidInputError('Banner destination must be a valid relative path');
-    }
-    if (input.imageUrl && !isAllowedMediaUrl(input.imageUrl)) {
-      throw new AdminInvalidInputError('Banner image URL is not in allowlisted media domains');
-    }
-
-    const now = new Date();
-
-    return this.repository.transaction(async (tx) => {
-      const campaignModule = await this.repository.findCampaignBannerModule(tx);
-      if (!campaignModule) {
-        throw new AdminNotFoundError('Campaign banner homepage module');
-      }
-
-      const created = await tx.homepageBanner.create({
-        data: {
-          moduleId: campaignModule.id,
-          eyebrow: input.eyebrow,
-          title: input.title.trim(),
-          description: input.description,
-          imageUrl: input.imageUrl,
-          altText: input.altText.trim(),
-          destinationPath: input.href.trim(),
-          themeKey: input.theme.trim(),
-          sortOrder: input.sortOrder ?? 0,
-        },
-      });
-
-      await recordPrivilegedAudit(tx, {
-        actorUserId,
-        targetType: PrivilegedTargetType.BANNER,
-        targetId: created.id,
-        action: PrivilegedAction.CREATE,
-        reason: `Created banner ${created.title}`,
-        afterSummary: {
-          title: created.title,
-          href: created.destinationPath,
-          sortOrder: created.sortOrder,
-        },
-        now,
-      });
-
-      return {
-        id: created.id,
-        eyebrow: created.eyebrow ?? undefined,
-        title: created.title,
-        description: created.description ?? undefined,
-        imageUrl: created.imageUrl,
-        altText: created.altText ?? '',
-        href: created.destinationPath,
-        theme: created.themeKey,
-        sortOrder: created.sortOrder,
-        createdAt: now.toISOString(),
-        updatedAt: now.toISOString(),
-      };
-    });
-  }
-
-  async updateBanner(
-    actorUserId: string,
-    id: string,
-    input: UpdateAdminBannerRequest,
-  ): Promise<AdminBannerSummary> {
-    if (input.href !== undefined && !isValidBannerDestination(input.href)) {
-      throw new AdminInvalidInputError('Banner destination must be a valid relative path');
-    }
-    if (input.imageUrl !== undefined && !isAllowedMediaUrl(input.imageUrl)) {
-      throw new AdminInvalidInputError('Banner image URL is not in allowlisted media domains');
-    }
-
-    const now = new Date();
-
-    return this.repository.transaction(async (tx) => {
-      const banner = await this.repository.findBannerById(id, tx);
-      if (!banner) throw new AdminNotFoundError('Banner');
-
-      const updated = await tx.homepageBanner.update({
-        where: { id },
-        data: {
-          eyebrow: input.eyebrow,
-          title: input.title ? input.title.trim() : undefined,
-          description: input.description,
-          imageUrl: input.imageUrl,
-          altText: input.altText ? input.altText.trim() : undefined,
-          destinationPath: input.href ? input.href.trim() : undefined,
-          themeKey: input.theme ? input.theme.trim() : undefined,
-          sortOrder: input.sortOrder !== undefined ? input.sortOrder : undefined,
-        },
-      });
-
-      await recordPrivilegedAudit(tx, {
-        actorUserId,
-        targetType: PrivilegedTargetType.BANNER,
-        targetId: id,
-        action: PrivilegedAction.UPDATE,
-        reason: `Updated banner ${updated.title}`,
-        beforeSummary: {
-          title: banner.title,
-          href: banner.destinationPath,
-          sortOrder: banner.sortOrder,
-        },
-        afterSummary: {
-          title: updated.title,
-          href: updated.destinationPath,
-          sortOrder: updated.sortOrder,
-        },
-        now,
-      });
-
-      return {
-        id: updated.id,
-        eyebrow: updated.eyebrow ?? undefined,
-        title: updated.title,
-        description: updated.description ?? undefined,
-        imageUrl: updated.imageUrl,
-        altText: updated.altText ?? '',
-        href: updated.destinationPath,
-        theme: updated.themeKey,
-        sortOrder: updated.sortOrder,
-        createdAt: now.toISOString(),
-        updatedAt: now.toISOString(),
-      };
-    });
-  }
-
-  async deleteBanner(actorUserId: string, id: string): Promise<void> {
-    const now = new Date();
-
-    return this.repository.transaction(async (tx) => {
-      const banner = await this.repository.findBannerById(id, tx);
-      if (!banner) throw new AdminNotFoundError('Banner');
-
-      await tx.homepageBanner.delete({ where: { id } });
-
-      await recordPrivilegedAudit(tx, {
-        actorUserId,
-        targetType: PrivilegedTargetType.BANNER,
-        targetId: id,
-        action: PrivilegedAction.DELETE,
-        reason: `Deleted banner ${banner.title}`,
-        beforeSummary: {
-          title: banner.title,
-          href: banner.destinationPath,
-        },
-        now,
-      });
-    });
-  }
-
-  async reorderBanners(
-    actorUserId: string,
-    input: ReorderAdminBannersRequest,
-  ): Promise<AdminBannerSummary[]> {
-    const now = new Date();
-
-    return this.repository.transaction(async (tx) => {
-      for (const item of input.items) {
-        await tx.homepageBanner.update({
-          where: { id: item.id },
-          data: { sortOrder: item.sortOrder },
-        });
-      }
-
-      await recordPrivilegedAudit(tx, {
-        actorUserId,
-        targetType: PrivilegedTargetType.BANNER,
-        targetId: input.items[0]?.id || actorUserId,
-        action: PrivilegedAction.REORDER,
-        reason: `Reordered ${input.items.length} banners`,
-        afterSummary: { reorderedCount: input.items.length },
-        now,
-      });
-
-      const campaignModule = await this.repository.findCampaignBannerModule(tx);
-      const banners = await tx.homepageBanner.findMany({
-        where: { moduleId: campaignModule?.id },
-        orderBy: [{ sortOrder: 'asc' }],
-      });
-
-      return banners.map((b) => ({
-        id: b.id,
-        eyebrow: b.eyebrow ?? undefined,
-        title: b.title,
-        description: b.description ?? undefined,
-        imageUrl: b.imageUrl,
-        altText: b.altText ?? '',
-        href: b.destinationPath,
-        theme: b.themeKey,
-        sortOrder: b.sortOrder,
-        createdAt: now.toISOString(),
-        updatedAt: now.toISOString(),
-      }));
-    });
-  }
-
   async listHomepageModules(): Promise<AdminHomepageModuleListResponse> {
     const modules = await this.repository.listHomepageModules();
     return {
@@ -1093,6 +892,44 @@ export class AdminService {
     };
   }
 
+  async listProducts(query: AdminProductListQuery): Promise<AdminProductListResponse> {
+    // The admin workspace intentionally exposes the live catalog only. Lifecycle
+    // states such as draft/hidden/archived remain available through the detail
+    // and action APIs, but never enter this list view.
+    const result = await this.repository.listProducts({ ...query, status: 'ACTIVE' });
+    return {
+      items: result.items.map((product) => {
+        const prices = product.variants.map((variant) => Number(variant.priceMinor));
+        const stockQuantity = product.variants.reduce((sum, variant) => {
+          const available =
+            (variant.inventory?.quantityOnHand ?? 0) - (variant.inventory?.quantityReserved ?? 0);
+          return sum + Math.max(0, available);
+        }, 0);
+
+        return {
+          id: product.id,
+          shopId: product.shop.id,
+          categoryId: product.category.id,
+          shopName: product.shop.name,
+          shopSlug: product.shop.slug,
+          categoryName: product.category.name,
+          categorySlug: product.category.slug,
+          slug: product.slug,
+          name: product.name,
+          status: product.status as 'DRAFT' | 'ACTIVE' | 'HIDDEN' | 'ARCHIVED',
+          moderationStatus: product.moderationStatus as 'ACTIVE' | 'SUSPENDED',
+          primaryImageUrl: product.images[0]?.url ?? null,
+          minPrice: prices.length ? Math.min(...prices) : null,
+          maxPrice: prices.length ? Math.max(...prices) : null,
+          stockQuantity,
+          variantCount: product.variants.length,
+          soldCount: product.soldCount,
+          updatedAt: product.updatedAt.toISOString(),
+        };
+      }),
+      nextCursor: result.nextCursor,
+    };
+  }
 
   async applyProductAction(
     productId: string,

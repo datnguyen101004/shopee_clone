@@ -41,6 +41,19 @@ interface DisplayableCatalogCandidate {
   relevance: number;
 }
 
+function campaignRank(candidate: DisplayableCatalogCandidate): number {
+  const scheduled = candidate.card.scheduledPrice;
+  if (!scheduled?.campaignId) return 0;
+  return scheduled.campaignImportanceClass === 'FEATURED' || scheduled.campaignTypeCode === 'FLASH_SALE' ? 2 : 1;
+}
+
+function lexicalTier(score: number): number {
+  if (score >= 1_000) return 3;
+  if (score >= 500) return 2;
+  if (score >= 200) return 1;
+  return 0;
+}
+
 function mapDisplayableCandidate(product: CatalogCandidate): DisplayableCatalogCandidate | null {
   const card = mapCatalogProductCard(product);
   if (!card) return null;
@@ -143,7 +156,16 @@ function compareCandidates(
 ): number {
   let primary = 0;
   const dailyBaseline = query.recommendationSurface === 'daily-recommendations' && !query.q;
-  if (query.sort === 'relevance' && query.q) primary = right.relevance - left.relevance;
+  if (query.sort === 'relevance' && query.q) {
+    const leftTier = lexicalTier(left.relevance);
+    const rightTier = lexicalTier(right.relevance);
+    // Campaign priority is a bounded tie-breaker within the same lexical
+    // tier. It can never lift a weak match above an exact or prefix match.
+    primary = leftTier === rightTier
+      ? campaignRank(right) - campaignRank(left)
+      : right.relevance - left.relevance;
+    if (primary === 0) primary = right.relevance - left.relevance;
+  }
   else if (query.sort === 'best-selling' || dailyBaseline) {
     primary = right.card.soldCount - left.card.soldCount;
   } else if (query.sort === 'price-asc')

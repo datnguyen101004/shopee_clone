@@ -153,7 +153,7 @@ export function CarrierShipmentDetailPage() {
     <main className="carrier-ui-page carrier-ui-detail" aria-label={`Chi tiết đơn ${shipment.trackingCode}`}>
       <header className="carrier-ui-detail-header">
         <div>
-          <nav className="carrier-ui-breadcrumbs" aria-label="Đường dẫn"><Link href="/carrier">Đơn hàng</Link><span>›</span><strong>Chi tiết đơn #{shipment.trackingCode}</strong></nav>
+          <nav className="carrier-ui-breadcrumbs" aria-label="Đường dẫn"><Link href="/carrier">Đơn hàng</Link><span>›</span><span className="font-medium">Chi tiết đơn #{shipment.trackingCode}</span></nav>
           <div className="carrier-ui-detail-title"><h1>Đơn hàng #{shipment.trackingCode}</h1><span className={`carrier-ui-status carrier-ui-status--${tone}`}><i />{statusLabel(shipment.status)}</span></div>
         </div>
         <div className="carrier-ui-detail-actions">
@@ -176,7 +176,7 @@ export function CarrierShipmentDetailPage() {
                     <span className="carrier-ui-order-product__image carrier-ui-order-product__image--empty" aria-label={`${item.productName} chưa có ảnh`}>Chưa có ảnh</span>
                   )}
                   <div className="carrier-ui-order-product__copy">
-                    <strong>{item.productName}</strong>
+                    <span className="font-medium">{item.productName}</span>
                     <span>{item.variantName} · Số lượng: {item.quantity}</span>
                     <p>{item.description ?? 'Sản phẩm chưa có mô tả.'}</p>
                   </div>
@@ -202,7 +202,7 @@ export function CarrierShipmentDetailPage() {
         <aside className="carrier-ui-detail-side">
           <ContactCard title="Người gửi" name={sender.name} phone={sender.phoneNumber ?? 'Chưa cập nhật'} address={`Địa chỉ gửi: ${sender.address}`} icon="user.svg" direction="up" />
           <ContactCard title="Người nhận" name={recipient.name} phone={recipient.phoneNumber ?? 'Chưa cập nhật'} address={`Địa chỉ giao: ${recipient.address}`} icon="user-check.svg" direction="down" />
-          <section className="carrier-ui-detail-card carrier-ui-driver-card"><h2>Tài xế phụ trách</h2><div className="carrier-ui-person"><span className="carrier-ui-person__icon"><img src="/media/carrier-ui/user.svg" alt="" /></span><div><strong>{shipment.driver?.name ?? 'Chưa phân công'}</strong><span>{shipment.driver?.phoneNumber ?? '—'}</span></div></div><div className="carrier-ui-driver-meta"><div><span>Phương tiện</span><strong>{shipment.driver?.vehicle ?? 'Chưa cập nhật'}</strong></div><div><span>Khu vực xử lý</span><strong>{quote?.delivery.districtName ?? 'Chưa phân công'}</strong></div></div></section>
+          <section className="carrier-ui-detail-card carrier-ui-driver-card"><h2>Tài xế phụ trách</h2><div className="carrier-ui-person"><span className="carrier-ui-person__icon"><img src="/media/carrier-ui/user.svg" alt="" /></span><div><strong>{shipment.driver?.name ?? 'Chưa phân công'}</strong><span>{shipment.driver?.phoneNumber ?? '—'}</span></div></div><div className="carrier-ui-driver-meta"><div><span>Phương tiện</span><span className="font-medium">{shipment.driver?.vehicle ?? 'Chưa cập nhật'}</span></div><div><span>Khu vực xử lý</span><span className="font-medium">{quote?.delivery.districtName ?? 'Chưa phân công'}</span></div></div></section>
         </aside>
       </div>
 
@@ -213,5 +213,5 @@ export function CarrierShipmentDetailPage() {
 }
 
 function ContactCard({ title, name, phone, address, icon, direction }: { title: string; name: string; phone: string; address: string; icon: string; direction: 'up' | 'down' }) {
-  return <section className="carrier-ui-detail-card carrier-ui-contact-card"><div className="carrier-ui-contact-heading"><h2>{title}</h2><img src={`/media/carrier-ui/arrow-${direction === 'up' ? 'up-right' : 'down-left'}.svg`} alt="" /></div><div className="carrier-ui-person"><span className="carrier-ui-person__icon"><img src={`/media/carrier-ui/${icon}`} alt="" /></span><div><strong>{name}</strong><span>{phone}</span></div></div><p><b>{address.split(':')[0]}:</b>{address.split(':').slice(1).join(':')}</p></section>;
+  return <section className="carrier-ui-detail-card carrier-ui-contact-card"><div className="carrier-ui-contact-heading"><h2>{title}</h2><img src={`/media/carrier-ui/arrow-${direction === 'up' ? 'up-right' : 'down-left'}.svg`} alt="" /></div><div className="carrier-ui-person"><span className="carrier-ui-person__icon"><img src={`/media/carrier-ui/${icon}`} alt="" /></span><div><strong>{name}</strong><span>{phone}</span></div></div><p><span className="font-medium">{address.split(':')[0]}:</span>{address.split(':').slice(1).join(':')}</p></section>;
 }

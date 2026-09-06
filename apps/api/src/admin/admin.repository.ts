@@ -10,7 +10,12 @@ import {
   type AdminUserStatus,
 } from '@shopee-clone/contracts';
 import { Inject, Injectable } from '@nestjs/common';
-import type { Prisma, PrivilegedAction, PrivilegedTargetType } from '../generated/prisma/client';
+import type {
+  Prisma,
+  PrivilegedAction,
+  PrivilegedTargetType,
+  ProductStatus,
+} from '../generated/prisma/client';
 import {
   MarketplaceRole,
   ProductModerationStatus,
@@ -33,6 +38,7 @@ export interface AdminUserListItem {
 
 export interface AdminShopListItem {
   id: string;
+  logoUrl?: string | null;
   ownerUserId: string;
   slug: string;
   name: string;
@@ -257,6 +263,7 @@ export class AdminRepository {
       orderBy: [{ updatedAt: 'desc' }, { id: 'desc' }],
       select: {
         id: true,
+        logoUrl: true,
         ownerId: true,
         slug: true,
         name: true,
@@ -275,6 +282,7 @@ export class AdminRepository {
     return {
       items: items.map((s) => ({
         id: s.id,
+        logoUrl: s.logoUrl,
         ownerUserId: s.ownerId,
         slug: s.slug,
         name: s.name,
@@ -304,6 +312,7 @@ export class AdminRepository {
       where: { id, deletedAt: null },
       select: {
         id: true,
+        logoUrl: true,
         ownerId: true,
         slug: true,
         name: true,
@@ -317,6 +326,7 @@ export class AdminRepository {
     if (!s) return null;
     return {
       id: s.id,
+      logoUrl: s.logoUrl,
       ownerUserId: s.ownerId,
       slug: s.slug,
       name: s.name,
@@ -389,32 +399,6 @@ export class AdminRepository {
     });
   }
 
-  async listBanners() {
-    const campaignModule = await this.prisma.homepageModule.findFirst({
-      where: { type: 'CAMPAIGN_BANNER' },
-    });
-    if (!campaignModule) return [];
-
-    return this.prisma.homepageBanner.findMany({
-      where: { moduleId: campaignModule.id },
-      orderBy: [{ sortOrder: 'asc' }],
-    });
-  }
-
-  async findBannerById(id: string, tx?: Prisma.TransactionClient) {
-    const client = tx ?? this.prisma;
-    return client.homepageBanner.findUnique({
-      where: { id },
-    });
-  }
-
-  async findCampaignBannerModule(tx?: Prisma.TransactionClient) {
-    const client = tx ?? this.prisma;
-    return client.homepageModule.findFirst({
-      where: { type: 'CAMPAIGN_BANNER' },
-    });
-  }
-
   async listHomepageModules() {
     return this.prisma.homepageModule.findMany({
       orderBy: [{ sortOrder: 'asc' }],
@@ -471,6 +455,121 @@ export class AdminRepository {
     const items = hasMore ? rows.slice(0, limit) : rows;
     const nextCursor = hasMore && items.length > 0 ? (items[items.length - 1]?.id ?? null) : null;
 
+    const idsByType = new Map<string, Set<string>>();
+    for (const event of items) {
+      const key = String(event.targetType);
+      const ids = idsByType.get(key) ?? new Set<string>();
+      ids.add(event.targetId);
+      idsByType.set(key, ids);
+    }
+    const targetIds = (type: string) => [...(idsByType.get(type) ?? [])];
+    const [
+      users,
+      shops,
+      products,
+      categories,
+      banners,
+      modules,
+      moderationCases,
+      reviews,
+      returns,
+    ] = await Promise.all([
+      this.prisma.user.findMany({
+        where: { id: { in: targetIds('USER') }, deletedAt: null },
+        select: { id: true, displayName: true },
+      }),
+      this.prisma.shop.findMany({
+        where: { id: { in: targetIds('SHOP') }, deletedAt: null },
+        select: { id: true, name: true, logoUrl: true },
+      }),
+      this.prisma.product.findMany({
+        where: { id: { in: targetIds('PRODUCT') }, deletedAt: null },
+        select: {
+          id: true,
+          name: true,
+          images: {
+            take: 1,
+            orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }],
+            select: { url: true },
+          },
+        },
+      }),
+      this.prisma.category.findMany({
+        where: { id: { in: targetIds('CATEGORY') }, deletedAt: null },
+        select: { id: true, name: true },
+      }),
+      this.prisma.homepageBanner.findMany({
+        where: { id: { in: targetIds('BANNER') } },
+        select: { id: true, title: true, imageUrl: true },
+      }),
+      this.prisma.homepageModule.findMany({
+        where: { id: { in: targetIds('HOMEPAGE_MODULE') } },
+        select: { id: true, title: true },
+      }),
+      this.prisma.moderationCase.findMany({
+        where: { id: { in: targetIds('MODERATION_CASE') } },
+        select: { id: true, targetSnapshot: true },
+      }),
+      this.prisma.productReview.findMany({
+        where: { id: { in: targetIds('REVIEW') } },
+        select: {
+          id: true,
+          product: {
+            select: {
+              name: true,
+              images: {
+                take: 1,
+                orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }],
+                select: { url: true },
+              },
+            },
+          },
+        },
+      }),
+      this.prisma.returnRequest.findMany({
+        where: { id: { in: targetIds('RETURN_REQUEST') } },
+        select: {
+          id: true,
+          shop: { select: { name: true } },
+          items: {
+            take: 1,
+            orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+            select: { orderLine: { select: { productName: true, productImageUrl: true } } },
+          },
+        },
+      }),
+    ]);
+    const targets = new Map<string, { name: string; imageUrl?: string | null }>();
+    users.forEach((item) => targets.set(`USER:${item.id}`, { name: item.displayName }));
+    shops.forEach((item) =>
+      targets.set(`SHOP:${item.id}`, { name: item.name, imageUrl: item.logoUrl }),
+    );
+    products.forEach((item) =>
+      targets.set(`PRODUCT:${item.id}`, { name: item.name, imageUrl: item.images[0]?.url ?? null }),
+    );
+    categories.forEach((item) => targets.set(`CATEGORY:${item.id}`, { name: item.name }));
+    banners.forEach((item) =>
+      targets.set(`BANNER:${item.id}`, { name: item.title, imageUrl: item.imageUrl }),
+    );
+    modules.forEach((item) => targets.set(`HOMEPAGE_MODULE:${item.id}`, { name: item.title }));
+    moderationCases.forEach((item) => {
+      const snapshot = item.targetSnapshot as Record<string, unknown>;
+      if (typeof snapshot?.name === 'string')
+        targets.set(`MODERATION_CASE:${item.id}`, { name: snapshot.name });
+    });
+    reviews.forEach((item) =>
+      targets.set(`REVIEW:${item.id}`, {
+        name: item.product.name,
+        imageUrl: item.product.images[0]?.url ?? null,
+      }),
+    );
+    returns.forEach((item) =>
+      targets.set(`RETURN_REQUEST:${item.id}`, {
+        name: item.items[0]?.orderLine.productName ?? item.shop.name,
+        imageUrl: item.items[0]?.orderLine.productImageUrl ?? null,
+      }),
+    );
+
     return {
       items: items.map((event) => ({
         id: event.id,
@@ -479,6 +578,8 @@ export class AdminRepository {
         actorDisplayName: event.actorUser?.displayName,
         targetType: event.targetType as AdminPrivilegedTargetType,
         targetId: event.targetId,
+        targetName: targets.get(`${event.targetType}:${event.targetId}`)?.name,
+        targetImageUrl: targets.get(`${event.targetType}:${event.targetId}`)?.imageUrl ?? null,
         action: event.action as AdminPrivilegedAction,
         reason: event.reason,
         beforeSummary: (event.beforeSummary as Record<string, unknown> | null) ?? null,
@@ -560,6 +661,61 @@ export class AdminRepository {
         },
       },
     });
+  }
+
+  async listProducts(options: {
+    limit?: number;
+    cursor?: string;
+    q?: string;
+    status?: 'DRAFT' | 'ACTIVE' | 'HIDDEN' | 'ARCHIVED';
+    moderationStatus?: 'ACTIVE' | 'SUSPENDED';
+  }) {
+    const limit = Math.min(options.limit ?? ADMIN_DEFAULT_LIMIT, ADMIN_MAX_LIMIT);
+    const normalizedQuery = options.q?.trim();
+    const where: Prisma.ProductWhereInput = { deletedAt: null };
+
+    if (normalizedQuery) {
+      where.OR = [
+        { name: { contains: normalizedQuery, mode: 'insensitive' } },
+        { slug: { contains: normalizedQuery, mode: 'insensitive' } },
+        { shop: { name: { contains: normalizedQuery, mode: 'insensitive' } } },
+        { category: { name: { contains: normalizedQuery, mode: 'insensitive' } } },
+      ];
+    }
+    if (options.status) where.status = options.status as ProductStatus;
+    if (options.moderationStatus) {
+      where.moderationStatus = options.moderationStatus as ProductModerationStatus;
+    }
+
+    const rows = await this.prisma.product.findMany({
+      where,
+      take: limit + 1,
+      ...(options.cursor ? { skip: 1, cursor: { id: options.cursor } } : {}),
+      orderBy: [{ updatedAt: 'desc' }, { id: 'desc' }],
+      include: {
+        shop: { select: { id: true, name: true, slug: true } },
+        category: { select: { id: true, name: true, slug: true } },
+        images: {
+          take: 1,
+          orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }],
+          select: { url: true },
+        },
+        variants: {
+          where: { deletedAt: null },
+          select: {
+            priceMinor: true,
+            inventory: { select: { quantityOnHand: true, quantityReserved: true } },
+          },
+        },
+      },
+    });
+
+    const hasMore = rows.length > limit;
+    const items = hasMore ? rows.slice(0, limit) : rows;
+    return {
+      items,
+      nextCursor: hasMore && items.length > 0 ? (items[items.length - 1]?.id ?? null) : null,
+    };
   }
 
   async updateProductModeration(

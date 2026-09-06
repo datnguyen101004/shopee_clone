@@ -8,7 +8,7 @@ import {
   type ShopOrderStatus,
   type InventoryHoldStatus,
 } from './checkout';
-import { isShippingBreakdown, type ShippingBreakdown, type ShippingServiceCode } from './pricing';
+import { isCampaignPriceSnapshot, isShippingBreakdown, type ShippingBreakdown, type ShippingServiceCode } from './pricing';
 import type { ReviewEligibility } from './reviews';
 
 export const ORDER_HISTORY_VERSION = 'order-history-v1' as const;
@@ -316,11 +316,12 @@ function isLine(value: unknown): value is BuyerOrderLine {
         'variantName',
         'variantSku',
       ],
-      ['review'],
+      ['review', 'campaignPrice'],
     )
   )
     return false;
   const line = value as unknown as BuyerOrderLine;
+  if (line.campaignPrice !== undefined && !isCampaignPriceSnapshot(line.campaignPrice)) return false;
   const money = [
     line.listUnitPriceMinor,
     line.sellingUnitPriceMinor,

@@ -19,6 +19,10 @@ import { ProductSearchCheckpointRepository } from './product-search-checkpoint.r
 
 const DEFAULT_BULK_RETRY_COUNT = 3;
 const RETRY_BACKOFF_MS = 25;
+// Keep the physical index name compatible with the existing alias during the
+// additive campaign rollout. Projection metadata remains versioned in the
+// document and the alias swap is the compatibility boundary.
+const PHYSICAL_INDEX_NAME_VERSION = 1;
 
 export interface FullReindexResult {
   alias: string;
@@ -124,7 +128,7 @@ export class ProductSearchIndexingService {
   }
 
   private indexName(alias: string, timestamp: number): string {
-    return `${alias}-v${PRODUCT_SEARCH_INDEX_METADATA.projectionVersion}-${timestamp}`;
+    return `${alias}-v${PHYSICAL_INDEX_NAME_VERSION}-${timestamp}`;
   }
 
   private async aliasIndexes(alias: string): Promise<string[]> {

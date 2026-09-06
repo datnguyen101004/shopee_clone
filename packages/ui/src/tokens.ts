@@ -36,11 +36,25 @@ export const designTokens = {
     '--sc-space-10',
     '--sc-space-12',
   ],
-  radius: ['--sc-radius-sm', '--sc-radius-md', '--sc-radius-lg', '--sc-radius-pill'],
+  radius: [
+    '--sc-radius-none',
+    '--sc-radius-xs',
+    '--sc-radius-sm',
+    '--sc-radius-md',
+    '--sc-radius-lg',
+    '--sc-radius-pill',
+    '--sc-radius-card',
+  ],
   elevation: ['--sc-shadow-sm', '--sc-shadow-md', '--sc-shadow-lg'],
   sizing: ['--sc-target-min', '--sc-container-max'],
   layering: ['--sc-z-sticky', '--sc-z-overlay', '--sc-z-toast'],
   motion: ['--sc-duration-fast', '--sc-duration-normal', '--sc-ease-standard'],
+  semantics: [
+    '--sc-color-brand-primary',
+    '--sc-color-brand-hover',
+    '--sc-color-brand-active',
+    '--sc-color-brand-light',
+  ],
 } as const;
 
 export const referenceViewports = {

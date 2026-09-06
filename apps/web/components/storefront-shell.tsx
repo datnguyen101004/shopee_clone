@@ -1,6 +1,6 @@
 'use client';
 
-import { Container, PageShell } from '@shopee-clone/ui';
+import { PageShell, StorefrontContainer } from '@shopee-clone/ui';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useCallback, type ReactNode } from 'react';
@@ -17,11 +17,11 @@ import {
 
 function StorefrontFooter() {
   return (
-    <Container className="market-footer">
+    <StorefrontContainer className="market-footer">
       <strong>Shopee Clone</strong>
       <span>Project học tập · Không liên kết với Shopee</span>
       <Link href="/design-system">Design system</Link>
-    </Container>
+    </StorefrontContainer>
   );
 }
 
@@ -31,6 +31,8 @@ export function StorefrontShell({ children }: { children: ReactNode }) {
   const cart = useCart();
   const pathname = usePathname();
   const router = useRouter();
+  const isAdminRoute = pathname === '/admin' || pathname?.startsWith('/admin/');
+  const isSellerRoute = pathname === '/seller' || pathname?.startsWith('/seller/');
   const handleLogout = useCallback(async () => {
     await auth.logout();
 
@@ -43,31 +45,46 @@ export function StorefrontShell({ children }: { children: ReactNode }) {
     router.replace('/');
   }, [auth, pathname, router]);
 
+  // Admin is a standalone console. The route still lives beside the
+  // storefront pages for URL and provider compatibility, but it must not
+  // render the marketplace header, category navigation, footer, or floating
+  // chat widget around its own shell.
+  if (isAdminRoute) {
+    return <>{children}</>;
+  }
+
   return (
-    <ChatProvider><PageShell
-      header={
-        <MarketplaceHeader
-          categoriesOpen={navigation.categoriesOpen}
-          onCategoriesToggle={navigation.toggleCategories}
-          menuButtonRef={navigation.menuButtonRef}
-          account={auth.state}
-          cartCount={
-            auth.state.status === 'authenticated'
-              ? (cart.state.cart?.summary.distinctLineCount ?? 0)
-              : 0
-          }
-          onLogout={() => void handleLogout()}
-        />
-      }
-      navigation={
-        <MarketplaceCategoryNavigation
-          open={navigation.categoriesOpen}
-          onNavigate={navigation.closeCategories}
-        />
-      }
-      footer={<StorefrontFooter />}
-    >
-      {children}
-    </PageShell><FloatingChat /></ChatProvider>
+    <ChatProvider>
+      <PageShell
+        header={
+          isSellerRoute ? undefined : (
+            <MarketplaceHeader
+              categoriesOpen={navigation.categoriesOpen}
+              onCategoriesToggle={navigation.toggleCategories}
+              menuButtonRef={navigation.menuButtonRef}
+              account={auth.state}
+              cartCount={
+                auth.state.status === 'authenticated'
+                  ? (cart.state.cart?.summary.distinctLineCount ?? 0)
+                  : 0
+              }
+              onLogout={() => void handleLogout()}
+            />
+          )
+        }
+        navigation={
+          isSellerRoute ? undefined : (
+            <MarketplaceCategoryNavigation
+              open={navigation.categoriesOpen}
+              onNavigate={navigation.closeCategories}
+            />
+          )
+        }
+        footer={isSellerRoute ? undefined : <StorefrontFooter />}
+      >
+        {children}
+      </PageShell>
+      {isSellerRoute ? null : <FloatingChat />}
+    </ChatProvider>
   );
 }

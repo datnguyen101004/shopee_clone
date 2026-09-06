@@ -19,9 +19,10 @@ import { AdminModerationRepository } from './admin-moderation.repository';
 import { AdminModerationService } from './admin-moderation.service';
 import { AdminReviewsController } from './admin-reviews.controller';
 import { SellerIdentityModule } from '../seller-identity/seller-identity.module';
+import { HomepageModule } from '../homepage/homepage.module';
 
 @Module({
-  imports: [PrismaModule, AuthModule, ReviewsModule, NotificationsModule, SellerIdentityModule],
+  imports: [PrismaModule, AuthModule, ReviewsModule, NotificationsModule, SellerIdentityModule, HomepageModule],
   controllers: [
     AdminDashboardController,
     AdminUsersController,

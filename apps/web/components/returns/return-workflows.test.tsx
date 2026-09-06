@@ -198,7 +198,10 @@ describe('return workflows', () => {
       ...list,
       items: [{ ...summary, status: 'ESCALATED', availableActions: [] }],
     });
-    api.fetchBuyerReturn.mockResolvedValue({ data: detail('REQUESTED', [{ action: 'CANCEL', requiresPublicReason: false }]), etag: '"return-0"' });
+    api.fetchBuyerReturn.mockResolvedValue({
+      data: detail('REQUESTED', [{ action: 'CANCEL', requiresPublicReason: false }]),
+      etag: '"return-0"',
+    });
     api.fetchSellerReturn.mockResolvedValue({
       data: detail('REQUESTED', [
         { action: 'ACCEPT_RETURN', requiresPublicReason: false },
@@ -217,7 +220,7 @@ describe('return workflows', () => {
     const user = userEvent.setup();
     render(<BuyerReturnQueueScreen />);
     expect(await screen.findByText('Đang chờ người bán phản hồi')).toBeInTheDocument();
-    fireEvent.change(screen.getByDisplayValue('Tất cả trạng thái'), {
+    fireEvent.change(screen.getByRole('combobox', { name: 'Trạng thái' }), {
       target: { value: 'REQUESTED' },
     });
     await user.click(screen.getByRole('button', { name: 'Lọc' }));
@@ -288,7 +291,16 @@ describe('return workflows', () => {
     });
     render(<AdminReturnQueueScreen />);
     expect(await screen.findByText('Cần quản trị viên xử lý')).toBeInTheDocument();
-    fireEvent.change(screen.getByPlaceholderText(/UUID yêu cầu hoặc đơn/i), {
+    expect(screen.getByRole('columnheader', { name: 'Yêu cầu' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Xử lý yêu cầu' })).toHaveAttribute(
+      'href',
+      `/admin/returns/${returnReference}#admin-return-actions`,
+    );
+    expect(screen.getByRole('link', { name: 'Xem chi tiết' })).toHaveAttribute(
+      'href',
+      `/admin/returns/${returnReference}`,
+    );
+    fireEvent.change(screen.getByPlaceholderText(/Nhập mã yêu cầu hoặc đơn/i), {
       target: { value: returnReference },
     });
     fireEvent.click(screen.getByRole('button', { name: 'Lọc' }));
@@ -300,6 +312,9 @@ describe('return workflows', () => {
     );
 
     render(<AdminReturnDetailScreen returnReference={returnReference} />);
+    expect(
+      await screen.findByRole('heading', { name: 'Chi tiết trả hàng / hoàn tiền' }),
+    ).toBeInTheDocument();
     expect(await screen.findByText(/Ghi chú nội bộ nhạy cảm/i)).toBeInTheDocument();
     fireEvent.change(screen.getByDisplayValue('Chọn quyết định'), {
       target: { value: 'APPROVE_REFUND' },

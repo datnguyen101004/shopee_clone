@@ -8,11 +8,13 @@ import {
   type SellerProductPage,
   type SellerProductPageQuery,
   type SellerProductUpsertRequest,
+  type SellerProductCampaignEntry,
 } from '@shopee-clone/contracts';
+import { campaignLifecycleAt } from '@shopee-clone/contracts';
 import { createHash, randomUUID } from 'node:crypto';
 import { Inject, Injectable } from '@nestjs/common';
 import { Prisma } from '../generated/prisma/client';
-import { InventoryAdjustmentReason, ProductModerationStatus, ProductStatus, ShopOnboardingStatus, ShopStatus, VariantStatus } from '../generated/prisma/enums';
+import { InventoryAdjustmentReason, MarketplaceCampaignParticipationState, ProductModerationStatus, ProductStatus, ShopOnboardingStatus, ShopStatus, VariantStatus } from '../generated/prisma/enums';
 import { PrismaService } from '../prisma/prisma.service';
 import { InventoryService } from '../inventory/inventory.service';
 import { SellerProductConflictError, SellerProductInputError, SellerProductMediaError, SellerProductNotFoundError, SellerProductUnavailableError } from './seller-products.errors';
@@ -155,21 +157,153 @@ export class SellerProductsService {
 
   async list(userId: string, query: SellerProductPageQuery): Promise<SellerProductPage> {
     const shop = await this.requireShop(userId);
+    const now = new Date();
+    const campaignTypeFilter = query.campaignTypeCode ? { code: query.campaignTypeCode } : undefined;
+    const campaignWindow: Prisma.MarketplaceCampaignWhereInput | undefined = query.campaign === 'ACTIVE'
+      ? { publishedAt: { not: null }, cancelledAt: null, startsAt: { lte: now }, endsAt: { gt: now } }
+      : query.campaign === 'UPCOMING'
+        ? { publishedAt: { not: null }, cancelledAt: null, startsAt: { gt: now } }
+        : query.campaign === 'HISTORY'
+          ? { OR: [{ cancelledAt: { not: null } }, { endsAt: { lte: now } }] }
+          : undefined;
+    const campaignFilter: Prisma.ProductWhereInput = campaignTypeFilter || campaignWindow
+      ? {
+          sellerCampaignProducts: {
+            some: {
+              participation: {
+                state: { in: [MarketplaceCampaignParticipationState.JOINED, MarketplaceCampaignParticipationState.LOCKED] },
+                campaign: {
+                  ...(campaignTypeFilter ? { type: campaignTypeFilter } : {}),
+                  ...(campaignWindow ?? {}),
+                },
+              },
+            },
+          },
+        }
+      : {};
+    const where: Prisma.ProductWhereInput = {
+      shopId: shop.id,
+      deletedAt: null,
+      ...(query.lifecycle ? { status: this.statusFor(query.lifecycle) } : {}),
+      ...campaignFilter,
+    };
     const rows = await this.prisma.product.findMany({
       take: query.limit + 1,
       ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
-      where: { shopId: shop.id, deletedAt: null, ...(query.lifecycle ? { status: this.statusFor(query.lifecycle) } : {}) },
+      where,
       include: { category: true, images: { take: 1, orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }] }, variants: { include: { inventory: true } } },
       orderBy: [{ updatedAt: 'desc' }, { id: 'desc' }],
     });
     const page = rows.slice(0, query.limit);
+    const productIds = page.map((product) => product.id);
+    const [campaignRows, campaignCounts, promotionRows] = await Promise.all([
+      productIds.length
+        ? this.prisma.sellerCampaignProduct.findMany({
+            where: { productId: { in: productIds }, participation: { state: { in: [MarketplaceCampaignParticipationState.JOINED, MarketplaceCampaignParticipationState.LOCKED] } } },
+            include: { participation: { include: { campaign: { include: { type: true } } } } },
+            orderBy: [{ acceptedAt: 'desc' }, { productId: 'asc' }],
+            // Four rows per product is enough to render three chips and a
+            // truthful bounded "more" indicator without an N+1 query.
+            take: Math.min(productIds.length * 4, 200),
+          })
+        : [],
+      productIds.length
+        ? this.prisma.sellerCampaignProduct.groupBy({
+            by: ['productId'],
+            where: { productId: { in: productIds }, participation: { state: { in: [MarketplaceCampaignParticipationState.JOINED, MarketplaceCampaignParticipationState.LOCKED] } } },
+            _count: { _all: true },
+          })
+        : [],
+      productIds.length
+        ? this.prisma.shopDiscountProduct.findMany({
+            where: {
+              productId: { in: productIds },
+              campaign: { isEnabled: true, archivedAt: null, endsAt: { gt: now } },
+            },
+            select: { productId: true, campaign: { select: { startsAt: true } } },
+          })
+        : [],
+    ]);
+    const campaignByProduct = new Map<string, typeof campaignRows>();
+    for (const row of campaignRows) {
+      const list = campaignByProduct.get(row.productId) ?? [];
+      list.push(row);
+      campaignByProduct.set(row.productId, list);
+    }
+    const campaignCountByProduct = new Map(campaignCounts.map((row) => [row.productId, row._count._all]));
+    const promotionByProduct = new Map<string, { activeCount: number; upcomingCount: number }>();
+    for (const row of promotionRows) {
+      const summary = promotionByProduct.get(row.productId) ?? { activeCount: 0, upcomingCount: 0 };
+      if (row.campaign.startsAt <= now) summary.activeCount += 1;
+      else summary.upcomingCount += 1;
+      promotionByProduct.set(row.productId, summary);
+    }
     return {
-      items: page.map((product) => ({ id: product.id, slug: product.slug, name: product.name, categoryName: product.category.name, lifecycle: lifecycle(product.status), moderationStatus: moderation(product.moderationStatus), primaryMediaUrl: product.images[0]?.url ?? null, variantCount: product.variants.length, stockQuantity: product.variants.reduce((total, variant) => total + Math.max(0, (variant.inventory?.quantityOnHand ?? 0) - (variant.inventory?.quantityReserved ?? 0)), 0), updatedAt: product.updatedAt.toISOString() })),
+      items: page.map((product) => {
+        const campaignEntries = campaignByProduct.get(product.id) ?? [];
+        const campaigns = campaignEntries.slice(0, 3).map((entry) => {
+          const campaign = entry.participation.campaign;
+          const state = entry.participation.state;
+          const at = campaignLifecycleAt(campaign, now);
+          return {
+            campaignId: campaign.id,
+            typeCode: campaign.type.code,
+            typeLabel: campaign.type.displayName,
+            title: campaign.name,
+            state,
+            group: at === 'ACTIVE' ? 'ACTIVE' as const : at === 'SCHEDULED' || at === 'ENROLLMENT_OPEN' ? 'UPCOMING_LOCKED' as const : 'HISTORY' as const,
+            startsAt: campaign.startsAt.toISOString(),
+            endsAt: campaign.endsAt.toISOString(),
+            discountBasisPoints: entry.discountBasisPoints,
+          };
+        });
+        const prices = product.variants.map((variant) => safeMoney(variant.priceMinor));
+        return {
+          id: product.id,
+          slug: product.slug,
+          name: product.name,
+          categoryName: product.category.name,
+          lifecycle: lifecycle(product.status),
+          moderationStatus: moderation(product.moderationStatus),
+          primaryMediaUrl: product.images[0]?.url ?? null,
+          variantCount: product.variants.length,
+          stockQuantity: product.variants.reduce((total, variant) => total + Math.max(0, (variant.inventory?.quantityOnHand ?? 0) - (variant.inventory?.quantityReserved ?? 0)), 0),
+          operationalPriceRange: { minPriceMinor: prices.length ? Math.min(...prices) : null, maxPriceMinor: prices.length ? Math.max(...prices) : null },
+          ...(promotionByProduct.has(product.id) ? { sellerPromotionSummary: promotionByProduct.get(product.id) } : {}),
+          ...(campaigns.length ? { campaigns } : {}),
+          ...((campaignCountByProduct.get(product.id) ?? 0) > 3
+            ? { additionalCampaignCount: (campaignCountByProduct.get(product.id) ?? 0) - 3 }
+            : {}),
+          updatedAt: product.updatedAt.toISOString(),
+        };
+      }),
       nextCursor: rows.length > query.limit ? page.at(-1)?.id ?? null : null,
     };
   }
 
-  async read(userId: string, productId: string): Promise<SellerProductDetail> { return mapDetail(await this.requireProduct(userId, productId)); }
+  async read(userId: string, productId: string): Promise<SellerProductDetail> {
+    const product = await this.requireProduct(userId, productId);
+    const detail = mapDetail(product);
+    const campaignRows = await this.prisma.sellerCampaignProduct.findMany({
+      where: { productId, participation: { shopId: product.shopId } },
+      include: { participation: { include: { campaign: { include: { type: true } } } } },
+      orderBy: { acceptedAt: 'desc' },
+      take: 20,
+    });
+    const campaigns: SellerProductCampaignEntry[] = campaignRows.map((entry) => {
+      const campaign = entry.participation.campaign;
+      const lifecycleValue = campaignLifecycleAt(campaign);
+      const group = lifecycleValue === 'ACTIVE' ? 'ACTIVE' : lifecycleValue === 'SCHEDULED' || lifecycleValue === 'ENROLLMENT_OPEN' ? 'UPCOMING_LOCKED' : 'HISTORY';
+      const eligibility = lifecycleValue === 'ENDED' ? 'ENDED' : lifecycleValue === 'CANCELLED' ? 'CANCELLED' : entry.participation.state === 'WITHDRAWN' ? 'WITHDRAWN' : 'ELIGIBLE';
+      const basePriceMinor = product.variants.reduce((min, variant) => Math.min(min, safeMoney(variant.priceMinor)), Number.MAX_SAFE_INTEGER);
+      const effectivePriceMinor = lifecycleValue === 'ACTIVE' && basePriceMinor !== Number.MAX_SAFE_INTEGER
+        ? Math.floor(basePriceMinor * (10_000 - entry.discountBasisPoints) / 10_000)
+        : null;
+      return { campaignId: campaign.id, type: { code: campaign.type.code, displayName: campaign.type.displayName, description: campaign.type.description, importanceClass: campaign.importanceClassSnapshot ?? campaign.type.importanceClass, policyVersion: campaign.policyVersionSnapshot ?? campaign.type.policyVersion, presentationKey: (campaign.presentationKeySnapshot ?? campaign.type.presentationKey) as never, productOrderKey: (campaign.productOrderKeySnapshot ?? campaign.type.productOrderKey) as never, rankingProfileKey: (campaign.rankingProfileKeySnapshot ?? campaign.type.rankingProfileKey) as never, enabled: campaign.type.isEnabled }, title: campaign.name, state: entry.participation.state, group, startsAt: campaign.startsAt.toISOString(), endsAt: campaign.endsAt.toISOString(), discountBasisPoints: entry.discountBasisPoints, effectivePriceMinor, eligibility, reason: null, href: `/campaigns/${encodeURIComponent(campaign.id)}` };
+    });
+    const prices = detail.variants.map((variant) => variant.priceMinor);
+    return { ...detail, campaigns, operationalSummary: { variantCount: detail.variants.length, stockQuantity: detail.variants.reduce((sum, variant) => sum + Math.max(0, variant.stock), 0), soldCount: product.soldCount, ratingAverageBasisPoints: product.ratingAverageBasisPoints, ratingCount: product.ratingCount, minPriceMinor: prices.length ? Math.min(...prices) : null, maxPriceMinor: prices.length ? Math.max(...prices) : null } };
+  }
 
   async stageMedia(userId: string, input: { storageKey: string; mimeType: string; byteSize: number; width: number; height: number }) {
     const shop = await this.requireShop(userId);

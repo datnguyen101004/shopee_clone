@@ -135,6 +135,7 @@ export function getAuditSummaryChanges(
   const keys = [...new Set([...Object.keys(before), ...Object.keys(after)])];
 
   return keys
+    .filter((key) => !/(^|[A-Z])id$/i.test(key))
     .filter((key) => !(key in before && key in after && comparableValue(before[key]) === comparableValue(after[key])))
     .map((key) => ({
       key,

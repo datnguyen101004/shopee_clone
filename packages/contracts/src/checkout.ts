@@ -1,5 +1,6 @@
 import {
   isPricingQuoteResponse,
+  isCampaignPriceSnapshot,
   parsePricingQuoteRequest,
   type ShippingBreakdown,
   type PricingQuoteLine,
@@ -390,7 +391,7 @@ function isPreviewLine(value: unknown): value is CheckoutPreviewLine {
       'productImageUrl',
       'variantName',
       'variantSku',
-    ]) ||
+    ], ['campaignPrice']) ||
     !isNonEmptyString(value.productName, 240) ||
     !(value.productImageUrl === null || isNonEmptyString(value.productImageUrl, 2048)) ||
     !isNonEmptyString(value.variantName, 160) ||
@@ -399,6 +400,7 @@ function isPreviewLine(value: unknown): value is CheckoutPreviewLine {
     return false;
   }
   const line = value as unknown as CheckoutPreviewLine;
+  if (line.campaignPrice !== undefined && !isCampaignPriceSnapshot(line.campaignPrice)) return false;
   const money = [
     line.listUnitPriceMinor,
     line.sellingUnitPriceMinor,
@@ -461,6 +463,7 @@ function pricingLine(line: CheckoutPreviewLine): PricingQuoteLine {
     platformVoucherDiscountMinor: line.platformVoucherDiscountMinor,
     merchandiseVoucherDiscountMinor: line.merchandiseVoucherDiscountMinor,
     payableMerchandiseMinor: line.payableMerchandiseMinor,
+    ...(line.campaignPrice ? { campaignPrice: line.campaignPrice } : {}),
   };
 }
 

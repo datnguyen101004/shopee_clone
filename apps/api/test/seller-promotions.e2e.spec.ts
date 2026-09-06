@@ -52,7 +52,7 @@ describe('Seller promotions HTTP contract', () => {
     const list = await request(app.getHttpServer()).get('/api/v1/seller/promotions/vouchers?state=SCHEDULED&limit=10').set('Authorization', 'Bearer seller').expect(200);
     expect(list.headers['cache-control']).toBe('no-store');
     expect(service.listVouchers).toHaveBeenCalledWith(seller.id, { state: 'SCHEDULED', limit: 10, cursor: null });
-    const body = { code: 'NEW10', name: 'New', benefitType: 'FIXED_AMOUNT', fixedAmountMinor: 10000, percentageBasisPoints: null, maximumDiscountMinor: null, minimumSpendMinor: 0, startsAt: voucher.startsAt, endsAt: voucher.endsAt, usageLimit: 10, perBuyerLimit: 1, productIds: [] };
+    const body = { name: 'New', benefitType: 'FIXED_AMOUNT', fixedAmountMinor: 10000, percentageBasisPoints: null, maximumDiscountMinor: null, minimumSpendMinor: 0, startsAt: voucher.startsAt, endsAt: voucher.endsAt, usageLimit: 10, perBuyerLimit: 1, productIds: [] };
     await request(app.getHttpServer()).post('/api/v1/seller/promotions/vouchers').set('Authorization', 'Bearer seller').set('Origin', 'https://attacker.test').set('Idempotency-Key', '00000000-0000-4000-8000-000000000021').send(body).expect(403);
     const created = await request(app.getHttpServer()).post('/api/v1/seller/promotions/vouchers').set('Authorization', 'Bearer seller').set('Origin', origin).set('Idempotency-Key', '00000000-0000-4000-8000-000000000021').send(body).expect(201);
     expect(created.headers.etag).toBe('"seller-promotion-1"');
@@ -64,9 +64,9 @@ describe('Seller promotions HTTP contract', () => {
     expect(service.deleteVoucher).toHaveBeenCalledWith(seller.id, voucher.id, 2);
   });
 
-  it('returns field-specific validation when voucher code is too short', async () => {
+  it('rejects client-supplied voucher codes', async () => {
     const body = {
-      code: 'ABC',
+      code: 'SHOP10',
       name: 'Giảm 20k cho đơn hàng trên 300k',
       benefitType: 'FIXED_AMOUNT',
       fixedAmountMinor: 20000,
@@ -88,8 +88,8 @@ describe('Seller promotions HTTP contract', () => {
       .expect(400);
     expect(response.body).toMatchObject({
       code: 'INVALID_SELLER_PROMOTION_REQUEST',
-      invalidParameters: ['code'],
-      detail: 'Voucher code must be 4-32 characters using A-Z, 0-9, and optional hyphens.',
+      invalidParameters: ['request'],
+      detail: 'Request body shape is invalid.',
     });
     expect(service.createVoucher).not.toHaveBeenCalled();
   });

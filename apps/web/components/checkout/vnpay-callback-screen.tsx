@@ -1,7 +1,7 @@
 'use client';
 
 import type { PaymentStatusResponse } from '@shopee-clone/contracts';
-import { Container } from '@shopee-clone/ui';
+import { StorefrontContainer } from '@shopee-clone/ui';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -232,7 +232,7 @@ export function VnpayCallbackScreen({
 
   if (auth.state.status === 'guest') {
     return (
-      <Container className="checkout-page">
+      <StorefrontContainer className="checkout-page">
         <section className="checkout-state">
           <h1>Đăng nhập để xem thanh toán</h1>
           <Link
@@ -245,29 +245,29 @@ export function VnpayCallbackScreen({
             Đăng nhập
           </Link>
         </section>
-      </Container>
+      </StorefrontContainer>
     );
   }
   if (!transactionReference) {
     return (
-      <Container className="checkout-page">
+      <StorefrontContainer className="checkout-page">
         <section className="checkout-state is-error">
           <h1>Thiếu mã giao dịch</h1>
           <p>Không thể xác định giao dịch VNPAY.</p>
           <Link href="/account/orders">Xem đơn mua</Link>
         </section>
-      </Container>
+      </StorefrontContainer>
     );
   }
   if (screenState === 'not-found') {
     return (
-      <Container className="checkout-page">
+      <StorefrontContainer className="checkout-page">
         <section className="checkout-state is-error" role="alert">
           <h1>Không thể mở giao dịch này</h1>
           <p>Vui lòng kiểm tra lại tài khoản hoặc xem danh sách đơn mua.</p>
           <Link href="/account/orders">Về đơn mua</Link>
         </section>
-      </Container>
+      </StorefrontContainer>
     );
   }
   const state = payment?.status ?? 'PENDING';
@@ -276,7 +276,7 @@ export function VnpayCallbackScreen({
       ? { title: 'Đang kiểm tra kết quả thanh toán', body: 'Vui lòng chờ trong giây lát.' }
       : (copy[state] ?? copy.UNKNOWN!);
   return (
-    <Container className="checkout-page">
+    <StorefrontContainer className="checkout-page">
       <section className="checkout-state" role="status" aria-live="polite">
         <p>VNPAY SANDBOX</p>
         <h1 ref={headingRef} tabIndex={-1}>
@@ -300,6 +300,6 @@ export function VnpayCallbackScreen({
           <Link href="/cart">Tạo đơn mới từ giỏ hàng</Link>
         ) : null}
       </section>
-    </Container>
+    </StorefrontContainer>
   );
 }

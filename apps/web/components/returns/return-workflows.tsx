@@ -15,6 +15,9 @@ import {
 } from '@shopee-clone/contracts';
 import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { Check, ChevronDown, Eye } from '@shopee-clone/ui';
+
+import { AdminEntityLink } from '../admin/admin-entity-link';
 
 import {
   decideAdminReturn,
@@ -87,6 +90,26 @@ function roleTitle(role: ReturnRole) {
       : 'Tranh chấp trả hàng';
 }
 
+function returnInitials(name: string) {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  return (
+    parts.length > 1 ? `${parts[0]?.[0] ?? ''}${parts.at(-1)?.[0] ?? ''}` : name.slice(0, 2)
+  ).toUpperCase();
+}
+
+function ReturnMedia({ src, name }: { src: string | null | undefined; name: string }) {
+  const [failed, setFailed] = useState(false);
+  return (
+    <span className="admin-return-media" aria-hidden="true">
+      {src && !failed ? (
+        <img src={src} alt="" onError={() => setFailed(true)} />
+      ) : (
+        <span>{returnInitials(name)}</span>
+      )}
+    </span>
+  );
+}
+
 function errorMessage(error: unknown) {
   if (error instanceof ReturnApiError) {
     if (error.status === 403) return 'Bạn không có quyền truy cập nội dung này.';
@@ -97,7 +120,13 @@ function errorMessage(error: unknown) {
 }
 
 function QueueShell({ role, children }: { role: ReturnRole; children: ReactNode }) {
-  const body = <section className="return-workflow">{children}</section>;
+  const body = (
+    <section
+      className={`return-workflow ${role === 'admin' ? 'admin-page admin-returns-page' : ''}`}
+    >
+      {children}
+    </section>
+  );
   if (role !== 'buyer') return body;
   return (
     <AccountWorkspace
@@ -111,6 +140,7 @@ function QueueShell({ role, children }: { role: ReturnRole; children: ReactNode 
 
 function ReturnQueue({ role }: { role: ReturnRole }) {
   const auth = useAuthSession();
+  const sellerVariant = role === 'seller';
   const [page, setPage] = useState<ReturnListResponse | null>(null);
   const [status, setStatus] = useState<ReturnStatus | 'ALL'>('ALL');
   const [deadline, setDeadline] = useState<'ALL' | 'OVERDUE' | 'DUE_SOON'>('ALL');
@@ -161,9 +191,11 @@ function ReturnQueue({ role }: { role: ReturnRole }) {
     return () => window.clearTimeout(timer);
   }, [accessible, load]);
 
+  const queueStateClassName =
+    role === 'admin' ? 'return-workflow__state admin-returns-state' : 'return-workflow__state';
   const content = (
     <>
-      {role !== 'buyer' ? (
+      {role === 'seller' ? (
         <header className="return-workflow__heading">
           <div>
             <p>{role === 'seller' ? 'SELLER CENTER' : 'ADMIN CONSOLE'}</p>
@@ -173,76 +205,169 @@ function ReturnQueue({ role }: { role: ReturnRole }) {
         </header>
       ) : null}
       {auth.state.status === 'loading' ? (
-        <p className="return-workflow__state" aria-busy="true">
+        <p className={queueStateClassName} aria-busy="true">
           Đang kiểm tra phiên đăng nhập…
         </p>
       ) : null}
       {auth.state.status === 'guest' ? (
-        <p className="return-workflow__state">Vui lòng đăng nhập để xem yêu cầu trả hàng.</p>
+        <p className={queueStateClassName}>Vui lòng đăng nhập để xem yêu cầu trả hàng.</p>
       ) : null}
       {auth.state.status === 'authenticated' && !accessible ? (
-        <p className="return-workflow__state">Bạn không có quyền truy cập khu vực này.</p>
+        <p className={queueStateClassName}>Bạn không có quyền truy cập khu vực này.</p>
       ) : null}
       {accessible ? (
         <>
-          <div className="return-workflow__filters">
-            <label>
-              Trạng thái
-              <select
-                value={status}
-                onChange={(event) => setStatus(event.target.value as ReturnStatus | 'ALL')}
+          <div
+            className={`${role === 'admin' ? 'admin-returns-toolbar ' : ''}return-workflow__filters${sellerVariant ? ' seller-pl-toolbar seller-pl-toolbar--labeled' : ''}`}
+          >
+            <div
+              className={
+                sellerVariant
+                  ? 'seller-pl-toolbar__filters'
+                  : role === 'admin'
+                    ? 'admin-returns-toolbar__filters'
+                    : 'return-workflow__filter-fields'
+              }
+            >
+              <div
+                className={
+                  sellerVariant
+                    ? 'seller-pl-field'
+                    : role === 'admin'
+                      ? 'admin-field admin-returns-toolbar__field'
+                      : 'return-workflow__field'
+                }
               >
-                <option value="ALL">Tất cả trạng thái</option>
-                {RETURN_STATUSES.map((value) => (
-                  <option key={value} value={value}>
-                    {statusLabels[value]}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              Thời hạn
-              <select
-                value={deadline}
-                onChange={(event) => setDeadline(event.target.value as typeof deadline)}
+                <label htmlFor="return-status-filter">Trạng thái</label>
+                <div
+                  className={
+                    sellerVariant
+                      ? 'seller-pl-select-wrap'
+                      : role === 'admin'
+                        ? 'admin-select-wrap'
+                        : 'return-workflow__select-wrap'
+                  }
+                >
+                  <select
+                    id="return-status-filter"
+                    className={
+                      sellerVariant
+                        ? 'seller-pl-select'
+                        : role === 'admin'
+                          ? 'admin-control'
+                          : undefined
+                    }
+                    value={status}
+                    onChange={(event) => setStatus(event.target.value as ReturnStatus | 'ALL')}
+                  >
+                    <option value="ALL">Tất cả</option>
+                    {RETURN_STATUSES.map((value) => (
+                      <option key={value} value={value}>
+                        {statusLabels[value]}
+                      </option>
+                    ))}
+                  </select>
+                  {sellerVariant ? (
+                    <ChevronDown className="seller-pl-select__arrow" size={16} aria-hidden="true" />
+                  ) : null}
+                </div>
+              </div>
+              <div
+                className={
+                  sellerVariant
+                    ? 'seller-pl-field'
+                    : role === 'admin'
+                      ? 'admin-field admin-returns-toolbar__field'
+                      : 'return-workflow__field'
+                }
               >
-                {RETURN_DEADLINE_FILTERS.map((value) => (
-                  <option key={value} value={value}>
-                    {deadlineLabels[value]}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              Mã yêu cầu hoặc đơn
-              <input
-                value={reference}
-                onChange={(event) => setReference(event.target.value)}
-                placeholder="UUID yêu cầu hoặc đơn"
-              />
-            </label>
-            {role === 'admin' ? (
-              <>
-                <label>
-                  Từ ngày
-                  <input
-                    type="date"
-                    value={from}
-                    onChange={(event) => setFrom(event.target.value)}
-                  />
-                </label>
-                <label>
-                  Đến ngày
-                  <input type="date" value={to} onChange={(event) => setTo(event.target.value)} />
-                </label>
-              </>
-            ) : null}
-            <button type="button" disabled={loading} onClick={() => void load()}>
-              Lọc
-            </button>
+                <label htmlFor="return-deadline-filter">Thời hạn</label>
+                <div
+                  className={
+                    sellerVariant
+                      ? 'seller-pl-select-wrap'
+                      : role === 'admin'
+                        ? 'admin-select-wrap'
+                        : 'return-workflow__select-wrap'
+                  }
+                >
+                  <select
+                    id="return-deadline-filter"
+                    className={
+                      sellerVariant
+                        ? 'seller-pl-select'
+                        : role === 'admin'
+                          ? 'admin-control'
+                          : undefined
+                    }
+                    value={deadline}
+                    onChange={(event) => setDeadline(event.target.value as typeof deadline)}
+                  >
+                    {RETURN_DEADLINE_FILTERS.map((value) => (
+                      <option key={value} value={value}>
+                        {value === 'ALL' ? 'Tất cả' : deadlineLabels[value]}
+                      </option>
+                    ))}
+                  </select>
+                  {sellerVariant ? (
+                    <ChevronDown className="seller-pl-select__arrow" size={16} aria-hidden="true" />
+                  ) : null}
+                </div>
+              </div>
+              <div
+                className={
+                  sellerVariant
+                    ? 'seller-pl-field'
+                    : role === 'admin'
+                      ? 'admin-field admin-returns-toolbar__field admin-returns-toolbar__field--reference'
+                      : 'return-workflow__field'
+                }
+              >
+                <label htmlFor="return-reference-filter">Mã yêu cầu hoặc đơn</label>
+                <input
+                  id="return-reference-filter"
+                  className={role === 'admin' ? 'admin-control' : undefined}
+                  value={reference}
+                  onChange={(event) => setReference(event.target.value)}
+                  placeholder="Nhập mã yêu cầu hoặc đơn"
+                />
+              </div>
+              {role === 'admin' ? (
+                <>
+                  <div className="admin-field admin-returns-toolbar__field">
+                    <label htmlFor="return-from-filter">Từ ngày</label>
+                    <input
+                      id="return-from-filter"
+                      className="admin-control"
+                      type="date"
+                      value={from}
+                      onChange={(event) => setFrom(event.target.value)}
+                    />
+                  </div>
+                  <div className="admin-field admin-returns-toolbar__field">
+                    <label htmlFor="return-to-filter">Đến ngày</label>
+                    <input
+                      id="return-to-filter"
+                      className="admin-control"
+                      type="date"
+                      value={to}
+                      onChange={(event) => setTo(event.target.value)}
+                    />
+                  </div>
+                </>
+              ) : null}
+              <button
+                className={role === 'admin' ? 'admin-btn admin-btn-primary' : undefined}
+                type="button"
+                disabled={loading}
+                onClick={() => void load()}
+              >
+                Lọc
+              </button>
+            </div>
           </div>
           {loading && !page ? (
-            <p className="return-workflow__state" aria-busy="true">
+            <p className={queueStateClassName} aria-busy="true">
               Đang tải yêu cầu…
             </p>
           ) : null}
@@ -253,45 +378,133 @@ function ReturnQueue({ role }: { role: ReturnRole }) {
             </p>
           ) : null}
           {!loading && !error && page?.items.length === 0 ? (
-            <p className="return-workflow__state">Chưa có yêu cầu phù hợp.</p>
+            <p className={queueStateClassName}>Chưa có yêu cầu phù hợp.</p>
           ) : null}
           {page?.items.length ? (
-            <div className="return-workflow__list">
-              {page.items.map((item) => (
-                <Link
-                  className="return-card"
-                  href={rolePath(role, item.returnReference)}
-                  key={item.returnReference}
-                >
-                  <div>
-                    <strong>{statusLabels[item.status]}</strong>
-                    <small>Mã đơn: {item.orderReference}</small>
-                  </div>
-                  <div>
-                    <span>{money(item.refundAmountMinor)}</span>
-                    <small>Cập nhật {dateTime(item.updatedAt)}</small>
-                  </div>
-                  <small>
-                    Hạn xử lý:{' '}
-                    {dateTime(
-                      item.deadline.sellerResponseAt ??
-                        item.deadline.shipmentAt ??
-                        item.deadline.receiptAt,
-                    )}
-                  </small>
-                </Link>
-              ))}
-            </div>
-          ) : null}
-          {page?.page.nextCursor ? (
-            <button
-              className="return-workflow__more"
-              type="button"
-              disabled={loading}
-              onClick={() => void load(page.page.nextCursor!, true)}
+            <div
+              className={`seller-pl-table-stack return-workflow-table-stack${role === 'admin' ? ' admin-returns-table-stack' : ''}`}
             >
-              {loading ? 'Đang tải…' : 'Xem thêm'}
-            </button>
+              {role === 'admin' ? (
+                <>
+                  <div className="admin-table-card__header admin-returns-list-header">
+                    <div>
+                      <h2>Yêu cầu trả hàng / hoàn tiền</h2>
+                      <p>Danh sách yêu cầu cần theo dõi và xử lý trong trung tâm quản trị.</p>
+                    </div>
+                    <span className="admin-table-card__count">{page.items.length} yêu cầu</span>
+                  </div>
+                  <div className="admin-returns-columns" role="row">
+                    <span role="columnheader">Yêu cầu</span>
+                    <span role="columnheader">Hoàn tiền</span>
+                    <span role="columnheader">Cập nhật</span>
+                    <span role="columnheader">Hạn xử lý</span>
+                    <span role="columnheader">Hành động</span>
+                  </div>
+                </>
+              ) : null}
+              <div
+                className={`return-workflow__list${role === 'admin' ? ' admin-returns-list-card' : ''}`}
+              >
+                {page.items.map((item) =>
+                  role === 'admin' ? (
+                    <div className="return-card admin-return-row" key={item.returnReference}>
+                      <Link
+                        className="admin-return-row__request"
+                        href={rolePath(role, item.returnReference)}
+                      >
+                        <ReturnMedia
+                          src={item.preview?.productImageUrl}
+                          name={item.preview?.productName ?? 'Yêu cầu trả hàng'}
+                        />
+                        <span className="admin-return-row__copy">
+                          <strong>{item.preview?.productName ?? 'Yêu cầu trả hàng'}</strong>
+                          <small>{item.preview?.shopName ?? 'Yêu cầu trả hàng'}</small>
+                          <span className="admin-status-pill">{statusLabels[item.status]}</span>
+                        </span>
+                      </Link>
+                      <div className="admin-return-row__amount">
+                        <strong>{money(item.refundAmountMinor)}</strong>
+                        <small>Hoàn tiền</small>
+                      </div>
+                      <div className="admin-return-row__updated">
+                        <strong>{dateTime(item.updatedAt)}</strong>
+                        <small>Cập nhật</small>
+                      </div>
+                      <div className="admin-return-row__deadline">
+                        <strong>
+                          {dateTime(
+                            item.deadline.sellerResponseAt ??
+                              item.deadline.shipmentAt ??
+                              item.deadline.receiptAt,
+                          )}
+                        </strong>
+                        <small>Hạn xử lý</small>
+                      </div>
+                      <div className="admin-return-row__actions" aria-label="Hành động">
+                        <Link
+                          className="admin-icon-btn admin-icon-btn--secondary"
+                          href={`${rolePath(role, item.returnReference)}#admin-return-actions`}
+                          aria-label="Xử lý yêu cầu"
+                          title="Xử lý yêu cầu"
+                        >
+                          <Check size={16} aria-hidden="true" />
+                        </Link>
+                        <Link
+                          className="admin-icon-btn admin-icon-btn--secondary"
+                          href={rolePath(role, item.returnReference)}
+                          aria-label="Xem chi tiết"
+                          title="Xem chi tiết"
+                        >
+                          <Eye size={16} aria-hidden="true" />
+                        </Link>
+                      </div>
+                    </div>
+                  ) : (
+                    <Link
+                      className="return-card"
+                      href={rolePath(role, item.returnReference)}
+                      key={item.returnReference}
+                    >
+                      <div>
+                        <span className="font-medium">
+                          {item.preview?.productName ?? 'Yêu cầu trả hàng'}
+                        </span>
+                        <small>{statusLabels[item.status]}</small>
+                      </div>
+                      <div>
+                        <span>{money(item.refundAmountMinor)}</span>
+                        <small>Cập nhật {dateTime(item.updatedAt)}</small>
+                      </div>
+                      <small>
+                        Hạn xử lý:{' '}
+                        {dateTime(
+                          item.deadline.sellerResponseAt ??
+                            item.deadline.shipmentAt ??
+                            item.deadline.receiptAt,
+                        )}
+                      </small>
+                    </Link>
+                  ),
+                )}
+              </div>
+              <footer className="seller-pl-footer return-workflow-footer">
+                <div className="seller-pl-footer__summary">
+                  Hiển thị <strong>{page.items.length}</strong> yêu cầu đã tải
+                </div>
+                {page.page.nextCursor ? (
+                  <button
+                    className="seller-pl-btn-loadmore"
+                    type="button"
+                    disabled={loading}
+                    onClick={() => void load(page.page.nextCursor!, true)}
+                  >
+                    {loading ? 'Đang tải…' : 'Xem thêm'}
+                  </button>
+                ) : (
+                  <span className="seller-pl-footer__complete">Đã tải hết danh sách yêu cầu</span>
+                )}
+              </footer>
+            </div>
           ) : null}
         </>
       ) : null}
@@ -435,42 +648,69 @@ function ReturnDetailBody({
   const adminChoices = detail.availableActions.filter((item) =>
     ADMIN_RETURN_DECISIONS.includes(item.action as AdminReturnDecision),
   );
+  const adminSectionClassName = role === 'admin' ? 'admin-return-detail__section' : undefined;
   return (
-    <article className="return-detail">
+    <article className={`return-detail ${role === 'admin' ? 'admin-return-detail' : ''}`}>
       {notice ? (
         <p className="return-workflow__notice" role="status">
           {notice}
         </p>
       ) : null}
-      <header className="return-detail__heading">
-        <div>
-          <small>Mã yêu cầu</small>
-          <strong>{detail.returnReference}</strong>
-          <small>Mã đơn: {detail.orderReference}</small>
-        </div>
+      {role === 'admin' ? (
+        <header className="admin-return-detail__intro">
+          <div>
+            <p>ADMIN CONSOLE</p>
+            <h2>Chi tiết trả hàng / hoàn tiền</h2>
+            <span>Kiểm tra thông tin yêu cầu và đưa ra quyết định xử lý.</span>
+          </div>
+        </header>
+      ) : null}
+      <header className="return-detail__heading admin-return-detail__heading">
+        {role === 'admin' && 'buyer' in detail ? (
+          <div className="admin-detail-linked-entities">
+            <AdminEntityLink
+              href={`/admin/shops/${detail.shop.id}`}
+              name={detail.shop.name}
+              meta="Shop"
+            />
+            <AdminEntityLink
+              href={`/admin/users/${detail.buyer.id}`}
+              name={detail.buyer.displayName}
+              meta="Người mua"
+            />
+          </div>
+        ) : (
+          <div>
+            <span className="font-medium">Yêu cầu trả hàng</span>
+          </div>
+        )}
         <span>{statusLabels[detail.status]}</span>
       </header>
-      <section>
+      <section className={adminSectionClassName}>
         <h2>Yêu cầu hoàn tiền</h2>
         <p>{detail.description}</p>
         <strong>{money(detail.refundAmountMinor)}</strong>
       </section>
-      <section>
+      <section className={adminSectionClassName}>
         <h2>Sản phẩm</h2>
         {detail.lines.map((line) => (
           <div className="return-detail__line" key={line.lineReference}>
-            <span>{line.productImageUrl ? <img src={line.productImageUrl} alt="" /> : null}</span>
+            {role === 'admin' ? (
+              <ReturnMedia src={line.productImageUrl} name={line.productName} />
+            ) : (
+              <span>{line.productImageUrl ? <img src={line.productImageUrl} alt="" /> : null}</span>
+            )}
             <div>
-              <strong>{line.productName}</strong>
+              <span className="font-medium">{line.productName}</span>
               <small>
                 {line.variantName} · {line.requestedQuantity}/{line.purchasedQuantity}
               </small>
             </div>
-            <b>{money(line.refundMinor)}</b>
+            <span className="font-medium">{money(line.refundMinor)}</span>
           </div>
         ))}
       </section>
-      <section>
+      <section className={adminSectionClassName}>
         <h2>Bằng chứng riêng tư</h2>
         <div className="return-evidence">
           {detail.evidence.map((item, index) => (
@@ -478,7 +718,7 @@ function ReturnDetailBody({
           ))}
         </div>
       </section>
-      <section>
+      <section className={adminSectionClassName}>
         <h2>Thời hạn và vận chuyển</h2>
         <dl className="return-detail__facts">
           <div>
@@ -496,7 +736,8 @@ function ReturnDetailBody({
         </dl>
         {detail.shipment ? (
           <p>
-            Mã vận đơn thử nghiệm: <strong>{detail.shipment.trackingCode}</strong>
+            Mã vận đơn thử nghiệm:{' '}
+            <span className="font-medium">{detail.shipment.trackingCode}</span>
             <br />
             Đến: {detail.shipment.destination.shopName}, {detail.shipment.destination.address}
           </p>
@@ -508,13 +749,13 @@ function ReturnDetailBody({
         ) : null}
       </section>
       {detail.sellerPublicReason ? (
-        <section>
+        <section className={adminSectionClassName}>
           <h2>Phản hồi của người bán</h2>
           <p>{detail.sellerPublicReason}</p>
         </section>
       ) : null}
       {'buyer' in detail ? (
-        <section>
+        <section className={adminSectionClassName}>
           <h2>Ngữ cảnh tranh chấp</h2>
           <p>
             Người mua: {detail.buyer.displayName} · Shop: {detail.shop.name}
@@ -523,7 +764,8 @@ function ReturnDetailBody({
             <ol className="return-timeline">
               {detail.decisions.map((decision) => (
                 <li key={decision.id}>
-                  <strong>{actionLabels[decision.decision]}</strong> · {decision.publicReason}
+                  <span className="font-medium">{actionLabels[decision.decision]}</span> ·{' '}
+                  {decision.publicReason}
                   <small>{dateTime(decision.decidedAt)}</small>
                   {decision.internalNote ? <p>Ghi chú nội bộ: {decision.internalNote}</p> : null}
                 </li>
@@ -532,12 +774,12 @@ function ReturnDetailBody({
           ) : null}
         </section>
       ) : null}
-      <section>
+      <section className={adminSectionClassName}>
         <h2>Lịch sử</h2>
         <ol className="return-timeline">
           {detail.timeline.map((event) => (
             <li key={event.id}>
-              <strong>{statusLabels[event.status]}</strong>
+              <span className="font-medium">{statusLabels[event.status]}</span>
               <small>
                 {event.actorType} · {dateTime(event.occurredAt)}
               </small>
@@ -564,18 +806,26 @@ function ReturnDetailBody({
       {role === 'seller' && sellerChoices.length ? (
         <section className="return-detail__actions">
           <h2>Xử lý yêu cầu</h2>
-          <select
-            value={sellerAction}
-            disabled={pending}
-            onChange={(event) => setSellerAction(event.target.value as SellerReturnAction | '')}
-          >
-            <option value="">Chọn thao tác</option>
-            {sellerChoices.map((item) => (
-              <option key={item.action} value={item.action}>
-                {actionLabels[item.action]}
-              </option>
-            ))}
-          </select>
+          <div className="return-detail__field return-detail__field--seller">
+            <label htmlFor="seller-return-action">Thao tác xử lý</label>
+            <div className="seller-pl-select-wrap">
+              <select
+                id="seller-return-action"
+                className="seller-pl-select"
+                value={sellerAction}
+                disabled={pending}
+                onChange={(event) => setSellerAction(event.target.value as SellerReturnAction | '')}
+              >
+                <option value="">Chọn thao tác</option>
+                {sellerChoices.map((item) => (
+                  <option key={item.action} value={item.action}>
+                    {actionLabels[item.action]}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown className="seller-pl-select__arrow" size={16} aria-hidden="true" />
+            </div>
+          </div>
           {sellerChoices.find((item) => item.action === sellerAction)?.requiresPublicReason ? (
             <textarea
               value={publicReason}
@@ -596,20 +846,31 @@ function ReturnDetailBody({
         </section>
       ) : null}
       {role === 'admin' && adminChoices.length ? (
-        <section className="return-detail__actions">
+        <section
+          id="admin-return-actions"
+          className="return-detail__actions admin-return-detail__actions"
+        >
           <h2>Quyết định tranh chấp</h2>
-          <select
-            value={adminDecision}
-            disabled={pending}
-            onChange={(event) => setAdminDecision(event.target.value as AdminReturnDecision | '')}
-          >
-            <option value="">Chọn quyết định</option>
-            {adminChoices.map((item) => (
-              <option key={item.action} value={item.action}>
-                {actionLabels[item.action]}
-              </option>
-            ))}
-          </select>
+          <div className="return-detail__field">
+            <label htmlFor="admin-return-decision">Quyết định</label>
+            <div className="return-detail__select-wrap">
+              <select
+                id="admin-return-decision"
+                value={adminDecision}
+                disabled={pending}
+                onChange={(event) =>
+                  setAdminDecision(event.target.value as AdminReturnDecision | '')
+                }
+              >
+                <option value="">Chọn quyết định</option>
+                {adminChoices.map((item) => (
+                  <option key={item.action} value={item.action}>
+                    {actionLabels[item.action]}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
           <textarea
             value={publicReason}
             disabled={pending}

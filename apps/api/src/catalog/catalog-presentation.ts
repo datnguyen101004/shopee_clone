@@ -66,6 +66,13 @@ export function publicScheduledPrice(discount: {
   compareAtPriceMinor: bigint | null;
   discountBasisPoints: number;
   campaignId: string | null;
+  sourceKind?: 'SHOP' | 'MARKETPLACE' | null;
+  campaignTypeCode?: string | null;
+  policyVersion?: number | null;
+  campaignImportanceClass?: 'NORMAL' | 'FEATURED' | null;
+  rankingProfileKey?: string | null;
+  campaignActiveFrom?: Date | null;
+  campaignActiveUntil?: Date | null;
   evaluatedAt: Date;
 }): PublicScheduledPriceBreakdown | undefined {
   if (discount.campaignId === null || discount.effectivePriceMinor >= discount.basePriceMinor)
@@ -84,6 +91,13 @@ export function publicScheduledPrice(discount: {
     compareAtPriceMinor: compare,
     discountBasisPoints: discount.discountBasisPoints,
     campaignId: discount.campaignId,
+    ...(discount.sourceKind !== undefined ? { sourceKind: discount.sourceKind } : {}),
+    ...(discount.campaignTypeCode !== undefined ? { campaignTypeCode: discount.campaignTypeCode } : {}),
+    ...(discount.policyVersion !== undefined ? { policyVersion: discount.policyVersion } : {}),
+    ...(discount.campaignImportanceClass !== undefined ? { campaignImportanceClass: discount.campaignImportanceClass } : {}),
+    ...(discount.rankingProfileKey !== undefined ? { rankingProfileKey: discount.rankingProfileKey } : {}),
+    ...(discount.campaignActiveFrom !== undefined ? { campaignActiveFrom: discount.campaignActiveFrom?.toISOString() ?? null } : {}),
+    ...(discount.campaignActiveUntil !== undefined ? { campaignActiveUntil: discount.campaignActiveUntil?.toISOString() ?? null } : {}),
     evaluatedAt: discount.evaluatedAt.toISOString(),
   };
 }

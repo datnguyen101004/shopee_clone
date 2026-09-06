@@ -1,0 +1,58 @@
+@layer storefront {
+/* Trang chi tiết shop /shops/[slug]: kế thừa baseline phẳng và token hover */
+
+.shop-page .shop-follow-control button:hover:not(:disabled),
+.shop-page .shop-follow-control a:hover {
+  background: #fff0ed !important;
+  color: #ee4d2d !important;
+}
+
+.shop-page .shop-follow-control button[aria-pressed='true']:hover:not(:disabled) {
+  background: #fee2e2 !important;
+}
+
+.shop-page .shop-catalog__controls button:hover:not(:disabled) {
+  background: #d73211 !important;
+  color: #fff !important;
+}
+
+.shop-page .shop-catalog__controls a:hover,
+.shop-page .shop-catalog__empty a:hover,
+.shop-page .shop-page__failure a:hover {
+  background: #fff0ed !important;
+}
+
+.shop-page .product-card:hover {
+  border-color: #ee4d2d !important;
+}
+
+.shop-page .catalog-pagination a:hover,
+.shop-page .catalog-pagination button:hover:not(:disabled) {
+  background: #fff0ed !important;
+  color: #ee4d2d !important;
+}
+
+.shop-page .favorite-control button:hover:not(:disabled) {
+  background: #fff5f2 !important;
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+.shop-page .favorite-control button:hover:not(:disabled) span[aria-hidden='true'] {
+  transform: none !important;
+}
+
+.shop-page .report-button:hover:not(:disabled),
+.shop-page .report-button:hover {
+  background: #fef2f2 !important;
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+.shop-page .chat-now-button:hover:not(:disabled) {
+  background: var(--sc-color-brand-hover, #d63c20) !important;
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+}

@@ -33,12 +33,14 @@ import { CarrierModule } from './carrier/carrier.module';
 import { PaymentsModule } from './payments/payments.module';
 import { SearchModule } from './search/search.module';
 import { RecommendationsModule } from './recommendations/recommendations.module';
+import { MarketplaceCampaignsModule } from './marketplace-campaigns/marketplace-campaigns.module';
 
 @Module({
   imports: [
     PrismaModule,
     SearchModule,
     RecommendationsModule,
+    MarketplaceCampaignsModule,
     HealthModule,
     HomepageModule,
     CatalogModule,

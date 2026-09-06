@@ -1,0 +1,28 @@
+{
+  "fixtures": [
+    {
+      "path": "adapted-assets/fixtures/power-blender.jpg",
+      "source": "apps/web/public/media/products/power-blender.jpg",
+      "usage": "Offline fixture only; not Keychron/Figma original; production uses API media",
+      "sha256": "2481ed9a2c78f0f315635248dc4051787566982aaadd0bc58ec47cb75e9a2d1c"
+    },
+    {
+      "path": "adapted-assets/fixtures/smart-rice-cooker.jpg",
+      "source": "apps/web/public/media/products/smart-rice-cooker.jpg",
+      "usage": "Offline fixture only; not Keychron/Figma original; production uses API media",
+      "sha256": "17ecd9811cb8393e74deb5c41accbab371e847e073d679cf354db9a817fcdf29"
+    },
+    {
+      "path": "adapted-assets/fixtures/smartphone-pro.jpg",
+      "source": "apps/web/public/media/products/smartphone-pro.jpg",
+      "usage": "Offline fixture only; not Keychron/Figma original; production uses API media",
+      "sha256": "f5750f1327c48860f8f90a2289ccbffd3e7709bcfb4261768db79a2faa29983f"
+    },
+    {
+      "path": "adapted-assets/fixtures/wireless-earbuds.jpg",
+      "source": "apps/web/public/media/products/wireless-earbuds.jpg",
+      "usage": "Offline fixture only; not Keychron/Figma original; production uses API media",
+      "sha256": "82111bf801c6dc6b3f7410e9ba0b7493e3cbedb17dd2ed06b53e55dbc6d65840"
+    }
+  ]
+}

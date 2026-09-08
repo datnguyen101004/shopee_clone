@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { Inject, Injectable, Optional } from '@nestjs/common';
 import type {
-  CampaignAdminPage, CampaignAdminSummary, CampaignBannerDetail, CampaignContentBlock,
+  CampaignAdminPage, CampaignAdminParticipantPage, CampaignAdminSummary, CampaignBannerDetail, CampaignContentBlock,
   CampaignParticipationPage, CampaignParticipationResponse, CampaignSummary, CampaignTypeSummary, CreateCampaignRequest,
   SellerCampaignDetail, SellerCampaignPage, SellerCampaignParticipationRequest,
 } from '@shopee-clone/contracts';
@@ -214,12 +214,16 @@ export class MarketplaceCampaignsService {
     return { ...summary, version: row.version, sellerJoinedCount: row.participations.filter((item) => item.state === 'JOINED' || item.state === 'LOCKED').length, sellerDeclinedCount: row.participations.filter((item) => item.state === 'DECLINED').length, productCount: row.participations.reduce((count, item) => count + item.products.length, 0), createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString() };
   }
 
-  async listAdmin(query: { cursor?: string; limit?: number; typeCode?: string; state?: string }): Promise<CampaignAdminPage> {
-    const limit = Math.min(Math.max(query.limit ?? 20, 1), 50);
+  async listAdmin(query: { page?: number; typeCode?: string; state?: string }): Promise<CampaignAdminPage> {
+    const page = query.page ?? 1;
+    const pageSize = 10;
     const now = new Date(); const stateWhere = query.state === 'DRAFT' ? { publishedAt: null } : query.state === 'CANCELLED' ? { cancelledAt: { not: null } } : query.state === 'ANNOUNCED' ? { publishedAt: { not: null }, cancelledAt: null, announceAt: { lte: now }, enrollmentStartsAt: { gt: now } } : query.state === 'ENROLLMENT_OPEN' ? { publishedAt: { not: null }, cancelledAt: null, enrollmentStartsAt: { lte: now }, enrollmentEndsAt: { gt: now } } : query.state === 'SCHEDULED' ? { publishedAt: { not: null }, cancelledAt: null, enrollmentEndsAt: { lte: now }, startsAt: { gt: now } } : query.state === 'ACTIVE' ? { publishedAt: { not: null }, cancelledAt: null, startsAt: { lte: now }, endsAt: { gt: now } } : query.state === 'ENDED' ? { publishedAt: { not: null }, cancelledAt: null, endsAt: { lte: now } } : query.state === 'UPCOMING' ? { publishedAt: { not: null }, cancelledAt: null, startsAt: { gt: now } } : {};
-    const rows = await this.prisma.marketplaceCampaign.findMany({ where: { ...(query.typeCode ? { type: { code: query.typeCode } } : {}), ...stateWhere, ...cursorWhere(query.cursor) }, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], take: limit + 1, include: { type: true, categories: true, participations: { include: { products: true } } } });
-    const items = rows.slice(0, limit).map((row) => this.adminSummary(row)); const last = items.at(-1);
-    return { items, nextCursor: rows.length > limit && last ? cursorFor(rows[limit - 1]!) : null };
+    const where: Prisma.MarketplaceCampaignWhereInput = { ...(query.typeCode ? { type: { code: query.typeCode } } : {}), ...stateWhere };
+    const [totalItems, rows] = await Promise.all([
+      this.prisma.marketplaceCampaign.count({ where }),
+      this.prisma.marketplaceCampaign.findMany({ where, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], skip: (page - 1) * pageSize, take: pageSize, include: { type: true, categories: true, participations: { include: { products: true } } } }),
+    ]);
+    return { items: rows.map((row) => this.adminSummary(row)), page, pageSize, totalItems, totalPages: Math.ceil(totalItems / pageSize) };
   }
 
   async readAdmin(id: string): Promise<CampaignAdminSummary> { return this.adminSummary(await this.campaign(id)); }
@@ -236,6 +240,116 @@ export class MarketplaceCampaignsService {
   async participationReport(id: string, query: { cursor?: string; limit?: number }): Promise<CampaignParticipationPage> {
     await this.campaign(id); const limit = Math.min(Math.max(query.limit ?? 20, 1), 50); const rows = await this.prisma.sellerCampaignParticipation.findMany({ where: { campaignId: id, ...cursorWhere(query.cursor) }, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], take: limit + 1, include: { products: { select: { productId: true } } } });
     return { items: rows.slice(0, limit).map((row) => ({ shopId: row.shopId, state: row.state, version: row.version, submittedProductCount: row.products.length, respondedAt: row.respondedAt?.toISOString() ?? null })), nextCursor: rows.length > limit ? cursorFor(rows[limit - 1]!) : null };
+  }
+
+  async participantDetails(id: string, query: { page?: number }): Promise<CampaignAdminParticipantPage> {
+    const page = Math.max(query.page ?? 1, 1);
+    const pageSize = 10;
+    const campaign = await this.prisma.marketplaceCampaign.findUnique({
+      where: { id },
+      select: { id: true, type: { select: { code: true } } },
+    });
+    if (!campaign) throw new MarketplaceCampaignNotFoundError();
+
+    // Page the actual registered product/SKU rows. This keeps the response bounded even
+    // when a single shop registers a large catalog, while retaining the shop context on
+    // every row. Only accepted participation states are shown as participating shops.
+    const participationWhere = { state: { in: [MarketplaceCampaignParticipationState.JOINED, MarketplaceCampaignParticipationState.LOCKED] } };
+    if (campaign.type.code === 'FLASH_SALE') {
+      const where = { campaignId: id, participation: participationWhere };
+      const [totalItems, rows] = await Promise.all([
+        this.prisma.flashSaleSku.count({ where }),
+        this.prisma.flashSaleSku.findMany({
+          where,
+          orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+          skip: (page - 1) * pageSize,
+          take: pageSize,
+          include: {
+            participation: { include: { shop: { select: { id: true, name: true, slug: true } } } },
+            product: { select: { id: true, name: true, slug: true } },
+            variant: {
+              include: {
+                inventory: true,
+                optionValues: { include: { optionValue: { include: { group: true } } } },
+              },
+            },
+          },
+        }),
+      ]);
+      const items = rows.map((sku) => {
+        const options = [...sku.variant.optionValues]
+          .sort((left, right) => left.optionValue.group.sortOrder - right.optionValue.group.sortOrder)
+          .map((item) => `${item.optionValue.group.name}: ${item.optionValue.value}`);
+        const inventory = sku.variant.inventory;
+        return {
+          participationId: sku.participation.id,
+          shopId: sku.participation.shop.id,
+          shopName: sku.participation.shop.name,
+          shopSlug: sku.participation.shop.slug,
+          state: sku.participation.state,
+          version: sku.participation.version,
+          respondedAt: sku.participation.respondedAt?.toISOString() ?? null,
+          products: [{
+            id: sku.id,
+            productId: sku.product.id,
+            productName: sku.product.name,
+            productSlug: sku.product.slug,
+            variantId: sku.variant.id,
+            variantName: sku.variant.name,
+            sku: sku.variant.sku,
+            options,
+            regularPriceMinor: Number(sku.referencePriceMinor),
+            salePriceMinor: Number(sku.salePriceMinor),
+            discountBasisPoints: null,
+            allocatedQuantity: sku.allocatedQuantity,
+            remainingQuantity: sku.remainingQuantity,
+            physicalInventoryAvailable: inventory ? Math.max(0, inventory.quantityOnHand - inventory.quantityReserved) : null,
+          }],
+        };
+      });
+      return { items, page, pageSize, totalItems, totalPages: Math.ceil(totalItems / pageSize) };
+    }
+
+    const where = { participation: { campaignId: id, ...participationWhere } };
+    const [totalItems, rows] = await Promise.all([
+      this.prisma.sellerCampaignProduct.count({ where }),
+      this.prisma.sellerCampaignProduct.findMany({
+        where,
+        orderBy: [{ acceptedAt: 'desc' }, { productId: 'desc' }],
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+        include: {
+          participation: { include: { shop: { select: { id: true, name: true, slug: true } } } },
+          product: { select: { id: true, name: true, slug: true } },
+        },
+      }),
+    ]);
+    const items = rows.map((entry) => ({
+      participationId: entry.participation.id,
+      shopId: entry.participation.shop.id,
+      shopName: entry.participation.shop.name,
+      shopSlug: entry.participation.shop.slug,
+      state: entry.participation.state,
+      version: entry.participation.version,
+      respondedAt: entry.participation.respondedAt?.toISOString() ?? null,
+      products: [{
+        id: entry.product.id,
+        productId: entry.product.id,
+        productName: entry.product.name,
+        productSlug: entry.product.slug,
+        variantId: null,
+        variantName: null,
+        sku: null,
+        options: [],
+        regularPriceMinor: null,
+        salePriceMinor: null,
+        discountBasisPoints: entry.discountBasisPoints,
+        allocatedQuantity: null,
+        remainingQuantity: null,
+        physicalInventoryAvailable: null,
+      }],
+    }));
+    return { items, page, pageSize, totalItems, totalPages: Math.ceil(totalItems / pageSize) };
   }
 
   async updateAdmin(id: string, input: CreateCampaignRequest & { version: number }, actorUserId: string): Promise<CampaignAdminSummary> {
@@ -382,11 +496,15 @@ export class MarketplaceCampaignsService {
 
   private async shopId(userId: string): Promise<string> { try { return (await this.sellerScope.resolve(userId)).id; } catch (error) { if (error instanceof SellerShopScopeNotFoundError) throw new MarketplaceCampaignNotFoundError(); throw error; } }
 
-  async listSeller(userId: string, query: { cursor?: string; limit?: number; typeCode?: string; state?: string }): Promise<SellerCampaignPage> {
-    const shopId = await this.shopId(userId); const limit = Math.min(Math.max(query.limit ?? 20, 1), 50); const now = new Date();
+  async listSeller(userId: string, query: { page?: number; typeCode?: string; state?: string }): Promise<SellerCampaignPage> {
+    const shopId = await this.shopId(userId); const page = query.page ?? 1; const pageSize = 10; const now = new Date();
     const stateWhere: Prisma.MarketplaceCampaignWhereInput = query.state === 'JOINED' ? { participations: { some: { shopId, state: { in: [MarketplaceCampaignParticipationState.JOINED, MarketplaceCampaignParticipationState.LOCKED] } } } } : query.state === 'AVAILABLE' ? { cancelledAt: null, enrollmentEndsAt: { gt: now }, participations: { none: { shopId, state: { in: [MarketplaceCampaignParticipationState.JOINED, MarketplaceCampaignParticipationState.LOCKED] } } } } : query.state === 'UPCOMING' ? { cancelledAt: null, startsAt: { gt: now } } : query.state === 'ACTIVE' ? { cancelledAt: null, startsAt: { lte: now }, endsAt: { gt: now } } : query.state === 'ENDED' ? { cancelledAt: null, endsAt: { lte: now } } : {};
-    const rows = await this.prisma.marketplaceCampaign.findMany({ where: { publishedAt: { not: null }, OR: [{ cancelledAt: null }, { participations: { some: { shopId } } }], ...(query.typeCode ? { type: { code: query.typeCode } } : {}), ...stateWhere, ...cursorWhere(query.cursor) }, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], take: limit + 1, include: { type: true, categories: true, participations: { where: { shopId }, include: { products: true } } } }) as unknown as CampaignGraph[];
-    const items = rows.slice(0, limit).map((row) => this.summary(row, now, shopId)); return { items, nextCursor: rows.length > limit ? cursorFor(rows[limit - 1]!) : null };
+    const where: Prisma.MarketplaceCampaignWhereInput = { publishedAt: { not: null }, OR: [{ cancelledAt: null }, { participations: { some: { shopId } } }], ...(query.typeCode ? { type: { code: query.typeCode } } : {}), ...stateWhere };
+    const [totalItems, rows] = await Promise.all([
+      this.prisma.marketplaceCampaign.count({ where }),
+      this.prisma.marketplaceCampaign.findMany({ where, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], skip: (page - 1) * pageSize, take: pageSize, include: { type: true, categories: true, participations: { where: { shopId }, include: { products: true } } } }) as unknown as Promise<CampaignGraph[]>,
+    ]);
+    const items = rows.map((row) => this.summary(row, now, shopId)); return { items, page, pageSize, totalItems, totalPages: Math.ceil(totalItems / pageSize) };
   }
 
   async sellerDetail(userId: string, id: string): Promise<SellerCampaignDetail> {
@@ -412,7 +530,8 @@ export class MarketplaceCampaignsService {
     if (!policy) throw new MarketplaceCampaignValidationError(['typeCode']);
     const products = input.products ?? [];
     const productIds = products.map((product) => product.productId);
-    if (input.decision === 'JOINED' && (products.length === 0 || products.length > policy.maximumProductsPerSeller || new Set(productIds).size !== productIds.length)) {
+    const requiresProductSelection = row.type.code !== 'FLASH_SALE';
+    if (input.decision === 'JOINED' && ((requiresProductSelection && products.length === 0) || products.length > policy.maximumProductsPerSeller || new Set(productIds).size !== productIds.length)) {
       throw new MarketplaceCampaignValidationError(['products'], 'Select a unique set of eligible products for this campaign.');
     }
     const idempotencyKey = commandKey(rawIdempotencyKey);

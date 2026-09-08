@@ -1,6 +1,5 @@
 export const SELLER_PROMOTION_VERSION = 'seller-promotions-v1' as const;
-export const SELLER_PROMOTION_DEFAULT_LIMIT = 20;
-export const SELLER_PROMOTION_MAX_LIMIT = 50;
+export const SELLER_PROMOTION_PAGE_SIZE = 10;
 export const SELLER_PROMOTION_ACTIONS = ['PAUSE', 'RESUME', 'ARCHIVE'] as const;
 export const SELLER_PROMOTION_BENEFITS = ['FIXED_AMOUNT', 'PERCENTAGE'] as const;
 export const SELLER_PROMOTION_STATES = ['SCHEDULED', 'ACTIVE', 'PAUSED', 'EXHAUSTED', 'EXPIRED', 'ARCHIVED'] as const;
@@ -57,8 +56,8 @@ export interface SellerEffectivePriceBreakdown {
   campaignId: string | null;
   evaluatedAt: string;
 }
-export interface SellerVoucherPage { sellerPromotionVersion: typeof SELLER_PROMOTION_VERSION; items: SellerVoucherSummary[]; nextCursor: string | null; }
-export interface SellerDiscountPage { sellerPromotionVersion: typeof SELLER_PROMOTION_VERSION; items: SellerDiscountSummary[]; nextCursor: string | null; }
+export interface SellerVoucherPage { sellerPromotionVersion: typeof SELLER_PROMOTION_VERSION; items: SellerVoucherSummary[]; page: number; pageSize: number; totalItems: number; totalPages: number; }
+export interface SellerDiscountPage { sellerPromotionVersion: typeof SELLER_PROMOTION_VERSION; items: SellerDiscountSummary[]; page: number; pageSize: number; totalItems: number; totalPages: number; }
 export interface SellerVoucherDeleteResult { deleted: true; }
 export interface SellerPromotionProblemDetails { type: string; title: string; status: number; detail: string; code?: string; invalidParameters?: string[]; currentVersion?: number; }
 
@@ -71,12 +70,12 @@ const voucherSummary = (value: unknown): value is SellerVoucherSummary => {
 const discountSummary = (value: unknown): value is SellerDiscountSummary => record(value) && typeof value.id === 'string' && typeof value.name === 'string' && promotionState(value.state) && safe(value.version) && Array.isArray(value.products) && value.products.every((item) => record(item) && typeof item.productId === 'string' && safe(item.discountBasisPoints));
 export function isSellerVoucherSummary(value: unknown): value is SellerVoucherSummary { return voucherSummary(value); }
 export function isSellerDiscountSummary(value: unknown): value is SellerDiscountSummary { return discountSummary(value); }
-export function isSellerVoucherPage(value: unknown): value is SellerVoucherPage { return record(value) && value.sellerPromotionVersion === SELLER_PROMOTION_VERSION && Array.isArray(value.items) && value.items.every(voucherSummary) && (value.nextCursor === null || typeof value.nextCursor === 'string'); }
-export function isSellerDiscountPage(value: unknown): value is SellerDiscountPage { return record(value) && value.sellerPromotionVersion === SELLER_PROMOTION_VERSION && Array.isArray(value.items) && value.items.every(discountSummary) && (value.nextCursor === null || typeof value.nextCursor === 'string'); }
+const pageMetadata = (value: Record<string, unknown>) => Number.isSafeInteger(value.page) && Number(value.page) >= 1 && value.pageSize === SELLER_PROMOTION_PAGE_SIZE && safe(value.totalItems) && safe(value.totalPages);
+export function isSellerVoucherPage(value: unknown): value is SellerVoucherPage { return record(value) && value.sellerPromotionVersion === SELLER_PROMOTION_VERSION && Array.isArray(value.items) && value.items.every(voucherSummary) && pageMetadata(value); }
+export function isSellerDiscountPage(value: unknown): value is SellerDiscountPage { return record(value) && value.sellerPromotionVersion === SELLER_PROMOTION_VERSION && Array.isArray(value.items) && value.items.every(discountSummary) && pageMetadata(value); }
 export function isSellerVoucherDeleteResult(value: unknown): value is SellerVoucherDeleteResult { return record(value) && value.deleted === true; }
 
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-const cursor = /^[A-Za-z0-9_-]{1,512}$/;
 const voucherCreateKeys = ['name', 'benefitType', 'fixedAmountMinor', 'percentageBasisPoints', 'maximumDiscountMinor', 'minimumSpendMinor', 'startsAt', 'endsAt', 'usageLimit', 'perBuyerLimit', 'productIds'] as const;
 const discountCreateKeys = ['name', 'startsAt', 'endsAt', 'products'] as const;
 const instant = (value: unknown): value is string => typeof value === 'string' && Number.isFinite(Date.parse(value)) && new Date(value).toISOString() === value;
@@ -308,14 +307,13 @@ export function parseSellerPromotionActionRequest(value: unknown): SellerPromoti
   return record(value) && exact(value, ['action']) && SELLER_PROMOTION_ACTIONS.includes(value.action as SellerPromotionAction) ? { action: value.action as SellerPromotionAction } : null;
 }
 
-export function parseSellerPromotionListQuery(value: unknown): { state: SellerPromotionState | 'ALL'; limit: number; cursor: string | null } | null {
-  if (!record(value) || !exact(value, ['state', 'limit', 'cursor'])) return null;
+export function parseSellerPromotionListQuery(value: unknown): { state: SellerPromotionState | 'ALL'; page: number } | null {
+  if (!record(value) || !exact(value, ['state', 'page'])) return null;
   const state = value.state === undefined ? 'ALL' : value.state;
-  const rawLimit = value.limit === undefined ? String(SELLER_PROMOTION_DEFAULT_LIMIT) : value.limit;
-  const rawCursor = value.cursor === undefined ? null : value.cursor;
-  if ((state !== 'ALL' && !SELLER_PROMOTION_STATES.includes(state as SellerPromotionState)) || typeof rawLimit !== 'string' || !/^[1-9][0-9]*$/.test(rawLimit) || (rawCursor !== null && (typeof rawCursor !== 'string' || !cursor.test(rawCursor)))) return null;
-  const limit = Number(rawLimit);
-  return Number.isSafeInteger(limit) && limit <= SELLER_PROMOTION_MAX_LIMIT ? { state: state as SellerPromotionState | 'ALL', limit, cursor: rawCursor as string | null } : null;
+  const rawPage = value.page === undefined ? '1' : value.page;
+  if ((state !== 'ALL' && !SELLER_PROMOTION_STATES.includes(state as SellerPromotionState)) || typeof rawPage !== 'string' || !/^[1-9][0-9]*$/.test(rawPage)) return null;
+  const page = Number(rawPage);
+  return Number.isSafeInteger(page) ? { state: state as SellerPromotionState | 'ALL', page } : null;
 }
 
 export function parseSellerPromotionIdempotencyKey(value: unknown): string | null { return typeof value === 'string' && uuid.test(value) ? value : null; }

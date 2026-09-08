@@ -1,5 +1,7 @@
 import type {
   AdminBannerListResponse,
+  AdminBannerMediaCompletionResponse,
+  AdminBannerMediaUploadIntentResponse,
   AdminBannerSummary,
   AdminHomepageModuleListResponse,
   AdminHomepageModuleSummary,
@@ -29,12 +31,14 @@ import { AdminExceptionFilter } from './admin-exception.filter';
 // eslint-disable-next-line @typescript-eslint/consistent-type-imports
 import {
   CreateAdminBannerDto,
+  CreateAdminBannerMediaUploadIntentDto,
   ReorderAdminBannersDto,
   UpdateAdminBannerDto,
   UpdateAdminHomepageModuleSettingsDto,
 } from './admin.dto';
 import { AdminService } from './admin.service';
 import { HomepageCmsService } from '../homepage/homepage-cms.service';
+import { HomepageBannerMediaService } from '../homepage/homepage-banner-media.service';
 
 @ApiTags('admin homepage configuration')
 @ApiBearerAuth()
@@ -46,6 +50,7 @@ export class AdminHomepageController {
   constructor(
     @Inject(AdminService) private readonly admin: AdminService,
     @Inject(HomepageCmsService) private readonly cms: HomepageCmsService,
+    @Inject(HomepageBannerMediaService) private readonly bannerMedia: HomepageBannerMediaService,
   ) {}
 
   // Banners
@@ -54,6 +59,26 @@ export class AdminHomepageController {
   @ApiOperation({ summary: 'List all campaign banners' })
   async listBanners(): Promise<AdminBannerListResponse> {
     return this.cms.listBanners();
+  }
+
+  @Post('banners/media/upload-intents')
+  @Header('Cache-Control', 'private, no-store')
+  @ApiOperation({ summary: 'Create a five-minute direct-to-private-S3 banner image upload intent' })
+  createBannerMediaUploadIntent(
+    @Body() input: CreateAdminBannerMediaUploadIntentDto,
+    @Req() request: AuthenticatedRequest,
+  ): Promise<AdminBannerMediaUploadIntentResponse> {
+    return this.bannerMedia.createUploadIntent(request.authUser!.id, input);
+  }
+
+  @Post('banners/media/:mediaId/complete')
+  @Header('Cache-Control', 'private, no-store')
+  @ApiOperation({ summary: 'Verify a private S3 banner image upload' })
+  completeBannerMediaUpload(
+    @Param('mediaId') mediaId: string,
+    @Req() request: AuthenticatedRequest,
+  ): Promise<AdminBannerMediaCompletionResponse> {
+    return this.bannerMedia.completeUpload(request.authUser!.id, mediaId);
   }
 
   @Post('banners')

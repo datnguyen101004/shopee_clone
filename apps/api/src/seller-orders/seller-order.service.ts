@@ -33,7 +33,6 @@ import {
   SellerOrderUnavailableError,
   SellerOrderValidationError,
 } from './seller-order.errors';
-import { decodeSellerOrderCursor, encodeSellerOrderCursor } from './seller-order-cursor';
 import { SellerOrderProjector } from './seller-order.projector';
 import { SellerOrderRepository } from './seller-order.repository';
 import { orderNotificationEvent } from '../notifications/notification-events';
@@ -53,16 +52,8 @@ export class SellerOrderService {
   ) {}
 
   async list(userId: string, query: SellerOrderQueueQuery): Promise<SellerOrderListResponse> {
-    const cursor = query.cursor ? decodeSellerOrderCursor(query.cursor, query) : null;
-    if (query.cursor && !cursor) throw new SellerOrderValidationError(['cursor']);
-    const rows = await this.repository.list(userId, query, cursor);
-    const page = rows.slice(0, query.limit);
-    const last = page.at(-1);
-    const nextCursor =
-      rows.length > query.limit && last
-        ? encodeSellerOrderCursor(query, { createdAt: last.createdAt, id: last.id })
-        : null;
-    return this.projector.list(page, query.limit, nextCursor);
+    const result = await this.repository.list(userId, query);
+    return this.projector.list(result.rows, query.page, result.totalItems);
   }
 
   async detail(userId: string, orderReference: string): Promise<SellerOrderDetailResponse> {

@@ -1,6 +1,7 @@
 export const ADMIN_VERSION = 'admin-v1' as const;
 export const ADMIN_DEFAULT_LIMIT = 20;
 export const ADMIN_MAX_LIMIT = 50;
+export const ADMIN_PAGE_SIZE = 10;
 export const ADMIN_REASON_MIN_LENGTH = 8;
 export const ADMIN_REASON_MAX_LENGTH = 240;
 
@@ -76,8 +77,7 @@ export interface AdminUserSummary {
 }
 
 export interface AdminUserListQuery {
-  limit?: number;
-  cursor?: string;
+  page?: number;
   status?: AdminUserStatus;
   role?: 'buyer' | 'seller' | 'admin' | 'carrier_operator';
   q?: string;
@@ -85,7 +85,10 @@ export interface AdminUserListQuery {
 
 export interface AdminUserListResponse {
   items: AdminUserSummary[];
-  nextCursor: string | null;
+  page: number;
+  pageSize: number;
+  totalItems: number;
+  totalPages: number;
 }
 
 export interface AdminUserActionRequest {
@@ -107,8 +110,7 @@ export interface AdminShopSummary {
 }
 
 export interface AdminShopListQuery {
-  limit?: number;
-  cursor?: string;
+  page?: number;
   status?: AdminShopStatus;
   onboardingStatus?: AdminShopOnboardingStatus;
   q?: string;
@@ -116,7 +118,10 @@ export interface AdminShopListQuery {
 
 export interface AdminShopListResponse {
   items: AdminShopSummary[];
-  nextCursor: string | null;
+  page: number;
+  pageSize: number;
+  totalItems: number;
+  totalPages: number;
 }
 
 export interface AdminShopActionRequest {
@@ -195,11 +200,44 @@ export interface AdminBannerListResponse {
   items: AdminBannerSummary[];
 }
 
+export const ADMIN_BANNER_MEDIA_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'] as const;
+export type AdminBannerMediaMimeType = (typeof ADMIN_BANNER_MEDIA_MIME_TYPES)[number];
+
+export interface AdminBannerMediaUploadIntentRequest {
+  mimeType: AdminBannerMediaMimeType;
+  byteSize: number;
+  checksumSha256: string;
+}
+
+export interface AdminBannerMediaUploadIntentResponse {
+  mediaId: string;
+  upload: {
+    url: string;
+    method: 'PUT';
+    headers: {
+      'Content-Type': AdminBannerMediaMimeType;
+      'x-amz-checksum-sha256': string;
+    };
+    expiresAt: string;
+  };
+}
+
+export interface AdminBannerMediaCompletionResponse {
+  id: string;
+  mimeType: AdminBannerMediaMimeType;
+  byteSize: number;
+  width: number;
+  height: number;
+  imageUrl: string;
+  expiresAt: string;
+}
+
 export interface CreateAdminBannerRequest {
   eyebrow?: string;
   title: string;
   description?: string;
   imageUrl?: string | null;
+  imageAssetId?: string | null;
   altText: string;
   href?: string;
   theme: string;
@@ -218,6 +256,7 @@ export interface UpdateAdminBannerRequest {
   title?: string;
   description?: string;
   imageUrl?: string | null;
+  imageAssetId?: string | null;
   altText?: string;
   href?: string;
   theme?: string;
@@ -354,8 +393,7 @@ export interface AdminProductListItem {
 }
 
 export interface AdminProductListQuery {
-  limit?: number;
-  cursor?: string;
+  page?: number;
   q?: string;
   status?: 'DRAFT' | 'ACTIVE' | 'HIDDEN' | 'ARCHIVED';
   moderationStatus?: 'ACTIVE' | 'SUSPENDED';
@@ -363,7 +401,10 @@ export interface AdminProductListQuery {
 
 export interface AdminProductListResponse {
   items: AdminProductListItem[];
-  nextCursor: string | null;
+  page: number;
+  pageSize: number;
+  totalItems: number;
+  totalPages: number;
 }
 
 export interface AdminProductActionInput {

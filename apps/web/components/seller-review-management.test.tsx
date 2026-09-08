@@ -7,6 +7,7 @@ import { listSellerShopReviews, submitSellerReviewReport } from '../lib/seller-r
 
 const authenticatedFetch = vi.fn();
 const reviewId = '123e4567-e89b-12d3-a456-426614174000';
+const pageMeta = { page: 1, pageSize: 10, totalItems: 1, totalPages: 1 };
 
 vi.mock('./auth-session-provider', () => ({
   useAuthSession: () => ({
@@ -29,6 +30,7 @@ describe('SellerReviewManagement', () => {
     vi.clearAllMocks();
     vi.stubGlobal('crypto', { randomUUID: () => '123e4567-e89b-12d3-a456-426614174001' });
     vi.mocked(listSellerShopReviews).mockResolvedValue({
+      ...pageMeta,
       items: [{
         id: reviewId,
         productId: '123e4567-e89b-12d3-a456-426614174002',
@@ -53,7 +55,7 @@ describe('SellerReviewManagement', () => {
     expect(await screen.findByText('Áo khoác của shop')).toBeInTheDocument();
     expect(screen.queryByText('Buyer Example')).not.toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: 'Báo cáo đánh giá' }));
+    await user.click(screen.getByRole('button', { name: /Báo cáo đánh giá Áo khoác/ }));
     await user.selectOptions(screen.getByLabelText('Lý do báo cáo'), 'SPAM_OR_FRAUD');
     await user.type(screen.getByLabelText('Mô tả thêm (không bắt buộc)'), 'Đánh giá dẫn người mua tới trang thanh toán không liên quan.');
     await user.click(screen.getByRole('button', { name: 'Tiếp tục' }));
@@ -66,11 +68,12 @@ describe('SellerReviewManagement', () => {
       authenticatedFetch,
     ));
     expect(await screen.findAllByText(/Đã gửi báo cáo/)).toHaveLength(2);
-    expect(screen.getByRole('button', { name: 'Đã báo cáo' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /Đã báo cáo Áo khoác/ })).toBeDisabled();
   });
 
   it('omits report button when review visibility is hidden', async () => {
     vi.mocked(listSellerShopReviews).mockResolvedValue({
+      ...pageMeta,
       items: [{
         id: reviewId,
         productId: '123e4567-e89b-12d3-a456-426614174002',
@@ -93,6 +96,8 @@ describe('SellerReviewManagement', () => {
   it('searches loaded reviews and sorts by rating', async () => {
     const user = userEvent.setup();
     vi.mocked(listSellerShopReviews).mockResolvedValue({
+      ...pageMeta,
+      totalItems: 2,
       items: [
         {
           id: reviewId,
@@ -127,6 +132,6 @@ describe('SellerReviewManagement', () => {
     await user.type(screen.getByLabelText('Tìm kiếm đánh giá'), 'Áo khoác');
     expect(screen.getByText('Áo khoác của shop')).toBeInTheDocument();
     expect(screen.queryByText('Giày thể thao của shop')).not.toBeInTheDocument();
-    expect(screen.getByText(/đánh giá đã tải/)).toHaveTextContent('Hiển thị 1 trong 2 đánh giá đã tải');
+    expect(screen.getByText(/Hiển thị 1–2 trong 2 đánh giá/)).toBeInTheDocument();
   });
 });

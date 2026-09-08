@@ -33,7 +33,7 @@ export class AdminUsersController {
 
   @Get()
   @Header('Cache-Control', 'private, no-store')
-  @ApiOperation({ summary: 'List and search users with keyset pagination' })
+  @ApiOperation({ summary: 'List and search users by page, with 10 users per page' })
   list(@Query() query: AdminUserListQueryDto): Promise<AdminUserListResponse> {
     return this.admin.listUsers(query);
   }

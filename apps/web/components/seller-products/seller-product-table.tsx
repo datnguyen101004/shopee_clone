@@ -86,9 +86,13 @@ export function SellerProductTable({
   return (
     <div className="seller-pl-table-card" aria-busy={loading}>
       <div className="seller-pl-table-scroll">
-        <table className="seller-pl-table" aria-label="Danh sách sản phẩm người bán">
+        <table
+          className="seller-pl-table seller-management-table"
+          aria-label="Danh sách sản phẩm người bán"
+        >
           <thead>
             <tr>
+              <th className="management-table-id-cell">ID</th>
               <th className="seller-pl-col-thumb">Hình ảnh</th>
               <th className="seller-pl-col-info">Thông tin sản phẩm</th>
               <th className="seller-pl-col-cat">Danh mục</th>
@@ -102,7 +106,7 @@ export function SellerProductTable({
             {loading && items.length === 0
               ? Array.from({ length: 5 }, (_, index) => (
                   <tr key={`skeleton-${index}`} className="seller-pl-skeleton-row" aria-hidden="true">
-                    <td colSpan={7}>
+                    <td colSpan={8}>
                       <span className="seller-pl-skeleton-line" />
                     </td>
                   </tr>
@@ -114,6 +118,7 @@ export function SellerProductTable({
 
               return (
                 <tr key={item.id} data-testid="seller-product-row">
+                  <td className="management-table-id-cell">{item.id}</td>
                   {/* 1. Thumbnail */}
                   <td className="seller-pl-col-thumb">
                     <div className="seller-pl-thumb">
@@ -163,12 +168,14 @@ export function SellerProductTable({
 
                   {/* 6. Status Badge */}
                   <td className="seller-pl-col-status">
-                    <span className={`seller-pl-badge ${statusInfo.className}`}>
+                    <span className={`seller-pl-badge seller-table-status ${statusInfo.className}`}>
                       <b>{statusInfo.label}</b>
                     </span>
                     {item.moderationStatus === 'suspended' ? (
                       <div>
-                        <span className="seller-pl-badge seller-pl-badge--suspended">Bị hạn chế</span>
+                        <span className="seller-pl-badge seller-table-status seller-pl-badge--suspended">
+                          Bị hạn chế
+                        </span>
                       </div>
                     ) : null}
                   </td>
@@ -180,7 +187,7 @@ export function SellerProductTable({
                       <Link
                         href={`/seller/products/${item.id}`}
                         className="seller-pl-btn-icon"
-                        aria-label="Xem chi tiết"
+                        aria-label={`Xem chi tiết sản phẩm ${item.name}`}
                         title="Xem chi tiết"
                       >
                         <Eye size={16} aria-hidden="true" />
@@ -191,7 +198,7 @@ export function SellerProductTable({
                         <Link
                           href={`/seller/products/${item.id}/edit`}
                           className="seller-pl-btn-icon"
-                          aria-label="Cập nhật sản phẩm"
+                          aria-label={`Cập nhật sản phẩm ${item.name}`}
                           title={`Cập nhật sản phẩm ${item.name}`}
                         >
                           <SquarePen size={16} aria-hidden="true" />
@@ -213,11 +220,13 @@ export function SellerProductTable({
                       ) : item.lifecycle === 'hidden' || item.lifecycle === 'draft' ? (
                         <button
                           type="button"
-                          className="seller-pl-btn-sm seller-pl-btn-sm--primary"
+                          className="seller-pl-btn-icon"
+                          aria-label={`Đăng bán sản phẩm ${item.name}`}
+                          title="Đăng bán sản phẩm"
                           disabled={isPending || item.moderationStatus === 'suspended'}
                           onClick={() => onPublish(item.id)}
                         >
-                          Đăng bán
+                          <Eye size={16} aria-hidden="true" />
                         </button>
                       ) : null}
 

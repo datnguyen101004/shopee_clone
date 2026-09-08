@@ -14,6 +14,7 @@ import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import { AdminModerationActionDialog } from '../../../../components/admin/admin-moderation-action-dialog';
 import { AdminModerationCaseDetail } from '../../../../components/admin/admin-moderation-case-detail';
 import { AdminEntityLink } from '../../../../components/admin/admin-entity-link';
+import { AdminPagination } from '../../../../components/admin/admin-pagination';
 import { useAuthSession } from '../../../../components/auth-session-provider';
 import {
   executeAdminReviewAction,
@@ -135,7 +136,9 @@ export default function AdminModerationPage({ initialCaseId }: { initialCaseId?:
   const [reportTypeFilter, setReportTypeFilter] = useState<ReportTypeFilter>('');
   const [timeFilter, setTimeFilter] = useState<TimeFilter>('');
   const [targetIdSearch, setTargetIdSearch] = useState('');
-  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
   const [queueError, setQueueError] = useState<string | null>(null);
   const [isLoadingList, setIsLoadingList] = useState(true);
   const [caseDetail, setCaseDetail] = useState<ModerationCaseDetail | null>(null);
@@ -155,6 +158,9 @@ export default function AdminModerationPage({ initialCaseId }: { initialCaseId?:
   const [reviewError, setReviewError] = useState<string | null>(null);
   const [isLoadingReview, setIsLoadingReview] = useState(false);
   const [reportedReviews, setReportedReviews] = useState<AdminReportedReviewSummary[]>([]);
+  const [reportedReviewPage, setReportedReviewPage] = useState(1);
+  const [reportedReviewTotalItems, setReportedReviewTotalItems] = useState(0);
+  const [reportedReviewTotalPages, setReportedReviewTotalPages] = useState(0);
   const [isLoadingReportedReviews, setIsLoadingReportedReviews] = useState(false);
   const [reportedReviewsError, setReportedReviewsError] = useState<string | null>(null);
   const [actionDialog, setActionDialog] = useState<'case' | 'review' | null>(null);
@@ -164,7 +170,7 @@ export default function AdminModerationPage({ initialCaseId }: { initialCaseId?:
   const isDetailRoute = Boolean(initialCaseId);
 
   const fetchCases = useCallback(
-    async (cursor?: string) => {
+    async (targetPage = 1) => {
       setIsLoadingList(true);
       setQueueError(null);
       try {
@@ -173,10 +179,14 @@ export default function AdminModerationPage({ initialCaseId }: { initialCaseId?:
         const response = await listModerationCases(authenticatedFetch, {
           status: statusFilter || undefined,
           targetType: selectedTargetType || undefined,
-          cursor,
+          page: targetPage,
         });
-        setCases((current) => (cursor ? [...current, ...response.items] : response.items));
-        setNextCursor(response.nextCursor);
+        const lastPage = Math.max(1, response.totalPages);
+        if (targetPage > lastPage) { setCurrentPage(lastPage); return; }
+        setCases(response.items);
+        setCurrentPage(response.page);
+        setTotalItems(response.totalItems);
+        setTotalPages(response.totalPages);
       } catch (error) {
         setQueueError(messageFrom(error, 'Không thể tải hàng đợi kiểm duyệt.'));
       } finally {
@@ -223,12 +233,20 @@ export default function AdminModerationPage({ initialCaseId }: { initialCaseId?:
     if (detail?.id === requestedId) setActionDialog('case');
   };
 
-  const loadReportedReviews = useCallback(async () => {
+  const loadReportedReviews = useCallback(async (targetPage = 1) => {
     setIsLoadingReportedReviews(true);
     setReportedReviewsError(null);
     try {
-      const response = await listAdminReportedReviews(authenticatedFetch);
+      const response = await listAdminReportedReviews(authenticatedFetch, targetPage);
+      const lastPage = Math.max(1, response.totalPages);
+      if (targetPage > lastPage) {
+        setReportedReviewPage(lastPage);
+        return;
+      }
       setReportedReviews(response.items);
+      setReportedReviewPage(response.page);
+      setReportedReviewTotalItems(response.totalItems);
+      setReportedReviewTotalPages(response.totalPages);
     } catch (error) {
       setReportedReviewsError(
         messageFrom(error, 'Không thể tải danh sách đánh giá được người bán báo cáo.'),
@@ -240,17 +258,17 @@ export default function AdminModerationPage({ initialCaseId }: { initialCaseId?:
 
   useEffect(() => {
     const loadTimer = window.setTimeout(() => {
-      if (isAdmin && !initialCaseId && reportTypeFilter !== 'REVIEW') void fetchCases();
+      if (isAdmin && !initialCaseId && reportTypeFilter !== 'REVIEW') void fetchCases(currentPage);
     }, 0);
     return () => window.clearTimeout(loadTimer);
-  }, [fetchCases, initialCaseId, isAdmin, reportTypeFilter]);
+  }, [currentPage, fetchCases, initialCaseId, isAdmin, reportTypeFilter]);
 
   useEffect(() => {
     const loadTimer = window.setTimeout(() => {
-      if (isAdmin && !initialCaseId && reportTypeFilter === 'REVIEW') void loadReportedReviews();
+      if (isAdmin && !initialCaseId && reportTypeFilter === 'REVIEW') void loadReportedReviews(reportedReviewPage);
     }, 0);
     return () => window.clearTimeout(loadTimer);
-  }, [initialCaseId, isAdmin, loadReportedReviews, reportTypeFilter]);
+  }, [initialCaseId, isAdmin, loadReportedReviews, reportTypeFilter, reportedReviewPage]);
 
   useEffect(() => {
     const loadTimer = window.setTimeout(() => {
@@ -426,7 +444,7 @@ export default function AdminModerationPage({ initialCaseId }: { initialCaseId?:
             ? 'Đánh giá đã được khôi phục.'
             : 'Đã giữ nguyên hiển thị và đóng các báo cáo của người bán.',
       );
-      await loadReportedReviews();
+      await loadReportedReviews(reportedReviewPage);
     } catch (error) {
       setReviewError(messageFrom(error, 'Không thể cập nhật trạng thái đánh giá.'));
     } finally {
@@ -446,7 +464,7 @@ export default function AdminModerationPage({ initialCaseId }: { initialCaseId?:
     requestAnimationFrame(() => confirmationTriggerRef.current?.focus());
   };
 
-  const clearTargetIdSearch = () => setTargetIdSearch('');
+  const clearTargetIdSearch = () => { setTargetIdSearch(''); setCurrentPage(1); setReportedReviewPage(1); };
 
   if (authState.status === 'loading') {
     return (
@@ -514,7 +532,7 @@ export default function AdminModerationPage({ initialCaseId }: { initialCaseId?:
                 id="moderation-report-search"
                 className="admin-form-input admin-control"
                 value={targetIdSearch}
-                onChange={(event) => setTargetIdSearch(event.target.value)}
+                onChange={(event) => { setTargetIdSearch(event.target.value); setCurrentPage(1); setReportedReviewPage(1); }}
                 placeholder="Mã report, sản phẩm, shop hoặc đánh giá"
               />
               {targetIdSearch ? (
@@ -549,7 +567,7 @@ export default function AdminModerationPage({ initialCaseId }: { initialCaseId?:
               id="moderation-report-type"
               className="admin-control"
               value={reportTypeFilter}
-              onChange={(event) => setReportTypeFilter(event.target.value as ReportTypeFilter)}
+              onChange={(event) => { setReportTypeFilter(event.target.value as ReportTypeFilter); setCurrentPage(1); setReportedReviewPage(1); }}
             >
               <option value="">Tất cả loại report</option>
               <option value="CHAT_MESSAGE">Tin nhắn</option>
@@ -564,7 +582,7 @@ export default function AdminModerationPage({ initialCaseId }: { initialCaseId?:
               id="moderation-report-status"
               className="admin-control"
               value={statusFilter}
-              onChange={(event) => setStatusFilter(event.target.value as typeof statusFilter)}
+              onChange={(event) => { setStatusFilter(event.target.value as typeof statusFilter); setCurrentPage(1); }}
             >
               <option value="OPEN">Chờ xử lý</option>
               <option value="IN_REVIEW">Đang xem xét</option>
@@ -578,7 +596,7 @@ export default function AdminModerationPage({ initialCaseId }: { initialCaseId?:
               id="moderation-report-object"
               className="admin-control"
               value={typeFilter}
-              onChange={(event) => setTypeFilter(event.target.value as typeof typeFilter)}
+              onChange={(event) => { setTypeFilter(event.target.value as typeof typeFilter); setCurrentPage(1); }}
             >
               <option value="">Tất cả đối tượng</option>
               <option value="PRODUCT">Sản phẩm</option>
@@ -593,7 +611,7 @@ export default function AdminModerationPage({ initialCaseId }: { initialCaseId?:
               id="moderation-report-time"
               className="admin-control"
               value={timeFilter}
-              onChange={(event) => setTimeFilter(event.target.value as TimeFilter)}
+              onChange={(event) => { setTimeFilter(event.target.value as TimeFilter); setCurrentPage(1); setReportedReviewPage(1); }}
             >
               <option value="">Tất cả thời gian</option>
               <option value="TODAY">Hôm nay</option>
@@ -638,9 +656,10 @@ export default function AdminModerationPage({ initialCaseId }: { initialCaseId?:
             ) : null}
             {visibleCases.length > 0 ? (
               <div className="admin-table-scroll">
-                <table className="admin-data-table admin-moderation-table">
+                <table className="admin-data-table admin-management-table admin-moderation-table">
                   <thead>
                     <tr>
+                      <th className="management-table-id-cell">ID</th>
                       <th>Loại report</th>
                       <th>Đối tượng</th>
                       <th>Báo cáo</th>
@@ -652,6 +671,7 @@ export default function AdminModerationPage({ initialCaseId }: { initialCaseId?:
                   <tbody>
                     {visibleCases.map((item) => (
                       <tr key={item.id}>
+                        <td className="management-table-id-cell">{item.id}</td>
                         <td>
                           <span
                             className={`admin-badge ${item.targetType === 'PRODUCT' ? 'admin-badge--product' : item.targetType === 'SHOP' ? 'admin-badge--shop' : 'admin-badge--chat'}`}
@@ -726,21 +746,7 @@ export default function AdminModerationPage({ initialCaseId }: { initialCaseId?:
                 </table>
               </div>
             ) : null}
-            <footer className="admin-list-footer">
-              <span>Hiển thị {visibleCases.length} report đã tải</span>
-              {nextCursor ? (
-                <button
-                  type="button"
-                  className="admin-btn admin-btn-secondary"
-                  onClick={() => void fetchCases(nextCursor)}
-                  disabled={isLoadingList}
-                >
-                  {isLoadingList ? 'Đang tải…' : 'Tải thêm report'}
-                </button>
-              ) : (
-                <span>Đã hiển thị hết kết quả</span>
-              )}
-            </footer>
+            <AdminPagination itemLabel="report" page={currentPage} totalItems={totalItems} totalPages={totalPages} disabled={isLoadingList} onPageChange={setCurrentPage} />
           </section>
         </section>
       ) : !isDetailRoute ? (
@@ -761,7 +767,7 @@ export default function AdminModerationPage({ initialCaseId }: { initialCaseId?:
               <button
                 type="button"
                 className="admin-btn admin-btn-secondary"
-                onClick={() => void loadReportedReviews()}
+                onClick={() => void loadReportedReviews(reportedReviewPage)}
                 disabled={isLoadingReportedReviews}
               >
                 {isLoadingReportedReviews ? 'Đang tải…' : 'Làm mới'}
@@ -782,9 +788,10 @@ export default function AdminModerationPage({ initialCaseId }: { initialCaseId?:
             ) : null}
             {visibleReviews.length > 0 ? (
               <div className="admin-table-scroll">
-                <table className="admin-data-table admin-moderation-table">
+                <table className="admin-data-table admin-management-table admin-moderation-table">
                   <thead>
                     <tr>
+                      <th className="management-table-id-cell">ID</th>
                       <th>Sản phẩm</th>
                       <th>Shop</th>
                       <th>Đánh giá</th>
@@ -803,6 +810,7 @@ export default function AdminModerationPage({ initialCaseId }: { initialCaseId?:
                             : undefined
                         }
                       >
+                        <td className="management-table-id-cell">{review.reviewId}</td>
                         <td>
                           <AdminEntityLink
                             href={`/admin/products/${review.productId}`}
@@ -827,7 +835,7 @@ export default function AdminModerationPage({ initialCaseId }: { initialCaseId?:
                         </td>
                         <td>
                           <span
-                            className={`admin-badge ${review.visibility === 'VISIBLE' ? 'admin-badge--success' : 'admin-badge--danger'}`}
+                            className={`admin-badge admin-table-status ${review.visibility === 'VISIBLE' ? 'admin-badge--success' : 'admin-badge--danger'}`}
                           >
                             {review.visibility === 'VISIBLE' ? 'Đang hiển thị' : 'Đã ẩn'}
                           </span>
@@ -868,10 +876,14 @@ export default function AdminModerationPage({ initialCaseId }: { initialCaseId?:
                 </table>
               </div>
             ) : null}
-            <footer className="admin-list-footer">
-              <span>Hiển thị {visibleReviews.length} report đã tải</span>
-              <span>Đã hiển thị hết kết quả</span>
-            </footer>
+            <AdminPagination
+              itemLabel="report đánh giá"
+              page={reportedReviewPage}
+              totalItems={reportedReviewTotalItems}
+              totalPages={reportedReviewTotalPages}
+              disabled={isLoadingReportedReviews}
+              onPageChange={setReportedReviewPage}
+            />
           </section>
           <section
             className="admin-review-panel admin-moderation-review-panel admin-moderation-detail-section"

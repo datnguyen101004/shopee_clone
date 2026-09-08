@@ -5,10 +5,12 @@ import type { Request } from 'express';
 import { AuthenticationFailedError } from './auth.errors';
 import { AuthService } from './auth.service';
 import { AuthTokenService } from './auth-token.service';
+import type { AdmissionLease } from '../traffic-admission/traffic-admission.service';
 
 export interface AuthenticatedRequest extends Request {
   authUser?: Awaited<ReturnType<AuthService['authenticateAccess']>>;
   authSessionId?: string;
+  admissionLease?: AdmissionLease;
 }
 
 @Injectable()

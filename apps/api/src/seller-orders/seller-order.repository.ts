@@ -92,32 +92,29 @@ export class SellerOrderRepository {
   async list(
     userId: string,
     query: SellerOrderQueueQuery,
-    cursor: { createdAt: Date; id: string } | null,
-  ): Promise<SellerOrderGraph[]> {
+  ): Promise<{ rows: SellerOrderGraph[]; totalItems: number }> {
     const statuses = statusesFor(query.status);
     const fulfillmentState =
       query.fulfillment === 'ALL' ? null : (query.fulfillment as SellerOrderFulfillmentState);
-    return this.prisma.shopOrder.findMany({
-      where: {
+    const where: Prisma.ShopOrderWhereInput = {
         ...this.ownership(userId),
         ...sellerPaymentGate,
         ...(statuses ? { status: { in: statuses } } : {}),
         ...(fulfillmentState ? { fulfillment: { is: { state: fulfillmentState } } } : {}),
         ...(query.orderReference ? { id: query.orderReference } : {}),
         ...dateRange(query),
-        ...(cursor
-          ? {
-              OR: [
-                { createdAt: { lt: cursor.createdAt } },
-                { createdAt: cursor.createdAt, id: { lt: cursor.id } },
-              ],
-            }
-          : {}),
-      },
-      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
-      take: query.limit + 1,
-      include: sellerOrderInclude,
-    });
+      };
+    const [totalItems, rows] = await Promise.all([
+      this.prisma.shopOrder.count({ where }),
+      this.prisma.shopOrder.findMany({
+        where,
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+        skip: (query.page - 1) * 10,
+        take: 10,
+        include: sellerOrderInclude,
+      }),
+    ]);
+    return { rows, totalItems };
   }
 
   async detail(

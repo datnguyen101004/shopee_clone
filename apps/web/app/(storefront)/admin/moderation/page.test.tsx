@@ -69,18 +69,18 @@ describe('AdminModerationPage', () => {
       },
       authenticatedFetch,
     } as unknown as ReturnType<typeof useAuthSession>);
-    vi.mocked(listModerationCases).mockResolvedValue({ items: [caseSummary], nextCursor: null } as never);
-    vi.mocked(listAdminReportedReviews).mockResolvedValue({ items: [] } as never);
+    vi.mocked(listModerationCases).mockResolvedValue({ items: [caseSummary], page: 1, pageSize: 10, totalItems: 1, totalPages: 1 } as never);
+    vi.mocked(listAdminReportedReviews).mockResolvedValue({ items: [], page: 1, pageSize: 10, totalItems: 0, totalPages: 0 } as never);
   });
 
-  it('hides technical queue identifiers without exposing reporter contact data', async () => {
+  it('shows the report ID without exposing target identifiers or reporter contact data', async () => {
     render(<AdminModerationPage />);
 
     expect(
       await screen.findByRole('main', { name: 'Trung tâm kiểm duyệt và tố cáo' }),
     ).toBeInTheDocument();
     expect(await screen.findByText(caseSummary.targetName)).toBeInTheDocument();
-    expect(screen.queryByText(caseSummary.id)).not.toBeInTheDocument();
+    expect(screen.getByText(caseSummary.id)).toBeInTheDocument();
     expect(screen.queryByText(caseSummary.targetId)).not.toBeInTheDocument();
     expect(screen.queryByText('private@example.test')).not.toBeInTheDocument();
   });
@@ -102,7 +102,7 @@ describe('AdminModerationPage', () => {
 
   it('opens only the chat-valid processing form without rendering report detail', async () => {
     const user = userEvent.setup();
-    vi.mocked(listModerationCases).mockResolvedValue({ items: [chatCase], nextCursor: null } as never);
+    vi.mocked(listModerationCases).mockResolvedValue({ items: [chatCase], page: 1, pageSize: 10, totalItems: 1, totalPages: 1 } as never);
     vi.mocked(getModerationCaseDetail).mockResolvedValue({
       ...chatCase,
       targetDetails: {

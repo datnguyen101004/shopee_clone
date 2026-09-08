@@ -49,7 +49,7 @@ describe('AdminAuditPage', () => {
     );
     expect(screen.getByTitle('HIDE')).toHaveTextContent('Ẩn đánh giá');
 
-    const detailsButton = screen.getByRole('button', { name: 'Xem thay đổi' });
+    const detailsButton = screen.getByRole('button', { name: 'Xem thay đổi của Đánh giá sản phẩm' });
     expect(detailsButton).toHaveAttribute('aria-expanded', 'false');
     fireEvent.click(detailsButton);
 

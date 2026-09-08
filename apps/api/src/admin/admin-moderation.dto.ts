@@ -1,7 +1,6 @@
 import {
   MODERATION_CASE_OUTCOMES,
   MODERATION_CASE_STATUSES,
-  MODERATION_MAX_LIMIT,
   MODERATION_PRIVATE_NOTE_MAX_LENGTH,
   REPORT_REASON_CODES,
   REPORT_REASON_MAX_LENGTH,
@@ -24,7 +23,6 @@ import {
   IsOptional,
   IsString,
   IsUUID,
-  Max,
   MaxLength,
   Min,
   MinLength,
@@ -32,18 +30,12 @@ import {
 } from 'class-validator';
 
 export class ModerationCaseQueryDto implements ModerationCaseListQuery {
-  @ApiPropertyOptional({ minimum: 1, maximum: MODERATION_MAX_LIMIT, default: 20 })
+  @ApiPropertyOptional({ minimum: 1, default: 1 })
   @IsOptional()
   @Type(() => Number)
   @IsInt()
   @Min(1)
-  @Max(MODERATION_MAX_LIMIT)
-  limit?: number;
-
-  @ApiPropertyOptional({ description: 'Pagination cursor (case id)' })
-  @IsOptional()
-  @IsString()
-  cursor?: string;
+  page = 1;
 
   @ApiPropertyOptional({ enum: MODERATION_CASE_STATUSES })
   @IsOptional()

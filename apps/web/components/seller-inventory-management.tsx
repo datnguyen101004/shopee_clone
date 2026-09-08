@@ -1,13 +1,14 @@
 'use client';
 
 import type { InventoryAdjustment, InventoryAdjustmentReason, InventoryBalance } from '@shopee-clone/contracts';
-import { ChevronDown, Search } from '@shopee-clone/ui';
+import { ChevronDown, RotateCcw, Search, SquarePen } from '@shopee-clone/ui';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { adjustSellerInventory, fetchSellerInventory, fetchSellerInventoryHistory } from '../lib/inventory-api';
 import { RoleApiError } from '../lib/role-api';
 import { marketplaceMediaUrl } from '../lib/marketplace-media-url';
 import { useAuthSession } from './auth-session-provider';
+import { SellerPagination } from './seller/seller-pagination';
 
 type InventorySort = 'newest' | 'oldest' | 'quantity';
 
@@ -22,7 +23,10 @@ function InventoryProductImage({ item }: { item: InventoryBalance }) {
 export function SellerInventoryManagement() {
   const { state, authenticatedFetch } = useAuthSession();
   const [items, setItems] = useState<InventoryBalance[]>([]);
-  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [totalItems, setTotalItems] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
   const [searchTerm, setSearchTerm] = useState('');
   const [sort, setSort] = useState<InventorySort>('newest');
   const [loading, setLoading] = useState(true);
@@ -33,22 +37,22 @@ export function SellerInventoryManagement() {
   const [note, setNote] = useState('');
   const [history, setHistory] = useState<InventoryAdjustment[] | null>(null);
 
-  const load = useCallback(async (cursor?: string, append = false) => {
+  const load = useCallback(async (targetPage = 1) => {
     if (state.status !== 'authenticated') return;
     setLoading(true); setError(null);
-    try { const page = await fetchSellerInventory(authenticatedFetch, { cursor }); setItems((current) => append ? [...current, ...page.items] : page.items); setNextCursor(page.nextCursor); }
+    try { const response = await fetchSellerInventory(authenticatedFetch, { page: targetPage }); const lastPage = Math.max(1, response.totalPages); if (targetPage > lastPage) { setPage(lastPage); return; } setItems(response.items); setPage(response.page); setPageSize(response.pageSize); setTotalItems(response.totalItems); setTotalPages(response.totalPages); }
     catch (cause) { setError(cause instanceof RoleApiError ? cause.problem?.detail ?? 'Không thể tải tồn kho.' : 'Không thể tải tồn kho.'); }
     finally { setLoading(false); }
   }, [authenticatedFetch, state.status]);
 
   // eslint-disable-next-line react-hooks/set-state-in-effect
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => { void load(page); }, [load, page]);
 
   const submitAdjustment = async () => {
     if (!selected) return;
     const parsed = Number(delta);
     if (!Number.isSafeInteger(parsed) || parsed === 0) { setError('Số lượng thay đổi phải là số nguyên khác 0.'); return; }
-    try { await adjustSellerInventory(authenticatedFetch, selected.variantId, selected.version, { delta: parsed, reason, note: note.trim() || null }); setSelected(null); setDelta(''); setNote(''); await load(); }
+    try { await adjustSellerInventory(authenticatedFetch, selected.variantId, selected.version, { delta: parsed, reason, note: note.trim() || null }); setSelected(null); setDelta(''); setNote(''); await load(page); }
     catch (cause) { setError(cause instanceof RoleApiError ? cause.problem?.detail ?? 'Không thể cập nhật tồn kho.' : 'Không thể cập nhật tồn kho.'); }
   };
   const showHistory = async (item: InventoryBalance) => { try { setHistory((await fetchSellerInventoryHistory(authenticatedFetch, item.variantId)).items); } catch { setError('Không thể tải lịch sử tồn kho.'); } };
@@ -81,7 +85,7 @@ export function SellerInventoryManagement() {
             <input
               type="search"
               value={searchTerm}
-              onChange={(event) => setSearchTerm(event.target.value)}
+              onChange={(event) => { setSearchTerm(event.target.value); setPage(1); }}
               placeholder="Tên sản phẩm hoặc SKU"
               aria-label="Tìm kiếm tồn kho"
             />
@@ -89,7 +93,7 @@ export function SellerInventoryManagement() {
           <div className="seller-pl-field seller-inventory-sort">
             <label htmlFor="seller-inventory-sort">Sắp xếp</label>
             <div className="seller-pl-select-wrap">
-              <select id="seller-inventory-sort" className="seller-pl-select" value={sort} onChange={(event) => setSort(event.target.value as InventorySort)}>
+              <select id="seller-inventory-sort" className="seller-pl-select" value={sort} onChange={(event) => { setSort(event.target.value as InventorySort); setPage(1); }}>
                 <option value="newest">Mới nhất</option>
                 <option value="oldest">Cũ nhất</option>
                 <option value="quantity">Số lượng</option>
@@ -102,36 +106,34 @@ export function SellerInventoryManagement() {
       </div>
 
       {loading ? <p className="seller-inventory-state">Đang tải tồn kho…</p> : null}
-      {error ? <div className="seller-inventory-error"><p>{error}</p><button type="button" onClick={() => void load()}>Thử lại</button></div> : null}
+      {error ? <div className="seller-inventory-error"><p>{error}</p><button type="button" onClick={() => void load(page)}>Thử lại</button></div> : null}
       {!loading && !error && items.length === 0 ? <p className="seller-inventory-state">Chưa có sản phẩm đang bán để quản lý tồn kho. Chỉ hiển thị sản phẩm đang bán; sản phẩm nháp, ẩn, lưu trữ hoặc bị xóa sẽ không xuất hiện tại đây.</p> : null}
       {!loading && !error && items.length > 0 ? (
         <>
           <div className="seller-pl-table-stack">
             <div className="seller-pl-table-card seller-inventory-table-card">
               <div className="seller-pl-table-scroll">
-                <table className="seller-pl-table seller-inventory-table">
-                  <thead><tr><th>Sản phẩm / SKU</th><th>Trạng thái</th><th>Hiện có</th><th>Đang giữ</th><th>Đã bán</th><th>Khả dụng</th><th>Cập nhật</th><th>Thao tác</th></tr></thead>
+                <table className="seller-pl-table seller-management-table seller-inventory-table">
+                  <thead><tr><th className="management-table-id-cell">ID</th><th>Sản phẩm / SKU</th><th>Trạng thái</th><th>Hiện có</th><th>Đang giữ</th><th>Đã bán</th><th>Khả dụng</th><th>Cập nhật</th><th>Thao tác</th></tr></thead>
                   <tbody>
                     {visibleItems.length ? visibleItems.map((item) => (
                       <tr key={item.variantId}>
+                        <td className="management-table-id-cell">{item.variantId}</td>
                         <td><div className="seller-inventory-product-cell"><InventoryProductImage item={item} /><span className="seller-inventory-product-copy"><strong>{item.productName}</strong><span>{item.variantName} · {item.sku}</span></span></div></td>
-                        <td>{item.lifecycle === 'active' ? 'Đang bán' : 'Tạm dừng'}</td>
+                        <td><span className="seller-table-status">{item.lifecycle === 'active' ? 'Đang bán' : 'Tạm dừng'}</span></td>
                         <td>{money(item.quantityOnHand)}</td>
                         <td>{money(item.quantityReserved)}</td>
                         <td>{money(item.quantitySold)}</td>
                         <td><strong className={item.lowStock ? 'seller-inventory-low' : ''}>{money(item.availableQuantity)}</strong>{item.lowStock ? <small>Sắp hết hàng</small> : null}</td>
                         <td>{new Date(item.updatedAt).toLocaleDateString('vi-VN')}</td>
-                        <td><div className="seller-inventory-row-actions"><button type="button" onClick={() => setSelected(item)}>Điều chỉnh</button><button type="button" onClick={() => void showHistory(item)}>Lịch sử</button></div></td>
+                        <td><div className="seller-inventory-row-actions"><button type="button" className="seller-pl-btn-icon" aria-label={`Điều chỉnh tồn kho ${item.productName} ${item.variantName}`} title="Điều chỉnh tồn kho" onClick={() => setSelected(item)}><SquarePen size={16} aria-hidden="true" /></button><button type="button" className="seller-pl-btn-icon" aria-label={`Xem lịch sử tồn kho ${item.productName} ${item.variantName}`} title="Xem lịch sử tồn kho" onClick={() => void showHistory(item)}><RotateCcw size={16} aria-hidden="true" /></button></div></td>
                       </tr>
-                    )) : <tr><td className="seller-inventory-table__empty" colSpan={8}>Không tìm thấy sản phẩm hoặc SKU phù hợp.</td></tr>}
+                    )) : <tr><td className="seller-inventory-table__empty" colSpan={9}>Không tìm thấy sản phẩm hoặc SKU phù hợp.</td></tr>}
                   </tbody>
                 </table>
               </div>
             </div>
-            <footer className="seller-pl-footer seller-inventory-footer">
-              <div className="seller-pl-footer__summary">Hiển thị <strong>{visibleItems.length}</strong>{visibleItems.length !== items.length ? ` / ${items.length}` : ''} biến thể tồn kho đã tải</div>
-              {nextCursor ? <button className="seller-inventory-load-more" type="button" onClick={() => void load(nextCursor, true)}>Tải thêm</button> : <span className="seller-pl-footer__complete">Đã tải hết tồn kho theo bộ lọc</span>}
-            </footer>
+            <SellerPagination itemLabel="biến thể" page={page} pageSize={pageSize} totalItems={totalItems} totalPages={totalPages} disabled={loading} onPageChange={setPage} />
           </div>
         </>
       ) : null}

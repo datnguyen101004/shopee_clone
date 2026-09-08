@@ -6,21 +6,24 @@ import type {
   CampaignAdminSummary,
   HomepageBannerTargetType,
 } from '@shopee-clone/contracts';
-import { useCallback, useEffect, useState } from 'react';
+import { ADMIN_BANNER_MEDIA_MIME_TYPES } from '@shopee-clone/contracts';
+import { useCallback, useEffect, useRef, useState, type ChangeEvent } from 'react';
 
 import { useAuthSession } from '../../../../components/auth-session-provider';
 import { AdminEntityLink } from '../../../../components/admin/admin-entity-link';
 import { EditIcon, TrashIcon } from '../../../../components/admin/admin-icons';
+import { DateTimeLocalPicker } from '../../../../components/datetime-local-picker';
 import {
   createAdminBanner,
   deleteAdminBanner,
   adminErrorMessage,
   fetchAdminBanners,
   fetchAdminHomepageModules,
+  uploadAdminBannerMedia,
   updateAdminBanner,
   updateAdminHomepageModule,
 } from '../../../../lib/admin-api';
-import { fetchAdminCampaigns } from '../../../../lib/campaigns-api';
+import { fetchAllAdminCampaigns } from '../../../../lib/campaigns-api';
 
 function adminBannerTarget(banner: AdminBannerSummary, activeCampaigns: CampaignAdminSummary[]) {
   if (!banner.targetId) return null;
@@ -46,6 +49,120 @@ function adminBannerTarget(banner: AdminBannerSummary, activeCampaigns: Campaign
   return { href, name, imageUrl: banner.targetImageUrl };
 }
 
+type BannerImageUploadState = {
+  status: 'idle' | 'selected' | 'uploading' | 'ready' | 'error';
+  file: File | null;
+  fileName: string | null;
+  previewUrl: string | null;
+  error: string | null;
+};
+
+const MAX_BANNER_IMAGE_BYTES = 5 * 1024 * 1024;
+
+function validateBannerImageFile(file: File): string | null {
+  if (!(ADMIN_BANNER_MEDIA_MIME_TYPES as readonly string[]).includes(file.type)) {
+    return 'Ảnh banner phải là JPG, PNG hoặc WebP.';
+  }
+  if (file.size < 1 || file.size > MAX_BANNER_IMAGE_BYTES) {
+    return 'Ảnh banner phải có dung lượng từ 1 byte đến tối đa 5 MB.';
+  }
+  return null;
+}
+
+type BannerDateTimeParts = {
+  year: number;
+  month: number;
+  day: number;
+  hour: number;
+  minute: number;
+};
+
+function padBannerDatePart(value: number): string {
+  return String(value).padStart(2, '0');
+}
+
+function bannerDateTimeParts(value: string): BannerDateTimeParts | null {
+  const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/.exec(value);
+  if (!match) return null;
+  const [, year, month, day, hour, minute] = match;
+  const parsed = {
+    year: Number(year),
+    month: Number(month),
+    day: Number(day),
+    hour: Number(hour),
+    minute: Number(minute),
+  };
+  if (
+    parsed.month < 1 ||
+    parsed.month > 12 ||
+    parsed.day < 1 ||
+    parsed.day > 31 ||
+    parsed.hour > 23 ||
+    parsed.minute > 59
+  ) {
+    return null;
+  }
+  return parsed;
+}
+
+function bannerDateTimeInputValue(parts: BannerDateTimeParts): string {
+  return `${parts.year}-${padBannerDatePart(parts.month)}-${padBannerDatePart(parts.day)}T${padBannerDatePart(parts.hour)}:${padBannerDatePart(parts.minute)}`;
+}
+
+function bannerTimeZoneParts(date: Date, timeZone: string): BannerDateTimeParts {
+  const values = Object.fromEntries(
+    new Intl.DateTimeFormat('en-US', {
+      timeZone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hourCycle: 'h23',
+    })
+      .formatToParts(date)
+      .filter(({ type }) => type !== 'literal')
+      .map(({ type, value }) => [type, Number(value)]),
+  ) as Record<string, number>;
+  return {
+    year: values.year ?? 0,
+    month: values.month ?? 0,
+    day: values.day ?? 0,
+    hour: values.hour ?? 0,
+    minute: values.minute ?? 0,
+  };
+}
+
+export function isoToBannerDateTimeInput(
+  value: string | null | undefined,
+  timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone,
+): string {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  return bannerDateTimeInputValue(bannerTimeZoneParts(date, timeZone));
+}
+
+function bannerTimeZoneOffsetMs(date: Date, timeZone: string): number {
+  const parts = bannerTimeZoneParts(date, timeZone);
+  return Date.UTC(parts.year, parts.month - 1, parts.day, parts.hour, parts.minute) - date.getTime();
+}
+
+export function bannerDateTimeInputToIso(
+  value: string,
+  timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone,
+): string | null {
+  const parts = bannerDateTimeParts(value);
+  if (!parts) return null;
+  const wallClockMs = Date.UTC(parts.year, parts.month - 1, parts.day, parts.hour, parts.minute);
+  let utcMs = wallClockMs;
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    utcMs = wallClockMs - bannerTimeZoneOffsetMs(new Date(utcMs), timeZone);
+  }
+  const result = new Date(utcMs);
+  return Number.isNaN(result.getTime()) ? null : result.toISOString();
+}
+
 export default function AdminHomepageConfigPage() {
   const { authenticatedFetch } = useAuthSession();
   const [banners, setBanners] = useState<AdminBannerSummary[]>([]);
@@ -65,6 +182,15 @@ export default function AdminHomepageConfigPage() {
   const [bannerTargetId, setBannerTargetId] = useState('');
   const [bannerTargetQuery, setBannerTargetQuery] = useState('/');
   const [bannerImageUrl, setBannerImageUrl] = useState('');
+  const [bannerExistingImageUrl, setBannerExistingImageUrl] = useState('');
+  const [bannerImageAssetId, setBannerImageAssetId] = useState<string | null>(null);
+  const [bannerImageUpload, setBannerImageUpload] = useState<BannerImageUploadState>({
+    status: 'idle',
+    file: null,
+    fileName: null,
+    previewUrl: null,
+    error: null,
+  });
   const [bannerAltText, setBannerAltText] = useState('');
   const [bannerTheme, setBannerTheme] = useState('brand');
   const [bannerEyebrow, setBannerEyebrow] = useState('');
@@ -85,6 +211,18 @@ export default function AdminHomepageConfigPage() {
   const [moduleActiveUntil, setModuleActiveUntil] = useState('');
   const [moduleSubmitting, setModuleSubmitting] = useState(false);
   const [moduleError, setModuleError] = useState<string | null>(null);
+  const bannerSubmittingRef = useRef(false);
+  const bannerUploadToken = useRef(0);
+  const bannerPreviewUrlRef = useRef<string | null>(null);
+  const bannerFileInputRef = useRef<HTMLInputElement | null>(null);
+
+  const invalidateBannerImageUpload = useCallback(() => {
+    bannerUploadToken.current += 1;
+    if (bannerPreviewUrlRef.current) {
+      URL.revokeObjectURL(bannerPreviewUrlRef.current);
+      bannerPreviewUrlRef.current = null;
+    }
+  }, []);
 
   const loadData = useCallback(() => {
     setLoading(true);
@@ -92,12 +230,12 @@ export default function AdminHomepageConfigPage() {
     Promise.all([
       fetchAdminBanners(authenticatedFetch),
       fetchAdminHomepageModules(authenticatedFetch),
-      fetchAdminCampaigns(authenticatedFetch, '?state=ACTIVE&limit=50'),
+      fetchAllAdminCampaigns(authenticatedFetch, '?state=ACTIVE'),
     ])
       .then(([bannersRes, modulesRes, campaignsRes]) => {
         setBanners(bannersRes.items);
         setModules(modulesRes.items);
-        setActiveCampaigns(campaignsRes.items);
+        setActiveCampaigns(campaignsRes);
         setLoading(false);
       })
       .catch((err) => {
@@ -111,7 +249,15 @@ export default function AdminHomepageConfigPage() {
     return () => window.clearTimeout(timer);
   }, [loadData]);
 
+  useEffect(
+    () => () => {
+      invalidateBannerImageUpload();
+    },
+    [invalidateBannerImageUpload],
+  );
+
   const openCreateBannerModal = () => {
+    invalidateBannerImageUpload();
     setBannerModalMode('CREATE');
     setEditingBanner(null);
     setBannerTitle('');
@@ -119,6 +265,9 @@ export default function AdminHomepageConfigPage() {
     setBannerTargetId('');
     setBannerTargetQuery('/');
     setBannerImageUrl('');
+    setBannerExistingImageUrl('');
+    setBannerImageAssetId(null);
+    setBannerImageUpload({ status: 'idle', file: null, fileName: null, previewUrl: null, error: null });
     setBannerAltText('');
     setBannerTheme('brand');
     setBannerEyebrow('');
@@ -130,6 +279,7 @@ export default function AdminHomepageConfigPage() {
   };
 
   const openEditBannerModal = (b: AdminBannerSummary) => {
+    invalidateBannerImageUpload();
     setBannerModalMode('EDIT');
     setEditingBanner(b);
     setBannerTitle(b.title);
@@ -137,13 +287,55 @@ export default function AdminHomepageConfigPage() {
     setBannerTargetId(b.targetId ?? '');
     setBannerTargetQuery(b.targetQuery ?? b.href ?? '/');
     setBannerImageUrl(b.imageUrl || '');
+    setBannerExistingImageUrl(b.imageUrl || '');
+    setBannerImageAssetId(null);
+    setBannerImageUpload({ status: 'idle', file: null, fileName: null, previewUrl: null, error: null });
     setBannerAltText(b.altText);
     setBannerTheme(b.theme);
     setBannerEyebrow(b.eyebrow || '');
     setBannerSortOrder(b.sortOrder ?? b.priority ?? 0);
-    setBannerDisplayFrom(b.displayFrom ? b.displayFrom.slice(0, 16) : '');
-    setBannerDisplayUntil(b.displayUntil ? b.displayUntil.slice(0, 16) : '');
+    setBannerDisplayFrom(isoToBannerDateTimeInput(b.displayFrom));
+    setBannerDisplayUntil(isoToBannerDateTimeInput(b.displayUntil));
     setBannerEnabled(b.isEnabled !== false);
+    setBannerError(null);
+  };
+
+  const handleBannerImageFileChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+    invalidateBannerImageUpload();
+    const validationError = validateBannerImageFile(file);
+    if (validationError) {
+      setBannerImageAssetId(null);
+      setBannerImageUpload({
+        status: 'error',
+        file: null,
+        fileName: file.name,
+        previewUrl: null,
+        error: validationError,
+      });
+      setBannerError(null);
+      return;
+    }
+    const previewUrl = URL.createObjectURL(file);
+    bannerPreviewUrlRef.current = previewUrl;
+    setBannerImageAssetId(null);
+    setBannerImageUpload({ status: 'selected', file, fileName: file.name, previewUrl, error: null });
+    setBannerError(null);
+  };
+
+  const clearBannerImageSelection = () => {
+    invalidateBannerImageUpload();
+    setBannerImageAssetId(null);
+    setBannerImageUrl(bannerExistingImageUrl);
+    setBannerImageUpload({ status: 'idle', file: null, fileName: null, previewUrl: null, error: null });
+  };
+
+  const closeBannerModal = () => {
+    if (bannerSubmitting || bannerImageUpload.status === 'uploading') return;
+    invalidateBannerImageUpload();
+    setBannerModalMode(null);
     setBannerError(null);
   };
 
@@ -158,11 +350,63 @@ export default function AdminHomepageConfigPage() {
       setBannerError('Vui lòng nhập giá trị đích đến.');
       return;
     }
+    if (bannerImageUpload.status === 'uploading') {
+      setBannerError('Vui lòng chờ ảnh banner tải lên hoàn tất.');
+      return;
+    }
+    if (bannerImageUpload.status === 'error' && !bannerImageUpload.file) {
+      setBannerError(bannerImageUpload.error ?? 'Ảnh banner không hợp lệ.');
+      return;
+    }
+    if (bannerSubmittingRef.current || bannerSubmitting) return;
 
+    bannerSubmittingRef.current = true;
     setBannerSubmitting(true);
     setBannerError(null);
 
     try {
+      let nextImageAssetId = bannerImageAssetId;
+      let nextImageUrl = bannerImageUrl.trim() || null;
+      const selectedFile = bannerImageUpload.file;
+      if (
+        selectedFile &&
+        (bannerImageUpload.status === 'selected' || bannerImageUpload.status === 'error')
+      ) {
+        const token = ++bannerUploadToken.current;
+        setBannerImageUpload((current) => ({ ...current, status: 'uploading', error: null }));
+        try {
+          const media = await uploadAdminBannerMedia(authenticatedFetch, selectedFile);
+          if (token !== bannerUploadToken.current) {
+            bannerSubmittingRef.current = false;
+            setBannerSubmitting(false);
+            return;
+          }
+          if (bannerPreviewUrlRef.current) {
+            URL.revokeObjectURL(bannerPreviewUrlRef.current);
+            bannerPreviewUrlRef.current = null;
+          }
+          nextImageAssetId = media.id;
+          nextImageUrl = media.imageUrl;
+          setBannerImageAssetId(media.id);
+          setBannerImageUrl(media.imageUrl);
+          setBannerImageUpload((current) => ({
+            ...current,
+            status: 'ready',
+            previewUrl: media.imageUrl,
+            error: null,
+          }));
+        } catch (cause: unknown) {
+          setBannerImageUpload((current) => ({
+            ...current,
+            status: 'error',
+            error: adminErrorMessage(cause, 'Không thể tải ảnh banner lên.'),
+          }));
+          setBannerError(adminErrorMessage(cause, 'Không thể tải ảnh banner lên.'));
+          bannerSubmittingRef.current = false;
+          setBannerSubmitting(false);
+          return;
+        }
+      }
       const previousTargetType = editingBanner?.targetType ?? 'URL';
       const previousTargetValue = ['CAMPAIGN', 'PRODUCT', 'SHOP', 'CATEGORY'].includes(
         previousTargetType,
@@ -181,16 +425,19 @@ export default function AdminHomepageConfigPage() {
             targetQuery: needsId ? null : bannerTargetQuery.trim(),
           }
         : {};
+      const imageFields = nextImageAssetId
+        ? { imageAssetId: nextImageAssetId }
+        : { imageUrl: nextImageUrl };
       if (bannerModalMode === 'CREATE') {
         await createAdminBanner(authenticatedFetch, {
           title: bannerTitle.trim(),
-          imageUrl: bannerImageUrl.trim() || null,
+          ...imageFields,
           altText: bannerAltText.trim() || bannerTitle.trim(),
           theme: bannerTheme.trim(),
           eyebrow: bannerEyebrow.trim() || undefined,
           ...targetFields,
-          displayFrom: bannerDisplayFrom ? new Date(bannerDisplayFrom).toISOString() : null,
-          displayUntil: bannerDisplayUntil ? new Date(bannerDisplayUntil).toISOString() : null,
+          displayFrom: bannerDisplayFrom ? bannerDateTimeInputToIso(bannerDisplayFrom) : null,
+          displayUntil: bannerDisplayUntil ? bannerDateTimeInputToIso(bannerDisplayUntil) : null,
           isEnabled: bannerEnabled,
           priority: Number(bannerSortOrder),
           sortOrder: Number(bannerSortOrder),
@@ -198,22 +445,26 @@ export default function AdminHomepageConfigPage() {
       } else if (bannerModalMode === 'EDIT' && editingBanner) {
         await updateAdminBanner(authenticatedFetch, editingBanner.id, {
           title: bannerTitle.trim(),
-          imageUrl: bannerImageUrl.trim() || null,
+          ...imageFields,
           altText: bannerAltText.trim() || bannerTitle.trim(),
           theme: bannerTheme.trim(),
           eyebrow: bannerEyebrow.trim() || undefined,
           ...targetFields,
-          displayFrom: bannerDisplayFrom ? new Date(bannerDisplayFrom).toISOString() : null,
-          displayUntil: bannerDisplayUntil ? new Date(bannerDisplayUntil).toISOString() : null,
+          displayFrom: bannerDisplayFrom ? bannerDateTimeInputToIso(bannerDisplayFrom) : null,
+          displayUntil: bannerDisplayUntil ? bannerDateTimeInputToIso(bannerDisplayUntil) : null,
           isEnabled: bannerEnabled,
           priority: Number(bannerSortOrder),
           sortOrder: Number(bannerSortOrder),
         });
       }
+      invalidateBannerImageUpload();
       setBannerModalMode(null);
+      bannerSubmittingRef.current = false;
+      setBannerSubmitting(false);
       loadData();
     } catch (error: unknown) {
       setBannerError(adminErrorMessage(error, 'Lỗi lưu banner'));
+      bannerSubmittingRef.current = false;
       setBannerSubmitting(false);
     }
   };
@@ -306,24 +557,24 @@ export default function AdminHomepageConfigPage() {
             {banners.length === 0 ? (
               <div className="admin-state-card__message">Chưa có banner nào.</div>
             ) : (
-              <table
-                className="admin-data-table admin-homepage-table admin-homepage-banner-table"
-                style={{
-                  width: '100%',
-                  borderCollapse: 'collapse',
-                  textAlign: 'left',
-                  fontSize: '14px',
-                }}
-              >
+              <div className="admin-table-scroll">
+                <table
+                  className="admin-data-table admin-management-table admin-homepage-table admin-homepage-banner-table"
+                  style={{
+                    width: '100%',
+                    borderCollapse: 'collapse',
+                    textAlign: 'left',
+                  }}
+                >
                 <thead>
                   <tr
                     style={{
                       background: '#f9fafb',
                       borderBottom: '1px solid #e5e7eb',
                       color: '#4b5563',
-                      fontSize: '13px',
                     }}
                   >
+                    <th style={{ padding: '12px 16px' }} className="management-table-id-cell">ID</th>
                     <th style={{ padding: '12px 16px' }}>Tiêu đề & Nhãn</th>
                     <th style={{ padding: '12px 16px' }}>Đối tượng đích</th>
                     <th style={{ padding: '12px 16px' }}>Giao diện (Theme)</th>
@@ -338,6 +589,7 @@ export default function AdminHomepageConfigPage() {
                       id={`admin-banner-${b.id}`}
                       style={{ borderBottom: '1px solid #f3f4f6' }}
                     >
+                      <td className="management-table-id-cell" style={{ padding: '14px 16px' }}>{b.id}</td>
                       <td style={{ padding: '14px 16px' }}>
                         <AdminEntityLink
                           href={`#admin-banner-${b.id}`}
@@ -346,31 +598,35 @@ export default function AdminHomepageConfigPage() {
                           meta={b.eyebrow}
                         />
                       </td>
-                      <td style={{ padding: '14px 16px', color: '#4b5563' }}>
-                        <div>{b.targetType ?? 'URL'}</div>
-                        {(() => {
-                          const target = adminBannerTarget(b, activeCampaigns);
-                          return target ? (
-                            <AdminEntityLink
-                              href={target.href}
-                              name={target.name}
-                              imageUrl={target.imageUrl}
-                              meta={
-                                b.targetAvailable === false ? 'Không khả dụng' : 'Mở trong Admin'
-                              }
-                            />
-                          ) : (
-                            <small>{b.targetQuery ?? 'Không có đối tượng quản lý'}</small>
-                          );
-                        })()}
-                        {b.targetType === 'CAMPAIGN' && b.targetAvailable === false && (
-                          <div className="admin-badge admin-badge--warning">
-                            Mục tiêu không khả dụng
-                          </div>
-                        )}
+                      <td className="admin-homepage-banner-target-cell">
+                        <div className="admin-homepage-banner-target">
+                          <span className="admin-homepage-banner-target__type">
+                            {b.targetType ?? 'URL'}
+                          </span>
+                          {(() => {
+                            const target = adminBannerTarget(b, activeCampaigns);
+                            return target ? (
+                              <AdminEntityLink
+                                href={target.href}
+                                name={target.name}
+                                imageUrl={target.imageUrl}
+                                meta={
+                                  b.targetAvailable === false ? 'Không khả dụng' : 'Mở trong Admin'
+                                }
+                              />
+                            ) : (
+                              <small>{b.targetQuery ?? 'Không có đối tượng quản lý'}</small>
+                            );
+                          })()}
+                          {b.targetType === 'CAMPAIGN' && b.targetAvailable === false && (
+                            <span className="admin-badge admin-badge--warning">
+                              Mục tiêu không khả dụng
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td style={{ padding: '14px 16px', color: '#6b7280' }}>{b.theme}</td>
-                      <td style={{ padding: '14px 16px', color: '#111827', fontWeight: 600 }}>
+                      <td style={{ padding: '14px 16px', color: '#111827' }}>
                         {b.sortOrder}
                       </td>
                       <td className="admin-table-cell--actions admin-homepage-actions-cell">
@@ -398,7 +654,8 @@ export default function AdminHomepageConfigPage() {
                     </tr>
                   ))}
                 </tbody>
-              </table>
+                </table>
+              </div>
             )}
           </div>
         </div>
@@ -413,24 +670,24 @@ export default function AdminHomepageConfigPage() {
             border: '1px solid #f3f4f6',
           }}
         >
-          <table
-            className="admin-data-table admin-homepage-table admin-homepage-module-table"
-            style={{
-              width: '100%',
-              borderCollapse: 'collapse',
-              textAlign: 'left',
-              fontSize: '14px',
-            }}
-          >
+          <div className="admin-table-scroll">
+            <table
+              className="admin-data-table admin-management-table admin-homepage-table admin-homepage-module-table"
+              style={{
+                width: '100%',
+                borderCollapse: 'collapse',
+                textAlign: 'left',
+              }}
+            >
             <thead>
               <tr
                 style={{
                   background: '#f9fafb',
                   borderBottom: '1px solid #e5e7eb',
                   color: '#4b5563',
-                  fontSize: '13px',
                 }}
               >
+                <th style={{ padding: '12px 16px' }} className="management-table-id-cell">ID</th>
                 <th style={{ padding: '12px 16px' }}>Module Key & Loại</th>
                 <th style={{ padding: '12px 16px' }}>Tiêu đề hiển thị</th>
                 <th style={{ padding: '12px 16px' }}>Trạng thái</th>
@@ -441,24 +698,23 @@ export default function AdminHomepageConfigPage() {
             <tbody>
               {modules.map((m) => (
                 <tr key={m.id} id={`admin-module-${m.id}`}>
+                  <td className="management-table-id-cell" style={{ padding: '14px 16px' }}>{m.id}</td>
                   <td style={{ padding: '14px 16px' }}>
                     <AdminEntityLink href={`#admin-module-${m.id}`} name={m.key} meta={m.type} />
                   </td>
                   <td style={{ padding: '14px 16px' }}>
                     <div style={{ color: '#111827' }}>{m.title}</div>
                     {m.subtitle && (
-                      <div style={{ fontSize: '12px', color: '#6b7280' }}>{m.subtitle}</div>
+                      <div className="admin-table-subtext" style={{ color: '#6b7280' }}>{m.subtitle}</div>
                     )}
                   </td>
                   <td style={{ padding: '14px 16px' }}>
                     <span
-                      className={`admin-badge ${m.isEnabled ? 'admin-badge--success' : 'admin-badge--danger'}`}
+                      className={`admin-badge admin-table-status ${m.isEnabled ? 'admin-badge--success' : 'admin-badge--danger'}`}
                       style={{
                         display: 'inline-block',
                         padding: '3px 10px',
                         borderRadius: '12px',
-                        fontSize: '12px',
-                        fontWeight: 600,
                         background: m.isEnabled ? '#d1fae5' : '#fee2e2',
                         color: m.isEnabled ? '#065f46' : '#991b1b',
                       }}
@@ -466,7 +722,7 @@ export default function AdminHomepageConfigPage() {
                       {m.isEnabled ? 'Kích hoạt' : 'Tắt'}
                     </span>
                   </td>
-                  <td style={{ padding: '14px 16px', fontWeight: 600 }}>{m.sortOrder}</td>
+                  <td style={{ padding: '14px 16px' }}>{m.sortOrder}</td>
                   <td className="admin-table-cell--actions admin-homepage-actions-cell">
                     <button
                       type="button"
@@ -481,14 +737,18 @@ export default function AdminHomepageConfigPage() {
                 </tr>
               ))}
             </tbody>
-          </table>
+            </table>
+          </div>
         </div>
       )}
 
       {/* Banner Modal */}
       {bannerModalMode && (
         <div
-          className="admin-dialog-backdrop"
+          className="admin-dialog-backdrop admin-homepage-banner-backdrop"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) closeBannerModal();
+          }}
           style={{
             position: 'fixed',
             inset: 0,
@@ -500,13 +760,11 @@ export default function AdminHomepageConfigPage() {
           }}
         >
           <div
-            className="admin-dialog"
+            className="admin-dialog admin-homepage-banner-dialog"
             style={{
               background: '#ffffff',
               borderRadius: '12px',
               padding: '24px',
-              maxWidth: '500px',
-              width: '90%',
               boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)',
             }}
           >
@@ -707,32 +965,66 @@ export default function AdminHomepageConfigPage() {
                 />
               </div>
 
-              <div className="admin-field">
-                <label
-                  style={{
-                    display: 'block',
-                    fontSize: '13px',
-                    fontWeight: 600,
-                    color: '#374151',
-                    marginBottom: '4px',
-                  }}
-                >
-                  URL Ảnh (Media relative hoặc S3):
-                </label>
+              <div className="admin-field admin-banner-image-upload">
+                <label htmlFor="admin-banner-image-file">Ảnh banner:</label>
+                <div className="admin-banner-image-upload__controls">
+                  <button
+                    type="button"
+                    className="admin-btn admin-btn-secondary"
+                    onClick={() => bannerFileInputRef.current?.click()}
+                    disabled={bannerSubmitting || bannerImageUpload.status === 'uploading'}
+                    aria-controls="admin-banner-image-file"
+                  >
+                    Chọn ảnh từ máy
+                  </button>
+                  <span className="admin-banner-image-upload__filename">
+                    {bannerImageUpload.fileName ?? 'Chưa chọn ảnh mới'}
+                  </span>
+                </div>
                 <input
-                  className="admin-control"
-                  type="text"
-                  value={bannerImageUrl}
-                  onChange={(e) => setBannerImageUrl(e.target.value)}
-                  placeholder="/media/banners/banner1.png"
-                  style={{
-                    width: '100%',
-                    padding: '8px 12px',
-                    borderRadius: '6px',
-                    border: '1px solid #d1d5db',
-                    fontSize: '14px',
-                  }}
+                  ref={bannerFileInputRef}
+                  id="admin-banner-image-file"
+                  className="admin-banner-image-upload__input"
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  onChange={handleBannerImageFileChange}
+                  disabled={bannerSubmitting || bannerImageUpload.status === 'uploading'}
                 />
+                <small className="admin-banner-image-upload__hint">
+                  JPG, PNG hoặc WebP · tối đa 5 MB
+                </small>
+                {bannerImageUpload.status === 'selected' && bannerImageUpload.fileName ? (
+                  <small className="admin-banner-image-upload__status" role="status">
+                    Đã chọn {bannerImageUpload.fileName}. Ảnh sẽ được tải lên khi lưu banner.
+                  </small>
+                ) : null}
+                {bannerImageUpload.status === 'uploading' && bannerImageUpload.fileName ? (
+                  <small className="admin-banner-image-upload__status" role="status">
+                    Đang tải {bannerImageUpload.fileName} lên kho ảnh…
+                  </small>
+                ) : null}
+                {bannerImageUpload.status === 'ready' && bannerImageUpload.fileName ? (
+                  <small className="admin-banner-image-upload__status" role="status">
+                    Đã tải ảnh {bannerImageUpload.fileName} lên kho ảnh.
+                  </small>
+                ) : null}
+                {bannerImageUpload.status === 'error' && bannerImageUpload.error ? (
+                  <small className="admin-banner-image-upload__error" role="alert">
+                    {bannerImageUpload.error}
+                  </small>
+                ) : null}
+                {bannerImageUpload.status !== 'idle' ? (
+                  <button
+                    type="button"
+                    className="admin-btn admin-btn-secondary admin-banner-image-upload__reset"
+                    onClick={clearBannerImageSelection}
+                    disabled={bannerSubmitting || bannerImageUpload.status === 'uploading'}
+                  >
+                    {bannerModalMode === 'EDIT' && bannerExistingImageUrl
+                      ? 'Giữ ảnh hiện tại'
+                      : 'Bỏ ảnh mới'}
+                  </button>
+                ) : null}
               </div>
 
               <div className="admin-homepage-banner-preview" aria-label="Xem trước banner">
@@ -742,7 +1034,9 @@ export default function AdminHomepageConfigPage() {
                   {bannerTargetType} ·{' '}
                   {bannerTargetId ? 'Đã chọn đối tượng' : bannerTargetQuery || 'Chưa chọn đích'}
                 </small>
-                {bannerImageUrl.trim() ? <img src={bannerImageUrl.trim()} alt="" /> : null}
+                {(bannerImageUpload.previewUrl ?? bannerImageUrl.trim()) ? (
+                  <img src={bannerImageUpload.previewUrl ?? bannerImageUrl.trim()} alt="" />
+                ) : null}
               </div>
 
               <div className="admin-dialog__field-row">
@@ -801,44 +1095,28 @@ export default function AdminHomepageConfigPage() {
               </div>
 
               <div className="admin-dialog__field-row">
-                <label className="admin-field" style={{ display: 'block' }}>
-                  <span
-                    style={{
-                      display: 'block',
-                      fontSize: '13px',
-                      fontWeight: 600,
-                      color: '#374151',
-                      marginBottom: '4px',
-                    }}
-                  >
-                    Hiển thị từ:
-                  </span>
-                  <input
-                    className="admin-control"
-                    type="datetime-local"
+                <div className="admin-field">
+                  <span className="admin-field__label">Hiển thị từ:</span>
+                  <DateTimeLocalPicker
+                    aria-label="Hiển thị từ"
                     value={bannerDisplayFrom}
-                    onChange={(e) => setBannerDisplayFrom(e.target.value)}
+                    onChange={setBannerDisplayFrom}
+                    locale="en"
+                    popoverClassName="datetime-local-picker__popover--admin-modal"
+                    disabled={bannerSubmitting}
                   />
-                </label>
-                <label className="admin-field" style={{ display: 'block' }}>
-                  <span
-                    style={{
-                      display: 'block',
-                      fontSize: '13px',
-                      fontWeight: 600,
-                      color: '#374151',
-                      marginBottom: '4px',
-                    }}
-                  >
-                    Hiển thị đến:
-                  </span>
-                  <input
-                    className="admin-control"
-                    type="datetime-local"
+                </div>
+                <div className="admin-field">
+                  <span className="admin-field__label">Hiển thị đến:</span>
+                  <DateTimeLocalPicker
+                    aria-label="Hiển thị đến"
                     value={bannerDisplayUntil}
-                    onChange={(e) => setBannerDisplayUntil(e.target.value)}
+                    onChange={setBannerDisplayUntil}
+                    locale="en"
+                    popoverClassName="datetime-local-picker__popover--admin-modal"
+                    disabled={bannerSubmitting}
                   />
-                </label>
+                </div>
               </div>
 
               <label
@@ -879,7 +1157,7 @@ export default function AdminHomepageConfigPage() {
               >
                 <button
                   type="button"
-                  onClick={() => setBannerModalMode(null)}
+                  onClick={closeBannerModal}
                   disabled={bannerSubmitting}
                   className="admin-btn admin-btn-secondary"
                   style={{
@@ -897,7 +1175,11 @@ export default function AdminHomepageConfigPage() {
                 </button>
                 <button
                   type="submit"
-                  disabled={bannerSubmitting}
+                  disabled={
+                    bannerSubmitting ||
+                    bannerImageUpload.status === 'uploading' ||
+                    (bannerImageUpload.status === 'error' && !bannerImageUpload.file)
+                  }
                   className="admin-btn admin-btn-primary"
                   style={{
                     padding: '8px 16px',

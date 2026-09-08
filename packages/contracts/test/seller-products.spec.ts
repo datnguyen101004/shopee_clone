@@ -84,7 +84,10 @@ describe('seller product contracts', () => {
         }],
         additionalCampaignCount: 1,
       }],
-      nextCursor: null,
+      page: 1,
+      pageSize: 10,
+      totalItems: 1,
+      totalPages: 1,
     })).toBe(true);
   });
 });

@@ -108,31 +108,33 @@ describe('InventoryService', () => {
       },
     ];
     const prisma = {
-      $queryRaw: jest.fn().mockResolvedValue(rows.map(({ variantId }) => ({ variantId }))),
+      $queryRaw: jest.fn()
+        .mockResolvedValueOnce([{ totalItems: rows.length }])
+        .mockResolvedValueOnce(rows.map(({ variantId }) => ({ variantId }))),
       inventory: { findMany: jest.fn().mockResolvedValue(rows) },
     };
     const service = new InventoryService(prisma as never, { enqueue: jest.fn() } as never);
 
-    const result = await service.list(userId, { cursor: null, limit: 1, productId: null, lowStock: true });
+    const result = await service.list(userId, { page: 1, productId: null, lowStock: true });
 
-    expect(prisma.$queryRaw).toHaveBeenCalledTimes(1);
-    expect(String(prisma.$queryRaw.mock.calls[0][0].sql)).toContain('ORDER BY i."variant_id" ASC');
-    expect(String(prisma.$queryRaw.mock.calls[0][0].sql)).toContain('LIMIT');
-    expect(result.items).toHaveLength(1);
+    expect(prisma.$queryRaw).toHaveBeenCalledTimes(2);
+    expect(String(prisma.$queryRaw.mock.calls[1][0].sql)).toContain('ORDER BY i."variant_id" ASC');
+    expect(String(prisma.$queryRaw.mock.calls[1][0].sql)).toContain('LIMIT');
+    expect(result.items).toHaveLength(2);
     expect(result.items[0]).toMatchObject({ variantId: rows[0]!.variantId, productImageUrl: 'https://cdn.example.test/primary.png', lowStock: true });
-    expect(result.nextCursor).toBe(rows[0]!.variantId);
+    expect(result).toMatchObject({ page: 1, pageSize: 10, totalItems: 2, totalPages: 1 });
   });
 
   it('shows low-stock and normal rows by default instead of excluding low-stock rows', async () => {
     const prisma = {
-      $queryRaw: jest.fn().mockResolvedValue([{ variantId }]),
+      $queryRaw: jest.fn().mockResolvedValueOnce([{ totalItems: 1 }]).mockResolvedValueOnce([{ variantId }]),
       inventory: { findMany: jest.fn().mockResolvedValue([]) },
     };
     // Keep the assertion focused on the SQL predicate; the response projection
     // is covered by the preceding list test.
     const service = new InventoryService(prisma as never, { enqueue: jest.fn() } as never);
-    await service.list(userId, { cursor: null, limit: 20, productId: null, lowStock: false });
-    const sql = String(prisma.$queryRaw.mock.calls[0][0].sql);
+    await service.list(userId, { page: 1, productId: null, lowStock: false });
+    const sql = String(prisma.$queryRaw.mock.calls[1][0].sql);
     expect(sql).not.toContain('quantity_on_hand" - i."quantity_reserved") >');
   });
 

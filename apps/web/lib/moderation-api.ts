@@ -69,8 +69,7 @@ export async function listModerationCases(
   query?: ModerationCaseListQuery,
 ): Promise<ModerationCaseListResponse> {
   const url = endpoint('/api/v1/admin/moderation/cases');
-  if (query?.limit) url.searchParams.set('limit', String(query.limit));
-  if (query?.cursor) url.searchParams.set('cursor', query.cursor);
+  if (query?.page) url.searchParams.set('page', String(query.page));
   if (query?.status) url.searchParams.set('status', query.status);
   if (query?.targetType) url.searchParams.set('targetType', query.targetType);
   if (query?.targetId) url.searchParams.set('targetId', query.targetId);
@@ -150,8 +149,10 @@ export async function getAdminReviewDetail(
 
 export async function listAdminReportedReviews(
   fetcher: AuthenticatedFetcher,
+  page = 1,
 ): Promise<AdminReportedReviewListResponse> {
   const url = endpoint('/api/v1/admin/reviews/reported');
+  url.searchParams.set('page', String(page));
   return requestJson<AdminReportedReviewListResponse>(url, fetcher, { method: 'GET' });
 }
 

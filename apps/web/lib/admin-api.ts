@@ -1,5 +1,8 @@
 import type {
   AdminBannerListResponse,
+  AdminBannerMediaCompletionResponse,
+  AdminBannerMediaUploadIntentRequest,
+  AdminBannerMediaUploadIntentResponse,
   AdminBannerSummary,
   AdminCategoryListResponse,
   AdminCategorySummary,
@@ -29,6 +32,7 @@ import type {
   UpdateAdminCategoryRequest,
   UpdateAdminHomepageModuleSettingsRequest,
 } from '@shopee-clone/contracts';
+import { ADMIN_BANNER_MEDIA_MIME_TYPES } from '@shopee-clone/contracts';
 
 const fallbackBaseUrl = 'http://localhost:3001';
 
@@ -116,8 +120,7 @@ export function fetchAdminUsers(
   query?: AdminUserListQuery,
 ): Promise<AdminUserListResponse> {
   const url = endpoint('/api/v1/admin/users');
-  if (query?.limit) url.searchParams.set('limit', String(query.limit));
-  if (query?.cursor) url.searchParams.set('cursor', query.cursor);
+  if (query?.page) url.searchParams.set('page', String(query.page));
   if (query?.status) url.searchParams.set('status', query.status);
   if (query?.role) url.searchParams.set('role', query.role);
   if (query?.q) url.searchParams.set('q', query.q);
@@ -147,8 +150,7 @@ export function fetchAdminShops(
   query?: AdminShopListQuery,
 ): Promise<AdminShopListResponse> {
   const url = endpoint('/api/v1/admin/shops');
-  if (query?.limit) url.searchParams.set('limit', String(query.limit));
-  if (query?.cursor) url.searchParams.set('cursor', query.cursor);
+  if (query?.page) url.searchParams.set('page', String(query.page));
   if (query?.status) url.searchParams.set('status', query.status);
   if (query?.onboardingStatus) url.searchParams.set('onboardingStatus', query.onboardingStatus);
   if (query?.q) url.searchParams.set('q', query.q);
@@ -221,6 +223,88 @@ export function reorderAdminCategories(
 
 export function fetchAdminBanners(fetcher: AuthenticatedFetcher): Promise<AdminBannerListResponse> {
   return requestJson(endpoint('/api/v1/admin/homepage/banners'), fetcher);
+}
+
+function isAdminBannerMediaUploadIntentResponse(
+  value: unknown,
+): value is AdminBannerMediaUploadIntentResponse {
+  if (!value || typeof value !== 'object') return false;
+  const item = value as Record<string, unknown>;
+  const upload = item.upload;
+  if (!upload || typeof upload !== 'object') return false;
+  const details = upload as Record<string, unknown>;
+  const headers = details.headers;
+  return (
+    typeof item.mediaId === 'string' &&
+    typeof details.url === 'string' &&
+    details.method === 'PUT' &&
+    typeof details.expiresAt === 'string' &&
+    !!headers &&
+    typeof headers === 'object' &&
+    typeof (headers as Record<string, unknown>)['Content-Type'] === 'string' &&
+    typeof (headers as Record<string, unknown>)['x-amz-checksum-sha256'] === 'string'
+  );
+}
+
+function isAdminBannerMediaCompletionResponse(
+  value: unknown,
+): value is AdminBannerMediaCompletionResponse {
+  if (!value || typeof value !== 'object') return false;
+  const item = value as Record<string, unknown>;
+  return (
+    typeof item.id === 'string' &&
+    typeof item.mimeType === 'string' &&
+    (ADMIN_BANNER_MEDIA_MIME_TYPES as readonly string[]).includes(item.mimeType) &&
+    typeof item.byteSize === 'number' &&
+    typeof item.width === 'number' &&
+    typeof item.height === 'number' &&
+    typeof item.imageUrl === 'string' &&
+    typeof item.expiresAt === 'string'
+  );
+}
+
+async function adminBannerFileChecksum(file: File): Promise<string> {
+  const bytes = typeof file.arrayBuffer === 'function'
+    ? await file.arrayBuffer()
+    : await new Response(file).arrayBuffer();
+  const digest = await globalThis.crypto.subtle.digest('SHA-256', new Uint8Array(bytes));
+  let binary = '';
+  for (const byte of new Uint8Array(digest)) binary += String.fromCharCode(byte);
+  return globalThis.btoa(binary);
+}
+
+export async function uploadAdminBannerMedia(
+  fetcher: AuthenticatedFetcher,
+  file: File,
+): Promise<AdminBannerMediaCompletionResponse> {
+  if (!(ADMIN_BANNER_MEDIA_MIME_TYPES as readonly string[]).includes(file.type) || file.size < 1 || file.size > 5 * 1024 * 1024) {
+    throw new AdminApiError('contract', 400, { detail: 'Ảnh banner phải là JPG, PNG hoặc WebP và tối đa 5 MB.' });
+  }
+  const input: AdminBannerMediaUploadIntentRequest = {
+    mimeType: file.type as AdminBannerMediaUploadIntentRequest['mimeType'],
+    byteSize: file.size,
+    checksumSha256: await adminBannerFileChecksum(file),
+  };
+  const intent = await requestJson<AdminBannerMediaUploadIntentResponse>(
+    endpoint('/api/v1/admin/homepage/banners/media/upload-intents'),
+    fetcher,
+    { method: 'POST', body: JSON.stringify(input) },
+  );
+  if (!isAdminBannerMediaUploadIntentResponse(intent)) throw new AdminApiError('contract', 200);
+  const uploadResponse = await fetch(intent.upload.url, {
+    method: 'PUT',
+    body: file,
+    cache: 'no-store',
+    headers: intent.upload.headers,
+  });
+  if (!uploadResponse.ok) throw new AdminApiError('status', uploadResponse.status);
+  const completion = await requestJson<AdminBannerMediaCompletionResponse>(
+    endpoint(`/api/v1/admin/homepage/banners/media/${intent.mediaId}/complete`),
+    fetcher,
+    { method: 'POST', body: JSON.stringify({}) },
+  );
+  if (!isAdminBannerMediaCompletionResponse(completion)) throw new AdminApiError('contract', 200);
+  return completion;
 }
 
 export function createAdminBanner(
@@ -306,8 +390,7 @@ export function fetchAdminProducts(
   query?: AdminProductListQuery,
 ): Promise<AdminProductListResponse> {
   const url = endpoint('/api/v1/admin/products');
-  if (query?.limit) url.searchParams.set('limit', String(query.limit));
-  if (query?.cursor) url.searchParams.set('cursor', query.cursor);
+  if (query?.page) url.searchParams.set('page', String(query.page));
   if (query?.q) url.searchParams.set('q', query.q);
   if (query?.status) url.searchParams.set('status', query.status);
   if (query?.moderationStatus) url.searchParams.set('moderationStatus', query.moderationStatus);

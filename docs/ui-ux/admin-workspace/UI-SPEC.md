@@ -25,7 +25,7 @@ Tài liệu này ghi lại biến thể Admin của Seller Workspace UI. Admin d
 | `/admin/products` | `admin/products/page.tsx` | Header theo route, không lặp H1 | Search không có nút submit, chỉ list sản phẩm lifecycle `ACTIVE`; filter kiểm duyệt áp dụng ngay; bảng nối footer | Dialog khóa/mở khóa từng sản phẩm; link storefront | Desktop/mobile; list thật + filter tức thời + action dialog |
 | `/admin/categories` | `admin/categories/page.tsx` | Header theo route | Cây danh mục, giữ indentation nghiệp vụ | Dialog tạo/sửa danh mục | Desktop/mobile; dialog đã kiểm tra |
 | `/admin/homepage` | `admin/homepage/page.tsx` | Header theo route | Tabs, bảng banner/module | Dialog banner/module | Desktop/mobile; dialog banner đã kiểm tra |
-| `/admin/campaigns` | `admin-campaigns-page.tsx` | Header theo route | Filter, campaign cards/editor | Preview/editor theo API | Desktop/mobile; không tạo dữ liệu KPI |
+| `/admin/campaigns` | `admin-campaigns-page.tsx` | Header theo route | Filter, campaign cards/editor; danh sách page 10 chiến dịch | Publish/hủy/xem dùng icon có nhãn truy cập; preview/editor theo API | Desktop/mobile; không tạo dữ liệu KPI |
 | `/admin/moderation` | `admin/moderation/page.tsx` | Header theo route | Một report workspace: search theo nội dung nhập tức thời, loại report (tin nhắn/shop/sản phẩm/đánh giá), trạng thái, đối tượng, thời gian; bảng quản lý nối footer như Sản phẩm, không hiển thị mã kỹ thuật trong hàng | Nút thao tác dùng icon có nhãn truy cập; Chi tiết đi tới route case; Xử lý report mở popup dùng chung | Desktop/mobile; bảng, divider cột, search và popup đã kiểm tra |
 | `/admin/moderation/[caseId]` | `admin/moderation/[caseId]/page.tsx` + `admin-moderation-case-detail.tsx` | Giữ Admin shell, có link quay lại danh sách | Chi tiết evidence, activity và outcome theo API | Nút Xử lý report ở header và cuối detail mở cùng popup; xác nhận quyết định giữ nguyên | Desktop/mobile; URL riêng và popup đã kiểm tra |
 | `/admin/returns` | `components/returns/return-workflows.tsx` | Variant Admin trong shell | Toolbar và list nối footer; cột Yêu cầu, Hoàn tiền, Cập nhật, Hạn xử lý, Hành động dùng chung một grid; hành động là icon Xử lý/Xem chi tiết | Giữ action theo status API; icon Xử lý mở detail tại vùng quyết định | Desktop/mobile; header-row alignment, icon action và overflow đã kiểm tra |
@@ -43,7 +43,7 @@ Quy ước trạng thái checklist: “đã kiểm tra” nghĩa là đã render
 - Tiêu đề shell dùng 20px/700; tiêu đề nội dung dùng phân cấp theo Seller; label và header bảng 12px/600; control cao 40px, chữ 14px, radius 8px; card/bảng radius 12px.
 - Header và content dùng gutter 32px ở desktop; dưới 1200px giảm còn 24px, dưới 768px còn 16px.
 - Toolbar đặt trực tiếp trên canvas, search/bộ lọc dùng control 40px; search lọc tức thời theo nội dung người dùng nhập và đặt icon ở cuối input; filter tức thời không thêm nút tìm kiếm giả. Dropdown có label nằm trên control, không lặp tên trường trong option.
-- Bảng có header nền canvas, padding ngang khoảng 20–24px, hàng dữ liệu nền trắng, thao tác căn phải; danh sách nối với footer hiển thị số bản ghi đang tải khi API có tổng đếm.
+- Bảng có header nền canvas, padding ngang khoảng 20–24px, hàng dữ liệu nền trắng, thao tác căn phải; mọi bảng danh sách mang `admin-management-table` dùng chung header 12px/500, nội dung 13px/400, tên chính 13px/500 và badge 11px/500. Badge trong bảng phải co trong ô và cho phép xuống dòng khi người dùng thu hẹp cột, không được vẽ chữ tràn qua divider. Danh sách nối với footer hiển thị số bản ghi đang tải khi API có tổng đếm.
 - Form chia section, ưu tiên grid hai cột ở desktop và một cột ở mobile; hành động đặt cuối form. Dialog giữ focus, nội dung cuộn trong viewport và nút hủy đứng trước nút xác nhận/lưu.
 - Không tạo KPI, biểu đồ, pagination hoặc trạng thái không có trong response API. Không đổi API, role gate, validation hay audit trail.
 
@@ -54,13 +54,13 @@ Quy ước trạng thái checklist: “đã kiểm tra” nghĩa là đã render
 | Điều hướng | Kiểm duyệt, người dùng, cửa hàng, sản phẩm, trang chủ, chiến dịch, nhật ký, trả hàng | Không dùng menu Seller; label thể hiện quyền quản trị |
 | Header | Tài khoản quản trị và chuông thông báo | Không hiển thị shop owner hoặc CTA bán hàng |
 | Tổng quan | Các số liệu thật từ `AdminDashboardResponse` | Card KPI chỉ dùng field API hiện có; liên kết đi đúng route Admin |
-| Người dùng | Lọc trạng thái/vai trò, khóa/mở khóa và lý do | Dialog xác nhận; không tự suy diễn quyền mới |
-| Cửa hàng | Trạng thái shop và onboarding approval | Duyệt/từ chối/tạm khóa giữ nguyên workflow và lý do |
-| Sản phẩm | Chỉ hiển thị sản phẩm lifecycle `ACTIVE`, tìm theo tên/slug/shop/danh mục, lọc trạng thái kiểm duyệt và khóa/mở khóa | API list ép `status=ACTIVE`, dùng cursor; filter kiểm duyệt áp dụng ngay. Không tạo dữ liệu giả. Lookup slug/UUID cũ vẫn được giữ ở API cho consumer tương thích |
+| Người dùng | Lọc trạng thái/vai trò, khóa/mở khóa và lý do | Thao tác dùng icon khóa/mở khóa có `aria-label`/tooltip. Cột thao tác nằm trong flow của bảng, không neo khi cuộn ngang. Danh sách phân trang theo số, cố định 10 người dùng mỗi trang; số trang không có khung, trang hiện tại và hover dùng màu primary/chữ đậm, danh sách dài rút gọn theo dạng `1 2 3 4 5 … 20`. Dialog xác nhận; không tự suy diễn quyền mới |
+| Cửa hàng | Trạng thái shop và onboarding approval | Duyệt/từ chối/khóa/mở khóa dùng icon có nhãn truy cập, giữ nguyên workflow và lý do. Danh sách dùng page, cố định 10 cửa hàng mỗi trang. Cột tên chỉ hiển thị tên shop, không có dòng slug phụ |
+| Sản phẩm | Chỉ hiển thị sản phẩm lifecycle `ACTIVE`, tìm theo tên/slug/shop/danh mục, lọc trạng thái kiểm duyệt và khóa/mở khóa | API list ép `status=ACTIVE`, dùng page cố định 10 sản phẩm; filter kiểm duyệt áp dụng ngay. Xem/khóa/mở khóa dùng icon có nhãn truy cập. Các ô chỉ hiển thị giá trị chính, không có dòng phụ cho slug, tồn kho, phân loại, vòng đời hoặc số đã bán. Không tạo dữ liệu giả. Lookup slug/UUID cũ vẫn được giữ ở API cho consumer tương thích |
 | Danh mục, Homepage | Cây danh mục, module và banner | Chỉnh sửa trong dialog, field có label, thao tác giữ nguyên payload |
-| Kiểm duyệt | Report tin nhắn, shop, sản phẩm, đánh giá; evidence và quyết định | Bỏ hai tab legacy “Hồ sơ vi phạm”/“Kiểm duyệt đánh giá”; dùng report type + filter trạng thái/đối tượng/thời gian. Detail case có URL `/admin/moderation/[caseId]`; popup xử lý dùng chung từ bảng và detail, nhưng giữ nguyên outcome, validation, confirmation và audit trail |
+| Kiểm duyệt | Report tin nhắn, shop, sản phẩm, đánh giá; evidence và quyết định | Bỏ hai tab legacy “Hồ sơ vi phạm”/“Kiểm duyệt đánh giá”; dùng report type + filter trạng thái/đối tượng/thời gian. Hàng đợi case và review bị báo cáo đều page 10 bản ghi. Detail case có URL `/admin/moderation/[caseId]`; popup xử lý dùng chung từ bảng và detail, nhưng giữ nguyên outcome, validation, confirmation và audit trail |
 | Trả hàng | Quyết định tranh chấp của Admin | Dùng variant Admin của workflow dùng chung, không lan style sang Buyer |
-| Chiến dịch | Publish/cancel/preview theo API | Giữ các mốc thời gian và điều kiện tham gia hiện có |
+| Chiến dịch | Publish/cancel/preview theo API | Giữ các mốc thời gian và điều kiện tham gia hiện có; danh sách dùng page 10 bản ghi và icon thao tác |
 | Kiểm toán | Bộ lọc đối tượng/hành động, chi tiết before/after | Dữ liệu bất biến, không chỉnh sửa/xóa; màu chỉ hỗ trợ quét nhanh |
 
 ## Responsive và kiểm chứng
@@ -77,5 +77,5 @@ Quy ước trạng thái checklist: “đã kiểm tra” nghĩa là đã render
 - [x] Workflow moderation, campaign và return giữ variant nghiệp vụ riêng.
 - [x] Đối chiếu ảnh render các route Admin ở desktop/mobile; xác nhận shell, typography, control, dialog và các biến thể workflow bằng phiên chạy UI cục bộ.
 - [x] Đối chiếu riêng route chi tiết trả hàng, dialog banner/người dùng/cửa hàng/danh mục và panel chi tiết moderation.
-- [x] Xác minh danh sách sản phẩm thật chỉ gồm lifecycle `ACTIVE`, filter kiểm duyệt áp dụng ngay, cursor/tải thêm và dialog khóa/mở khóa; lookup slug/UUID vẫn được giữ ở API cho tương thích.
+- [x] Xác minh danh sách sản phẩm thật chỉ gồm lifecycle `ACTIVE`, filter kiểm duyệt áp dụng ngay, page 10 bản ghi và dialog khóa/mở khóa; lookup slug/UUID vẫn được giữ ở API cho tương thích.
 - [x] Xóa 4 category seed tiếng Anh khỏi local DB sau khi kiểm tra product/FK references; seed đã chuyển sang category tiếng Việt.

@@ -40,18 +40,18 @@ describe('Seller promotions HTTP contract', () => {
   });
   beforeEach(() => {
     jest.clearAllMocks();
-    service.listVouchers.mockResolvedValue({ sellerPromotionVersion: 'seller-promotions-v1', items: [voucher], nextCursor: null });
+    service.listVouchers.mockResolvedValue({ sellerPromotionVersion: 'seller-promotions-v1', items: [voucher], page: 1, pageSize: 10, totalItems: 1, totalPages: 1 });
     service.getVoucher.mockResolvedValue(voucher); service.createVoucher.mockResolvedValue(voucher); service.updateVoucher.mockResolvedValue({ ...voucher, version: 2 }); service.actionVoucher.mockResolvedValue({ ...voucher, state: 'PAUSED', version: 2 }); service.deleteVoucher.mockResolvedValue({ deleted: true });
-    service.listDiscounts.mockResolvedValue({ sellerPromotionVersion: 'seller-promotions-v1', items: [discount], nextCursor: null });
+    service.listDiscounts.mockResolvedValue({ sellerPromotionVersion: 'seller-promotions-v1', items: [discount], page: 1, pageSize: 10, totalItems: 1, totalPages: 1 });
     service.getDiscount.mockResolvedValue(discount); service.createDiscount.mockResolvedValue(discount); service.updateDiscount.mockResolvedValue({ ...discount, version: 2 }); service.actionDiscount.mockResolvedValue({ ...discount, state: 'PAUSED', version: 2 });
   });
   afterAll(async () => app.close());
 
   it('covers voucher list/detail/create/update/action headers, origin, and exact service inputs', async () => {
     await request(app.getHttpServer()).get('/api/v1/seller/promotions/vouchers').expect(401);
-    const list = await request(app.getHttpServer()).get('/api/v1/seller/promotions/vouchers?state=SCHEDULED&limit=10').set('Authorization', 'Bearer seller').expect(200);
+    const list = await request(app.getHttpServer()).get('/api/v1/seller/promotions/vouchers?state=SCHEDULED&page=1').set('Authorization', 'Bearer seller').expect(200);
     expect(list.headers['cache-control']).toBe('no-store');
-    expect(service.listVouchers).toHaveBeenCalledWith(seller.id, { state: 'SCHEDULED', limit: 10, cursor: null });
+    expect(service.listVouchers).toHaveBeenCalledWith(seller.id, { state: 'SCHEDULED', page: 1 });
     const body = { name: 'New', benefitType: 'FIXED_AMOUNT', fixedAmountMinor: 10000, percentageBasisPoints: null, maximumDiscountMinor: null, minimumSpendMinor: 0, startsAt: voucher.startsAt, endsAt: voucher.endsAt, usageLimit: 10, perBuyerLimit: 1, productIds: [] };
     await request(app.getHttpServer()).post('/api/v1/seller/promotions/vouchers').set('Authorization', 'Bearer seller').set('Origin', 'https://attacker.test').set('Idempotency-Key', '00000000-0000-4000-8000-000000000021').send(body).expect(403);
     const created = await request(app.getHttpServer()).post('/api/v1/seller/promotions/vouchers').set('Authorization', 'Bearer seller').set('Origin', origin).set('Idempotency-Key', '00000000-0000-4000-8000-000000000021').send(body).expect(201);
@@ -96,6 +96,7 @@ describe('Seller promotions HTTP contract', () => {
 
   it('covers discount list/create/update/action and rejects malformed or missing concurrency headers', async () => {
     await request(app.getHttpServer()).get('/api/v1/seller/promotions/discounts?state=ACTIVE').set('Authorization', 'Bearer seller').expect(200);
+    expect(service.listDiscounts).toHaveBeenCalledWith(seller.id, { state: 'ACTIVE', page: 1 });
     const body = { name: 'Summer', startsAt: discount.startsAt, endsAt: discount.endsAt, products: discount.products };
     const created = await request(app.getHttpServer()).post('/api/v1/seller/promotions/discounts').set('Authorization', 'Bearer seller').set('Origin', origin).set('Idempotency-Key', '00000000-0000-4000-8000-000000000023').send(body).expect(201);
     expect(created.headers.etag).toBe('"seller-promotion-1"');

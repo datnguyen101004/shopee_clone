@@ -65,10 +65,21 @@ export function stableProductMediaUrl(mediaId: string): string {
   return `/api/v1/product-media/${encodeURIComponent(mediaId)}`;
 }
 
-function managedMediaKey(key: string): string | null {
-  const prefix = `${envValue('AWS_S3_PREFIX') ?? 'seller-product-media'}/`;
+function managedMediaKey(key: string, prefixName = envValue('AWS_S3_PREFIX') ?? 'seller-product-media'): string | null {
+  const prefix = `${prefixName.replace(/\/+$/, '')}/`;
   const filename = key.startsWith(prefix) ? key.slice(prefix.length) : '';
   return /^[0-9a-f-]{36}\.(jpg|png|webp)$/.test(filename) ? key : null;
+}
+
+export function publicManagedMediaUrl(
+  key: string,
+  prefixName = envValue('AWS_S3_PREFIX') ?? 'seller-product-media',
+): string | null {
+  const remoteKey = managedMediaKey(key, prefixName);
+  const publicBase =
+    envValue('AWS_CLOUDFRONT_BASE_URL', 'AWS_S3_PUBLIC_BASE_URL') || cloudFrontDefaultBaseUrl;
+  if (!remoteKey || !publicBase) return null;
+  return `${publicBase.replace(/\/$/, '')}/${remoteKey.split('/').map((part) => encodeURIComponent(part)).join('/')}`;
 }
 
 /**
@@ -77,11 +88,7 @@ function managedMediaKey(key: string): string | null {
  * seller projections (inventory/orders) can repair legacy image snapshots.
  */
 export function publicSellerProductMediaUrl(key: string): string | null {
-  const remoteKey = managedMediaKey(key);
-  const publicBase =
-    envValue('AWS_CLOUDFRONT_BASE_URL', 'AWS_S3_PUBLIC_BASE_URL') || cloudFrontDefaultBaseUrl;
-  if (!remoteKey || !publicBase) return null;
-  return `${publicBase.replace(/\/$/, '')}/${remoteKey.split('/').map((part) => encodeURIComponent(part)).join('/')}`;
+  return publicManagedMediaUrl(key);
 }
 
 @Injectable()
@@ -130,9 +137,9 @@ export class SellerProductMediaStorage {
     return this.client !== null && this.bucket !== undefined;
   }
 
-  private s3Key(key: string): string | null {
+  private s3Key(key: string, prefixName = this.prefix): string | null {
     if (!this.s3Enabled) return null;
-    const prefix = `${this.prefix}/`;
+    const prefix = `${prefixName.replace(/\/+$/, '')}/`;
     const filename = key.startsWith(prefix) ? key.slice(prefix.length) : '';
     return /^[0-9a-f-]{36}\.(jpg|png|webp)$/.test(filename) ? key : null;
   }
@@ -142,9 +149,9 @@ export class SellerProductMediaStorage {
    * The API only uses this when the deployment explicitly provides a public
    * media base (the local environment points it at cdn.videod.me).
    */
-  publicUrl(key: string): string | null {
-    const remoteKey = this.s3Key(key);
-    return remoteKey ? publicSellerProductMediaUrl(remoteKey) : null;
+  publicUrl(key: string, prefixName = this.prefix): string | null {
+    const remoteKey = this.s3Key(key, prefixName);
+    return remoteKey ? publicManagedMediaUrl(remoteKey, prefixName) : null;
   }
 
   private cloudFrontUrl(remoteKey: string): string {
@@ -174,8 +181,8 @@ export class SellerProductMediaStorage {
     return filename;
   }
 
-  async createUploadUrl(key: string, mimeType: string, checksumSha256: string): Promise<{ url: string; expiresAt: Date }> {
-    const remoteKey = this.s3Key(key);
+  async createUploadUrl(key: string, mimeType: string, checksumSha256: string, prefixName = this.prefix): Promise<{ url: string; expiresAt: Date }> {
+    const remoteKey = this.s3Key(key, prefixName);
     if (!remoteKey || !this.client || !this.bucket) throw new SellerProductMediaDeliveryUnavailableError();
     const expiresAt = new Date(Date.now() + this.uploadTtlSeconds * 1000);
     const url = await getS3SignedUrl(this.client as never, new PutObjectCommand({
@@ -194,8 +201,8 @@ export class SellerProductMediaStorage {
     return { url, expiresAt };
   }
 
-  async verifyUploadedObject(key: string, expected: { mimeType: string; byteSize: number; checksumSha256: string }): Promise<VerifiedUploadedObject | null> {
-    const remoteKey = this.s3Key(key);
+  async verifyUploadedObject(key: string, expected: { mimeType: string; byteSize: number; checksumSha256: string }, prefixName = this.prefix): Promise<VerifiedUploadedObject | null> {
+    const remoteKey = this.s3Key(key, prefixName);
     if (!remoteKey || !this.client || !this.bucket) return null;
     let head: { ContentLength?: number; ContentType?: string; ChecksumSHA256?: string };
     try {
@@ -220,8 +227,8 @@ export class SellerProductMediaStorage {
     return { byteSize: body.length, mimeType: expected.mimeType, checksumSha256: checksum, width: dimensions.width, height: dimensions.height };
   }
 
-  async read(key: string): Promise<Buffer | null> {
-    const remoteKey = this.s3Key(key);
+  async read(key: string, prefixName = this.prefix): Promise<Buffer | null> {
+    const remoteKey = this.s3Key(key, prefixName);
     if (remoteKey) {
       try {
         const response = await this.client!.send(new GetObjectCommand({ Bucket: this.bucket, Key: remoteKey }));
@@ -240,8 +247,8 @@ export class SellerProductMediaStorage {
     }
   }
 
-  async readTarget(key: string): Promise<MediaReadTarget | null> {
-    const remoteKey = this.s3Key(key);
+  async readTarget(key: string, prefixName = this.prefix): Promise<MediaReadTarget | null> {
+    const remoteKey = this.s3Key(key, prefixName);
     if (remoteKey) {
       try {
         await this.client!.send(new HeadObjectCommand({ Bucket: this.bucket, Key: remoteKey }));
@@ -256,12 +263,12 @@ export class SellerProductMediaStorage {
       }
       return { kind: 'cloudfront', url: this.cloudFrontUrl(remoteKey), expiresAt: null };
     }
-    const data = await this.read(key);
+    const data = await this.read(key, prefixName);
     return data ? { kind: 'local', data } : null;
   }
 
-  async remove(key: string): Promise<void> {
-    const remoteKey = this.s3Key(key);
+  async remove(key: string, prefixName = this.prefix): Promise<void> {
+    const remoteKey = this.s3Key(key, prefixName);
     if (remoteKey) {
       await this.client!.send(new DeleteObjectCommand({ Bucket: this.bucket, Key: remoteKey }));
       return;

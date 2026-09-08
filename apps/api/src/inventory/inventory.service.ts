@@ -8,6 +8,7 @@ import type {
   InventoryAdjustment,
   InventoryAdjustmentPage,
 } from '@shopee-clone/contracts';
+import { INVENTORY_PAGE_SIZE } from '@shopee-clone/contracts';
 import { PrismaService } from '../prisma/prisma.service';
 import { Prisma } from '../generated/prisma/client';
 import { INVENTORY_LOW_STOCK_THRESHOLD, INVENTORY_RESERVATION_TTL_MS } from './inventory.constants';
@@ -164,15 +165,11 @@ export class InventoryService {
   async list(
     userId: string,
     query: {
-      cursor: string | null;
-      limit: number;
+      page: number;
       productId: string | null;
       lowStock: boolean | null;
     },
   ): Promise<InventoryPage> {
-    const cursorClause = query.cursor
-      ? Prisma.sql`AND i."variant_id" > ${query.cursor}::uuid`
-      : Prisma.empty;
     const productClause = query.productId
       ? Prisma.sql`AND p."id" = ${query.productId}::uuid`
       : Prisma.empty;
@@ -182,8 +179,7 @@ export class InventoryService {
       query.lowStock === true
         ? Prisma.sql`AND (i."quantity_on_hand" - i."quantity_reserved") <= ${INVENTORY_LOW_STOCK_THRESHOLD}`
         : Prisma.empty;
-    const ids = await this.prisma.$queryRaw<Array<{ variantId: string }>>(Prisma.sql`
-      SELECT i."variant_id" AS "variantId"
+    const baseWhere = Prisma.sql`
       FROM "inventory" i
       JOIN "product_variants" v ON v."id" = i."variant_id"
       JOIN "products" p ON p."id" = v."product_id"
@@ -194,11 +190,23 @@ export class InventoryService {
         AND c."is_active" = TRUE AND c."deleted_at" IS NULL
         AND s."owner_id" = ${userId}::uuid AND s."deleted_at" IS NULL
         AND s."status" = 'active' AND s."onboarding_status" = 'approved'
-        ${productClause} ${cursorClause} ${lowStockClause}
+        ${productClause} ${lowStockClause}
+    `;
+    const [countRows, ids] = await Promise.all([
+      this.prisma.$queryRaw<Array<{ totalItems: number }>>(Prisma.sql`
+        SELECT COUNT(*)::int AS "totalItems" ${baseWhere}
+      `),
+      this.prisma.$queryRaw<Array<{ variantId: string }>>(Prisma.sql`
+      SELECT i."variant_id" AS "variantId"
+      ${baseWhere}
       ORDER BY i."variant_id" ASC
-      LIMIT ${query.limit + 1}
-    `);
-    if (ids.length === 0) return { items: [], nextCursor: null };
+      OFFSET ${(query.page - 1) * INVENTORY_PAGE_SIZE}
+      LIMIT ${INVENTORY_PAGE_SIZE}
+    `),
+    ]);
+    const totalItems = countRows[0]?.totalItems ?? 0;
+    const metadata = { page: query.page, pageSize: INVENTORY_PAGE_SIZE, totalItems, totalPages: Math.ceil(totalItems / INVENTORY_PAGE_SIZE) };
+    if (ids.length === 0) return { items: [], ...metadata };
     const rows = await this.prisma.inventory.findMany({
       where: { variantId: { in: ids.map((row) => row.variantId) } },
       include: inventoryInclude,
@@ -207,11 +215,8 @@ export class InventoryService {
     const ordered = ids
       .map((row) => byId.get(row.variantId))
       .filter((row): row is InventoryRow => Boolean(row));
-    const items = ordered.slice(0, query.limit).map((row) => this.mapBalance(row));
-    return {
-      items,
-      nextCursor: ids.length > query.limit ? (items.at(-1)?.variantId ?? null) : null,
-    };
+    const items = ordered.map((row) => this.mapBalance(row));
+    return { items, ...metadata };
   }
 
   async history(
@@ -299,6 +304,18 @@ export class InventoryService {
     const nextOnHand = current.quantityOnHand + input.delta;
     if (nextOnHand < current.quantityReserved)
       throw new InventoryInsufficientError(current.quantityOnHand - current.quantityReserved);
+    const flashSaleDelegate = (tx as unknown as { flashSaleSku?: { findMany: (args: unknown) => Promise<Array<{ remainingQuantity: number }>> } }).flashSaleSku;
+    let protectedQuota = 0;
+    if (flashSaleDelegate) {
+      const now = await this.databaseNow(tx);
+      const protectedFlashSale = await flashSaleDelegate.findMany({
+        where: { variantId, endedAt: null, campaign: { cancelledAt: null, endsAt: { gt: now } } },
+        select: { remainingQuantity: true },
+      });
+      protectedQuota = protectedFlashSale.reduce((total, row) => total + row.remainingQuantity, 0);
+    }
+    if (nextOnHand - current.quantityReserved < protectedQuota)
+      throw new InventoryInsufficientError(Math.max(current.quantityOnHand - current.quantityReserved - protectedQuota, 0));
     const next = await tx.inventory.update({
       where: { variantId },
       data: { quantityOnHand: nextOnHand, version: { increment: 1 } },
@@ -369,12 +386,30 @@ export class InventoryService {
         data: { status: 'EXPIRED', releasedAt: databaseNow, terminalReason: 'expired' },
       });
     }
+    const flashSaleDelegate = (tx as unknown as { flashSaleSku?: { findMany: (args: unknown) => Promise<Array<{ variantId: string; remainingQuantity: number }>> } }).flashSaleSku;
+    const protectedByVariant = new Map<string, number>();
+    const activeSaleByVariant = new Map<string, { remainingQuantity: number }>();
+    if (flashSaleDelegate) {
+      const protectedRows = await flashSaleDelegate.findMany({
+        where: { variantId: { in: sorted.map((line) => line.variantId) }, endedAt: null, campaign: { cancelledAt: null, endsAt: { gt: databaseNow } } },
+        select: { variantId: true, remainingQuantity: true },
+      });
+      for (const row of protectedRows) protectedByVariant.set(row.variantId, (protectedByVariant.get(row.variantId) ?? 0) + row.remainingQuantity);
+      const activeRows = await flashSaleDelegate.findMany({
+        where: { variantId: { in: sorted.map((line) => line.variantId) }, endedAt: null, remainingQuantity: { gt: 0 }, campaign: { cancelledAt: null, startsAt: { lte: databaseNow }, endsAt: { gt: databaseNow } } },
+        select: { variantId: true, remainingQuantity: true },
+      });
+      for (const row of activeRows) activeSaleByVariant.set(row.variantId, row);
+    }
     for (const line of sorted) {
       if (!Number.isInteger(line.quantity) || line.quantity <= 0)
         throw new InventoryInsufficientError(0);
       const inventory = await tx.inventory.findUnique({ where: { variantId: line.variantId } });
       const available = (inventory?.quantityOnHand ?? 0) - (inventory?.quantityReserved ?? 0);
-      if (!inventory || available < line.quantity)
+      const sale = activeSaleByVariant.get(line.variantId);
+      const saleUnits = sale && line.quantity === 1 ? 1 : 0;
+      const ordinaryAvailable = available - (protectedByVariant.get(line.variantId) ?? 0) + saleUnits;
+      if (!inventory || ordinaryAvailable < line.quantity)
         throw new InventoryInsufficientError(Math.max(available, 0));
     }
     const expiresAt = new Date(databaseNow.getTime() + INVENTORY_RESERVATION_TTL_MS);

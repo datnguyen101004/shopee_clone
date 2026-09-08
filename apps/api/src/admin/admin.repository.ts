@@ -1,6 +1,7 @@
 import {
   ADMIN_DEFAULT_LIMIT,
   ADMIN_MAX_LIMIT,
+  ADMIN_PAGE_SIZE,
   type AdminCategorySummary,
   type AdminDashboardCounts,
   type AdminPrivilegedAction,
@@ -100,13 +101,18 @@ export class AdminRepository {
   }
 
   async listUsers(options: {
-    limit?: number;
-    cursor?: string;
+    page?: number;
     status?: AdminUserStatus;
     role?: 'buyer' | 'seller' | 'admin' | 'carrier_operator';
     q?: string;
-  }): Promise<{ items: AdminUserListItem[]; nextCursor: string | null }> {
-    const limit = Math.min(options.limit ?? ADMIN_DEFAULT_LIMIT, ADMIN_MAX_LIMIT);
+  }): Promise<{
+    items: AdminUserListItem[];
+    page: number;
+    pageSize: number;
+    totalItems: number;
+    totalPages: number;
+  }> {
+    const page = Math.max(1, options.page ?? 1);
     const where: Prisma.UserWhereInput = { deletedAt: null };
 
     if (options.status) {
@@ -131,29 +137,28 @@ export class AdminRepository {
       ];
     }
 
-    const rows = await this.prisma.user.findMany({
-      where,
-      take: limit + 1,
-      ...(options.cursor ? { skip: 1, cursor: { id: options.cursor } } : {}),
-      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
-      select: {
-        id: true,
-        email: true,
-        displayName: true,
-        phoneNumber: true,
-        status: true,
-        createdAt: true,
-        updatedAt: true,
-        roleAssignments: { select: { role: true } },
-      },
-    });
-
-    const hasMore = rows.length > limit;
-    const items = hasMore ? rows.slice(0, limit) : rows;
-    const nextCursor = hasMore && items.length > 0 ? (items[items.length - 1]?.id ?? null) : null;
+    const [totalItems, rows] = await Promise.all([
+      this.prisma.user.count({ where }),
+      this.prisma.user.findMany({
+        where,
+        skip: (page - 1) * ADMIN_PAGE_SIZE,
+        take: ADMIN_PAGE_SIZE,
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+        select: {
+          id: true,
+          email: true,
+          displayName: true,
+          phoneNumber: true,
+          status: true,
+          createdAt: true,
+          updatedAt: true,
+          roleAssignments: { select: { role: true } },
+        },
+      }),
+    ]);
 
     return {
-      items: items.map((u) => ({
+      items: rows.map((u) => ({
         id: u.id,
         email: u.email,
         displayName: u.displayName,
@@ -171,7 +176,10 @@ export class AdminRepository {
         createdAt: u.createdAt,
         updatedAt: u.updatedAt,
       })),
-      nextCursor,
+      page,
+      pageSize: ADMIN_PAGE_SIZE,
+      totalItems,
+      totalPages: Math.ceil(totalItems / ADMIN_PAGE_SIZE),
     };
   }
 
@@ -223,13 +231,18 @@ export class AdminRepository {
   }
 
   async listShops(options: {
-    limit?: number;
-    cursor?: string;
+    page?: number;
     status?: AdminShopStatus;
     onboardingStatus?: AdminShopOnboardingStatus;
     q?: string;
-  }): Promise<{ items: AdminShopListItem[]; nextCursor: string | null }> {
-    const limit = Math.min(options.limit ?? ADMIN_DEFAULT_LIMIT, ADMIN_MAX_LIMIT);
+  }): Promise<{
+    items: AdminShopListItem[];
+    page: number;
+    pageSize: number;
+    totalItems: number;
+    totalPages: number;
+  }> {
+    const page = Math.max(1, options.page ?? 1);
     const where: Prisma.ShopWhereInput = { deletedAt: null };
 
     if (options.status) {
@@ -256,31 +269,30 @@ export class AdminRepository {
       ];
     }
 
-    const rows = await this.prisma.shop.findMany({
-      where,
-      take: limit + 1,
-      ...(options.cursor ? { skip: 1, cursor: { id: options.cursor } } : {}),
-      orderBy: [{ updatedAt: 'desc' }, { id: 'desc' }],
-      select: {
-        id: true,
-        logoUrl: true,
-        ownerId: true,
-        slug: true,
-        name: true,
-        status: true,
-        onboardingStatus: true,
-        onboardingReason: true,
-        createdAt: true,
-        updatedAt: true,
-      },
-    });
-
-    const hasMore = rows.length > limit;
-    const items = hasMore ? rows.slice(0, limit) : rows;
-    const nextCursor = hasMore && items.length > 0 ? (items[items.length - 1]?.id ?? null) : null;
+    const [totalItems, rows] = await Promise.all([
+      this.prisma.shop.count({ where }),
+      this.prisma.shop.findMany({
+        where,
+        skip: (page - 1) * ADMIN_PAGE_SIZE,
+        take: ADMIN_PAGE_SIZE,
+        orderBy: [{ updatedAt: 'desc' }, { id: 'desc' }],
+        select: {
+          id: true,
+          logoUrl: true,
+          ownerId: true,
+          slug: true,
+          name: true,
+          status: true,
+          onboardingStatus: true,
+          onboardingReason: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      }),
+    ]);
 
     return {
-      items: items.map((s) => ({
+      items: rows.map((s) => ({
         id: s.id,
         logoUrl: s.logoUrl,
         ownerUserId: s.ownerId,
@@ -302,7 +314,10 @@ export class AdminRepository {
         createdAt: s.createdAt,
         updatedAt: s.updatedAt,
       })),
-      nextCursor,
+      page,
+      pageSize: ADMIN_PAGE_SIZE,
+      totalItems,
+      totalPages: Math.ceil(totalItems / ADMIN_PAGE_SIZE),
     };
   }
 
@@ -664,13 +679,12 @@ export class AdminRepository {
   }
 
   async listProducts(options: {
-    limit?: number;
-    cursor?: string;
+    page?: number;
     q?: string;
     status?: 'DRAFT' | 'ACTIVE' | 'HIDDEN' | 'ARCHIVED';
     moderationStatus?: 'ACTIVE' | 'SUSPENDED';
   }) {
-    const limit = Math.min(options.limit ?? ADMIN_DEFAULT_LIMIT, ADMIN_MAX_LIMIT);
+    const page = Math.max(1, options.page ?? 1);
     const normalizedQuery = options.q?.trim();
     const where: Prisma.ProductWhereInput = { deletedAt: null };
 
@@ -687,34 +701,45 @@ export class AdminRepository {
       where.moderationStatus = options.moderationStatus as ProductModerationStatus;
     }
 
-    const rows = await this.prisma.product.findMany({
-      where,
-      take: limit + 1,
-      ...(options.cursor ? { skip: 1, cursor: { id: options.cursor } } : {}),
-      orderBy: [{ updatedAt: 'desc' }, { id: 'desc' }],
-      include: {
-        shop: { select: { id: true, name: true, slug: true } },
-        category: { select: { id: true, name: true, slug: true } },
-        images: {
-          take: 1,
-          orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }],
-          select: { url: true },
-        },
-        variants: {
-          where: { deletedAt: null },
-          select: {
-            priceMinor: true,
-            inventory: { select: { quantityOnHand: true, quantityReserved: true } },
+    const [totalItems, rows] = await Promise.all([
+      this.prisma.product.count({ where }),
+      this.prisma.product.findMany({
+        where,
+        skip: (page - 1) * ADMIN_PAGE_SIZE,
+        take: ADMIN_PAGE_SIZE,
+        orderBy: [{ updatedAt: 'desc' }, { id: 'desc' }],
+        select: {
+          id: true,
+          slug: true,
+          name: true,
+          status: true,
+          moderationStatus: true,
+          soldCount: true,
+          updatedAt: true,
+          shop: { select: { id: true, name: true, slug: true } },
+          category: { select: { id: true, name: true, slug: true } },
+          images: {
+            take: 1,
+            orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }],
+            select: { url: true },
+          },
+          variants: {
+            where: { deletedAt: null },
+            select: {
+              priceMinor: true,
+              inventory: { select: { quantityOnHand: true, quantityReserved: true } },
+            },
           },
         },
-      },
-    });
+      }),
+    ]);
 
-    const hasMore = rows.length > limit;
-    const items = hasMore ? rows.slice(0, limit) : rows;
     return {
-      items,
-      nextCursor: hasMore && items.length > 0 ? (items[items.length - 1]?.id ?? null) : null,
+      items: rows,
+      page,
+      pageSize: ADMIN_PAGE_SIZE,
+      totalItems,
+      totalPages: Math.ceil(totalItems / ADMIN_PAGE_SIZE),
     };
   }
 

@@ -63,6 +63,7 @@ describe('ReviewsService public projection', () => {
   it('lists only reviews belonging to the seller current shop and exposes only that seller report status', async () => {
     const prisma = {
       productReview: {
+        count: jest.fn().mockResolvedValue(1),
         findMany: jest.fn().mockResolvedValue([
           {
             id: 'review-1', productId: 'product-1', rating: 4, text: 'Nội dung review', visibility: 'VISIBLE',
@@ -73,15 +74,33 @@ describe('ReviewsService public projection', () => {
       },
     } as any;
 
-    const result = await new ReviewsService(prisma).listSellerShopReviews('seller-1');
+    const result = await new ReviewsService(prisma).listSellerShopReviews('seller-1', 3);
 
     expect(prisma.productReview.findMany).toHaveBeenCalledWith(expect.objectContaining({
       where: { shop: { ownerId: 'seller-1' } },
+      skip: 20,
+      take: 10,
       select: expect.objectContaining({ sellerReports: expect.objectContaining({ where: { sellerUserId: 'seller-1' } }) }),
     }));
+    expect(result).toMatchObject({ page: 3, pageSize: 10, totalItems: 1, totalPages: 1 });
     expect(result.items).toEqual([expect.objectContaining({ id: 'review-1', reportStatus: 'OPEN' })]);
     expect(result.items[0]).not.toHaveProperty('buyerUserId');
     expect(result.items[0]).not.toHaveProperty('sellerUserId');
+  });
+
+  it('paginates the admin reported-review queue with a distinct total', async () => {
+    const prisma = {
+      $queryRaw: jest.fn()
+        .mockResolvedValueOnce([{ count: 24n }])
+        .mockResolvedValueOnce([]),
+      sellerReviewReport: { findMany: jest.fn().mockResolvedValue([]) },
+    } as any;
+
+    const result = await new ReviewsService(prisma).adminListReportedReviews(3);
+
+    expect(prisma.$queryRaw).toHaveBeenCalledTimes(2);
+    expect(prisma.sellerReviewReport.findMany).not.toHaveBeenCalled();
+    expect(result).toEqual({ items: [], totalItems: 24 });
   });
 
   it('returns a seller-safe not-found response path when a review is outside the seller shop', async () => {

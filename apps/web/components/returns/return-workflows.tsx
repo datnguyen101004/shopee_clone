@@ -444,7 +444,7 @@ function ReturnQueue({ role }: { role: ReturnRole }) {
                         <Link
                           className="admin-icon-btn admin-icon-btn--secondary"
                           href={`${rolePath(role, item.returnReference)}#admin-return-actions`}
-                          aria-label="Xử lý yêu cầu"
+                          aria-label={`Xử lý yêu cầu ${item.preview?.productName ?? item.returnReference}`}
                           title="Xử lý yêu cầu"
                         >
                           <Check size={16} aria-hidden="true" />
@@ -452,7 +452,7 @@ function ReturnQueue({ role }: { role: ReturnRole }) {
                         <Link
                           className="admin-icon-btn admin-icon-btn--secondary"
                           href={rolePath(role, item.returnReference)}
-                          aria-label="Xem chi tiết"
+                          aria-label={`Xem chi tiết yêu cầu ${item.preview?.productName ?? item.returnReference}`}
                           title="Xem chi tiết"
                         >
                           <Eye size={16} aria-hidden="true" />

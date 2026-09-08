@@ -23,7 +23,7 @@ Tài liệu giúp agent khác triển khai mà không cần lịch sử hội th
 | Bề mặt | Canvas `#f9fafb`, card/header/sidebar trắng `#ffffff`, viền `#e5e7eb` |
 | Chữ | Chính `#111827`, phụ `#4b5563`, muted `#9ca3af`; nội dung cần đọc phải đủ tương phản, không dùng muted cho mọi label |
 | Font | Kế thừa Be Vietnam Pro từ app layout; input/select/button cũng kế thừa font, hỗ trợ dấu tiếng Việt |
-| Phân cấp | H1 shell 20px/700; nội dung và giá trị field 14px; label/header bảng 12px/600; không in đậm mọi nội dung |
+| Phân cấp | H1 shell 20px/700; giá trị field 14px; bảng danh sách dùng nội dung 13px/400, tên chính 13px/500, badge 11px/500 và header 12px/500; không in đậm mọi nội dung |
 | Khoảng cách | Nhịp 4/8px, ưu tiên 8, 12, 16, 24, 32px; giữ cùng gutters giữa header và nội dung |
 | Bo góc | Card 12px, control 8px, badge/thumbnail 6px; avatar tròn |
 | Icon | Icon nét đồng bộ từ UI package; nav icon khoảng 18px trong vùng 20px; icon trang trí có `aria-hidden`, nút chỉ icon có tên truy cập |
@@ -51,7 +51,7 @@ Ghi chú phạm vi tìm kiếm/lọc (chỉ khi cần)
 ┌ Bảng hoặc card danh sách ────────────────────────────────────────────┐
 │ Header cột → các dòng dữ liệu → trạng thái rỗng/tải/lỗi phù hợp        │
 ├ Footer nối liền bảng ────────────────────────────────────────────────┤
-│ Hiển thị X trong Y bản ghi đã tải                     Tải thêm / hết  │
+│ Hiển thị 11–20 trong 46 bản ghi              Trước 1 2 3 … 5 Sau     │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -62,12 +62,14 @@ Ghi chú phạm vi tìm kiếm/lọc (chỉ khi cần)
 | Label dropdown | Nằm trên ô, 12px/600, line-height 16px, gap 4px, liên kết label/for |
 | Giá trị dropdown | `Danh mục` → `Tất cả`; `Trạng thái` → `Tất cả`; `Sắp xếp` → `Mới nhất`. Không lặp tên trường trong option |
 | Căn hàng | Căn đáy cả toolbar và cụm filters để mép control search/select/CTA trùng nhau; icon mũi tên căn giữa riêng ô select |
-| Bảng | Viền 1px, radius 12px; header nền canvas, sentence case, 12px/600, cao tham chiếu 47px, padding ngang 24px |
-| Dòng | Nền trắng, chữ 14px, cell padding 16px 24px, căn giữa dọc; cột thao tác căn phải |
+| Bảng | Viền 1px, radius 12px; bảng danh sách gắn `seller-management-table`; header nền canvas, sentence case, 12px/500, cao tham chiếu 47px, padding ngang 24px |
+| Dòng | Nền trắng, chữ 13px/400, tên chính 13px/500, cell padding 16px 24px, căn giữa dọc; cột thao tác căn phải và dùng icon có tên truy cập |
 | Ảnh | Thumbnail 48×48px, radius 6px, ảnh giữ tỷ lệ; có placeholder thật khi thiếu ảnh |
-| Footer | Nối liền bảng, không double border; X là số đang hiển thị, Y là số đã tải; giữ nút tải thêm ngay cả khi lọc cục bộ ra rỗng |
+| Footer | Nối liền bảng, không double border; hiển thị khoảng hiện tại và tổng số từ API; dùng page cố định 10 bản ghi với Trước/Sau và dãy số trang rút gọn |
 
 Không trình bày tìm kiếm/sort trên dữ liệu đã tải như tìm toàn hệ thống. Chỉ dùng pagination, tổng đếm và KPI mà API có thể cung cấp; không tạo trang số, tỷ lệ tăng trưởng hoặc biểu đồ giả.
+
+Khi resize cột, badge trạng thái và nhãn trong bảng phải có `box-sizing: border-box`, `max-width: 100%` và được phép xuống dòng; chữ, nền và border không được tràn qua divider. Tên hoặc mã dài dùng `min-width: 0` và wrap theo nội dung. Chỉ icon thao tác giữ một dòng.
 
 ## Biến thể theo nghiệp vụ
 
@@ -76,10 +78,10 @@ Không trình bày tìm kiếm/sort trên dữ liệu đã tải như tìm toàn
 | Sản phẩm | Search tên/mã, danh mục, trạng thái, CTA thêm; ảnh, thông tin, danh mục, giá, kho, badge, thao tác. Ba nút của form tạo sản phẩm ở cuối form |
 | Tồn kho | Search tên/biến thể/SKU; sort mới nhất, cũ nhất theo `updatedAt`, số lượng theo khả dụng giảm dần trong mapping hiện có. Không có checkbox “Chỉ hiện sắp hết hàng” |
 | Đơn hàng | Tab trạng thái trải đều chiều ngang desktop; search, trạng thái chuẩn bị và sort cùng toolbar. Sort thời gian và giá. Footer hiện số đơn như Sản phẩm; không có label “Không đơn” dư thừa |
-| Đánh giá | Search tên sản phẩm/nội dung, sort thời gian hoặc số sao; giữ phản hồi và báo cáo. Dropdown lý do nằm trong dialog báo cáo |
+| Đánh giá | Search tên sản phẩm/nội dung, sort thời gian hoặc số sao; page 10 đánh giá; thao tác báo cáo dùng icon có nhãn truy cập. Dropdown lý do nằm trong dialog báo cáo |
 | Khuyến mãi | Quản lý Voucher; bỏ mục giảm giá sản phẩm trong màn này. Có search, trạng thái, thời gian và sort theo khả năng hiện có; form/modal theo phần dưới |
 | Trả hàng / Hoàn tiền | Một workflow Seller, giữ trạng thái, mã yêu cầu/đơn, thời hạn và hành động xử lý; chỉ bật variant Seller tại consumer Seller |
-| Chiến dịch | Bộ lọc loại/trạng thái, đăng ký/rút, sản phẩm tham gia và mức giảm; giữ điều kiện tham gia từ API |
+| Chiến dịch | Bộ lọc loại/trạng thái, page 10 chiến dịch; cột thao tác có icon xác nhận tham gia, từ chối và xem chi tiết với nhãn truy cập, nhưng trạng thái Đã tham gia chỉ còn xem; giữ luồng chọn sản phẩm/mức giảm trước khi xác nhận và luồng rút. SKU Flash Sale hết quota có action kết thúc chiến dịch riêng cho SKU khi API cho phép. Các nút ở trang chi tiết dùng đầy đủ variant primary/secondary/danger, kể cả khối Flash Sale và popup |
 | Thông báo | Chuông trên navbar và mục trong sidebar, giữ trạng thái đọc/chưa đọc và đích điều hướng |
 | Chat | Một trang làm việc trong shell tại `/seller/chat`, xem phần Chat bên dưới |
 

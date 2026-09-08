@@ -64,8 +64,7 @@ export class SellerOrdersController {
   @ApiQuery({ name: 'from', required: false, description: 'UTC date, inclusive' })
   @ApiQuery({ name: 'to', required: false, description: 'UTC date, inclusive' })
   @ApiQuery({ name: 'orderReference', required: false, format: 'uuid' })
-  @ApiQuery({ name: 'limit', required: false, example: 20 })
-  @ApiQuery({ name: 'cursor', required: false })
+  @ApiQuery({ name: 'page', required: false, example: 1 })
   async list(
     @Req() request: AuthenticatedRequest,
     @Query() rawQuery: Record<string, string | string[] | undefined>,

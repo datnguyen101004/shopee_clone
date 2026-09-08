@@ -138,7 +138,7 @@ export function SellerDashboard() {
       const next = await fetchSellerDashboard(authenticatedFetch, { from, to, granularity });
       setData(next);
       try {
-        const orders = await fetchSellerOrders(authenticatedFetch, { status: 'ALL', limit: 5 });
+        const orders = await fetchSellerOrders(authenticatedFetch, { status: 'ALL', page: 1 });
         setRecentOrders(orders.items.slice(0, 5));
       } catch {
         // Analytics remains useful when the order queue is temporarily unavailable.
@@ -352,6 +352,7 @@ export function SellerDashboard() {
                   className="seller-dashboard-orders-row seller-dashboard-orders-row--head"
                   role="row"
                 >
+                  <span className="management-table-id-cell">ID</span>
                   <span>Mã đơn</span>
                   <span>Sản phẩm</span>
                   <span>Giá trị</span>
@@ -364,6 +365,7 @@ export function SellerDashboard() {
                     key={order.orderReference}
                     role="row"
                   >
+                    <span className="management-table-id-cell">{order.orderReference}</span>
                     <span>#{order.orderReference.slice(0, 8).toUpperCase()}</span>
                     <span>{order.lines[0]?.productName ?? `${order.lineCount} sản phẩm`}</span>
                     <span>{money(order.payableTotalMinor)}</span>

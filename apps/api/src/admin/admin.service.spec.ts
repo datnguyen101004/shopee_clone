@@ -52,6 +52,43 @@ describe('AdminService', () => {
   });
 
   describe('User Administration', () => {
+    it('returns page metadata with serialized users', async () => {
+      const createdAt = new Date('2026-08-25T00:00:00.000Z');
+      const updatedAt = new Date('2026-08-26T00:00:00.000Z');
+      repository.listUsers.mockResolvedValue({
+        items: [
+          {
+            id: targetUserId,
+            email: 'buyer@example.com',
+            displayName: 'Target Buyer',
+            phoneNumber: null,
+            status: 'ACTIVE',
+            roles: ['buyer'],
+            createdAt,
+            updatedAt,
+          },
+        ],
+        page: 2,
+        pageSize: 10,
+        totalItems: 11,
+        totalPages: 2,
+      });
+
+      await expect(service.listUsers({ page: 2 })).resolves.toEqual({
+        items: [
+          expect.objectContaining({
+            id: targetUserId,
+            createdAt: createdAt.toISOString(),
+            updatedAt: updatedAt.toISOString(),
+          }),
+        ],
+        page: 2,
+        pageSize: 10,
+        totalItems: 11,
+        totalPages: 2,
+      });
+    });
+
     it('rejects self-suspend', async () => {
       await expect(
         service.executeUserAction(adminUserId, adminUserId, {

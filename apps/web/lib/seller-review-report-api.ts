@@ -38,8 +38,9 @@ async function request<T>(
 
 export function listSellerShopReviews(
   authenticatedFetch: AuthenticatedFetch,
+  page = 1,
 ): Promise<SellerShopReviewListResponse> {
-  return request('/api/v1/seller/reviews', authenticatedFetch, { method: 'GET' });
+  return request(`/api/v1/seller/reviews?page=${page}`, authenticatedFetch, { method: 'GET' });
 }
 
 export function submitSellerReviewReport(

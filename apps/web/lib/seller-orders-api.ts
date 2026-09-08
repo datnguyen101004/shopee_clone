@@ -49,8 +49,7 @@ export async function fetchSellerOrders(
     from: input.from,
     to: input.to,
     orderReference: input.orderReference,
-    limit: input.limit,
-    cursor: input.cursor,
+    page: input.page,
   };
   Object.entries(query).forEach(([key, value]) => {
     if (value !== undefined && value !== null && value !== '')

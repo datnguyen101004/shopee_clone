@@ -24,6 +24,8 @@
     "db:import:dataset": "tsx prisma/import-dataset.ts",
     "db:reset": "prisma migrate reset",
     "db:verify": "tsx prisma/verify.ts",
+    "flash-sale:verify": "tsx prisma/verify-flash-sale-foundation.ts",
+    "admission:localstack:setup": "tsx scripts/admission-localstack-setup.ts",
     "db:migration:checksums": "tsx prisma/verify-migration-checksums.ts",
     "chat:preflight": "tsx prisma/preflight-chat-foundation.ts",
     "chat:repair:legacy-conversation": "tsx prisma/repair-chat-legacy-conversation.ts",
@@ -55,7 +57,9 @@
     "recommendations:activate": "tsx scripts/recommendations-activate-model.ts"
   },
   "dependencies": {
+    "@aws-sdk/client-lambda": "^3.1127.0",
     "@aws-sdk/client-s3": "^3.1111.0",
+    "@aws-sdk/client-sqs": "^3.1127.0",
     "@aws-sdk/s3-request-presigner": "3.1111.0",
     "@elastic/elasticsearch": "8.17.0",
     "@nestjs/common": "11.1.29",
@@ -76,6 +80,7 @@
     "google-auth-library": "11.0.1",
     "pg": "8.23.0",
     "pg-boss": "12.26.1",
+    "redis": "5.9.0",
     "reflect-metadata": "0.2.2",
     "rxjs": "7.8.2",
     "socket.io": "4.8.1"

@@ -7,6 +7,7 @@ import { MarketplaceCampaignError } from './marketplace-campaigns.errors';
 export class MarketplaceCampaignExceptionFilter implements ExceptionFilter {
   catch(error: unknown, host: ArgumentsHost): void {
     const response = host.switchToHttp().getResponse<Response>();
+    if (error instanceof MarketplaceCampaignError && error.retryAfterSeconds) response.header('Retry-After', String(error.retryAfterSeconds));
     const status = error instanceof MarketplaceCampaignError ? error.status : error instanceof AuthenticationFailedError ? 401 : error instanceof AuthorizationDeniedError ? 403 : 503;
     const code = error instanceof MarketplaceCampaignError ? error.code : status === 401 ? 'AUTHENTICATION_FAILED' : status === 403 ? 'AUTHORIZATION_DENIED' : 'CAMPAIGN_UNAVAILABLE';
     response.header('Cache-Control', 'no-store').type('application/problem+json').status(status).json({

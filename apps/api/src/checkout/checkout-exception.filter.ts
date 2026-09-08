@@ -20,10 +20,13 @@ import {
   CheckoutCartConflictError,
   CheckoutIdempotencyConflictError,
   CheckoutInventoryConflictError,
+  CheckoutFlashSaleError,
   CheckoutNotReadyError,
   CheckoutPreviewChangedError,
   CheckoutPurchaseNotFoundError,
   CheckoutUnavailableError,
+  CheckoutRateLimitedError,
+  CheckoutFlashSaleBusyError,
   CheckoutValidationError,
   PaymentRetryActiveError,
   PaymentRetryNotAllowedError,
@@ -141,6 +144,15 @@ export class CheckoutExceptionFilter implements ExceptionFilter {
       );
       return;
     }
+    if (exception instanceof CheckoutFlashSaleError) {
+      this.problem(response, 409, exception.code.toLowerCase().replaceAll('_', '-'), 'Flash Sale checkout unavailable', exception.message, { code: exception.code });
+      return;
+    }
+    if (exception instanceof CheckoutFlashSaleBusyError) {
+      response.setHeader('Retry-After', String(exception.retryAfterSeconds));
+      this.problem(response, 429, 'flash-sale-busy', 'Flash Sale is busy', exception.message, { code: 'FLASH_SALE_BUSY', retryAfterSeconds: exception.retryAfterSeconds });
+      return;
+    }
     if (exception instanceof CheckoutPreviewChangedError) {
       this.problem(
         response,
@@ -175,6 +187,11 @@ export class CheckoutExceptionFilter implements ExceptionFilter {
     }
     if (exception instanceof CheckoutUnavailableError) {
       this.unavailable(response);
+      return;
+    }
+    if (exception instanceof CheckoutRateLimitedError) {
+      response.setHeader('Retry-After', String(exception.retryAfterSeconds));
+      this.problem(response, 429, 'checkout-rate-limited', 'Checkout is busy', 'Please retry checkout after the indicated delay.');
       return;
     }
     this.unavailable(response);

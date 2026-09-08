@@ -5,8 +5,18 @@ import {
   type AdminReviewActionRequest,
   type AdminReviewVisibilityAction,
 } from '@shopee-clone/contracts';
-import { ApiProperty } from '@nestjs/swagger';
-import { IsIn, IsInt, IsString, MaxLength, Min, MinLength } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { Type } from 'class-transformer';
+import { IsIn, IsInt, IsOptional, IsString, MaxLength, Min, MinLength } from 'class-validator';
+
+export class AdminReportedReviewPageQueryDto {
+  @ApiPropertyOptional({ default: 1, minimum: 1 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  page = 1;
+}
 
 export class AdminReviewActionDto implements AdminReviewActionRequest {
   @ApiProperty({ enum: ADMIN_REVIEW_VISIBILITY_ACTIONS, example: 'HIDE' })

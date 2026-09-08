@@ -9,7 +9,7 @@ const key = '00000000-0000-4000-8000-000000000003';
 describe('InventoryController', () => {
   function fixture() {
     const inventory = {
-      list: jest.fn().mockResolvedValue({ items: [], nextCursor: null }),
+      list: jest.fn().mockResolvedValue({ items: [], page: 1, pageSize: 10, totalItems: 0, totalPages: 0 }),
       history: jest.fn().mockResolvedValue({ items: [], nextCursor: null }),
       adjust: jest.fn().mockResolvedValue({ inventoryVersion: 8, id: 'audit' }),
     };
@@ -19,11 +19,11 @@ describe('InventoryController', () => {
   it('validates and forwards seller list/history queries', async () => {
     const { controller, inventory } = fixture();
     const req = { authUser: user } as never;
-    await controller.list(req, { limit: '20' });
+    await controller.list(req, { page: '2' });
     await controller.history(req, variantId, { limit: '20' });
-    expect(inventory.list).toHaveBeenCalledWith(user.id, { cursor: null, limit: 20, productId: null, lowStock: null });
-    expect(inventory.history).toHaveBeenCalledWith(user.id, variantId, { cursor: null, limit: 20, productId: null, lowStock: null });
-    await expect(controller.list({ authUser: null } as never, { limit: '20' })).rejects.toBeInstanceOf(InventoryValidationError);
+    expect(inventory.list).toHaveBeenCalledWith(user.id, { page: 2, productId: null, lowStock: null });
+    expect(inventory.history).toHaveBeenCalledWith(user.id, variantId, { cursor: null, limit: 20 });
+    await expect(controller.list({ authUser: null } as never, { page: '2' })).rejects.toBeInstanceOf(InventoryValidationError);
   });
 
   it('requires ETag/idempotency headers and returns the next ETag on success', async () => {

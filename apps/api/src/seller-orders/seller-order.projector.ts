@@ -243,14 +243,17 @@ function projectDetail(graph: SellerOrderGraph, now: Date): SellerOrderDetail {
 export class SellerOrderProjector {
   list(
     graphs: SellerOrderGraph[],
-    limit: number,
-    nextCursor: string | null,
+    page: number,
+    totalItems: number,
     now = new Date(),
   ): SellerOrderListResponse {
     const result: SellerOrderListResponse = {
       sellerOrderVersion: SELLER_ORDER_VERSION,
       items: graphs.map((graph) => projectSummary(graph, now)),
-      page: { limit, nextCursor },
+      page,
+      pageSize: 10,
+      totalItems,
+      totalPages: Math.ceil(totalItems / 10),
     };
     if (!isSellerOrderListResponse(result)) throw new SellerOrderUnavailableError();
     return result;

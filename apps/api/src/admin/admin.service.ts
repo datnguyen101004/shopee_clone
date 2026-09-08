@@ -83,7 +83,10 @@ export class AdminService {
         createdAt: u.createdAt.toISOString(),
         updatedAt: u.updatedAt.toISOString(),
       })),
-      nextCursor: result.nextCursor,
+      page: result.page,
+      pageSize: result.pageSize,
+      totalItems: result.totalItems,
+      totalPages: result.totalPages,
     };
   }
 
@@ -266,7 +269,10 @@ export class AdminService {
         createdAt: s.createdAt.toISOString(),
         updatedAt: s.updatedAt.toISOString(),
       })),
-      nextCursor: result.nextCursor,
+      page: result.page,
+      pageSize: result.pageSize,
+      totalItems: result.totalItems,
+      totalPages: result.totalPages,
     };
   }
 
@@ -927,7 +933,10 @@ export class AdminService {
           updatedAt: product.updatedAt.toISOString(),
         };
       }),
-      nextCursor: result.nextCursor,
+      page: result.page,
+      pageSize: result.pageSize,
+      totalItems: result.totalItems,
+      totalPages: result.totalPages,
     };
   }
 

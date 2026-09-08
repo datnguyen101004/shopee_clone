@@ -3,9 +3,9 @@ import { RoleApiError, type AuthenticatedFetcher } from './role-api';
 
 const endpoint = (path: string) => new URL(path, process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:3001');
 
-export async function fetchSellerInventory(fetcher: AuthenticatedFetcher, input: { cursor?: string; lowStock?: boolean } = {}): Promise<InventoryPage> {
+export async function fetchSellerInventory(fetcher: AuthenticatedFetcher, input: { page?: number; lowStock?: boolean } = {}): Promise<InventoryPage> {
   const url = endpoint('/api/v1/seller/inventory');
-  if (input.cursor) url.searchParams.set('cursor', input.cursor);
+  if (input.page) url.searchParams.set('page', String(input.page));
   if (input.lowStock !== undefined) url.searchParams.set('lowStock', String(input.lowStock));
   const response = await fetcher(url, { cache: 'no-store', headers: { Accept: 'application/json, application/problem+json' } });
   let body: unknown;

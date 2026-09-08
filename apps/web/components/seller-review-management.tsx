@@ -1,12 +1,13 @@
 'use client';
 
 import type { SellerReviewReportReasonCode, SellerShopReviewSummary } from '@shopee-clone/contracts';
-import { ChevronDown, Search } from '@shopee-clone/ui';
+import { ChevronDown, Flag, Search } from '@shopee-clone/ui';
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { useAuthSession } from './auth-session-provider';
 import { listSellerShopReviews, SellerReviewReportApiError, submitSellerReviewReport } from '../lib/seller-review-report-api';
+import { SellerPagination } from './seller/seller-pagination';
 
 const REPORT_REASONS: Array<{ value: SellerReviewReportReasonCode; label: string }> = [
   { value: 'ABUSIVE_CONTENT', label: 'Nội dung xúc phạm hoặc quấy rối' },
@@ -31,6 +32,9 @@ export function SellerReviewManagement() {
   const { authenticatedFetch, state: authState } = useAuthSession();
   const isSeller = authState.status === 'authenticated' && authState.user.roles.includes('seller');
   const [reviews, setReviews] = useState<SellerShopReviewSummary[]>([]);
+  const [page, setPage] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
   const [searchTerm, setSearchTerm] = useState('');
   const [sort, setSort] = useState<ReviewSort>('newest');
   const [loading, setLoading] = useState(true);
@@ -43,12 +47,20 @@ export function SellerReviewManagement() {
   const [submitting, setSubmitting] = useState(false);
   const [dialogError, setDialogError] = useState<string | null>(null);
 
-  const loadReviews = useCallback(async () => {
+  const loadReviews = useCallback(async (targetPage = 1) => {
     setLoading(true);
     setError(null);
     try {
-      const response = await listSellerShopReviews(authenticatedFetch);
+      const response = await listSellerShopReviews(authenticatedFetch, targetPage);
+      const lastPage = Math.max(1, response.totalPages);
+      if (targetPage > lastPage) {
+        setPage(lastPage);
+        return;
+      }
       setReviews(response.items);
+      setPage(response.page);
+      setTotalItems(response.totalItems);
+      setTotalPages(response.totalPages);
     } catch (caught) {
       setError(messageFrom(caught, 'Không thể tải đánh giá của shop.'));
     } finally {
@@ -58,10 +70,10 @@ export function SellerReviewManagement() {
 
   useEffect(() => {
     const loadTimer = window.setTimeout(() => {
-      if (isSeller) void loadReviews();
+      if (isSeller) void loadReviews(page);
     }, 0);
     return () => window.clearTimeout(loadTimer);
-  }, [isSeller, loadReviews]);
+  }, [isSeller, loadReviews, page]);
 
   const openReportDialog = (review: SellerShopReviewSummary) => {
     setSelectedReview(review);
@@ -171,7 +183,7 @@ export function SellerReviewManagement() {
       {error ? (
         <p role="alert" className="seller-reviews__error">
           {error}{' '}
-          <button type="button" onClick={() => void loadReviews()}>Thử lại</button>
+          <button type="button" onClick={() => void loadReviews(page)}>Thử lại</button>
         </p>
       ) : null}
       <div className="seller-pl-toolbar seller-pl-toolbar--labeled seller-reviews-toolbar">
@@ -183,7 +195,7 @@ export function SellerReviewManagement() {
               aria-label="Tìm kiếm đánh giá"
               placeholder="Tên sản phẩm hoặc nội dung"
               value={searchTerm}
-              onChange={(event) => setSearchTerm(event.target.value)}
+              onChange={(event) => { setSearchTerm(event.target.value); setPage(1); }}
             />
           </div>
           <div className="seller-pl-field seller-reviews-sort">
@@ -193,7 +205,7 @@ export function SellerReviewManagement() {
                 id="seller-reviews-sort"
                 className="seller-pl-select"
                 value={sort}
-                onChange={(event) => setSort(event.target.value as ReviewSort)}
+                onChange={(event) => { setSort(event.target.value as ReviewSort); setPage(1); }}
               >
                 <option value="newest">Mới nhất</option>
                 <option value="oldest">Cũ nhất</option>
@@ -245,10 +257,12 @@ export function SellerReviewManagement() {
                       <button
                         type="button"
                         className="seller-review-card__report"
+                        aria-label={`${review.reportStatus === 'OPEN' ? 'Đã báo cáo' : 'Báo cáo đánh giá'} ${review.productName}`}
+                        title={review.reportStatus === 'OPEN' ? 'Đã báo cáo' : 'Báo cáo đánh giá'}
                         disabled={review.reportStatus === 'OPEN'}
                         onClick={() => openReportDialog(review)}
                       >
-                        {review.reportStatus === 'OPEN' ? 'Đã báo cáo' : 'Báo cáo đánh giá'}
+                        <Flag size={16} aria-hidden="true" />
                       </button>
                     ) : null}
                   </article>
@@ -258,12 +272,14 @@ export function SellerReviewManagement() {
           ) : (
             <p className="seller-reviews-filter-empty">Không tìm thấy đánh giá phù hợp với bộ lọc hiện tại.</p>
           )}
-          <footer className="seller-pl-footer seller-reviews-footer">
-            <span className="seller-pl-footer__summary">
-              Hiển thị <strong>{visibleReviews.length}</strong> trong {reviews.length} đánh giá đã tải
-            </span>
-            <span className="seller-pl-footer__complete">Đã tải hết danh sách đánh giá</span>
-          </footer>
+          <SellerPagination
+            itemLabel="đánh giá"
+            page={page}
+            totalItems={totalItems}
+            totalPages={totalPages}
+            disabled={loading}
+            onPageChange={setPage}
+          />
         </>
       ) : null}
       {selectedReview ? (

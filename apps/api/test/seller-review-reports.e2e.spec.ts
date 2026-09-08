@@ -58,7 +58,7 @@ describe('Seller review report E2E endpoints', () => {
   beforeEach(() => jest.clearAllMocks());
 
   it('lists only the authenticated seller review projection with private caching', async () => {
-    reviewsService.listSellerShopReviews.mockResolvedValue({ items: [{
+    reviewsService.listSellerShopReviews.mockResolvedValue({ page: 1, pageSize: 10, totalItems: 1, totalPages: 1, items: [{
       id: reviewId, productId: '123e4567-e89b-12d3-a456-426614174002', productName: 'Seller Product', rating: 4,
       comment: 'Review text', visibility: 'VISIBLE', reportStatus: 'NOT_REPORTED',
       createdAt: '2026-08-21T12:00:00.000Z', updatedAt: '2026-08-21T12:00:00.000Z',
@@ -72,7 +72,7 @@ describe('Seller review report E2E endpoints', () => {
     expect(res.header['cache-control']).toBe('private, no-store');
     expect(res.body.items[0]).not.toHaveProperty('buyerUserId');
     expect(res.body.items[0]).not.toHaveProperty('sellerUserId');
-    expect(reviewsService.listSellerShopReviews).toHaveBeenCalledWith(users.seller!.id);
+    expect(reviewsService.listSellerShopReviews).toHaveBeenCalledWith(users.seller!.id, 1);
   });
 
   it('rejects a buyer from seller review routes', async () => {

@@ -2,6 +2,7 @@
 import { createHash } from 'node:crypto';
 import { Inject, Injectable } from '@nestjs/common';
 import type {
+  AdminReportedReviewSummary,
   CreateProductReviewRequest,
   AuthorProductReview,
   PublicProductReviewPage,
@@ -10,10 +11,10 @@ import type {
   SellerShopReviewListResponse,
   UpdateProductReviewRequest,
 } from '@shopee-clone/contracts';
-import { REVIEW_VERSION, SELLER_REVIEWS_MAX_LIMIT } from '@shopee-clone/contracts';
+import { REVIEW_VERSION } from '@shopee-clone/contracts';
 
 import { PrismaService } from '../prisma/prisma.service';
-import type { Prisma } from '../generated/prisma/client';
+import { Prisma } from '../generated/prisma/client';
 import {
   ReviewDuplicateError,
   ReviewEligibilityError,
@@ -162,10 +163,15 @@ export class ReviewsService {
     return this.authorReview(review);
   }
 
-  async listSellerShopReviews(sellerUserId: string): Promise<SellerShopReviewListResponse> {
-    const reviews = await this.prisma.productReview.findMany({
-      where: { shop: { ownerId: sellerUserId } },
-      take: SELLER_REVIEWS_MAX_LIMIT,
+  async listSellerShopReviews(sellerUserId: string, page = 1): Promise<SellerShopReviewListResponse> {
+    const pageSize = 10;
+    const where = { shop: { ownerId: sellerUserId } };
+    const [totalItems, reviews] = await Promise.all([
+      this.prisma.productReview.count({ where }),
+      this.prisma.productReview.findMany({
+      where,
+      skip: (page - 1) * pageSize,
+      take: pageSize,
       orderBy: [{ updatedAt: 'desc' }, { id: 'desc' }],
       select: {
         id: true,
@@ -183,7 +189,8 @@ export class ReviewsService {
           select: { status: true },
         },
       },
-    });
+      }),
+    ]);
 
     return {
       items: reviews.map((review) => ({
@@ -199,6 +206,10 @@ export class ReviewsService {
           ? (review.sellerReports[0].status as 'OPEN' | 'RESOLVED')
           : 'NOT_REPORTED',
       })),
+      page,
+      pageSize,
+      totalItems,
+      totalPages: Math.ceil(totalItems / pageSize),
     };
   }
 
@@ -503,45 +514,71 @@ export class ReviewsService {
     });
   }
 
-  async adminListReportedReviews(): Promise<any[]> {
-    const reports = await this.prisma.sellerReviewReport.findMany({
-      where: { status: 'OPEN' as any },
-      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
-      distinct: ['reviewId'],
-      include: {
-        review: {
+  async adminListReportedReviews(page = 1): Promise<{ items: AdminReportedReviewSummary[]; totalItems: number }> {
+    const pageSize = 10;
+    const [countRows, pageRows] = await Promise.all([
+      this.prisma.$queryRaw<Array<{ count: bigint }>>(Prisma.sql`
+        SELECT COUNT(DISTINCT review_id)::bigint AS count
+        FROM seller_review_reports
+        WHERE status = 'open'::seller_review_report_status
+      `),
+      this.prisma.$queryRaw<Array<{ id: string }>>(Prisma.sql`
+        SELECT latest.id
+        FROM (
+          SELECT DISTINCT ON (review_id) id, review_id, created_at
+          FROM seller_review_reports
+          WHERE status = 'open'::seller_review_report_status
+          ORDER BY review_id, created_at DESC, id DESC
+        ) AS latest
+        ORDER BY latest.created_at DESC, latest.id DESC
+        OFFSET ${(page - 1) * pageSize}
+        LIMIT ${pageSize}
+      `),
+    ]);
+    const pageIds = pageRows.map((row) => row.id);
+    const reports = pageIds.length === 0
+      ? []
+      : await this.prisma.sellerReviewReport.findMany({
+          where: { id: { in: pageIds } },
           include: {
-            product: {
-              select: {
-                id: true,
-                name: true,
-                images: {
-                  take: 1,
-                  orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }],
-                  select: { url: true },
+            review: {
+              include: {
+                product: {
+                  select: {
+                    id: true,
+                    name: true,
+                    images: {
+                      take: 1,
+                      orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }],
+                      select: { url: true },
+                    },
+                  },
                 },
+                shop: { select: { id: true, name: true, logoUrl: true } },
+                _count: { select: { sellerReports: { where: { status: 'OPEN' as any } } } },
               },
             },
-            shop: { select: { id: true, name: true, logoUrl: true } },
-            _count: { select: { sellerReports: { where: { status: 'OPEN' as any } } } },
           },
-        },
-      },
-    });
-    return reports.map((report) => ({
-      reviewId: report.review.id,
-      productId: report.review.product.id,
-      productName: report.review.product.name,
-      productImageUrl: report.review.product.images[0]?.url ?? null,
-      shopId: report.review.shop.id,
-      shopName: report.review.shop.name,
-      shopLogoUrl: report.review.shop.logoUrl,
-      rating: report.review.rating,
-      comment: report.review.text,
-      visibility: report.review.visibility,
-      reportCount: report.review._count.sellerReports,
-      latestReportedAt: report.createdAt.toISOString(),
-    }));
+        });
+    const pageOrder = new Map(pageIds.map((id, index) => [id, index]));
+    reports.sort((left, right) => (pageOrder.get(left.id) ?? 0) - (pageOrder.get(right.id) ?? 0));
+    return {
+      items: reports.map((report) => ({
+        reviewId: report.review.id,
+        productId: report.review.product.id,
+        productName: report.review.product.name,
+        productImageUrl: report.review.product.images[0]?.url ?? null,
+        shopId: report.review.shop.id,
+        shopName: report.review.shop.name,
+        shopLogoUrl: report.review.shop.logoUrl,
+        rating: report.review.rating,
+        comment: report.review.text,
+        visibility: report.review.visibility,
+        reportCount: report.review._count.sellerReports,
+        latestReportedAt: report.createdAt.toISOString(),
+      })),
+      totalItems: Number(countRows[0]?.count ?? 0n),
+    };
   }
 
   async adminExecuteReviewAction(

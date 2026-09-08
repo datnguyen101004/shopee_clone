@@ -1,0 +1,173 @@
+{
+    "metrics": {
+        "t35_unexpected": {
+            "count": 0,
+            "rate": 0,
+            "thresholds": {
+                "count==0": false
+            }
+        },
+        "http_reqs": {
+            "count": 18,
+            "rate": 2.720580017986661
+        },
+        "checks": {
+            "passes": 18,
+            "fails": 0,
+            "value": 1
+        },
+        "http_req_failed": {
+            "passes": 0,
+            "fails": 18,
+            "value": 0
+        },
+        "iteration_duration": {
+            "avg": 5502.263783333333,
+            "min": 717.7438,
+            "med": 6483.9591,
+            "max": 6616.2362,
+            "p(90)": 6606.00355,
+            "p(95)": 6611.119875
+        },
+        "http_req_waiting": {
+            "max": 6133.4478,
+            "p(90)": 6002.80425,
+            "p(95)": 6024.0176950000005,
+            "avg": 1799.1035722222223,
+            "min": 123.7574,
+            "med": 224.96269999999998
+        },
+        "t35_rejections": {
+            "count": 3,
+            "rate": 0.45343000299777686
+        },
+        "http_req_sending": {
+            "p(95)": 0,
+            "avg": 0,
+            "min": 0,
+            "med": 0,
+            "max": 0,
+            "p(90)": 0
+        },
+        "http_req_connecting": {
+            "min": 0,
+            "med": 0,
+            "max": 1.7214,
+            "p(90)": 1.7214,
+            "p(95)": 1.7214,
+            "avg": 0.5737999999999999
+        },
+        "t35_api_latency": {
+            "avg": 1799.2210666666667,
+            "min": 123.7574,
+            "med": 224.96269999999998,
+            "max": 6133.9775,
+            "p(90)": 6003.17567,
+            "p(95)": 6024.09715
+        },
+        "t35_success_rate": {
+            "passes": 18,
+            "fails": 0,
+            "value": 1
+        },
+        "vus_max": {
+            "min": 6,
+            "max": 6,
+            "value": 6
+        },
+        "iterations": {
+            "count": 6,
+            "rate": 0.9068600059955537
+        },
+        "http_req_duration": {
+            "avg": 1799.2210666666667,
+            "min": 123.7574,
+            "med": 224.96269999999998,
+            "max": 6133.9775,
+            "p(90)": 6003.17567,
+            "p(95)": 6024.09715
+        },
+        "http_req_duration{expected_response:true}": {
+            "max": 6133.9775,
+            "p(90)": 6003.17567,
+            "p(95)": 6024.09715,
+            "avg": 1799.2210666666667,
+            "min": 123.7574,
+            "med": 224.96269999999998
+        },
+        "http_req_tls_handshaking": {
+            "min": 0,
+            "med": 0,
+            "max": 0,
+            "p(90)": 0,
+            "p(95)": 0,
+            "avg": 0
+        },
+        "data_received": {
+            "count": 50738,
+            "rate": 7668.710497367068
+        },
+        "http_req_receiving": {
+            "min": 0,
+            "med": 0,
+            "max": 0.5321,
+            "p(90)": 0.5299699999999999,
+            "p(95)": 0.530825,
+            "avg": 0.11749444444444444
+        },
+        "vus": {
+            "min": 5,
+            "max": 5,
+            "value": 5
+        },
+        "http_req_blocked": {
+            "p(90)": 1.7214,
+            "p(95)": 1.7214,
+            "avg": 0.5737999999999999,
+            "min": 0,
+            "med": 0,
+            "max": 1.7214
+        },
+        "data_sent": {
+            "count": 13806,
+            "rate": 2086.6848737957694
+        },
+        "t35_requests": {
+            "count": 18,
+            "rate": 2.720580017986661
+        },
+        "t35_orders": {
+            "count": 3,
+            "rate": 0.45343000299777686
+        }
+    },
+    "root_group": {
+        "path": "",
+        "id": "d41d8cd98f00b204e9800998ecf8427e",
+        "groups": {},
+        "checks": {
+                "A05-join: expected HTTP 200": {
+                    "passes": 6,
+                    "fails": 0,
+                    "name": "A05-join: expected HTTP 200",
+                    "path": "::A05-join: expected HTTP 200",
+                    "id": "dc409cd515cb1ffa8bb8203b9be3a682"
+                },
+                "A05-preview: expected HTTP 200/409/428/429": {
+                    "fails": 0,
+                    "name": "A05-preview: expected HTTP 200/409/428/429",
+                    "path": "::A05-preview: expected HTTP 200/409/428/429",
+                    "id": "cfdd14f2aec10beaa58c66c223c591f8",
+                    "passes": 6
+                },
+                "A05: expected HTTP 200/201/409/428/429": {
+                    "passes": 6,
+                    "fails": 0,
+                    "name": "A05: expected HTTP 200/201/409/428/429",
+                    "path": "::A05: expected HTTP 200/201/409/428/429",
+                    "id": "42b366b6a278b6bd09a6f4a0a1515f78"
+                }
+            },
+        "name": ""
+    }
+}

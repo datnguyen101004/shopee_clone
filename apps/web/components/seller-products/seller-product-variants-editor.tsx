@@ -320,6 +320,7 @@ export function SellerProductVariantsEditor({
           <table className="seller-pl-table" style={{ minWidth: '700px' }}>
             <thead>
               <tr>
+                <th className="management-table-id-cell">ID</th>
                 <th>Biến thể</th>
                 <th>Mã SKU</th>
                 <th>Giá bán (₫) *</th>
@@ -329,8 +330,13 @@ export function SellerProductVariantsEditor({
               </tr>
             </thead>
             <tbody>
-              {form.variants.map((v, vIdx) => (
-                <tr key={v.combination.join('|') || vIdx}>
+              {form.variants.map((v, vIdx) => {
+                const persistedId = (v as SellerProductVariantInput & { id?: unknown }).id;
+                const variantId = typeof persistedId === 'string' ? persistedId : '—';
+
+                return (
+                  <tr key={v.combination.join('|') || vIdx}>
+                  <td className="management-table-id-cell">{variantId}</td>
                   <td>
                     <strong>{v.combination.join(' · ') || 'Mặc định'}</strong>
                   </td>
@@ -422,8 +428,9 @@ export function SellerProductVariantsEditor({
                       }
                     />
                   </td>
-                </tr>
-              ))}
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>

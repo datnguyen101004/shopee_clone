@@ -23,6 +23,46 @@ services:
       com.shopee-clone.component: postgres
       com.shopee-clone.scope: ${SHOPEE_COMPOSE_SCOPE:-development}
 
+  redis:
+    image: redis:7.4.2-alpine
+    restart: unless-stopped
+    command: ['redis-server', '--appendonly', 'yes', '--save', '60', '1']
+    ports:
+      - '127.0.0.1:${REDIS_PORT:-6379}:6379'
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 2s
+      timeout: 3s
+      retries: 20
+    labels:
+      com.shopee-clone.component: redis
+      com.shopee-clone.scope: ${SHOPEE_COMPOSE_SCOPE:-development}
+
+  localstack:
+    image: localstack/localstack:4.4.0
+    profiles: ['admission']
+    restart: unless-stopped
+    environment:
+      SERVICES: sqs,lambda
+      DEBUG: ${LOCALSTACK_DEBUG:-0}
+      AWS_DEFAULT_REGION: ${AWS_REGION:-ap-southeast-1}
+      PERSISTENCE: '1'
+    ports:
+      - '127.0.0.1:${LOCALSTACK_PORT:-4566}:4566'
+    volumes:
+      - localstack-data:/var/lib/localstack
+      - /var/run/docker.sock:/var/run/docker.sock
+    healthcheck:
+      test: ['CMD', 'curl', '--silent', '--fail', 'http://localhost:4566/_localstack/health']
+      interval: 3s
+      timeout: 5s
+      retries: 20
+    labels:
+      com.shopee-clone.component: localstack
+      com.shopee-clone.scope: ${SHOPEE_COMPOSE_SCOPE:-development}
+
   elasticsearch:
     image: docker.elastic.co/elasticsearch/elasticsearch:8.17.0
     profiles: ['search']
@@ -57,6 +97,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     env_file:
       - ${DEV_ENV_FILE:-.env}
     environment:
@@ -65,6 +107,7 @@ services:
       # Host publish port can still be 80 via PORT / API_HOST_PORT in .env.
       PORT: '3001'
       DATABASE_URL: ${DATABASE_CONTAINER_URL:-postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}}
+      REDIS_URL: ${REDIS_CONTAINER_URL:-redis://redis:6379}
       ELASTICSEARCH_URL: ${ELASTICSEARCH_CONTAINER_URL:-http://elasticsearch:9200}
     ports:
       - '${API_HOST_PORT:-3001}:3001'
@@ -102,6 +145,14 @@ volumes:
   postgres-data:
     labels:
       com.shopee-clone.component: postgres-data
+      com.shopee-clone.scope: ${SHOPEE_COMPOSE_SCOPE:-development}
+  redis-data:
+    labels:
+      com.shopee-clone.component: redis-data
+      com.shopee-clone.scope: ${SHOPEE_COMPOSE_SCOPE:-development}
+  localstack-data:
+    labels:
+      com.shopee-clone.component: localstack-data
       com.shopee-clone.scope: ${SHOPEE_COMPOSE_SCOPE:-development}
   elasticsearch-data:
     labels:

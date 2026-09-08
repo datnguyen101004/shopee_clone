@@ -152,6 +152,38 @@ export class PricingQuoteService {
     private readonly scheduledDiscounts?: ScheduledDiscountService,
   ) {}
 
+  private async flashSaleOverrides(
+    transaction: Prisma.TransactionClient,
+    variantIds: readonly string[],
+    evaluatedAt: Date,
+  ) {
+    // Older isolated pricing tests and read-only tooling may provide a
+    // transaction mock created before the Flash Sale delegate existed.
+    const delegate = (transaction as unknown as { flashSaleSku?: { findMany: (args: unknown) => Promise<Array<{ variantId: string; salePriceMinor: bigint | number; referencePriceMinor: bigint | number; campaignId: string; remainingQuantity: number; campaign: { policyVersionSnapshot: number | null } }>> } }).flashSaleSku;
+    if (!delegate) return new Map();
+    const rows = await delegate.findMany({
+      where: {
+        variantId: { in: [...new Set(variantIds)] },
+        endedAt: null,
+        campaign: {
+          cancelledAt: null,
+          startsAt: { lte: evaluatedAt },
+          endsAt: { gt: evaluatedAt },
+          type: { code: 'FLASH_SALE' },
+        },
+      },
+      include: { campaign: true },
+    });
+    return new Map(rows.map((row) => [row.variantId, {
+      salePriceMinor: Number(row.salePriceMinor),
+      referencePriceMinor: Number(row.referencePriceMinor),
+      campaignId: row.campaignId,
+      campaignTypeCode: 'FLASH_SALE',
+      policyVersion: row.campaign.policyVersionSnapshot ?? 1,
+      soldOut: row.remainingQuantity === 0,
+    }]));
+  }
+
   async quote(
     userId: string,
     expectedVersion: number,
@@ -215,6 +247,7 @@ export class PricingQuoteService {
     if (version !== input.expectedVersion) throw new PricingConflictError();
 
     const facts = this.currentFacts(cart, input.userId);
+    const flashSales = await this.flashSaleOverrides(transaction, facts.lines.map((line) => line.variantId), input.evaluatedAt);
     const discounts = this.scheduledDiscounts
       ? await this.scheduledDiscounts.resolveVariants(
           transaction,
@@ -227,20 +260,26 @@ export class PricingQuoteService {
           input.evaluatedAt,
         )
       : new Map();
-    const lines = facts.lines.map((line) => {
+    const lines = facts.lines.flatMap((line) => {
+      const flashSale = flashSales.get(line.variantId);
+      if (flashSale?.soldOut) {
+        facts.exclusions.push({ lineId: line.lineId, code: 'unavailable', message: 'Flash Sale đã hết suất cho SKU này.' });
+        return [];
+      }
+      if (flashSale) return [{ ...line, sellingUnitPriceMinor: flashSale.salePriceMinor, compareAtUnitPriceMinor: flashSale.referencePriceMinor, campaignPrice: { sourceKind: 'MARKETPLACE' as const, campaignId: flashSale.campaignId, campaignTypeCode: flashSale.campaignTypeCode, policyVersion: flashSale.policyVersion, discountBasisPoints: Math.floor(((flashSale.referencePriceMinor - flashSale.salePriceMinor) * 10_000) / flashSale.referencePriceMinor), evaluatedAt: input.evaluatedAt.toISOString() } }];
       const discount = discounts.get(line.variantId);
-      if (!discount || discount.effectivePriceMinor === discount.basePriceMinor) return line;
+      if (!discount || discount.effectivePriceMinor === discount.basePriceMinor) return [line];
       const listPrice =
         line.compareAtUnitPriceMinor === null ||
         line.compareAtUnitPriceMinor < discount.basePriceMinor
           ? discount.basePriceMinor
           : line.compareAtUnitPriceMinor;
-      return {
+      return [{
         ...line,
         sellingUnitPriceMinor: discount.effectivePriceMinor,
         compareAtUnitPriceMinor: listPrice,
         campaignPrice: campaignPriceSnapshot(discount),
-      };
+      }];
     });
     const selectedShopIds = new Set(lines.map((line) => line.shop.id));
     for (const selection of input.vouchers?.shopCodes ?? []) {
@@ -320,6 +359,7 @@ export class PricingQuoteService {
     if (version !== input.expectedVersion) throw new PricingConflictError();
 
     const facts = this.currentFacts(cart, input.userId);
+    const flashSales = await this.flashSaleOverrides(transaction, facts.lines.map((line) => line.variantId), input.evaluatedAt);
     const discounts = this.scheduledDiscounts
       ? await this.scheduledDiscounts.resolveVariants(
           transaction,
@@ -332,20 +372,26 @@ export class PricingQuoteService {
           input.evaluatedAt,
         )
       : new Map();
-    const lines = facts.lines.map((line) => {
+    const lines = facts.lines.flatMap((line) => {
+      const flashSale = flashSales.get(line.variantId);
+      if (flashSale?.soldOut) {
+        facts.exclusions.push({ lineId: line.lineId, code: 'unavailable', message: 'Flash Sale đã hết suất cho SKU này.' });
+        return [];
+      }
+      if (flashSale) return [{ ...line, sellingUnitPriceMinor: flashSale.salePriceMinor, compareAtUnitPriceMinor: flashSale.referencePriceMinor, campaignPrice: { sourceKind: 'MARKETPLACE' as const, campaignId: flashSale.campaignId, campaignTypeCode: flashSale.campaignTypeCode, policyVersion: flashSale.policyVersion, discountBasisPoints: Math.floor(((flashSale.referencePriceMinor - flashSale.salePriceMinor) * 10_000) / flashSale.referencePriceMinor), evaluatedAt: input.evaluatedAt.toISOString() } }];
       const discount = discounts.get(line.variantId);
-      if (!discount || discount.effectivePriceMinor === discount.basePriceMinor) return line;
+      if (!discount || discount.effectivePriceMinor === discount.basePriceMinor) return [line];
       const listPrice =
         line.compareAtUnitPriceMinor === null ||
         line.compareAtUnitPriceMinor < discount.basePriceMinor
           ? discount.basePriceMinor
           : line.compareAtUnitPriceMinor;
-      return {
+      return [{
         ...line,
         sellingUnitPriceMinor: discount.effectivePriceMinor,
         compareAtUnitPriceMinor: listPrice,
         campaignPrice: campaignPriceSnapshot(discount),
-      };
+      }];
     });
     const { exclusions, snapshots } = facts;
     const selectedShopIds = new Set(lines.map((line) => line.shop.id));

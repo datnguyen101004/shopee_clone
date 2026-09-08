@@ -1,10 +1,12 @@
 'use client';
 
 import type { ProductDetailVariant } from '@shopee-clone/contracts';
+import type { VariantFlashSaleOffer } from './product-detail-flash-sale';
 
 export interface ProductQuantityStepperProps {
   quantity: string;
   selectedVariant: ProductDetailVariant | null;
+  flashSaleOffer?: VariantFlashSaleOffer | null;
   purchasable: boolean;
   statusMessage: string;
   isError: boolean;
@@ -15,6 +17,7 @@ export interface ProductQuantityStepperProps {
 export function ProductQuantityStepper({
   quantity,
   selectedVariant,
+  flashSaleOffer,
   purchasable,
   statusMessage,
   isError,
@@ -22,6 +25,8 @@ export function ProductQuantityStepper({
   onStepQuantity,
 }: ProductQuantityStepperProps) {
   const currentQuantity = Number(quantity);
+  const isFlashSaleActive = flashSaleOffer?.isFlashSale && flashSaleOffer.state === 'ACTIVE';
+  const isFlashSaleSoldOut = flashSaleOffer?.isFlashSale && flashSaleOffer.state === 'SOLD_OUT';
 
   return (
     <>
@@ -32,7 +37,7 @@ export function ProductQuantityStepper({
             type="button"
             className="product-detail-quantity__btn"
             aria-label="Giảm số lượng"
-            disabled={!selectedVariant || currentQuantity <= 1}
+            disabled={!selectedVariant || currentQuantity <= 1 || isFlashSaleActive || isFlashSaleSoldOut}
             onClick={() => onStepQuantity(-1)}
           >
             −
@@ -41,16 +46,24 @@ export function ProductQuantityStepper({
             id="product-quantity"
             className="product-detail-quantity__input"
             inputMode="numeric"
-            value={quantity}
+            value={isFlashSaleActive ? '1' : quantity}
+            readOnly={isFlashSaleActive || isFlashSaleSoldOut}
+            disabled={isFlashSaleSoldOut}
             aria-describedby="product-quantity-status"
-            onChange={(event) => onQuantityChange(event.target.value)}
+            onChange={(event) => {
+              if (isFlashSaleActive) return;
+              onQuantityChange(event.target.value);
+            }}
           />
           <button
             type="button"
             className="product-detail-quantity__btn"
             aria-label="Tăng số lượng"
             disabled={
-              !selectedVariant || currentQuantity >= selectedVariant.availableQuantity
+              !selectedVariant ||
+              currentQuantity >= selectedVariant.availableQuantity ||
+              isFlashSaleActive ||
+              isFlashSaleSoldOut
             }
             onClick={() => onStepQuantity(1)}
           >
@@ -58,6 +71,11 @@ export function ProductQuantityStepper({
           </button>
         </div>
       </div>
+      {isFlashSaleActive && (
+        <p className="product-detail-fs-stepper-note">
+          ⚡ Số lượng Flash Sale cố định 1 sản phẩm cho mỗi tài khoản trong chiến dịch.
+        </p>
+      )}
       <p
         id="product-quantity-status"
         className={isError ? 'product-detail-status is-error' : 'product-detail-status'}

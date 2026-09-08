@@ -14,6 +14,7 @@ import {
   type SellerVoucherSummary,
   type SellerVoucherState,
   type SellerVoucherUpdateRequest,
+  SELLER_PROMOTION_PAGE_SIZE,
 } from '@shopee-clone/contracts';
 import { SellerPromotionConflictError, SellerPromotionIdempotencyConflictError, SellerPromotionNotFoundError, SellerPromotionStaleError, SellerPromotionUnavailableError, SellerPromotionValidationError } from './seller-promotions.errors';
 import { SellerShopScopeNotFoundError, SellerShopScopeService } from '../seller-scope/seller-shop-scope.service';
@@ -38,12 +39,6 @@ function campaignState(campaign: Pick<CampaignGraph, 'isEnabled' | 'startsAt' | 
   if (!campaign.isEnabled) return 'PAUSED';
   if (now >= campaign.endsAt) return 'EXPIRED';
   return now < campaign.startsAt ? 'SCHEDULED' : 'ACTIVE';
-}
-
-function cursorFor(createdAt: Date, id: string): string { return Buffer.from(JSON.stringify({ createdAt: createdAt.toISOString(), id }), 'utf8').toString('base64url'); }
-function decodeCursor(value: string | null): { createdAt: Date; id: string } | null {
-  if (!value) return null;
-  try { const parsed = JSON.parse(Buffer.from(value, 'base64url').toString('utf8')) as { createdAt?: string; id?: string }; const createdAt = new Date(parsed.createdAt ?? ''); if (!parsed.id || Number.isNaN(createdAt.getTime())) throw new Error(); return { createdAt, id: parsed.id }; } catch { throw new SellerPromotionValidationError(['cursor']); }
 }
 
 @Injectable()
@@ -98,11 +93,28 @@ export class SellerPromotionsService {
   private voucherInclude = { productScopes: { select: { productId: true } } } satisfies Prisma.VoucherInclude;
   private campaignInclude = { products: { select: { productId: true, discountBasisPoints: true } } } satisfies Prisma.ShopDiscountCampaignInclude;
 
-  async listVouchers(userId: string, filter: { state: SellerPromotionState | 'ALL'; limit: number; cursor: string | null }): Promise<SellerVoucherPage> {
-    const shop = await this.shopFor(userId); const cursor = decodeCursor(filter.cursor); const now = await this.databaseNow();
-    const rows = await this.prisma.voucher.findMany({ where: { issuer: 'SHOP', shopId: shop.id, ...this.voucherStateWhere(filter.state, now), ...(cursor ? { OR: [{ createdAt: { lt: cursor.createdAt } }, { createdAt: cursor.createdAt, id: { lt: cursor.id } }] } : {}) }, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], take: filter.limit + 1, include: this.voucherInclude });
-    const filtered = filter.state === 'EXHAUSTED' ? rows.filter((row) => voucherState(row, now) === filter.state) : rows; const items = filtered.slice(0, filter.limit).map((row) => this.voucherSummary(row, now)); const last = filtered.at(-1);
-    return { sellerPromotionVersion: 'seller-promotions-v1', items, nextCursor: filtered.length > filter.limit && last ? cursorFor(last.createdAt, last.id) : null };
+  async listVouchers(userId: string, filter: { state: SellerPromotionState | 'ALL'; page: number }): Promise<SellerVoucherPage> {
+    const shop = await this.shopFor(userId); const now = await this.databaseNow(); const skip = (filter.page - 1) * SELLER_PROMOTION_PAGE_SIZE;
+    let totalItems: number;
+    let rows: VoucherGraph[];
+    if (filter.state === 'EXHAUSTED') {
+      const [countRows, idRows] = await Promise.all([
+        this.prisma.$queryRaw<Array<{ count: number }>>(Prisma.sql`SELECT COUNT(*)::int AS count FROM "vouchers" WHERE "issuer" = 'shop'::"voucher_issuer" AND "shop_id" = ${shop.id}::uuid AND "is_enabled" = TRUE AND "used_count" >= "usage_limit"`),
+        this.prisma.$queryRaw<Array<{ id: string }>>(Prisma.sql`SELECT "id" FROM "vouchers" WHERE "issuer" = 'shop'::"voucher_issuer" AND "shop_id" = ${shop.id}::uuid AND "is_enabled" = TRUE AND "used_count" >= "usage_limit" ORDER BY "created_at" DESC, "id" DESC OFFSET ${skip} LIMIT ${SELLER_PROMOTION_PAGE_SIZE}`),
+      ]);
+      totalItems = countRows[0]?.count ?? 0;
+      const ids = idRows.map((row) => row.id);
+      const unordered = ids.length ? await this.prisma.voucher.findMany({ where: { id: { in: ids } }, include: this.voucherInclude }) : [];
+      const byId = new Map(unordered.map((row) => [row.id, row]));
+      rows = ids.map((id) => byId.get(id)).filter((row): row is VoucherGraph => Boolean(row));
+    } else {
+      const where: Prisma.VoucherWhereInput = { issuer: 'SHOP', shopId: shop.id, ...this.voucherStateWhere(filter.state, now) };
+      [totalItems, rows] = await Promise.all([
+        this.prisma.voucher.count({ where }),
+        this.prisma.voucher.findMany({ where, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], skip, take: SELLER_PROMOTION_PAGE_SIZE, include: this.voucherInclude }),
+      ]);
+    }
+    return { sellerPromotionVersion: 'seller-promotions-v1', items: rows.map((row) => this.voucherSummary(row, now)), page: filter.page, pageSize: SELLER_PROMOTION_PAGE_SIZE, totalItems, totalPages: Math.ceil(totalItems / SELLER_PROMOTION_PAGE_SIZE) };
   }
 
   async getVoucher(userId: string, id: string): Promise<SellerVoucherSummary> {
@@ -213,8 +225,41 @@ export class SellerPromotionsService {
     });
   }
 
-  async listDiscounts(userId: string, filter: { state: SellerPromotionState | 'ALL'; limit: number; cursor: string | null }): Promise<SellerDiscountPage> {
-    const shop = await this.shopFor(userId); const cursor = decodeCursor(filter.cursor); const now = await this.databaseNow(); const rows = await this.prisma.shopDiscountCampaign.findMany({ where: { shopId: shop.id, ...(filter.state === 'ARCHIVED' ? { archivedAt: { not: null } } : filter.state === 'PAUSED' ? { archivedAt: null, isEnabled: false } : filter.state === 'SCHEDULED' ? { archivedAt: null, isEnabled: true, startsAt: { gt: now } } : filter.state === 'EXPIRED' ? { archivedAt: null, isEnabled: true, endsAt: { lte: now } } : filter.state === 'ACTIVE' ? { archivedAt: null, isEnabled: true, startsAt: { lte: now }, endsAt: { gt: now } } : { archivedAt: null }), ...(cursor ? { OR: [{ createdAt: { lt: cursor.createdAt } }, { createdAt: cursor.createdAt, id: { lt: cursor.id } }] } : {}) }, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], take: filter.limit + 1, include: this.campaignInclude }); const items = rows.slice(0, filter.limit).map((row) => this.discountSummary(row, now)); const last = rows[filter.limit - 1]; return { sellerPromotionVersion: 'seller-promotions-v1', items, nextCursor: rows.length > filter.limit && last ? cursorFor(last.createdAt, last.id) : null };
+  async listDiscounts(userId: string, filter: { state: SellerPromotionState | 'ALL'; page: number }): Promise<SellerDiscountPage> {
+    const shop = await this.shopFor(userId);
+    const now = await this.databaseNow();
+    const stateWhere: Prisma.ShopDiscountCampaignWhereInput =
+      filter.state === 'ARCHIVED'
+        ? { archivedAt: { not: null } }
+        : filter.state === 'PAUSED'
+          ? { archivedAt: null, isEnabled: false }
+          : filter.state === 'SCHEDULED'
+            ? { archivedAt: null, isEnabled: true, startsAt: { gt: now } }
+            : filter.state === 'EXPIRED'
+              ? { archivedAt: null, isEnabled: true, endsAt: { lte: now } }
+              : filter.state === 'ACTIVE'
+                ? { archivedAt: null, isEnabled: true, startsAt: { lte: now }, endsAt: { gt: now } }
+                : { archivedAt: null };
+    const where: Prisma.ShopDiscountCampaignWhereInput = { shopId: shop.id, ...stateWhere };
+    const [totalItems, rows] = await Promise.all([
+      this.prisma.shopDiscountCampaign.count({ where }),
+      this.prisma.shopDiscountCampaign.findMany({
+        where,
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+        skip: (filter.page - 1) * SELLER_PROMOTION_PAGE_SIZE,
+        take: SELLER_PROMOTION_PAGE_SIZE,
+        include: this.campaignInclude,
+      }),
+    ]);
+
+    return {
+      sellerPromotionVersion: 'seller-promotions-v1',
+      items: rows.map((row) => this.discountSummary(row, now)),
+      page: filter.page,
+      pageSize: SELLER_PROMOTION_PAGE_SIZE,
+      totalItems,
+      totalPages: Math.ceil(totalItems / SELLER_PROMOTION_PAGE_SIZE),
+    };
   }
 
   async getDiscount(userId: string, id: string): Promise<SellerDiscountSummary> { const shop = await this.shopFor(userId); const row = await this.prisma.shopDiscountCampaign.findFirst({ where: { id, shopId: shop.id }, include: this.campaignInclude }); if (!row) throw new SellerPromotionNotFoundError(); return this.discountSummary(row, new Date()); }

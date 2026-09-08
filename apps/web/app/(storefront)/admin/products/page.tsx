@@ -11,6 +11,7 @@ import {
   UnlockIcon,
 } from '../../../../components/admin/admin-icons';
 import { AdminEntityLink } from '../../../../components/admin/admin-entity-link';
+import { AdminPagination } from '../../../../components/admin/admin-pagination';
 import { useAuthSession } from '../../../../components/auth-session-provider';
 import {
   adminErrorMessage,
@@ -21,13 +22,6 @@ import {
 type ProductFilters = {
   q: string;
   moderationStatus: NonNullable<AdminProductListQuery['moderationStatus']> | '';
-};
-
-const STATUS_LABELS: Record<AdminProductListItem['status'], string> = {
-  DRAFT: 'Bản nháp',
-  ACTIVE: 'Đang bán',
-  HIDDEN: 'Đang ẩn',
-  ARCHIVED: 'Đã lưu trữ',
 };
 
 function formatVnd(amount: number | null, maxAmount = amount): string {
@@ -44,7 +38,9 @@ export default function AdminProductsPage() {
     useState<ProductFilters['moderationStatus']>('');
   const [filters, setFilters] = useState<ProductFilters>({ q: '', moderationStatus: '' });
   const [products, setProducts] = useState<AdminProductListItem[]>([]);
-  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [modalProduct, setModalProduct] = useState<AdminProductListItem | null>(null);
@@ -53,43 +49,47 @@ export default function AdminProductsPage() {
   const [submitting, setSubmitting] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
 
-  const loadProducts = useCallback(
-    async (nextFilters: ProductFilters, cursor?: string, append = false) => {
-      setLoading(true);
-      setErrorMessage(null);
-      try {
-        const response = await fetchAdminProducts(authenticatedFetch, {
-          limit: 20,
-          cursor,
-          q: nextFilters.q || undefined,
-          status: 'ACTIVE',
-          moderationStatus: nextFilters.moderationStatus || undefined,
-        });
-        setProducts((current) => (append ? [...current, ...response.items] : response.items));
-        setNextCursor(response.nextCursor);
-      } catch (error: unknown) {
-        setErrorMessage(adminErrorMessage(error, 'Không thể tải danh sách sản phẩm'));
-        if (!append) setProducts([]);
-      } finally {
-        setLoading(false);
+  const loadProducts = useCallback(async () => {
+    setLoading(true);
+    setErrorMessage(null);
+    try {
+      const response = await fetchAdminProducts(authenticatedFetch, {
+        page,
+        q: filters.q || undefined,
+        status: 'ACTIVE',
+        moderationStatus: filters.moderationStatus || undefined,
+      });
+      const lastAvailablePage = Math.max(1, response.totalPages);
+      if (page > lastAvailablePage) {
+        setPage(lastAvailablePage);
+        return;
       }
-    },
-    [authenticatedFetch],
-  );
+      setProducts(response.items);
+      setTotalItems(response.totalItems);
+      setTotalPages(response.totalPages);
+    } catch (error: unknown) {
+      setErrorMessage(adminErrorMessage(error, 'Không thể tải danh sách sản phẩm'));
+      setProducts([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [authenticatedFetch, filters, page]);
 
   useEffect(() => {
-    const timer = window.setTimeout(() => void loadProducts(filters), 0);
+    const timer = window.setTimeout(() => void loadProducts(), 0);
     return () => window.clearTimeout(timer);
-  }, [filters, loadProducts]);
+  }, [loadProducts]);
 
   const handleSearch = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setFilters({ q: draftQuery.trim(), moderationStatus: draftModerationStatus });
+    setPage(1);
   };
 
   const handleModerationFilterChange = (value: ProductFilters['moderationStatus']) => {
     setDraftModerationStatus(value);
     setFilters({ q: draftQuery.trim(), moderationStatus: value });
+    setPage(1);
   };
 
   const openAction = (product: AdminProductListItem) => {
@@ -127,7 +127,10 @@ export default function AdminProductsPage() {
             : item,
         ),
       );
-      closeAction();
+      setModalProduct(null);
+      setModalAction(null);
+      setReason('');
+      await loadProducts();
     } catch (error: unknown) {
       setActionError(adminErrorMessage(error, 'Không thể cập nhật trạng thái sản phẩm'));
     } finally {
@@ -192,7 +195,7 @@ export default function AdminProductsPage() {
                 : 'Danh sách sản phẩm đang hoạt động trên toàn sàn'}
             </p>
           </div>
-          <span className="admin-table-card__count">Đã tải {products.length} sản phẩm</span>
+          <span className="admin-table-card__count">Tổng {totalItems} sản phẩm</span>
         </div>
         {loading && products.length === 0 ? (
           <div className="admin-state-card__message" role="status">
@@ -206,13 +209,14 @@ export default function AdminProductsPage() {
         ) : null}
         {products.length > 0 ? (
           <div className="admin-table-scroll">
-            <table className="admin-data-table admin-products-list-table">
+            <table className="admin-data-table admin-management-table admin-products-list-table">
               <thead>
                 <tr>
+                  <th className="management-table-id-cell">ID</th>
                   <th>Sản phẩm</th>
                   <th>Gian hàng</th>
                   <th>Danh mục</th>
-                  <th>Giá / tồn kho</th>
+                  <th>Giá</th>
                   <th>Trạng thái</th>
                   <th className="admin-table-cell--actions">Thao tác</th>
                 </tr>
@@ -220,12 +224,12 @@ export default function AdminProductsPage() {
               <tbody>
                 {products.map((product) => (
                   <tr key={product.id}>
+                    <td className="management-table-id-cell">{product.id}</td>
                     <td>
                       <AdminEntityLink
                         href={`/admin/products/${product.id}`}
                         name={product.name}
                         imageUrl={product.primaryImageUrl}
-                        meta={product.slug}
                         fallbackIcon={<ProductIcon size={22} color="#94a3b8" />}
                       />
                     </td>
@@ -233,7 +237,6 @@ export default function AdminProductsPage() {
                       <AdminEntityLink
                         href={product.shopId ? `/admin/shops/${product.shopId}` : '/admin/shops'}
                         name={product.shopName}
-                        meta={product.shopSlug}
                       />
                     </td>
                     <td>
@@ -244,24 +247,17 @@ export default function AdminProductsPage() {
                             : '/admin/categories'
                         }
                         name={product.categoryName}
-                        meta={product.categorySlug}
                       />
                     </td>
                     <td>
                       <span>{formatVnd(product.minPrice, product.maxPrice)}</span>
-                      <small className="admin-table-subtext">
-                        {product.stockQuantity} tồn · {product.variantCount} phân loại
-                      </small>
                     </td>
                     <td>
                       <span
-                        className={`admin-badge ${product.moderationStatus === 'ACTIVE' ? 'admin-badge--success' : 'admin-badge--danger'}`}
+                        className={`admin-badge admin-table-status ${product.moderationStatus === 'ACTIVE' ? 'admin-badge--success' : 'admin-badge--danger'}`}
                       >
                         {product.moderationStatus === 'ACTIVE' ? 'Đang hoạt động' : 'Đã tạm khóa'}
                       </span>
-                      <small className="admin-table-subtext">
-                        {STATUS_LABELS[product.status]} · {product.soldCount} đã bán
-                      </small>
                     </td>
                     <td className="admin-table-cell--actions">
                       <div className="admin-table-actions">
@@ -298,21 +294,16 @@ export default function AdminProductsPage() {
             </table>
           </div>
         ) : null}
-        <footer className="admin-list-footer">
-          <span>Hiển thị {products.length} sản phẩm đã tải</span>
-          {nextCursor ? (
-            <button
-              type="button"
-              className="admin-btn admin-btn-secondary"
-              onClick={() => void loadProducts(filters, nextCursor, true)}
-              disabled={loading}
-            >
-              {loading ? 'Đang tải…' : 'Tải thêm sản phẩm'}
-            </button>
-          ) : (
-            <span>Đã hiển thị hết kết quả</span>
-          )}
-        </footer>
+        {products.length > 0 ? (
+          <AdminPagination
+            itemLabel="sản phẩm"
+            page={page}
+            totalItems={totalItems}
+            totalPages={totalPages}
+            disabled={loading}
+            onPageChange={setPage}
+          />
+        ) : null}
       </section>
 
       {modalProduct && modalAction ? (

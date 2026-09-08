@@ -62,6 +62,22 @@ export class CampaignCursorQueryDto {
   @ApiPropertyOptional() @IsOptional() @IsIn(['AVAILABLE', 'JOINED', 'UPCOMING', 'ACTIVE', 'ENDED', 'DRAFT', 'ANNOUNCED', 'ENROLLMENT_OPEN', 'SCHEDULED', 'CANCELLED']) state?: 'AVAILABLE' | 'JOINED' | 'UPCOMING' | 'ACTIVE' | 'ENDED' | 'DRAFT' | 'ANNOUNCED' | 'ENROLLMENT_OPEN' | 'SCHEDULED' | 'CANCELLED';
 }
 
+export class SellerCampaignPageQueryDto {
+  @ApiPropertyOptional({ default: 1, minimum: 1 }) @IsOptional() @Type(() => Number) @IsInt() @Min(1) page = 1;
+  @ApiPropertyOptional() @IsOptional() @IsString() typeCode?: string;
+  @ApiPropertyOptional() @IsOptional() @IsIn(['AVAILABLE', 'JOINED', 'UPCOMING', 'ACTIVE', 'ENDED']) state?: 'AVAILABLE' | 'JOINED' | 'UPCOMING' | 'ACTIVE' | 'ENDED';
+}
+
+export class AdminCampaignPageQueryDto {
+  @ApiPropertyOptional({ default: 1, minimum: 1 }) @IsOptional() @Type(() => Number) @IsInt() @Min(1) page = 1;
+  @ApiPropertyOptional() @IsOptional() @IsString() typeCode?: string;
+  @ApiPropertyOptional() @IsOptional() @IsIn(['UPCOMING', 'ACTIVE', 'ENDED', 'DRAFT', 'ANNOUNCED', 'ENROLLMENT_OPEN', 'SCHEDULED', 'CANCELLED']) state?: 'UPCOMING' | 'ACTIVE' | 'ENDED' | 'DRAFT' | 'ANNOUNCED' | 'ENROLLMENT_OPEN' | 'SCHEDULED' | 'CANCELLED';
+}
+
+export class AdminCampaignParticipantPageQueryDto {
+  @ApiPropertyOptional({ default: 1, minimum: 1 }) @IsOptional() @Type(() => Number) @IsInt() @Min(1) page = 1;
+}
+
 export class CampaignPlacementDto {
   @ApiProperty() @IsUUID() moduleId!: string;
   @ApiPropertyOptional({ default: 0 }) @IsOptional() @IsInt() @Min(0) @Max(100000) sortOrder?: number;

@@ -1,5 +1,6 @@
 import {
   ADMIN_DEFAULT_LIMIT,
+  ADMIN_BANNER_MEDIA_MIME_TYPES,
   ADMIN_MAX_LIMIT,
   ADMIN_PRIVILEGED_ACTIONS,
   ADMIN_PRIVILEGED_TARGET_TYPES,
@@ -14,6 +15,7 @@ import {
   type AdminUserActionRequest,
   type AdminUserStatus,
   type CreateAdminBannerRequest,
+  type AdminBannerMediaUploadIntentRequest,
   type CreateAdminCategoryRequest,
   type ReorderAdminBannersRequest,
   type ReorderAdminCategoriesRequest,
@@ -30,6 +32,7 @@ import {
   IsInt,
   IsNotEmpty,
   IsOptional,
+  Matches,
   IsString,
   IsUUID,
   Max,
@@ -44,12 +47,7 @@ export class AdminUserListQueryDto {
   @Type(() => Number)
   @IsInt()
   @Min(1)
-  @Max(ADMIN_MAX_LIMIT)
-  limit?: number = ADMIN_DEFAULT_LIMIT;
-
-  @IsOptional()
-  @IsString()
-  cursor?: string;
+  page?: number = 1;
 
   @IsOptional()
   @IsIn(ADMIN_USER_STATUSES)
@@ -79,12 +77,7 @@ export class AdminShopListQueryDto {
   @Type(() => Number)
   @IsInt()
   @Min(1)
-  @Max(ADMIN_MAX_LIMIT)
-  limit?: number = ADMIN_DEFAULT_LIMIT;
-
-  @IsOptional()
-  @IsString()
-  cursor?: string;
+  page?: number = 1;
 
   @IsOptional()
   @IsIn(ADMIN_SHOP_STATUSES)
@@ -114,12 +107,7 @@ export class AdminProductListQueryDto {
   @Type(() => Number)
   @IsInt()
   @Min(1)
-  @Max(ADMIN_MAX_LIMIT)
-  limit?: number = ADMIN_DEFAULT_LIMIT;
-
-  @IsOptional()
-  @IsString()
-  cursor?: string;
+  page?: number = 1;
 
   @IsOptional()
   @IsString()
@@ -226,6 +214,10 @@ export class CreateAdminBannerDto implements CreateAdminBannerRequest {
   @IsString()
   imageUrl?: string | null;
 
+  @IsOptional()
+  @IsUUID()
+  imageAssetId?: string | null;
+
   @IsString()
   @IsNotEmpty()
   @MaxLength(120)
@@ -299,6 +291,10 @@ export class UpdateAdminBannerDto implements UpdateAdminBannerRequest {
   imageUrl?: string | null;
 
   @IsOptional()
+  @IsUUID()
+  imageAssetId?: string | null;
+
+  @IsOptional()
   @IsString()
   @MaxLength(120)
   altText?: string;
@@ -348,6 +344,21 @@ export class UpdateAdminBannerDto implements UpdateAdminBannerRequest {
   @IsInt()
   @Min(0)
   sortOrder?: number;
+}
+
+export class CreateAdminBannerMediaUploadIntentDto implements AdminBannerMediaUploadIntentRequest {
+  @IsIn(ADMIN_BANNER_MEDIA_MIME_TYPES)
+  mimeType!: AdminBannerMediaUploadIntentRequest['mimeType'];
+
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(5_000_000)
+  byteSize!: number;
+
+  @IsString()
+  @Matches(/^[A-Za-z0-9+/]{43}=$/)
+  checksumSha256!: string;
 }
 
 export class ReorderBannerItemDto {

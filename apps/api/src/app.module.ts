@@ -34,6 +34,8 @@ import { PaymentsModule } from './payments/payments.module';
 import { SearchModule } from './search/search.module';
 import { RecommendationsModule } from './recommendations/recommendations.module';
 import { MarketplaceCampaignsModule } from './marketplace-campaigns/marketplace-campaigns.module';
+import { TrafficAdmissionModule } from './traffic-admission/traffic-admission.module';
+import { CacheModule } from './cache/cache.module';
 
 @Module({
   imports: [
@@ -41,6 +43,8 @@ import { MarketplaceCampaignsModule } from './marketplace-campaigns/marketplace-
     SearchModule,
     RecommendationsModule,
     MarketplaceCampaignsModule,
+    TrafficAdmissionModule,
+    CacheModule,
     HealthModule,
     HomepageModule,
     CatalogModule,

@@ -15,7 +15,7 @@ import { formatSellerOrderVersionEtag } from '@shopee-clone/contracts';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ChevronDown, Search } from '@shopee-clone/ui';
+import { Check, ChevronDown, Search, X } from '@shopee-clone/ui';
 import {
   executeSellerOrderAction,
   fetchSellerOrder,
@@ -24,6 +24,7 @@ import {
 import { RoleApiError } from '../lib/role-api';
 import { marketplaceMediaUrl } from '../lib/marketplace-media-url';
 import { useAuthSession } from './auth-session-provider';
+import { SellerPagination } from './seller/seller-pagination';
 
 const money = (value: number) => `${new Intl.NumberFormat('vi-VN').format(value)}₫`;
 type OrderSort = 'newest' | 'oldest' | 'highest-price' | 'lowest-price';
@@ -106,6 +107,7 @@ export function SellerOrderQueueScreen() {
     (params.get('fulfillment') as SellerOrderFulfillmentFilter) || 'ALL',
   );
   const [page, setPage] = useState<SellerOrderListResponse | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -116,15 +118,16 @@ export function SellerOrderQueueScreen() {
   } | null>(null);
   const [pendingAction, setPendingAction] = useState(false);
   const load = useCallback(
-    async (cursor?: string, append = false) => {
+    async (targetPage = 1) => {
       if (state.status !== 'authenticated') return;
       setLoading(true);
       setError(null);
       try {
-        const next = await fetchSellerOrders(authenticatedFetch, { status, fulfillment, cursor });
-        setPage((previous) =>
-          append && previous ? { ...next, items: [...previous.items, ...next.items] } : next,
-        );
+        const next = await fetchSellerOrders(authenticatedFetch, { status, fulfillment, page: targetPage });
+        const lastPage = Math.max(1, next.totalPages);
+        if (targetPage > lastPage) { setCurrentPage(lastPage); return; }
+        setPage(next);
+        setCurrentPage(next.page);
       } catch (cause) {
         setError(
           cause instanceof RoleApiError
@@ -142,8 +145,8 @@ export function SellerOrderQueueScreen() {
   );
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    void load();
-  }, [load]);
+    void load(currentPage);
+  }, [currentPage, load]);
 
   const visibleItems = useMemo(() => {
     const term = searchTerm.trim().toLocaleLowerCase('vi-VN');
@@ -176,6 +179,7 @@ export function SellerOrderQueueScreen() {
   const changeFilter = (nextStatus: SellerOrderQueueFilter) => {
     setStatus(nextStatus);
     setPage(null);
+    setCurrentPage(1);
     router.replace(`/seller/orders?status=${nextStatus}&fulfillment=${fulfillment}`);
   };
 
@@ -215,7 +219,7 @@ export function SellerOrderQueueScreen() {
                 : 'Không thể thực hiện thao tác.'))
           : 'Không thể thực hiện thao tác.',
       );
-      if (cause instanceof RoleApiError && cause.status === 409) void load();
+      if (cause instanceof RoleApiError && cause.status === 409) void load(currentPage);
     } finally {
       setPendingAction(false);
     }
@@ -259,7 +263,7 @@ export function SellerOrderQueueScreen() {
               aria-label="Tìm kiếm đơn hàng"
               placeholder="Mã đơn hoặc sản phẩm"
               value={searchTerm}
-              onChange={(event) => setSearchTerm(event.target.value)}
+              onChange={(event) => { setSearchTerm(event.target.value); setCurrentPage(1); }}
             />
           </div>
           <div className="seller-pl-field">
@@ -273,6 +277,7 @@ export function SellerOrderQueueScreen() {
                   const next = event.target.value as SellerOrderFulfillmentFilter;
                   setFulfillment(next);
                   setPage(null);
+                  setCurrentPage(1);
                   router.replace(`/seller/orders?status=${status}&fulfillment=${next}`);
                 }}
               >
@@ -293,7 +298,7 @@ export function SellerOrderQueueScreen() {
                 id="seller-orders-sort"
                 className="seller-pl-select"
                 value={sort}
-                onChange={(event) => setSort(event.target.value as OrderSort)}
+                onChange={(event) => { setSort(event.target.value as OrderSort); setCurrentPage(1); }}
               >
                 <option value="newest">Mới nhất</option>
                 <option value="oldest">Cũ nhất</option>
@@ -316,9 +321,10 @@ export function SellerOrderQueueScreen() {
           <div className="seller-pl-table-stack seller-orders-table-stack">
             <div className="seller-pl-table-card seller-orders-table-card">
               <div className="seller-pl-table-scroll">
-                <table className="seller-pl-table seller-orders-table">
+                <table className="seller-pl-table seller-management-table seller-orders-table">
                   <thead>
                     <tr>
+                      <th className="management-table-id-cell">ID</th>
                       <th>Mã đơn</th>
                       <th>Sản phẩm</th>
                       <th>Số lượng</th>
@@ -336,6 +342,7 @@ export function SellerOrderQueueScreen() {
                         );
                         return (
                           <tr className="seller-order-table-row" key={item.orderReference}>
+                            <td className="management-table-id-cell">{item.orderReference}</td>
                             <td>
                               <Link
                                 className="seller-order-table-reference"
@@ -360,7 +367,7 @@ export function SellerOrderQueueScreen() {
                               <strong>{money(item.payableTotalMinor)}</strong>
                             </td>
                             <td>
-                              <span className="seller-order-badge" data-status={item.status}>
+                              <span className="seller-order-badge seller-table-status" data-status={item.status}>
                                 {statusLabels[item.status] ?? item.status}
                               </span>
                               <small className="seller-order-table-subtext">
@@ -374,11 +381,18 @@ export function SellerOrderQueueScreen() {
                                   availableActions.map((available) => (
                                     <button
                                       type="button"
+                                      className={`seller-pl-btn-icon ${available.action === 'REJECT' ? 'seller-pl-btn-icon--delete' : ''}`}
                                       key={available.action}
                                       data-action={available.action}
+                                      aria-label={`${actionLabels[available.action]} đơn hàng ${item.orderReference}`}
+                                      title={actionLabels[available.action]}
                                       onClick={() => setSelected({ order: item, available })}
                                     >
-                                      {actionLabels[available.action]}
+                                      {available.action === 'CONFIRM' ? (
+                                        <Check size={16} aria-hidden="true" />
+                                      ) : (
+                                        <X size={16} aria-hidden="true" />
+                                      )}
                                     </button>
                                   ))
                                 ) : (
@@ -391,7 +405,7 @@ export function SellerOrderQueueScreen() {
                       })
                     ) : (
                       <tr>
-                        <td className="seller-order-table__empty" colSpan={7}>
+                        <td className="seller-order-table__empty" colSpan={8}>
                           Không tìm thấy đơn hàng phù hợp.
                         </td>
                       </tr>
@@ -400,23 +414,7 @@ export function SellerOrderQueueScreen() {
                 </table>
               </div>
             </div>
-            <footer className="seller-pl-footer seller-orders-footer">
-              <div className="seller-pl-footer__summary">
-                Hiển thị <strong>{visibleItems.length}</strong> trong{' '}
-                <strong>{page.items.length}</strong> đơn hàng đã tải
-              </div>
-              {page.page.nextCursor ? (
-                <button
-                  className="seller-pl-btn-loadmore"
-                  type="button"
-                  onClick={() => void load(page.page.nextCursor!, true)}
-                >
-                  Tải thêm
-                </button>
-              ) : (
-                <span className="seller-pl-footer__complete">Đã tải hết danh sách đơn hàng</span>
-              )}
-            </footer>
+            <SellerPagination itemLabel="đơn hàng" page={currentPage} pageSize={page.pageSize} totalItems={page.totalItems} totalPages={page.totalPages} disabled={loading} onPageChange={setCurrentPage} />
           </div>
           {selected ? (
             <ActionDialog

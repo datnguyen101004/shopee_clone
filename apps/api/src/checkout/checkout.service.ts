@@ -27,6 +27,10 @@ import { CheckoutAssembler } from './checkout-assembler';
 import { CheckoutPurchaseBuilder } from './checkout-purchase-builder';
 import {
   CheckoutCartConflictError,
+  CheckoutFlashSaleLimitError,
+  CheckoutFlashSaleSoldOutError,
+  CheckoutFlashSaleCodOnlyError,
+  CheckoutFlashSaleBusyError,
   CheckoutIdempotencyConflictError,
   CheckoutInventoryConflictError,
   CheckoutNotReadyError,
@@ -43,6 +47,7 @@ import {
 import { orderNotificationEvent } from '../notifications/notification-events';
 import { NotificationService } from '../notifications/notification.service';
 import { publicSellerProductMediaUrl } from '../seller-products/seller-product-media.storage';
+import { FlashSaleAdmissionService, type FlashSaleAdmission } from './flash-sale-admission.service';
 
 const MAX_SERIALIZABLE_ATTEMPTS = 3;
 
@@ -96,6 +101,7 @@ export class CheckoutService {
     @Inject(VoucherHoldService) private readonly voucherHold: VoucherHoldService,
     @Inject(InventoryService) private readonly inventory: InventoryService,
     @Inject(NotificationService) private readonly notifications: NotificationService,
+    @Inject(FlashSaleAdmissionService) private readonly flashSaleAdmission: FlashSaleAdmissionService,
   ) {}
 
   preview(
@@ -106,6 +112,53 @@ export class CheckoutService {
     return this.assembler.preview(userId, expectedVersion, input);
   }
 
+  private async consumeFlashSaleLines(
+    transaction: Prisma.TransactionClient,
+    buyerId: string,
+    purchaseId: string,
+  ): Promise<void> {
+    if (process.env.FLASH_SALE_SKU_ENABLED === 'false') return;
+    const nowRows = await transaction.$queryRaw<Array<{ now: Date }>>(Prisma.sql`SELECT clock_timestamp() AS "now"`);
+    const now = nowRows[0]?.now ?? new Date();
+    const lines = await transaction.orderLine.findMany({
+      where: { order: { purchaseId } },
+      select: { id: true, productId: true, variantId: true, quantity: true, sellingUnitPriceMinor: true },
+      orderBy: { id: 'asc' },
+    });
+    for (const line of lines) {
+      const sku = await transaction.flashSaleSku.findFirst({
+        where: {
+          variantId: line.variantId,
+          endedAt: null,
+          campaign: {
+            cancelledAt: null,
+            startsAt: { lte: now },
+            endsAt: { gt: now },
+            type: { code: 'FLASH_SALE' },
+          },
+        },
+        include: { campaign: true },
+      });
+      if (!sku) continue;
+      if (line.quantity !== 1 || line.sellingUnitPriceMinor !== sku.salePriceMinor) throw new CheckoutFlashSaleLimitError();
+      if (sku.remainingQuantity < 1) throw new CheckoutFlashSaleSoldOutError();
+      const existingClaim = await transaction.flashSaleBuyerClaim.findUnique({ where: { campaignId_buyerId_productId: { campaignId: sku.campaignId, buyerId, productId: line.productId } } });
+      if (existingClaim) throw new CheckoutFlashSaleLimitError();
+      const consumed = await transaction.flashSaleSku.updateMany({ where: { id: sku.id, remainingQuantity: { gt: 0 }, version: sku.version }, data: { remainingQuantity: { decrement: 1 }, netConsumedQuantity: { increment: 1 }, version: { increment: 1 } } });
+      if (consumed.count !== 1) {
+        const current = await transaction.flashSaleSku.findUnique({
+          where: { id: sku.id },
+          select: { remainingQuantity: true },
+        });
+        if (!current || current.remainingQuantity < 1) throw new CheckoutFlashSaleSoldOutError();
+        throw new CheckoutFlashSaleBusyError(1);
+      }
+      await transaction.flashSaleConsumption.create({ data: { id: randomUUID(), orderLineId: line.id, flashSaleSkuId: sku.id, quantity: 1, salePriceMinor: sku.salePriceMinor } });
+      await transaction.flashSaleBuyerClaim.create({ data: { id: randomUUID(), campaignId: sku.campaignId, buyerId, productId: line.productId, variantId: line.variantId, purchaseId, orderLineId: line.id, flashSaleSkuId: sku.id } });
+      await transaction.flashSaleOutbox.create({ data: { id: randomUUID(), eventId: randomUUID(), flashSaleSkuId: sku.id, sequence: sku.version + 1, managementEpoch: sku.managementEpoch, admissionDelta: -1, publicSnapshot: { state: 'ACTIVE', stateVersion: sku.version + 1, salePriceMinor: Number(sku.salePriceMinor) } } });
+    }
+  }
+
   async confirmCod(
     userId: string,
     expectedVersion: number,
@@ -113,6 +166,13 @@ export class CheckoutService {
     input: CheckoutConfirmationRequest,
   ): Promise<CheckoutConfirmationResponse> {
     const requestDigest = confirmationRequestDigest(userId, expectedVersion, input);
+    const existingBeforeAdmission = await this.prisma.purchase.findUnique({ where: { buyerId_idempotencyKey: { buyerId: userId, idempotencyKey } }, include: purchaseInclude });
+    if (existingBeforeAdmission) {
+      if (existingBeforeAdmission.requestDigest !== requestDigest) throw new CheckoutIdempotencyConflictError();
+      return { replayed: true, purchase: this.projector.project(existingBeforeAdmission) };
+    }
+    let admission: FlashSaleAdmission = { token: null, skuIds: [] };
+    admission = await this.flashSaleAdmission.admit(userId, expectedVersion, idempotencyKey);
     for (let attempt = 1; attempt <= MAX_SERIALIZABLE_ATTEMPTS; attempt += 1) {
       try {
         const result = await this.prisma.$transaction(
@@ -154,6 +214,7 @@ export class CheckoutService {
               paymentMethod: 'COD',
               paymentStatus: 'UNPAID',
             });
+            await this.consumeFlashSaleLines(transaction, userId, built.purchaseId);
             await this.inventory.consumeInTransaction(
               transaction,
               built.reservationId,
@@ -199,9 +260,15 @@ export class CheckoutService {
         if (!result.replayed) {
           await this.emitNewOrderNotifications(result.purchase.purchaseReference);
         }
+        await this.flashSaleAdmission.finalize(admission);
         return result;
       } catch (error) {
         if (isRetryableTransactionError(error) && attempt < MAX_SERIALIZABLE_ATTEMPTS) continue;
+        if (isRetryableTransactionError(error)) {
+          await this.flashSaleAdmission.release(admission);
+          throw new CheckoutFlashSaleBusyError(1);
+        }
+        await this.flashSaleAdmission.release(admission);
         if (error instanceof VoucherConsumptionUnavailableError) {
           throw new CheckoutNotReadyError();
         }
@@ -217,6 +284,10 @@ export class CheckoutService {
           error instanceof CheckoutIdempotencyConflictError ||
           error instanceof CheckoutInventoryConflictError ||
           error instanceof CheckoutNotReadyError ||
+          error instanceof CheckoutFlashSaleLimitError ||
+          error instanceof CheckoutFlashSaleSoldOutError ||
+          error instanceof CheckoutFlashSaleCodOnlyError ||
+          error instanceof CheckoutFlashSaleBusyError ||
           error instanceof CheckoutPreviewChangedError ||
           error instanceof CheckoutUnavailableError ||
           error instanceof PricingAddressNotFoundError ||
@@ -292,6 +363,21 @@ export class CheckoutService {
               paymentMethod: provider,
               paymentStatus: 'PENDING',
             });
+            const activeFlashSaleLine = await transaction.orderLine.findFirst({
+              where: {
+                order: { purchaseId: built.purchaseId },
+                variant: {
+                  flashSaleSkus: {
+                    some: {
+                      endedAt: null,
+                      campaign: { cancelledAt: null, startsAt: { lte: built.evaluatedAt }, endsAt: { gt: built.evaluatedAt }, type: { code: 'FLASH_SALE' } },
+                    },
+                  },
+                },
+              },
+              select: { id: true },
+            });
+            if (activeFlashSaleLine) throw new CheckoutFlashSaleCodOnlyError();
             const settlement = await transaction.purchase.findUniqueOrThrow({
               where: { id: built.purchaseId },
               select: {
@@ -392,6 +478,9 @@ export class CheckoutService {
           error instanceof CheckoutIdempotencyConflictError ||
           error instanceof CheckoutInventoryConflictError ||
           error instanceof CheckoutNotReadyError ||
+          error instanceof CheckoutFlashSaleLimitError ||
+          error instanceof CheckoutFlashSaleSoldOutError ||
+          error instanceof CheckoutFlashSaleCodOnlyError ||
           error instanceof CheckoutPreviewChangedError ||
           error instanceof CheckoutUnavailableError ||
           error instanceof PricingAddressNotFoundError ||
@@ -445,6 +534,12 @@ export class CheckoutService {
       where: { id: purchaseReference, buyerId: userId },
       include: purchaseInclude,
     });
+    if (!purchase) throw new CheckoutPurchaseNotFoundError();
+    return this.projector.project(purchase);
+  }
+
+  async getPurchaseByIdempotency(userId: string, idempotencyKey: string): Promise<PurchaseResult> {
+    const purchase = await this.prisma.purchase.findFirst({ where: { buyerId: userId, idempotencyKey }, include: purchaseInclude });
     if (!purchase) throw new CheckoutPurchaseNotFoundError();
     return this.projector.project(purchase);
   }

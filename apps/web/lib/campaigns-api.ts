@@ -1,5 +1,6 @@
 import type {
   CampaignAdminPage,
+  CampaignAdminParticipantPage,
   CampaignAdminSummary,
   CampaignBannerDetail,
   CampaignParticipationResponse,
@@ -46,8 +47,34 @@ export const fetchCampaignTypes = (fetcher: AuthenticatedFetcher) =>
   request<CampaignTypeSummary[]>(fetcher, '/api/v1/admin/campaign-types');
 export const fetchAdminCampaigns = (fetcher: AuthenticatedFetcher, query = '') =>
   request<CampaignAdminPage>(fetcher, `/api/v1/admin/campaigns${query}`);
+export async function fetchAllAdminCampaigns(
+  fetcher: AuthenticatedFetcher,
+  query = '',
+): Promise<CampaignAdminSummary[]> {
+  const params = new URLSearchParams(query.startsWith('?') ? query.slice(1) : query);
+  const items: CampaignAdminSummary[] = [];
+  let page = 1;
+  let totalPages = 1;
+  do {
+    params.set('page', String(page));
+    const response = await fetchAdminCampaigns(fetcher, `?${params}`);
+    items.push(...response.items);
+    totalPages = response.totalPages;
+    page += 1;
+  } while (page <= totalPages);
+  return items;
+}
 export const fetchAdminCampaign = (fetcher: AuthenticatedFetcher, id: string) =>
   request<CampaignAdminSummary>(fetcher, `/api/v1/admin/campaigns/${encodeURIComponent(id)}`);
+export const fetchAdminCampaignParticipantDetails = (
+  fetcher: AuthenticatedFetcher,
+  id: string,
+  page = 1,
+) =>
+  request<CampaignAdminParticipantPage>(
+    fetcher,
+    `/api/v1/admin/campaigns/${encodeURIComponent(id)}/participant-details?page=${page}`,
+  );
 export const createAdminCampaign = (fetcher: AuthenticatedFetcher, input: CreateCampaignRequest) =>
   request<CampaignAdminSummary>(fetcher, '/api/v1/admin/campaigns', {
     method: 'POST',

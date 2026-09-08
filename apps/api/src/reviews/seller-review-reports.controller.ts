@@ -1,6 +1,6 @@
 import type { SellerShopReviewListResponse } from '@shopee-clone/contracts';
 import { parseCreateSellerReviewReportRequest, SELLER_REVIEW_REPORT_REASON_CODES } from '@shopee-clone/contracts';
-import { Body, Controller, Get, Header, Headers, HttpCode, HttpStatus, Inject, Param, ParseUUIDPipe, Post, Req, UseFilters, UseGuards } from '@nestjs/common';
+import { Body, Controller, DefaultValuePipe, Get, Header, Headers, HttpCode, HttpStatus, Inject, Param, ParseIntPipe, ParseUUIDPipe, Post, Query, Req, UseFilters, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiBody, ApiHeader, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { createHash } from 'node:crypto';
 
@@ -21,9 +21,13 @@ export class SellerReviewReportsController {
 
   @Get()
   @Header('Cache-Control', 'private, no-store')
-  @ApiOperation({ summary: 'List reviews for products in the authenticated seller shop' })
-  async list(@Req() request: AuthenticatedRequest): Promise<SellerShopReviewListResponse> {
-    return this.reviews.listSellerShopReviews(request.authUser!.id);
+  @ApiOperation({ summary: 'List reviews for products in the authenticated seller shop, 10 items per page' })
+  async list(
+    @Req() request: AuthenticatedRequest,
+    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
+  ): Promise<SellerShopReviewListResponse> {
+    if (page < 1) throw new ReviewValidationError(['page']);
+    return this.reviews.listSellerShopReviews(request.authUser!.id, page);
   }
 
   @Post(':reviewId/reports')

@@ -178,11 +178,12 @@ export interface CheckoutProblemDetails {
   currentCartVersion?: number;
   availableQuantity?: number;
   preview?: CheckoutPreviewResponse;
+  retryAfterSeconds?: number;
 }
 
 const canonicalUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const problemType = /^https:\/\/shopee-clone\.local\/problems\/[a-z0-9]+(?:-[a-z0-9]+)*$/;
-const problemStatuses = new Set([400, 401, 403, 404, 409, 413, 415, 503]);
+const problemStatuses = new Set([400, 401, 403, 404, 409, 413, 415, 429, 503]);
 const blockerCodes = new Set<string>(CHECKOUT_BLOCKER_CODES);
 const shopOrderStatuses = new Set<string>(SHOP_ORDER_STATUSES);
 const inventoryHoldStatuses = new Set<string>(INVENTORY_HOLD_STATUSES);
@@ -740,7 +741,7 @@ export function isCheckoutProblemDetails(value: unknown): value is CheckoutProbl
     !hasExactKeys(
       value,
       ['type', 'title', 'status', 'detail'],
-      ['code', 'invalidParameters', 'currentCartVersion', 'availableQuantity', 'preview'],
+      ['code', 'invalidParameters', 'currentCartVersion', 'availableQuantity', 'preview', 'retryAfterSeconds'],
     ) ||
     !isNonEmptyString(value.type) ||
     !problemType.test(value.type) ||
@@ -754,7 +755,8 @@ export function isCheckoutProblemDetails(value: unknown): value is CheckoutProbl
     ) ||
     !(value.currentCartVersion === undefined || isNonNegativeInteger(value.currentCartVersion)) ||
     !(value.availableQuantity === undefined || isNonNegativeInteger(value.availableQuantity)) ||
-    !(value.preview === undefined || isCheckoutPreviewResponse(value.preview))
+    !(value.preview === undefined || isCheckoutPreviewResponse(value.preview)) ||
+    !(value.retryAfterSeconds === undefined || (isNonNegativeInteger(value.retryAfterSeconds) && value.retryAfterSeconds > 0))
   ) {
     return false;
   }

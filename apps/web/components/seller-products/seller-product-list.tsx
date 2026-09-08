@@ -19,11 +19,12 @@ export function SellerProductList() {
   const { authenticatedFetch, state } = useAuthSession();
   const [items, setItems] = useState<SellerProductSummary[]>([]);
   const [lifecycle, setLifecycle] = useState<SellerProductLifecycle | undefined>();
-  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [totalItems, setTotalItems] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [loadMoreError, setLoadMoreError] = useState('');
   const [message, setMessage] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
@@ -42,22 +43,26 @@ export function SellerProductList() {
   // Load only the selected lifecycle. A version guard keeps a slower response
   // from an older filter from replacing the current table.
   const load = useCallback(
-    (targetLifecycle?: SellerProductLifecycle) => {
+    (targetLifecycle?: SellerProductLifecycle, targetPage = 1) => {
       const requestVersion = ++requestVersionRef.current;
       setLoading(true);
       setLoadError('');
       setMessage('');
       setItems([]);
-      setNextCursor(null);
-      setLoadingMore(false);
-      setLoadMoreError('');
-      setSelectedCategory('');
 
-      fetchSellerProducts(authenticatedFetch, { lifecycle: targetLifecycle })
-        .then((page) => {
+      fetchSellerProducts(authenticatedFetch, { lifecycle: targetLifecycle, page: targetPage })
+        .then((response) => {
           if (requestVersion !== requestVersionRef.current) return;
-          setItems(page.items);
-          setNextCursor(page.nextCursor);
+          const lastAvailablePage = Math.max(1, response.totalPages);
+          if (targetPage > lastAvailablePage) {
+            setPage(lastAvailablePage);
+            return;
+          }
+          setItems(response.items);
+          setPage(response.page);
+          setPageSize(response.pageSize);
+          setTotalItems(response.totalItems);
+          setTotalPages(response.totalPages);
           setLoading(false);
         })
         .catch((err) => {
@@ -71,38 +76,9 @@ export function SellerProductList() {
 
   useEffect(() => {
     if (isSeller) {
-      void Promise.resolve().then(() => load(lifecycle));
+      void Promise.resolve().then(() => load(lifecycle, page));
     }
-  }, [isSeller, lifecycle, load]);
-
-  // Load more with cursor
-  const handleLoadMore = useCallback(async () => {
-    if (!nextCursor || loadingMore) return;
-    const requestVersion = requestVersionRef.current;
-    setLoadingMore(true);
-    setLoadMoreError('');
-
-    try {
-      const page = await fetchSellerProducts(authenticatedFetch, {
-        cursor: nextCursor,
-        lifecycle,
-      });
-      // Deduplicate by id
-      if (requestVersion !== requestVersionRef.current) return;
-      setItems((prev) => {
-        const existingIds = new Set(prev.map((p) => p.id));
-        const newUnique = page.items.filter((p) => !existingIds.has(p.id));
-        return [...prev, ...newUnique];
-      });
-      setNextCursor(page.nextCursor);
-    } catch {
-      if (requestVersion === requestVersionRef.current) {
-        setLoadMoreError('Không thể tải thêm sản phẩm.');
-      }
-    } finally {
-      if (requestVersion === requestVersionRef.current) setLoadingMore(false);
-    }
-  }, [authenticatedFetch, lifecycle, nextCursor, loadingMore]);
+  }, [isSeller, lifecycle, load, page]);
 
   // Distinct category list from loaded items
   const loadedCategories = useMemo(() => {
@@ -153,6 +129,7 @@ export function SellerProductList() {
     try {
       await deleteSellerProductDraft(authenticatedFetch, item.id);
       setItems((prev) => prev.filter((p) => p.id !== item.id));
+      setTotalItems((count) => Math.max(0, count - 1));
       setDeleteDialogItem(null);
       setMessage('Đã xóa sản phẩm.');
     } catch (err) {
@@ -186,6 +163,7 @@ export function SellerProductList() {
           ? prev.filter((p) => p.id !== item.id)
           : prev.map((p) => (p.id === item.id ? { ...p, lifecycle: 'hidden' as const } : p)),
       );
+      if (lifecycle === 'published') setTotalItems((count) => Math.max(0, count - 1));
       setHideDialogItem(null);
       setMessage('Đã ẩn sản phẩm.');
     } catch (err) {
@@ -206,6 +184,7 @@ export function SellerProductList() {
           ? prev.filter((p) => p.id !== productId)
           : prev.map((p) => (p.id === productId ? { ...p, lifecycle: 'published' as const } : p)),
       );
+      if (lifecycle && lifecycle !== 'published') setTotalItems((count) => Math.max(0, count - 1));
       setMessage('Sản phẩm đã được đăng bán.');
     } catch (err) {
       setMessage(errorMessage(err));
@@ -251,11 +230,11 @@ export function SellerProductList() {
       {/* Toolbar */}
       <SellerProductListToolbar
         searchTerm={searchTerm}
-        onSearchChange={setSearchTerm}
+        onSearchChange={(value) => { setSearchTerm(value); setPage(1); }}
         lifecycle={lifecycle}
-        onLifecycleChange={setLifecycle}
+        onLifecycleChange={(value) => { setLifecycle(value); setSelectedCategory(''); setPage(1); }}
         selectedCategory={selectedCategory}
-        onCategoryChange={setSelectedCategory}
+        onCategoryChange={(value) => { setSelectedCategory(value); setPage(1); }}
         categories={loadedCategories}
       />
 
@@ -264,7 +243,7 @@ export function SellerProductList() {
           items={filteredItems}
           loading={loading}
           error={loadError}
-          onRetry={() => load(lifecycle)}
+          onRetry={() => load(lifecycle, page)}
           hasLocalFilters={Boolean(searchTerm.trim() || selectedCategory)}
           onClearFilters={() => {
             setSearchTerm('');
@@ -278,13 +257,12 @@ export function SellerProductList() {
         />
 
         <SellerProductListFooter
-          filteredCount={filteredItems.length}
-          totalLoadedCount={items.length}
+          page={page}
+          pageSize={pageSize}
+          totalItems={totalItems}
+          totalPages={totalPages}
           loading={loading}
-          nextCursor={nextCursor}
-          loadingMore={loadingMore}
-          loadMoreError={loadMoreError}
-          onLoadMore={handleLoadMore}
+          onPageChange={setPage}
         />
       </div>
 

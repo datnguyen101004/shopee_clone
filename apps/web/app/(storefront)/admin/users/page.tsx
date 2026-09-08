@@ -5,6 +5,8 @@ import { useCallback, useEffect, useState } from 'react';
 
 import { useAuthSession } from '../../../../components/auth-session-provider';
 import { AdminEntityLink } from '../../../../components/admin/admin-entity-link';
+import { LockIcon, UnlockIcon } from '../../../../components/admin/admin-icons';
+import { AdminPagination } from '../../../../components/admin/admin-pagination';
 import {
   adminErrorMessage,
   executeAdminUserAction,
@@ -18,9 +20,13 @@ export default function AdminUsersPage() {
   const [error, setError] = useState<string | null>(null);
 
   // Filters
+  const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'ACTIVE' | 'SUSPENDED'>('ALL');
   const [roleFilter, setRoleFilter] = useState<'ALL' | 'buyer' | 'seller' | 'admin'>('ALL');
+  const [page, setPage] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
 
   // Action Modal State
   const [selectedUser, setSelectedUser] = useState<AdminUserSummary | null>(null);
@@ -28,24 +34,30 @@ export default function AdminUsersPage() {
   const [reason, setReason] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
-
-  const loadUsers = useCallback(() => {
+  const loadUsers = useCallback(async () => {
     setLoading(true);
     setError(null);
-    fetchAdminUsers(authenticatedFetch, {
-      status: statusFilter === 'ALL' ? undefined : statusFilter,
-      role: roleFilter === 'ALL' ? undefined : roleFilter,
-      q: search.trim() || undefined,
-    })
-      .then((res) => {
-        setUsers(res.items);
-        setLoading(false);
-      })
-      .catch((err) => {
-        setError(err.message || 'Không thể tải danh sách người dùng');
-        setLoading(false);
+    try {
+      const response = await fetchAdminUsers(authenticatedFetch, {
+        page,
+        status: statusFilter === 'ALL' ? undefined : statusFilter,
+        role: roleFilter === 'ALL' ? undefined : roleFilter,
+        q: search || undefined,
       });
-  }, [authenticatedFetch, roleFilter, search, statusFilter]);
+      const lastAvailablePage = Math.max(1, response.totalPages);
+      if (page > lastAvailablePage) {
+        setPage(lastAvailablePage);
+        return;
+      }
+      setUsers(response.items);
+      setTotalItems(response.totalItems);
+      setTotalPages(response.totalPages);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Không thể tải danh sách người dùng');
+    } finally {
+      setLoading(false);
+    }
+  }, [authenticatedFetch, page, roleFilter, search, statusFilter]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => void loadUsers(), 0);
@@ -54,7 +66,13 @@ export default function AdminUsersPage() {
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    loadUsers();
+    const nextSearch = searchInput.trim();
+    if (page === 1 && search === nextSearch) {
+      void loadUsers();
+      return;
+    }
+    setSearch(nextSearch);
+    setPage(1);
   };
 
   const handleActionSubmit = async (e: React.FormEvent) => {
@@ -76,7 +94,7 @@ export default function AdminUsersPage() {
         });
         setUsers((prev) => prev.map((u) => (u.id === updated.id ? updated : u)));
         // Refetch the authoritative list so paired shop/account state is not left stale.
-        loadUsers();
+        void loadUsers();
       }
       closeModal();
     } catch (error: unknown) {
@@ -127,8 +145,8 @@ export default function AdminUsersPage() {
             className="admin-control admin-toolbar__search-input"
             type="text"
             placeholder="Tìm theo email hoặc tên..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
             style={{
               flex: 1,
               padding: '8px 12px',
@@ -156,7 +174,10 @@ export default function AdminUsersPage() {
               id="admin-user-status"
               className="admin-control"
               value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value as 'ALL' | 'ACTIVE' | 'SUSPENDED')}
+              onChange={(e) => {
+                setStatusFilter(e.target.value as 'ALL' | 'ACTIVE' | 'SUSPENDED');
+                setPage(1);
+              }}
               style={{
                 padding: '6px 10px',
                 borderRadius: '6px',
@@ -176,9 +197,10 @@ export default function AdminUsersPage() {
               id="admin-user-role"
               className="admin-control"
               value={roleFilter}
-              onChange={(e) =>
-                setRoleFilter(e.target.value as 'ALL' | 'buyer' | 'seller' | 'admin')
-              }
+              onChange={(e) => {
+                setRoleFilter(e.target.value as 'ALL' | 'buyer' | 'seller' | 'admin');
+                setPage(1);
+              }}
               style={{
                 padding: '6px 10px',
                 borderRadius: '6px',
@@ -213,118 +235,140 @@ export default function AdminUsersPage() {
         ) : users.length === 0 ? (
           <div className="admin-state-card__message">Không tìm thấy người dùng nào phù hợp.</div>
         ) : (
-          <table
-            className="admin-data-table"
-            style={{
-              width: '100%',
-              borderCollapse: 'collapse',
-              textAlign: 'left',
-              fontSize: '14px',
-            }}
-          >
-            <thead>
-              <tr
+          <>
+            <div className="admin-table-scroll admin-users-table-scroll">
+              <table
+                className="admin-data-table admin-management-table admin-users-table"
                 style={{
-                  background: '#f9fafb',
-                  borderBottom: '1px solid #e5e7eb',
-                  color: '#4b5563',
-                  fontSize: '13px',
+                  width: '100%',
+                  borderCollapse: 'collapse',
+                  textAlign: 'left',
+                  fontSize: '14px',
                 }}
               >
-                <th style={{ padding: '12px 16px' }}>Họ tên & Email</th>
-                <th style={{ padding: '12px 16px' }}>Số điện thoại</th>
-                <th style={{ padding: '12px 16px' }}>Vai trò</th>
-                <th style={{ padding: '12px 16px' }}>Trạng thái</th>
-                <th style={{ padding: '12px 16px' }}>Ngày tạo</th>
-                <th style={{ padding: '12px 16px', textAlign: 'right' }}>Thao tác</th>
-              </tr>
-            </thead>
-            <tbody>
-              {users.map((u) => (
-                <tr key={u.id}>
-                  <td style={{ padding: '14px 16px' }}>
-                    <AdminEntityLink
-                      href={`/admin/users/${u.id}`}
-                      name={u.displayName}
-                      imageUrl={u.avatarUrl}
-                      meta={u.email}
-                    />
-                  </td>
-                  <td style={{ padding: '14px 16px', color: '#4b5563' }}>{u.phoneNumber || '—'}</td>
-                  <td style={{ padding: '14px 16px' }}>
-                    <div className="admin-badge-list">
-                      {u.roles.map((r) => (
+                <thead>
+                  <tr
+                    style={{
+                      background: '#f9fafb',
+                      borderBottom: '1px solid #e5e7eb',
+                      color: '#4b5563',
+                      fontSize: '13px',
+                    }}
+                  >
+                    <th style={{ padding: '12px 16px' }} className="management-table-id-cell">ID</th>
+                    <th style={{ padding: '12px 16px' }}>Họ tên & Email</th>
+                    <th style={{ padding: '12px 16px' }}>Số điện thoại</th>
+                    <th style={{ padding: '12px 16px' }}>Vai trò</th>
+                    <th style={{ padding: '12px 16px' }}>Trạng thái</th>
+                    <th style={{ padding: '12px 16px' }}>Ngày tạo</th>
+                    <th className="admin-table-cell--actions admin-users-table__actions">
+                      Thao tác
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {users.map((u) => (
+                    <tr key={u.id}>
+                      <td className="management-table-id-cell" style={{ padding: '14px 16px' }}>{u.id}</td>
+                      <td style={{ padding: '14px 16px' }}>
+                        <AdminEntityLink
+                          href={`/admin/users/${u.id}`}
+                          name={u.displayName}
+                          imageUrl={u.avatarUrl}
+                          meta={u.email}
+                        />
+                      </td>
+                      <td style={{ padding: '14px 16px', color: '#4b5563' }}>
+                        {u.phoneNumber || '—'}
+                      </td>
+                      <td style={{ padding: '14px 16px' }}>
+                        <div className="admin-badge-list">
+                          {u.roles.map((r) => (
+                            <span
+                              className={`admin-badge admin-badge--role-${r}`}
+                              key={r}
+                              style={{
+                                fontSize: '11px',
+                                fontWeight: 600,
+                                padding: '2px 8px',
+                                borderRadius: '12px',
+                                background:
+                                  r === 'admin'
+                                    ? '#fef3c7'
+                                    : r === 'seller'
+                                      ? '#e0e7ff'
+                                      : '#f3f4f6',
+                                color:
+                                  r === 'admin'
+                                    ? '#92400e'
+                                    : r === 'seller'
+                                      ? '#3730a3'
+                                      : '#4b5563',
+                              }}
+                            >
+                              {r}
+                            </span>
+                          ))}
+                        </div>
+                      </td>
+                      <td style={{ padding: '14px 16px' }}>
                         <span
-                          className={`admin-badge admin-badge--role-${r}`}
-                          key={r}
+                          className={`admin-badge admin-table-status ${u.status === 'ACTIVE' ? 'admin-badge--success' : 'admin-badge--danger'}`}
                           style={{
-                            fontSize: '11px',
-                            fontWeight: 600,
-                            padding: '2px 8px',
+                            display: 'inline-block',
+                            padding: '3px 10px',
                             borderRadius: '12px',
-                            background:
-                              r === 'admin' ? '#fef3c7' : r === 'seller' ? '#e0e7ff' : '#f3f4f6',
-                            color:
-                              r === 'admin' ? '#92400e' : r === 'seller' ? '#3730a3' : '#4b5563',
+                            fontSize: '12px',
+                            fontWeight: 600,
+                            background: u.status === 'ACTIVE' ? '#d1fae5' : '#fee2e2',
+                            color: u.status === 'ACTIVE' ? '#065f46' : '#991b1b',
                           }}
                         >
-                          {r}
+                          {u.status === 'ACTIVE' ? 'Hoạt động' : 'Tạm khóa'}
                         </span>
-                      ))}
-                    </div>
-                  </td>
-                  <td style={{ padding: '14px 16px' }}>
-                    <span
-                      className={`admin-badge ${u.status === 'ACTIVE' ? 'admin-badge--success' : 'admin-badge--danger'}`}
-                      style={{
-                        display: 'inline-block',
-                        padding: '3px 10px',
-                        borderRadius: '12px',
-                        fontSize: '12px',
-                        fontWeight: 600,
-                        background: u.status === 'ACTIVE' ? '#d1fae5' : '#fee2e2',
-                        color: u.status === 'ACTIVE' ? '#065f46' : '#991b1b',
-                      }}
-                    >
-                      {u.status === 'ACTIVE' ? 'Hoạt động' : 'Tạm khóa'}
-                    </span>
-                  </td>
-                  <td style={{ padding: '14px 16px', color: '#6b7280', fontSize: '13px' }}>
-                    {new Date(u.createdAt).toLocaleDateString('vi-VN')}
-                  </td>
-                  <td style={{ padding: '14px 16px', textAlign: 'right' }}>
-                    <div className="admin-table-actions">
-                      {u.status === 'ACTIVE' ? (
-                        <button
-                          onClick={() => openModal(u, 'SUSPEND')}
-                          className="admin-btn admin-btn-danger-outline"
-                          style={{
-                            borderRadius: '6px',
-                            cursor: 'pointer',
-                            fontWeight: 600,
-                          }}
-                        >
-                          Khóa
-                        </button>
-                      ) : (
-                        <button
-                          onClick={() => openModal(u, 'RESTORE')}
-                          className="admin-btn admin-btn-success-outline"
-                          style={{
-                            borderRadius: '6px',
-                            cursor: 'pointer',
-                            fontWeight: 600,
-                          }}
-                        >
-                          Mở khóa
-                        </button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                      </td>
+                      <td style={{ padding: '14px 16px', color: '#6b7280', fontSize: '13px' }}>
+                        {new Date(u.createdAt).toLocaleDateString('vi-VN')}
+                      </td>
+                      <td className="admin-table-cell--actions admin-users-table__actions">
+                        <div className="admin-table-actions">
+                          {u.status === 'ACTIVE' ? (
+                            <button
+                              type="button"
+                              onClick={() => openModal(u, 'SUSPEND')}
+                              className="admin-icon-btn admin-icon-btn--danger"
+                              aria-label={`Khóa tài khoản ${u.displayName}`}
+                              title="Khóa tài khoản"
+                            >
+                              <LockIcon aria-hidden="true" />
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => openModal(u, 'RESTORE')}
+                              className="admin-icon-btn admin-icon-btn--success"
+                              aria-label={`Mở khóa tài khoản ${u.displayName}`}
+                              title="Mở khóa tài khoản"
+                            >
+                              <UnlockIcon aria-hidden="true" />
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <AdminPagination
+              itemLabel="người dùng"
+              page={page}
+              totalItems={totalItems}
+              totalPages={totalPages}
+              disabled={loading}
+              onPageChange={setPage}
+            />
+          </>
         )}
       </div>
 

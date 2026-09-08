@@ -1,0 +1,10 @@
+{
+  "peakActiveLeases": 20,
+  "peakExecutingConfirmations": 5,
+  "duplicateOrders": 0,
+  "duplicateReversals": 0,
+  "negativeQuotaRows": 0,
+  "negativeStockRows": 0,
+  "lambdaInvocations": 57,
+  "pollingQueriesCheckout": 0
+}

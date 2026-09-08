@@ -40,6 +40,9 @@ import { CheckoutConfirmationDto, CheckoutPreviewDto } from './checkout.dto';
 import { CheckoutExceptionFilter } from './checkout-exception.filter';
 import { CheckoutCartConflictError, CheckoutValidationError } from './checkout.errors';
 import { CheckoutService } from './checkout.service';
+import { TrafficAdmissionGuard } from '../traffic-admission/traffic-admission.guard';
+import { TrafficAdmissionFilter } from '../traffic-admission/traffic-admission.filter';
+import { TrafficAdmissionService } from '../traffic-admission/traffic-admission.service';
 
 function expectedVersion(value: string | undefined): number {
   const match = /^"cart-(0|[1-9][0-9]*)"$/.exec(value ?? '');
@@ -57,12 +60,13 @@ function expectedVersion(value: string | undefined): number {
 @ApiResponse({ status: 409, description: 'Cart, preview, readiness, or idempotency conflict' })
 @ApiResponse({ status: 503, description: 'Checkout could not be completed safely' })
 @Controller('checkout')
-@UseFilters(CheckoutExceptionFilter)
+@UseFilters(CheckoutExceptionFilter, TrafficAdmissionFilter)
 @UseGuards(AuthGuard)
 export class CheckoutController {
-  constructor(@Inject(CheckoutService) private readonly checkout: CheckoutService) {}
+  constructor(@Inject(CheckoutService) private readonly checkout: CheckoutService, @Inject(TrafficAdmissionService) private readonly admission: TrafficAdmissionService) {}
 
   @Post('preview')
+  @UseGuards(TrafficAdmissionGuard)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Build a server-authoritative COD checkout preview' })
   @ApiHeader({ name: 'If-Match', required: true, example: '"cart-7"' })
@@ -88,6 +92,7 @@ export class CheckoutController {
   }
 
   @Post('cod')
+  @UseGuards(TrafficAdmissionGuard)
   @ApiOperation({ summary: 'Confirm COD and atomically create one order per shop' })
   @ApiHeader({ name: 'If-Match', required: true, example: '"cart-7"' })
   @ApiHeader({
@@ -117,6 +122,7 @@ export class CheckoutController {
       idempotencyKey,
       parsed,
     );
+    await this.admission.releaseLease(request.admissionLease, 'SUCCESS');
     response.status(result.replayed ? HttpStatus.OK : HttpStatus.CREATED);
     response.setHeader('Cache-Control', 'private, no-store');
     response.setHeader('ETag', `"cart-${result.purchase.sourceCartVersion + 1}"`);

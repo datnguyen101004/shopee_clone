@@ -1,7 +1,5 @@
 import { randomUUID } from 'node:crypto';
 import {
-  MODERATION_DEFAULT_LIMIT,
-  MODERATION_MAX_LIMIT,
   type ModerationCaseDetail,
   type ModerationCaseListQuery,
   type ModerationCaseListResponse,
@@ -62,7 +60,8 @@ export class AdminModerationRepository {
   ) {}
 
   async listCases(query: ModerationCaseListQuery): Promise<ModerationCaseListResponse> {
-    const limit = Math.min(query.limit ?? MODERATION_DEFAULT_LIMIT, MODERATION_MAX_LIMIT);
+    const page = query.page ?? 1;
+    const pageSize = 10;
     const where: Prisma.ModerationCaseWhereInput = {};
 
     if (query.status) {
@@ -104,12 +103,14 @@ export class AdminModerationRepository {
       where.assignedAdminId = query.assignedAdminId;
     }
 
-    const rows = await this.prisma.moderationCase.findMany({
-      where,
-      take: limit + 1,
-      ...(query.cursor ? { skip: 1, cursor: { id: query.cursor } } : {}),
-      orderBy: [{ lastActivityAt: 'desc' }, { id: 'desc' }],
-      include: {
+    const [totalItems, rows] = await Promise.all([
+      this.prisma.moderationCase.count({ where }),
+      this.prisma.moderationCase.findMany({
+        where,
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+        orderBy: [{ lastActivityAt: 'desc' }, { id: 'desc' }],
+        include: {
         assignedAdmin: {
           select: {
             id: true,
@@ -128,15 +129,12 @@ export class AdminModerationRepository {
           },
         },
         shop: { select: { logoUrl: true } },
-      },
-    });
-
-    const hasMore = rows.length > limit;
-    const items = hasMore ? rows.slice(0, limit) : rows;
-    const nextCursor = hasMore && items.length > 0 ? items[items.length - 1]!.id : null;
+        },
+      }),
+    ]);
 
     return {
-      items: items.map((c): ModerationCaseSummary => {
+      items: rows.map((c): ModerationCaseSummary => {
         const snap = c.targetSnapshot as Record<string, unknown>;
         return {
           id: c.id,
@@ -164,7 +162,10 @@ export class AdminModerationRepository {
           resolvedAt: c.resolvedAt ? c.resolvedAt.toISOString() : null,
         };
       }),
-      nextCursor,
+      page,
+      pageSize,
+      totalItems,
+      totalPages: Math.ceil(totalItems / pageSize),
     };
   }
 

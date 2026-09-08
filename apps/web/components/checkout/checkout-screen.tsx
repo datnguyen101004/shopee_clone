@@ -4,7 +4,7 @@ import { CHECKOUT_NOTE_MAX_LENGTH, SHIPPING_SERVICES } from '@shopee-clone/contr
 import { StorefrontContainer } from '@shopee-clone/ui';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useRef, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 
 import {
   CheckoutApiError,
@@ -19,6 +19,13 @@ import { useAuthSession } from '../auth-session-provider';
 import { useCart } from '../cart/cart-provider';
 import { useCheckoutPreview } from './use-checkout-preview';
 import { ChatNowButton } from '../chat/chat-now-button';
+import { CheckoutWaitingRoom } from './checkout-waiting-room';
+import type { CheckoutAdmissionState } from '../../lib/flash-sale-types';
+import {
+  fetchCheckoutTicketStatus,
+  leaveCheckoutQueue,
+  requestCheckoutTicket,
+} from '../../lib/flash-sale-api';
 
 const serviceLabels = {
   ECONOMY: 'Tiết kiệm',
@@ -35,13 +42,50 @@ export function CheckoutScreen() {
   const cart = useCart();
   const router = useRouter();
   const currentCart = cart.state.cart;
-  const checkout = useCheckoutPreview(currentCart, cart.refresh);
   const intent = useRef(new CheckoutSubmitIntent());
+  const admissionKey = useRef(crypto.randomUUID());
   const submitLock = useRef(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitMessage, setSubmitMessage] = useState('');
   const [addressDialogOpen, setAddressDialogOpen] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<'COD' | 'MOMO' | 'VNPAY'>('COD');
+  const [waitingRoomState, setWaitingRoomState] = useState<{
+    active: boolean;
+    ticketId: string;
+    status: CheckoutAdmissionState;
+    retryAfterSeconds: number;
+    leaseExpiresAt?: string | null;
+    message?: string;
+  } | null>(null);
+
+  const beginAdmission = useCallback(
+    (message?: string, retryAfterSeconds = 5) => {
+      void requestCheckoutTicket(auth.authenticatedFetch, admissionKey.current)
+        .then((ticket) => {
+          setWaitingRoomState({
+            active: true,
+            ticketId: ticket.ticketId,
+            status: ticket.status,
+            retryAfterSeconds: ticket.retryAfterSeconds || retryAfterSeconds,
+            leaseExpiresAt: ticket.leaseExpiresAt,
+            message: message ?? ticket.message,
+          });
+        })
+        .catch(() => {
+          setSubmitMessage('Không thể vào phòng chờ thanh toán. Vui lòng thử lại.');
+        });
+    },
+    [auth.authenticatedFetch],
+  );
+  const checkout = useCheckoutPreview(currentCart, cart.refresh, beginAdmission);
+  const preview = checkout.preview;
+  const hasFlashSaleLine = Boolean(
+    preview?.shops.some((shop) =>
+      shop.lines.some((line) => line.campaignPrice?.campaignTypeCode === 'FLASH_SALE'),
+    ),
+  );
+
+  const selectedPaymentMethod = hasFlashSaleLine ? 'COD' : paymentMethod;
 
   if (auth.state.status === 'guest' || cart.state.status === 'unauthenticated') {
     return (
@@ -77,7 +121,53 @@ export function CheckoutScreen() {
     );
   }
 
-  const preview = checkout.preview;
+  if (waitingRoomState?.active) {
+    return (
+      <CheckoutWaitingRoom
+        status={waitingRoomState.status}
+        retryAfterSeconds={waitingRoomState.retryAfterSeconds}
+        leaseExpiresAt={waitingRoomState.leaseExpiresAt}
+        message={waitingRoomState.message}
+        onPollStatus={async () => {
+          const res = await fetchCheckoutTicketStatus(auth.authenticatedFetch, waitingRoomState.ticketId);
+          setWaitingRoomState((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  ticketId: res.ticketId,
+                  status: res.status,
+                  retryAfterSeconds: res.retryAfterSeconds,
+                  leaseExpiresAt: res.leaseExpiresAt,
+                  message: res.message,
+                }
+              : null,
+          );
+        }}
+        onLeaveQueue={async () => {
+          await leaveCheckoutQueue(auth.authenticatedFetch, waitingRoomState.ticketId);
+          setWaitingRoomState(null);
+          router.push('/cart');
+        }}
+        onRejoinQueue={async () => {
+          admissionKey.current = crypto.randomUUID();
+          const res = await requestCheckoutTicket(auth.authenticatedFetch, admissionKey.current);
+          setWaitingRoomState({
+            active: true,
+            ticketId: res.ticketId,
+            status: res.status,
+            retryAfterSeconds: res.retryAfterSeconds,
+            leaseExpiresAt: res.leaseExpiresAt,
+            message: res.message,
+          });
+        }}
+        onProceedToCheckout={() => {
+          setWaitingRoomState(null);
+          checkout.retry();
+        }}
+      />
+    );
+  }
+
   const canSubmit =
     checkout.status === 'ready' &&
     preview?.ready === true &&
@@ -92,17 +182,17 @@ export function CheckoutScreen() {
     submitLock.current = true;
     setSubmitting(true);
     setSubmitMessage(
-      paymentMethod === 'MOMO'
+      selectedPaymentMethod === 'MOMO'
         ? 'Đang tạo giao dịch MoMo sandbox…'
-        : paymentMethod === 'VNPAY'
+        : selectedPaymentMethod === 'VNPAY'
           ? 'Đang tạo giao dịch VNPAY sandbox…'
           : 'Đang tạo đơn hàng COD…',
     );
     const request = { ...checkout.request, checkoutFingerprint: preview.checkoutFingerprint };
-    const signature = JSON.stringify({ cartVersion: currentCart!.version, request, paymentMethod });
+    const signature = JSON.stringify({ cartVersion: currentCart!.version, request, paymentMethod: selectedPaymentMethod });
     try {
       const idempotencyKey = intent.current.keyFor(signature);
-      if (paymentMethod === 'MOMO') {
+      if (selectedPaymentMethod === 'MOMO') {
         const result = await confirmMomoCheckout(
           { ...request, provider: 'MOMO' },
           currentCart!.version,
@@ -119,7 +209,7 @@ export function CheckoutScreen() {
           );
         }
         router.replace(`/checkout/payment/${result.payment.paymentReference}`);
-      } else if (paymentMethod === 'VNPAY') {
+      } else if (selectedPaymentMethod === 'VNPAY') {
         const result = await confirmVnpayCheckout(
           { ...request, provider: 'VNPAY' },
           currentCart!.version,
@@ -147,6 +237,17 @@ export function CheckoutScreen() {
     } catch (error) {
       if (error instanceof CheckoutApiError && error.status === 401) {
         router.replace('/login?returnTo=%2Fcheckout');
+      } else if (
+        error instanceof CheckoutApiError &&
+        (error.status === 428 ||
+          error.problem?.type?.includes('admission') ||
+          error.problem?.type?.includes('waiting-room'))
+      ) {
+        beginAdmission(
+          error.problem?.detail ||
+            'Có nhiều người đang mua sắm. Bạn đang chờ đến lượt vào thanh toán.',
+          5,
+        );
       } else if (error instanceof CheckoutApiError && error.status === 409) {
         if (error.problem?.type.endsWith('/checkout-idempotency-conflict')) intent.current.rotate();
         setSubmitMessage(
@@ -157,6 +258,9 @@ export function CheckoutScreen() {
               : 'Giỏ hàng hoặc thông tin thanh toán đã thay đổi. Đang xác nhận lại…',
         );
         checkout.retry();
+      } else if (error instanceof CheckoutApiError && error.status === 429) {
+        const retryAfter = error.problem?.retryAfterSeconds ?? 1;
+        setSubmitMessage(`Flash Sale đang có nhiều lượt xác nhận. Vui lòng thử lại sau ${retryAfter} giây bằng cùng mã đơn.`);
       } else if (error instanceof CheckoutApiError && error.kind === 'transport') {
         setSubmitMessage(
           'Chưa nhận được kết quả. Bấm đặt hàng lại để kiểm tra bằng cùng mã an toàn.',
@@ -249,6 +353,9 @@ export function CheckoutScreen() {
                   )}
                   <div>
                     <span className="font-medium">{line.productName}</span>
+                    {line.campaignPrice?.campaignTypeCode === 'FLASH_SALE' && (
+                      <span className="checkout-fs-badge">⚡ Flash Sale</span>
+                    )}
                     <small>
                       Phân loại: {line.variantName} · x{line.quantity}
                     </small>
@@ -334,37 +441,49 @@ export function CheckoutScreen() {
 
       <section className="checkout-card checkout-payment">
         <h2>Phương thức thanh toán</h2>
+        {hasFlashSaleLine && (
+          <div className="checkout-fs-cod-notice" role="note">
+            <p>
+              <strong>⚡ Đơn hàng có sản phẩm Flash Sale chỉ hỗ trợ thanh toán khi nhận hàng (COD).</strong>
+            </p>
+            <p className="checkout-fs-cod-notice__hint">
+              Nếu muốn thanh toán online (Ví MoMo hoặc VNPAY) cho các sản phẩm thường, bạn vui lòng bỏ chọn sản phẩm Flash Sale trong giỏ hàng rồi đặt đơn riêng.
+            </p>
+          </div>
+        )}
         <label>
           <input
             type="radio"
             name="payment-method"
-            checked={paymentMethod === 'COD'}
+            checked={selectedPaymentMethod === 'COD'}
             onChange={() => setPaymentMethod('COD')}
           />{' '}
           Thanh toán khi nhận hàng (COD)
         </label>
-        <label>
+        <label className={hasFlashSaleLine ? 'is-disabled' : undefined}>
           <input
             type="radio"
             name="payment-method"
-            checked={paymentMethod === 'MOMO'}
-            onChange={() => setPaymentMethod('MOMO')}
+            disabled={hasFlashSaleLine}
+            checked={selectedPaymentMethod === 'MOMO'}
+            onChange={() => !hasFlashSaleLine && setPaymentMethod('MOMO')}
           />{' '}
-          Ví MoMo (sandbox)
+          Ví MoMo (sandbox) {hasFlashSaleLine ? '· (Không áp dụng cho đơn có Flash Sale)' : ''}
         </label>
-        <label>
+        <label className={hasFlashSaleLine ? 'is-disabled' : undefined}>
           <input
             type="radio"
             name="payment-method"
-            checked={paymentMethod === 'VNPAY'}
-            onChange={() => setPaymentMethod('VNPAY')}
+            disabled={hasFlashSaleLine}
+            checked={selectedPaymentMethod === 'VNPAY'}
+            onChange={() => !hasFlashSaleLine && setPaymentMethod('VNPAY')}
           />{' '}
-          VNPAY (sandbox)
+          VNPAY (sandbox) {hasFlashSaleLine ? '· (Không áp dụng cho đơn có Flash Sale)' : ''}
         </label>
-        {paymentMethod === 'MOMO' ? (
+        {selectedPaymentMethod === 'MOMO' ? (
           <p>Bạn sẽ dùng QR hoặc ứng dụng MoMo Test để thanh toán tổng tiền đã xác nhận.</p>
         ) : null}
-        {paymentMethod === 'VNPAY' ? (
+        {selectedPaymentMethod === 'VNPAY' ? (
           <p>Bạn sẽ được chuyển tới VNPAY sandbox để chọn QR hoặc thẻ ngân hàng.</p>
         ) : null}
       </section>
@@ -405,10 +524,10 @@ export function CheckoutScreen() {
         </div>
         <button type="button" disabled={!canSubmit || submitting} onClick={() => void submit()}>
           {submitting
-            ? paymentMethod === 'VNPAY'
+            ? selectedPaymentMethod === 'VNPAY'
               ? 'Đang kết nối VNPAY…'
               : 'Đang đặt hàng…'
-            : paymentMethod === 'VNPAY'
+            : selectedPaymentMethod === 'VNPAY'
               ? 'Thanh toán với VNPAY'
               : 'Đặt hàng'}
         </button>

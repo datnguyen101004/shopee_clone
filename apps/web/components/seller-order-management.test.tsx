@@ -110,7 +110,10 @@ const detail: SellerOrderDetailResponse = {
 const list: SellerOrderListResponse = {
   sellerOrderVersion: 'seller-orders-v1',
   items: [baseSummary],
-  page: { limit: 20, nextCursor: null },
+  page: 1,
+  pageSize: 10,
+  totalItems: 1,
+  totalPages: 1,
 };
 const secondSummary = {
   ...baseSummary,
@@ -159,13 +162,13 @@ describe('Seller order management', () => {
     render(<SellerOrderQueueScreen />);
     expect(await screen.findByText('Bình nước')).toBeInTheDocument();
     expect(screen.getByRole('columnheader', { name: 'Mã đơn' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Xác nhận đơn' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Hủy đơn' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^Xác nhận đơn đơn hàng / }).querySelector('svg')).not.toBeNull();
+    expect(screen.getByRole('button', { name: /^Hủy đơn đơn hàng / }).querySelector('svg')).not.toBeNull();
   });
 
   it('executes a queue action with the row version and refreshes the row', async () => {
     render(<SellerOrderQueueScreen />);
-    fireEvent.click(await screen.findByRole('button', { name: 'Xác nhận đơn' }));
+    fireEvent.click(await screen.findByRole('button', { name: /^Xác nhận đơn đơn hàng / }));
     const dialog = screen.getByRole('dialog');
     fireEvent.click(screen.getByRole('button', { name: /^Xác nhận$/ }));
 

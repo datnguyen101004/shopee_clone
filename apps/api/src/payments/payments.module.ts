@@ -17,6 +17,8 @@ import { MomoIpnController } from './momo-ipn.controller';
 import { VnpayIpnController } from './vnpay-ipn.controller';
 import { PaymentsController } from './payments.controller';
 import { AuthModule } from '../auth/auth.module';
+import { TrafficAdmissionModule } from '../traffic-admission/traffic-admission.module';
+import { TrafficAdmissionFilter } from '../traffic-admission/traffic-admission.filter';
 import { CheckoutExceptionFilter } from '../checkout/checkout-exception.filter';
 import { VNPAY_CONFIG, loadVnpayConfig, type VnpayConfig } from './vnpay.config';
 import { VnpayPaymentProvider } from './vnpay-payment-provider';
@@ -26,7 +28,7 @@ import { PAYMENT_PROVIDER_REGISTRY, PaymentProviderRegistry } from './payment-pr
 export const MOMO_HTTP_TRANSPORT = Symbol('MOMO_HTTP_TRANSPORT');
 
 @Module({
-  imports: [AuthModule, CheckoutModule, InventoryModule, VouchersModule],
+  imports: [AuthModule, CheckoutModule, InventoryModule, VouchersModule, TrafficAdmissionModule],
   controllers: [MomoIpnController, VnpayIpnController, PaymentsController],
   providers: [
     { provide: MOMO_CONFIG, useFactory: (): MomoConfig => loadMomoConfig() },
@@ -42,6 +44,7 @@ export const MOMO_HTTP_TRANSPORT = Symbol('MOMO_HTTP_TRANSPORT');
     PaymentReconciliationService,
     RefundReconciliationService,
     CheckoutExceptionFilter,
+    TrafficAdmissionFilter,
     {
       provide: PAYMENT_PROVIDER,
       inject: [MOMO_CONFIG, MOMO_HTTP_TRANSPORT, MomoResultCodeMetrics],

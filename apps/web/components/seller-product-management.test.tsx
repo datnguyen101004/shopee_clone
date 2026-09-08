@@ -64,7 +64,7 @@ describe('Seller product management', () => {
           updatedAt: '2026-08-17T00:00:00.000Z',
         },
       ],
-      nextCursor: null,
+      page: 1, pageSize: 10, totalItems: 1, totalPages: 1,
     });
     render(<SellerProductList />);
     expect(await screen.findByText('Sample Product')).toBeInTheDocument();
@@ -72,15 +72,15 @@ describe('Seller product management', () => {
       'href',
       '/seller/products/new',
     );
-    expect(screen.getByRole('link', { name: 'Cập nhật sản phẩm' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Cập nhật sản phẩm Sample Product' })).toHaveAttribute(
       'href',
       '/seller/products/00000000-0000-4000-8000-000000000101/edit',
     );
-    expect(screen.getByRole('link', { name: /Sample Product/ })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Xem chi tiết sản phẩm Sample Product' })).toHaveAttribute(
       'href',
       '/seller/products/00000000-0000-4000-8000-000000000101',
     );
-    expect(screen.getByRole('button', { name: 'Đăng bán' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^Đăng bán sản phẩm / })).toBeInTheDocument();
   });
 
   it('publishes a draft directly from the seller product list', async () => {
@@ -100,12 +100,12 @@ describe('Seller product management', () => {
           updatedAt: '2026-08-17T00:00:00.000Z',
         },
       ],
-      nextCursor: null,
+      page: 1, pageSize: 10, totalItems: 1, totalPages: 1,
     });
     transitionProduct.mockResolvedValue({});
     render(<SellerProductList />);
     await screen.findByText('Sample Product');
-    fireEvent.click(screen.getByRole('button', { name: 'Đăng bán' }));
+    fireEvent.click(screen.getByRole('button', { name: /^Đăng bán sản phẩm / }));
     await waitFor(() =>
       expect(transitionProduct).toHaveBeenCalledWith(expect.anything(), productId, 'published'),
     );
@@ -120,7 +120,7 @@ describe('Seller product management', () => {
         id: productId, slug: 'sample-product', name: 'Sample Product', categoryName: 'Thiết bị điện tử',
         lifecycle: 'published', moderationStatus: 'active', primaryMediaUrl: null, variantCount: 1, stockQuantity: 3, updatedAt: '2026-08-17T00:00:00.000Z',
       }],
-      nextCursor: null,
+      page: 1, pageSize: 10, totalItems: 1, totalPages: 1,
     });
     transitionProduct.mockResolvedValue({});
     render(<SellerProductList />);
@@ -139,7 +139,7 @@ describe('Seller product management', () => {
     const productId = '00000000-0000-4000-8000-000000000101';
     fetchProducts.mockResolvedValue({
       items: [{ id: productId, slug: 'draft-product', name: 'Bản nháp cần xóa', categoryName: 'Thiết bị điện tử', lifecycle: 'draft', moderationStatus: 'active', primaryMediaUrl: null, variantCount: 1, stockQuantity: 1, updatedAt: '2026-08-17T00:00:00.000Z' }],
-      nextCursor: null,
+      page: 1, pageSize: 10, totalItems: 1, totalPages: 1,
     });
     deleteDraft.mockResolvedValue(undefined);
     render(<SellerProductList />);
@@ -155,7 +155,7 @@ describe('Seller product management', () => {
     const productId = '00000000-0000-4000-8000-000000000101';
     fetchProducts.mockResolvedValue({
       items: [{ id: productId, slug: 'published-product', name: 'Sản phẩm đang bán', categoryName: 'Thiết bị điện tử', lifecycle: 'published', moderationStatus: 'active', primaryMediaUrl: null, variantCount: 1, stockQuantity: 1, updatedAt: '2026-08-17T00:00:00.000Z' }],
-      nextCursor: null,
+      page: 1, pageSize: 10, totalItems: 1, totalPages: 1,
     });
     deleteDraft.mockResolvedValue(undefined);
     render(<SellerProductList />);
@@ -170,7 +170,7 @@ describe('Seller product management', () => {
     const productId = '00000000-0000-4000-8000-000000000101';
     fetchProducts.mockResolvedValue({
       items: [{ id: productId, slug: 'draft-product', name: 'Bản nháp bàn phím', categoryName: 'Thiết bị điện tử', lifecycle: 'draft', moderationStatus: 'active', primaryMediaUrl: null, variantCount: 1, stockQuantity: 1, updatedAt: '2026-08-17T00:00:00.000Z' }],
-      nextCursor: null,
+      page: 1, pageSize: 10, totalItems: 1, totalPages: 1,
     });
     let resolveDelete!: () => void;
     deleteDraft.mockImplementation(() => new Promise<void>((resolve) => { resolveDelete = resolve; }));
@@ -244,7 +244,7 @@ describe('Seller product management', () => {
     expect(screen.getByRole('button', { name: 'Hủy' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Cập nhật' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Lưu nháp' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Đăng bán' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Đăng bán sản phẩm / })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Ẩn sản phẩm' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Lưu trữ' })).not.toBeInTheDocument();
   });

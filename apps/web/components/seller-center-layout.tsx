@@ -18,6 +18,7 @@ import {
 import { fetchSellerShopWorkspace } from '../lib/seller-shop-api';
 import { useAuthSession } from './auth-session-provider';
 import { NotificationBell } from './notifications/notification-bell';
+import { WorkspaceColumnResizer } from './workspace-column-resizer';
 
 const productWorkspaceNavigation = [
   { href: '/seller', label: 'Tổng quan', Icon: Boxes },
@@ -114,6 +115,7 @@ function SellerWorkspace({
 
   return (
     <div className="seller-workspace" data-testid="seller-workspace">
+      <WorkspaceColumnResizer rootSelector=".seller-workspace" />
       <aside className="seller-workspace__sidebar" aria-label="Quản lý shop">
         <div className="seller-workspace__brand">
           <span className="seller-workspace__brand-mark" aria-hidden="true">

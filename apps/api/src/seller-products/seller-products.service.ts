@@ -7,6 +7,7 @@ import {
   type SellerProductLifecycle,
   type SellerProductPage,
   type SellerProductPageQuery,
+  SELLER_PRODUCT_PAGE_SIZE,
   type SellerProductUpsertRequest,
   type SellerProductCampaignEntry,
 } from '@shopee-clone/contracts';
@@ -187,15 +188,17 @@ export class SellerProductsService {
       ...(query.lifecycle ? { status: this.statusFor(query.lifecycle) } : {}),
       ...campaignFilter,
     };
-    const rows = await this.prisma.product.findMany({
-      take: query.limit + 1,
-      ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
-      where,
-      include: { category: true, images: { take: 1, orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }] }, variants: { include: { inventory: true } } },
-      orderBy: [{ updatedAt: 'desc' }, { id: 'desc' }],
-    });
-    const page = rows.slice(0, query.limit);
-    const productIds = page.map((product) => product.id);
+    const [totalItems, rows] = await Promise.all([
+      this.prisma.product.count({ where }),
+      this.prisma.product.findMany({
+        skip: (query.page - 1) * SELLER_PRODUCT_PAGE_SIZE,
+        take: SELLER_PRODUCT_PAGE_SIZE,
+        where,
+        include: { category: true, images: { take: 1, orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }] }, variants: { include: { inventory: true } } },
+        orderBy: [{ updatedAt: 'desc' }, { id: 'desc' }],
+      }),
+    ]);
+    const productIds = rows.map((product) => product.id);
     const [campaignRows, campaignCounts, promotionRows] = await Promise.all([
       productIds.length
         ? this.prisma.sellerCampaignProduct.findMany({
@@ -239,7 +242,7 @@ export class SellerProductsService {
       promotionByProduct.set(row.productId, summary);
     }
     return {
-      items: page.map((product) => {
+      items: rows.map((product) => {
         const campaignEntries = campaignByProduct.get(product.id) ?? [];
         const campaigns = campaignEntries.slice(0, 3).map((entry) => {
           const campaign = entry.participation.campaign;
@@ -277,7 +280,10 @@ export class SellerProductsService {
           updatedAt: product.updatedAt.toISOString(),
         };
       }),
-      nextCursor: rows.length > query.limit ? page.at(-1)?.id ?? null : null,
+      page: query.page,
+      pageSize: SELLER_PRODUCT_PAGE_SIZE,
+      totalItems,
+      totalPages: Math.ceil(totalItems / SELLER_PRODUCT_PAGE_SIZE),
     };
   }
 

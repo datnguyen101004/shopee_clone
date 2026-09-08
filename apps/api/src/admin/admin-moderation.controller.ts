@@ -59,7 +59,7 @@ export class AdminModerationController {
 
   @Get()
   @Header('Cache-Control', 'private, no-store')
-  @ApiOperation({ summary: 'List moderation cases with queue filters and cursor pagination' })
+  @ApiOperation({ summary: 'List moderation cases with queue filters and page pagination' })
   @ApiResponse({ status: 200, description: 'Moderation case summary list' })
   listCases(@Query() query: ModerationCaseQueryDto): Promise<ModerationCaseListResponse> {
     return this.moderationService.listCases(query);

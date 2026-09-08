@@ -1,6 +1,6 @@
 import { Body, Controller, Get, Header, Headers, Inject, Param, Post, Query, Req, Res, UseFilters, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { formatInventoryVersionEtag, parseInventoryAdjustmentRequest, parseInventoryIdempotencyKey, parseInventoryPageQuery, parseInventoryVersionEtag, type InventoryAdjustmentPage, type InventoryPage } from '@shopee-clone/contracts';
+import { formatInventoryVersionEtag, parseInventoryAdjustmentPageQuery, parseInventoryAdjustmentRequest, parseInventoryIdempotencyKey, parseInventoryPageQuery, parseInventoryVersionEtag, type InventoryAdjustmentPage, type InventoryPage } from '@shopee-clone/contracts';
 import type { Response } from 'express';
 import { AuthGuard, type AuthenticatedRequest } from '../auth/auth.guard';
 import { RequireRoles, RolesGuard } from '../auth/role-authorization.guard';
@@ -30,7 +30,7 @@ export class InventoryController {
   @Header('Cache-Control', 'private, no-store')
   @ApiOperation({ summary: 'List immutable inventory adjustments' })
   async history(@Req() req: AuthenticatedRequest, @Param('variantId') variantId: string, @Query() query: Record<string, string | string[] | undefined>): Promise<InventoryAdjustmentPage> {
-    const parsed = parseInventoryPageQuery(query);
+    const parsed = parseInventoryAdjustmentPageQuery(query);
     if (!parsed || !req.authUser) throw new InventoryValidationError(['query']);
     return this.inventory.history(req.authUser.id, variantId, parsed);
   }

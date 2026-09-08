@@ -221,13 +221,12 @@ export default function AdminAuditPage() {
         ) : (
           <div style={{ overflowX: 'auto' }}>
             <table
-              className="admin-data-table admin-audit-table"
+              className="admin-data-table admin-management-table admin-audit-table"
               style={{
                 width: '100%',
                 minWidth: '960px',
                 borderCollapse: 'collapse',
                 textAlign: 'left',
-                fontSize: '14px',
               }}
             >
               <thead>
@@ -236,9 +235,9 @@ export default function AdminAuditPage() {
                     background: '#f9fafb',
                     borderBottom: '1px solid #e5e7eb',
                     color: '#4b5563',
-                    fontSize: '13px',
                   }}
                 >
+                  <th style={{ padding: '12px 16px' }} className="management-table-id-cell">ID</th>
                   <th style={{ padding: '12px 16px' }}>Thời gian (UTC+7)</th>
                   <th style={{ padding: '12px 16px' }}>Admin thực hiện</th>
                   <th style={{ padding: '12px 16px' }}>Hành động</th>
@@ -262,12 +261,13 @@ export default function AdminAuditPage() {
                           verticalAlign: 'top',
                         }}
                       >
+                        <td className="management-table-id-cell" style={{ padding: '14px 16px' }}>{event.id}</td>
                         <td
                           style={{
                             padding: '14px 16px',
                             color: '#4b5563',
-                            fontSize: '13px',
-                            whiteSpace: 'nowrap',
+                            whiteSpace: 'normal',
+                            overflowWrap: 'anywhere',
                           }}
                         >
                           {formatAuditDate(event.createdAt)}
@@ -281,13 +281,12 @@ export default function AdminAuditPage() {
                         </td>
                         <td style={{ padding: '14px 16px' }}>
                           <span
+                            className="admin-table-status"
                             title={event.action}
                             style={{
                               display: 'inline-block',
                               padding: '3px 10px',
                               borderRadius: '12px',
-                              fontSize: '11px',
-                              fontWeight: 700,
                               background: actionBadge.bg,
                               color: actionBadge.color,
                             }}
@@ -316,7 +315,7 @@ export default function AdminAuditPage() {
                             <button
                               type="button"
                               className="admin-icon-btn admin-icon-btn--secondary"
-                              aria-label={isExpanded ? 'Ẩn thay đổi' : 'Xem thay đổi'}
+                              aria-label={`${isExpanded ? 'Ẩn' : 'Xem'} thay đổi của ${auditTarget(event).name}`}
                               aria-controls={detailId}
                               aria-expanded={isExpanded}
                               title={isExpanded ? 'Ẩn thay đổi' : 'Xem thay đổi'}
@@ -333,7 +332,7 @@ export default function AdminAuditPage() {
                       </tr>
                       {isExpanded ? (
                         <tr style={{ borderBottom: '1px solid #f3f4f6' }}>
-                          <td colSpan={6} style={{ padding: '0 16px 16px' }}>
+                          <td colSpan={7} style={{ padding: '0 16px 16px' }}>
                             <section
                               id={detailId}
                               aria-label={`Chi tiết thay đổi của ${AUDIT_TARGET_LABELS[event.targetType]}`}

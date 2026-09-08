@@ -4,11 +4,11 @@ import {
   executeAdminShopAction,
   executeAdminUserAction,
   fetchAdminDashboard,
+  fetchAdminProducts,
+  fetchAdminShops,
   fetchAdminUsers,
   lookupAdminProduct,
 } from './admin-api';
-
-
 
 describe('Admin API boundary', () => {
   it('calls dashboard with no-store and handles valid response', async () => {
@@ -93,17 +93,43 @@ describe('Admin API boundary', () => {
   });
 
   it('passes search filters and status to users query', async () => {
-    const authenticatedFetch = vi.fn().mockResolvedValue(Response.json({ items: [], nextCursor: null }));
+    const authenticatedFetch = vi.fn().mockResolvedValue(
+      Response.json({ items: [], page: 3, pageSize: 10, totalItems: 0, totalPages: 0 }),
+    );
     await fetchAdminUsers(authenticatedFetch, {
+      page: 3,
       status: 'ACTIVE',
       role: 'seller',
       q: 'john',
     });
 
     const [url] = authenticatedFetch.mock.calls[0]!;
+    expect(String(url)).toContain('page=3');
+    expect(String(url)).not.toContain('cursor=');
     expect(String(url)).toContain('status=ACTIVE');
     expect(String(url)).toContain('role=seller');
     expect(String(url)).toContain('q=john');
+  });
+
+  it('uses page queries for shops and products without cursor parameters', async () => {
+    const response = { items: [], page: 3, pageSize: 10, totalItems: 0, totalPages: 0 };
+    const shopFetch = vi.fn().mockResolvedValue(Response.json(response));
+    const productFetch = vi.fn().mockResolvedValue(Response.json(response));
+
+    await fetchAdminShops(shopFetch, { page: 3, status: 'ACTIVE', q: 'shop' });
+    await fetchAdminProducts(productFetch, {
+      page: 3,
+      status: 'ACTIVE',
+      moderationStatus: 'SUSPENDED',
+      q: 'product',
+    });
+
+    const [shopUrl] = shopFetch.mock.calls[0]!;
+    const [productUrl] = productFetch.mock.calls[0]!;
+    expect(String(shopUrl)).toContain('page=3');
+    expect(String(shopUrl)).not.toContain('cursor=');
+    expect(String(productUrl)).toContain('page=3');
+    expect(String(productUrl)).not.toContain('cursor=');
   });
 
   it('looks up product by slug and executes product suspension action', async () => {

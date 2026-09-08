@@ -40,6 +40,8 @@ import {
 } from '../checkout/checkout.errors';
 import { OnlinePaymentService } from './online-payment.service';
 import { OnlinePaymentCheckoutDto, PaymentRetryDto, VnpayReturnDto } from './payments.dto';
+import { TrafficAdmissionGuard } from '../traffic-admission/traffic-admission.guard';
+import { TrafficAdmissionFilter } from '../traffic-admission/traffic-admission.filter';
 
 function expectedVersion(value: string | undefined): number {
   const match = /^"cart-(0|[1-9][0-9]*)"$/.exec(value ?? '');
@@ -51,12 +53,13 @@ function expectedVersion(value: string | undefined): number {
 @ApiTags('payments')
 @ApiBearerAuth()
 @Controller()
-@UseFilters(CheckoutExceptionFilter)
+@UseFilters(CheckoutExceptionFilter, TrafficAdmissionFilter)
 @UseGuards(AuthGuard)
 export class PaymentsController {
   constructor(@Inject(OnlinePaymentService) private readonly payments: OnlinePaymentService) {}
 
   @Post('checkout/online-payments')
+  @UseGuards(TrafficAdmissionGuard)
   @ApiBody({ type: OnlinePaymentCheckoutDto })
   @ApiOperation({ summary: 'Create or replay an online sandbox checkout' })
   @ApiHeader({ name: 'If-Match', required: true, example: '"cart-7"' })
@@ -123,6 +126,7 @@ export class PaymentsController {
   }
 
   @Post('payments/:paymentReference/retry')
+  @UseGuards(TrafficAdmissionGuard)
   @HttpCode(HttpStatus.CREATED)
   @ApiBody({ type: PaymentRetryDto })
   @ApiHeader({ name: 'Idempotency-Key', required: true })

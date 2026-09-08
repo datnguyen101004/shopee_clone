@@ -1,0 +1,23 @@
+{
+  "baseUrl": "http://127.0.0.1:3001/api/v1",
+  "controlPlaneUrl": "http://127.0.0.1:3001/api/v1",
+  "users": [
+    {
+      "id": "buyer-001",
+      "accessToken": "replace-with-local-access-token",
+      "sessionId": "replace-with-session-id",
+      "cartVersion": 1,
+      "cartEtag": "\"cart-1\"",
+      "preview": {
+        "shippingAddressId": "00000000-0000-4000-8000-000000000001",
+        "services": []
+      },
+      "confirmation": {
+        "shippingAddressId": "00000000-0000-4000-8000-000000000001",
+        "services": [],
+        "checkoutFingerprint": "replace-with-64-lowercase-hex-preview-fingerprint"
+      }
+    }
+  ],
+  "public": { "campaignId": "replace-campaign-id", "variantIds": ["replace-variant-id"] }
+}

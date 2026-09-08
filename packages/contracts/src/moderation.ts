@@ -256,8 +256,7 @@ export interface ModerationCaseDetail extends ModerationCaseSummary {
 }
 
 export interface ModerationCaseListQuery {
-  limit?: number;
-  cursor?: string;
+  page?: number;
   status?: ModerationCaseStatus;
   targetType?: ReportTargetType;
   targetId?: string;
@@ -270,7 +269,10 @@ export interface ModerationCaseListQuery {
 
 export interface ModerationCaseListResponse {
   items: ModerationCaseSummary[];
-  nextCursor: string | null;
+  page: number;
+  pageSize: number;
+  totalItems: number;
+  totalPages: number;
 }
 
 export interface AssignModerationCaseRequest {
@@ -368,6 +370,10 @@ export interface SellerShopReviewSummary {
 
 export interface SellerShopReviewListResponse {
   items: SellerShopReviewSummary[];
+  page: number;
+  pageSize: number;
+  totalItems: number;
+  totalPages: number;
 }
 
 export interface AdminReportedReviewSummary {
@@ -387,6 +393,10 @@ export interface AdminReportedReviewSummary {
 
 export interface AdminReportedReviewListResponse {
   items: AdminReportedReviewSummary[];
+  page: number;
+  pageSize: number;
+  totalItems: number;
+  totalPages: number;
 }
 
 // ==========================================

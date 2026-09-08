@@ -8,7 +8,7 @@ import {
 
 describe('seller order contracts', () => {
   it('normalizes the queue query and rejects unsafe filters', () => {
-    expect(parseSellerOrderQueueQuery({ status: 'PENDING_CONFIRMATION', fulfillment: 'PENDING_CONFIRMATION', limit: '10', from: '2026-08-01', to: '2026-08-18' })).toEqual({ status: 'PENDING_CONFIRMATION', fulfillment: 'PENDING_CONFIRMATION', from: '2026-08-01', to: '2026-08-18', orderReference: null, limit: 10, cursor: null });
+    expect(parseSellerOrderQueueQuery({ status: 'PENDING_CONFIRMATION', fulfillment: 'PENDING_CONFIRMATION', page: '2', from: '2026-08-01', to: '2026-08-18' })).toEqual({ status: 'PENDING_CONFIRMATION', fulfillment: 'PENDING_CONFIRMATION', from: '2026-08-01', to: '2026-08-18', orderReference: null, page: 2 });
     expect(parseSellerOrderQueueQuery({ from: '2026-08-20', to: '2026-08-01' })).toBeNull();
     expect(parseSellerOrderQueueQuery({ status: ['ALL'] })).toBeNull();
     expect(parseSellerOrderQueueQuery({ unknown: 'value' })).toBeNull();

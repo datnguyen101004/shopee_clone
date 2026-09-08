@@ -3,8 +3,7 @@ import {
 } from './campaigns';
 import type { SellerProductCampaignEntry, SellerProductCampaignSummary } from './campaigns';
 
-export const SELLER_PRODUCT_DEFAULT_PAGE_SIZE = 20;
-export const SELLER_PRODUCT_MAX_PAGE_SIZE = 50;
+export const SELLER_PRODUCT_PAGE_SIZE = 10;
 export const SELLER_PRODUCT_TITLE_MAX_LENGTH = 240;
 export const SELLER_PRODUCT_DESCRIPTION_MAX_LENGTH = 8000;
 export const SELLER_PRODUCT_MAX_MEDIA = 9;
@@ -178,12 +177,14 @@ export interface SellerProductSummary {
 
 export interface SellerProductPage {
   items: SellerProductSummary[];
-  nextCursor: string | null;
+  page: number;
+  pageSize: number;
+  totalItems: number;
+  totalPages: number;
 }
 
 export interface SellerProductPageQuery {
-  cursor: string | null;
-  limit: number;
+  page: number;
   lifecycle: SellerProductLifecycle | null;
   campaign: SellerProductCampaignFilter | null;
   campaignTypeCode: string | null;
@@ -289,7 +290,7 @@ function canonicalDate(value: unknown): value is string {
 }
 
 export function isSellerProductPage(value: unknown): value is SellerProductPage {
-  if (!isRecord(value) || !exactKeys(value, ['items', 'nextCursor']) || !Array.isArray(value.items) || (value.nextCursor !== null && !isCanonicalSellerProductId(value.nextCursor))) return false;
+  if (!isRecord(value) || !exactKeys(value, ['items', 'page', 'pageSize', 'totalItems', 'totalPages']) || !Array.isArray(value.items) || !positiveInteger(value.page) || value.pageSize !== SELLER_PRODUCT_PAGE_SIZE || !nonNegativeInteger(value.totalItems) || !nonNegativeInteger(value.totalPages)) return false;
   return value.items.every((item) => {
     if (!isRecord(item)) return false;
     const allowedKeys = ['id', 'slug', 'name', 'categoryName', 'lifecycle', 'moderationStatus', 'primaryMediaUrl', 'variantCount', 'stockQuantity', 'updatedAt', 'operationalPriceRange', 'sellerPromotionSummary', 'campaigns', 'additionalCampaignCount'];
@@ -344,14 +345,13 @@ export function isSellerProductDetail(value: unknown): value is SellerProductDet
   }) && Array.isArray(value.variants) && value.variants.every((variant) => isRecord(variant) && typeof variant.sku === 'string' && variant.sku.trim().length > 0 && variant.sku.length <= 80) && isCanonicalSellerProductId(value.id) && sellerProductLifecycleValues.includes(value.lifecycle as SellerProductLifecycle) && sellerProductModerationValues.includes(value.moderationStatus as SellerProductModerationStatus) && (value.moderationReason === null || typeof value.moderationReason === 'string') && canonicalDate(value.createdAt) && canonicalDate(value.updatedAt);
 }
 
-export function parseSellerProductPageQuery(value: { cursor?: string | string[]; limit?: string | string[]; lifecycle?: string | string[]; campaign?: string | string[]; campaignTypeCode?: string | string[] }): SellerProductPageQuery | null {
+export function parseSellerProductPageQuery(value: { page?: string | string[]; lifecycle?: string | string[]; campaign?: string | string[]; campaignTypeCode?: string | string[] }): SellerProductPageQuery | null {
   const one = (item: string | string[] | undefined) => typeof item === 'string' ? item : undefined;
-  const cursor = one(value.cursor) ?? null;
-  const limitText = one(value.limit);
+  const pageText = one(value.page);
   const lifecycle = one(value.lifecycle) ?? null;
   const campaign = one(value.campaign) ?? null;
   const campaignTypeCode = one(value.campaignTypeCode) ?? null;
-  const limit = limitText === undefined ? SELLER_PRODUCT_DEFAULT_PAGE_SIZE : Number(limitText);
-  if ((cursor !== null && !isCanonicalSellerProductId(cursor)) || !Number.isSafeInteger(limit) || limit < 1 || limit > SELLER_PRODUCT_MAX_PAGE_SIZE || (lifecycle !== null && !sellerProductLifecycleValues.includes(lifecycle as SellerProductLifecycle)) || (campaign !== null && !sellerProductCampaignFilterValues.includes(campaign as SellerProductCampaignFilter)) || (campaignTypeCode !== null && !/^[A-Z][A-Z0-9_]{1,63}$/.test(campaignTypeCode))) return null;
-  return { cursor, limit, lifecycle: lifecycle as SellerProductLifecycle | null, campaign: campaign as SellerProductCampaignFilter | null, campaignTypeCode };
+  const page = pageText === undefined ? 1 : Number(pageText);
+  if (!Number.isSafeInteger(page) || page < 1 || (lifecycle !== null && !sellerProductLifecycleValues.includes(lifecycle as SellerProductLifecycle)) || (campaign !== null && !sellerProductCampaignFilterValues.includes(campaign as SellerProductCampaignFilter)) || (campaignTypeCode !== null && !/^[A-Z][A-Z0-9_]{1,63}$/.test(campaignTypeCode))) return null;
+  return { page, lifecycle: lifecycle as SellerProductLifecycle | null, campaign: campaign as SellerProductCampaignFilter | null, campaignTypeCode };
 }

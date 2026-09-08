@@ -1,0 +1,153 @@
+{
+    "metrics": {
+        "vus": {
+            "min": 1,
+            "max": 10,
+            "value": 1
+        },
+        "t35_unexpected": {
+            "rate": 0,
+            "count": 0,
+            "thresholds": {
+                "count==0": false
+            }
+        },
+        "http_req_duration": {
+            "avg": 24.79091935483872,
+            "min": 3.0522,
+            "med": 5.5265,
+            "max": 67.7159,
+            "p(90)": 67.1979,
+            "p(95)": 67.4569
+        },
+        "http_req_blocked": {
+            "med": 0,
+            "max": 3.1969,
+            "p(90)": 3.1969,
+            "p(95)": 3.1969,
+            "avg": 0.8267516129032259,
+            "min": 0
+        },
+        "http_req_connecting": {
+            "avg": 0.8267516129032259,
+            "min": 0,
+            "med": 0,
+            "max": 3.1969,
+            "p(90)": 3.1969,
+            "p(95)": 3.1969
+        },
+        "http_req_receiving": {
+            "avg": 0.07679677419354838,
+            "min": 0,
+            "med": 0,
+            "max": 0.7715,
+            "p(90)": 0.3388,
+            "p(95)": 0.6352
+        },
+        "iteration_duration": {
+            "avg": 3842.2900354838716,
+            "min": 3010.2229,
+            "med": 3673.7751,
+            "max": 4828.1121,
+            "p(90)": 4717.5586,
+            "p(95)": 4780.645399999999
+        },
+        "data_sent": {
+            "count": 19127,
+            "rate": 1302.3291346660549
+        },
+        "vus_max": {
+            "value": 10,
+            "min": 10,
+            "max": 10
+        },
+        "t35_requests": {
+            "count": 31,
+            "rate": 2.1107441404636225
+        },
+        "http_req_waiting": {
+            "med": 5.1877,
+            "max": 67.1978,
+            "p(90)": 66.6481,
+            "p(95)": 66.92295,
+            "avg": 24.541896774193557,
+            "min": 3.0467
+        },
+        "checks": {
+            "passes": 62,
+            "fails": 0,
+            "value": 1
+        },
+        "http_req_sending": {
+            "max": 1.0678,
+            "p(90)": 1.0678,
+            "p(95)": 1.0678,
+            "avg": 0.17222580645161292,
+            "min": 0,
+            "med": 0
+        },
+        "http_req_failed": {
+            "passes": 0,
+            "fails": 31,
+            "value": 0
+        },
+        "http_req_tls_handshaking": {
+            "min": 0,
+            "med": 0,
+            "max": 0,
+            "p(90)": 0,
+            "p(95)": 0,
+            "avg": 0
+        },
+        "data_received": {
+            "count": 26660,
+            "rate": 1815.2399607987152
+        },
+        "http_reqs": {
+            "count": 31,
+            "rate": 2.1107441404636225
+        },
+        "t35_api_latency": {
+            "avg": 24.79091935483872,
+            "min": 3.0522,
+            "med": 5.5265,
+            "max": 67.7159,
+            "p(90)": 67.1979,
+            "p(95)": 67.4569
+        },
+        "iterations": {
+            "count": 31,
+            "rate": 2.1107441404636225
+        },
+        "http_req_duration{expected_response:true}": {
+            "med": 5.5265,
+            "max": 67.7159,
+            "p(90)": 67.1979,
+            "p(95)": 67.4569,
+            "avg": 24.79091935483872,
+            "min": 3.0522
+        }
+    },
+    "root_group": {
+        "name": "",
+        "path": "",
+        "id": "d41d8cd98f00b204e9800998ecf8427e",
+        "groups": {},
+        "checks": {
+                "status endpoint returns success": {
+                    "name": "status endpoint returns success",
+                    "path": "::status endpoint returns success",
+                    "id": "ea15bc1b497baf84e41c06892887ae35",
+                    "passes": 31,
+                    "fails": 0
+                },
+                "public response does not expose exact quota": {
+                    "id": "9cbe19b22b4c1282854e7efa712b3966",
+                    "passes": 31,
+                    "fails": 0,
+                    "name": "public response does not expose exact quota",
+                    "path": "::public response does not expose exact quota"
+                }
+            }
+    }
+}

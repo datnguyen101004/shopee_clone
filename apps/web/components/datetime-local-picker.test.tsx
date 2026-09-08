@@ -35,6 +35,26 @@ describe('DateTimeLocalPicker', () => {
     expect(screen.queryByRole('option', { name: 'CH' })).not.toBeInTheDocument();
   });
 
+  it('supports English month and control labels for admin scheduling', () => {
+    render(
+      <DateTimeLocalPicker
+        aria-label="Starts at"
+        locale="en"
+        value="2026-08-19T23:25"
+        onChange={() => undefined}
+      />,
+    );
+    expect(screen.getByRole('button', { name: 'Starts at' })).toHaveTextContent(
+      'Aug 19, 2026 11:25 PM',
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Starts at' }));
+    expect(screen.getByRole('dialog', { name: /August 2026/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Previous month' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Next month' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Clear' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Today' })).toBeInTheDocument();
+  });
+
   it('converts 11 AM to 11 PM', () => {
     render(<Harness />);
     openStart();

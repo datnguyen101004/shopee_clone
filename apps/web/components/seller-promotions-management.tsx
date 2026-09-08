@@ -5,7 +5,7 @@ import type {
   SellerVoucherCreateRequest,
   SellerVoucherSummary,
 } from '@shopee-clone/contracts';
-import { AlertTriangle, CalendarDays, Check, ChevronDown, Eye, Plus, Search, SquarePen, Trash2, useToast } from '@shopee-clone/ui';
+import { AlertTriangle, CalendarDays, Check, ChevronDown, Eye, Pause, Play, Plus, Search, SquarePen, Trash2, useToast } from '@shopee-clone/ui';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -24,6 +24,7 @@ import {
 import type { SellerProductSummary } from '@shopee-clone/contracts';
 import { fetchSellerProducts } from '../lib/seller-products-api';
 import { formatMoney, sellerProductMediaUrl } from './seller-products/seller-products-utils';
+import { SellerPagination } from './seller/seller-pagination';
 
 const iso = (value: string, boundary: 'start' | 'end' = 'start') => {
   const normalized = /^\d{4}-\d{2}-\d{2}$/.test(value)
@@ -82,7 +83,6 @@ const FIELD_ERROR_VI: Record<string, string> = {
   ifMatch: 'Thiếu hoặc sai phiên bản khuyến mãi (If-Match).',
   request: 'Dữ liệu gửi lên không hợp lệ.',
   query: 'Bộ lọc danh sách không hợp lệ.',
-  cursor: 'Con trỏ phân trang không hợp lệ.',
 };
 const DETAIL_ERROR_VI: Array<[string, string]> = [
   ['Voucher code is already in use.', 'Mã voucher đã được sử dụng.'],
@@ -269,7 +269,10 @@ function VoucherKpiCard({ label, value, note, tone }: { label: string; value: st
 function VoucherListView({
   vouchers,
   visibleVouchers,
-  voucherCursor,
+  page,
+  pageSize,
+  totalItems,
+  totalPages,
   promotionSearch,
   promotionSort,
   voucherState,
@@ -284,11 +287,14 @@ function VoucherListView({
   onPause,
   onResume,
   onDelete,
-  onLoadMore,
+  onPageChange,
 }: {
   vouchers: SellerVoucherSummary[];
   visibleVouchers: SellerVoucherSummary[];
-  voucherCursor: string | null;
+  page: number;
+  pageSize: number;
+  totalItems: number;
+  totalPages: number;
   promotionSearch: string;
   promotionSort: PromotionSort;
   voucherState: string;
@@ -303,7 +309,7 @@ function VoucherListView({
   onPause: (item: SellerVoucherSummary) => void;
   onResume: (item: SellerVoucherSummary) => void;
   onDelete: (item: SellerVoucherSummary) => void;
-  onLoadMore: () => void;
+  onPageChange: (page: number) => void;
 }) {
   const activeCount = vouchers.filter((item) => item.state === 'ACTIVE').length;
   const expiredCount = vouchers.filter((item) => item.state === 'EXPIRED').length;
@@ -323,7 +329,7 @@ function VoucherListView({
         </button>
       </div>
       <div className="seller-voucher-kpis" aria-label="Tổng quan voucher">
-        <VoucherKpiCard label="Tổng voucher" value={String(vouchers.length)} note="Đã tải từ hệ thống" tone="blue" />
+        <VoucherKpiCard label="Tổng voucher" value={String(totalItems)} note="Đã tải từ hệ thống" tone="blue" />
         <VoucherKpiCard label="Đang hoạt động" value={String(activeCount)} note="Trong danh sách đã tải" tone="green" />
         <VoucherKpiCard label="Đã hết hạn" value={String(expiredCount)} note="Cần kiểm tra lại" tone="amber" />
         <VoucherKpiCard label="Đã sử dụng" value={compactCount(usedCount)} note="Tổng lượt đã dùng" tone="violet" />
@@ -380,15 +386,16 @@ function VoucherListView({
       </div>
       <div className="seller-voucher-table-card">
         <div className="seller-voucher-table-scroll">
-          <table className="seller-voucher-table">
+          <table className="seller-voucher-table seller-management-table">
             <thead>
-              <tr><th>Mã voucher</th><th>Tên chương trình</th><th>Loại giảm</th><th>Giá trị</th><th>Đã dùng / Tổng</th><th>Hạn sử dụng</th><th>Trạng thái</th><th>Hành động</th></tr>
+              <tr><th className="management-table-id-cell">ID</th><th>Mã voucher</th><th>Tên chương trình</th><th>Loại giảm</th><th>Giá trị</th><th>Đã dùng / Tổng</th><th>Hạn sử dụng</th><th>Trạng thái</th><th>Hành động</th></tr>
             </thead>
             <tbody>
               {visibleVouchers.map((item) => {
                 const usagePercent = item.usageLimit > 0 ? Math.min(100, Math.round((item.usedCount / item.usageLimit) * 100)) : 0;
                 return (
                   <tr key={item.id}>
+                    <td className="management-table-id-cell">{item.id}</td>
                     <td><Link className="seller-voucher-code" href={`/seller/promotions/vouchers/${item.id}`}>{item.code}</Link></td>
                     <td><span className="seller-voucher-name" title={item.name}>{item.name}</span></td>
                     <td><span className="seller-voucher-muted">{voucherBenefitLabel(item)}</span></td>
@@ -397,13 +404,13 @@ function VoucherListView({
                       <div className="seller-voucher-usage"><span>{item.usedCount}/{item.usageLimit}</span><i><b style={{ width: `${usagePercent}%` }} /></i></div>
                     </td>
                     <td><span className="seller-voucher-expiry">Bắt đầu: {voucherDateLabel(item.startsAt)}<br />Kết thúc: {voucherDateLabel(item.endsAt)}</span></td>
-                    <td><span className="seller-voucher-status" data-state={item.state}>{promotionStateLabel[item.state]}</span></td>
+                    <td><span className="seller-voucher-status seller-table-status" data-state={item.state}>{promotionStateLabel[item.state]}</span></td>
                     <td>
                       <div className="seller-voucher-row-actions">
                         <Link href={`/seller/promotions/vouchers/${item.id}`} aria-label={`Xem voucher ${item.code}`} title="Xem chi tiết"><Eye size={15} aria-hidden="true" /></Link>
                         <button type="button" aria-label={`Sửa voucher ${item.code}`} title="Sửa" onClick={() => onEdit(item)}><SquarePen size={15} aria-hidden="true" /></button>
-                        {item.state === 'PAUSED' ? <button type="button" aria-label={`Tiếp tục voucher ${item.code}`} title="Tiếp tục" disabled={saving} onClick={() => onResume(item)}>▶</button> : null}
-                        {['ACTIVE', 'SCHEDULED'].includes(item.state) ? <button type="button" aria-label={`Tạm dừng voucher ${item.code}`} title="Tạm dừng" disabled={saving} onClick={() => onPause(item)}>Ⅱ</button> : null}
+                        {item.state === 'PAUSED' ? <button type="button" aria-label={`Tiếp tục voucher ${item.code}`} title="Tiếp tục" disabled={saving} onClick={() => onResume(item)}><Play size={15} aria-hidden="true" /></button> : null}
+                        {['ACTIVE', 'SCHEDULED'].includes(item.state) ? <button type="button" aria-label={`Tạm dừng voucher ${item.code}`} title="Tạm dừng" disabled={saving} onClick={() => onPause(item)}><Pause size={15} aria-hidden="true" /></button> : null}
                         {item.state === 'PAUSED' ? <button type="button" aria-label={`Xóa voucher ${item.code}`} title="Xóa" disabled={saving} onClick={() => onDelete(item)}><Trash2 size={15} aria-hidden="true" /></button> : null}
                       </div>
                     </td>
@@ -414,14 +421,7 @@ function VoucherListView({
           </table>
           {!visibleVouchers.length ? <p className="seller-voucher-empty">{vouchers.length ? 'Không tìm thấy voucher phù hợp.' : 'Chưa có voucher nào.'}</p> : null}
         </div>
-        <footer className="seller-voucher-footer">
-          <span>Hiển thị <strong>{visibleVouchers.length}</strong> trong <strong>{vouchers.length}</strong> voucher đã tải</span>
-          <div className="seller-voucher-pagination">
-            <button type="button" disabled aria-label="Trang trước">‹</button><button type="button" className="is-active">1</button>
-            {voucherCursor ? <button type="button" onClick={onLoadMore}>Xem thêm</button> : <span>Đã tải hết danh sách</span>}
-            <button type="button" disabled={!voucherCursor} aria-label="Trang sau">›</button>
-          </div>
-        </footer>
+        <SellerPagination itemLabel="voucher" page={page} pageSize={pageSize} totalItems={totalItems} totalPages={totalPages} disabled={saving} onPageChange={onPageChange} />
       </div>
     </div>
   );
@@ -448,14 +448,12 @@ export function ProductPicker({
     setError(null);
     try {
       const items: SellerProductSummary[] = [];
-      const seenCursors = new Set<string>();
-      let cursor: string | undefined;
+      let pageNumber = 1;
       while (true) {
-        const page = await fetchSellerProducts(fetcher, cursor ? { cursor } : {});
-        items.push(...page.items);
-        if (!page.nextCursor || seenCursors.has(page.nextCursor)) break;
-        seenCursors.add(page.nextCursor);
-        cursor = page.nextCursor;
+        const response = await fetchSellerProducts(fetcher, { page: pageNumber });
+        items.push(...response.items);
+        if (pageNumber >= response.totalPages) break;
+        pageNumber += 1;
       }
       setProducts(items);
     } catch (cause) {
@@ -716,7 +714,10 @@ export function SellerPromotionsManagement() {
     if (typeof window === 'undefined') return null;
     return new URLSearchParams(window.location.search).get('edit');
   });
-  const [voucherCursor, setVoucherCursor] = useState<string | null>(null);
+  const [voucherPage, setVoucherPage] = useState(1);
+  const [voucherPageSize, setVoucherPageSize] = useState(10);
+  const [voucherTotalItems, setVoucherTotalItems] = useState(0);
+  const [voucherTotalPages, setVoucherTotalPages] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -729,20 +730,25 @@ export function SellerPromotionsManagement() {
   const [voucherFormOpen, setVoucherFormOpen] = useState(false);
   const [voucherForm, setVoucherForm] = useState(createVoucherForm);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (targetPage = voucherPage) => {
     if (auth.state.status !== 'authenticated') return;
     setLoading(true);
     setError(null);
     try {
-      const voucherPage = await fetchSellerVouchers(auth.authenticatedFetch, { state: voucherState, limit: 20 });
-      setVouchers(voucherPage.items);
-      setVoucherCursor(voucherPage.nextCursor);
+      const response = await fetchSellerVouchers(auth.authenticatedFetch, { state: voucherState, page: targetPage });
+      const lastPage = Math.max(1, response.totalPages);
+      if (targetPage > lastPage) { setVoucherPage(lastPage); return; }
+      setVouchers(response.items);
+      setVoucherPage(response.page);
+      setVoucherPageSize(response.pageSize);
+      setVoucherTotalItems(response.totalItems);
+      setVoucherTotalPages(response.totalPages);
     } catch (cause) {
       setError(promotionErrorMessage(cause, 'Không thể tải khuyến mãi.'));
     } finally {
       setLoading(false);
     }
-  }, [auth.authenticatedFetch, auth.state.status, voucherState]);
+  }, [auth.authenticatedFetch, auth.state.status, voucherPage, voucherState]);
   useEffect(() => {
     void Promise.resolve().then(() => load());
   }, [load]);
@@ -876,16 +882,6 @@ export function SellerPromotionsManagement() {
     if (!pending) return;
     await actVoucher(pending.item, pending.action);
   };
-  const loadMoreVouchers = async () => {
-    if (!voucherCursor) return;
-    const page = await fetchSellerVouchers(auth.authenticatedFetch, {
-      state: voucherState,
-      limit: 20,
-      cursor: voucherCursor,
-    });
-    setVouchers((items) => [...items, ...page.items]);
-    setVoucherCursor(page.nextCursor);
-  };
   const startVoucherEdit = (item: SellerVoucherSummary) => {
     setEditingVoucher(item);
     setVoucherFormOpen(true);
@@ -919,22 +915,25 @@ export function SellerPromotionsManagement() {
           <VoucherListView
             vouchers={vouchers}
             visibleVouchers={visibleVouchers}
-            voucherCursor={voucherCursor}
+            page={voucherPage}
+            pageSize={voucherPageSize}
+            totalItems={voucherTotalItems}
+            totalPages={voucherTotalPages}
             promotionSearch={promotionSearch}
             promotionSort={promotionSort}
             voucherState={voucherState}
             voucherTimeFilter={voucherTimeFilter}
             saving={saving}
-            onSearch={setPromotionSearch}
-            onSort={setPromotionSort}
-            onVoucherState={setVoucherState}
-            onTimeFilter={setVoucherTimeFilter}
+            onSearch={(value) => { setPromotionSearch(value); setVoucherPage(1); }}
+            onSort={(value) => { setPromotionSort(value); setVoucherPage(1); }}
+            onVoucherState={(value) => { setVoucherState(value); setVoucherPage(1); }}
+            onTimeFilter={(value) => { setVoucherTimeFilter(value); setVoucherPage(1); }}
             onCreate={startVoucherCreate}
             onEdit={startVoucherEdit}
             onPause={(item) => setPendingAction({ item, action: 'PAUSE' })}
             onResume={(item) => setPendingAction({ item, action: 'RESUME' })}
             onDelete={setPendingVoucherDelete}
-            onLoadMore={() => void loadMoreVouchers()}
+            onPageChange={setVoucherPage}
           />
           {voucherFormOpen ? (
             <SellerVoucherFormDialog

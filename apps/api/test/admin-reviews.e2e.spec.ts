@@ -119,14 +119,15 @@ describe('Admin Reviews E2E Endpoints', () => {
       reportCount: 1,
       latestReportedAt: '2026-08-21T12:00:00.000Z',
     }];
-    reviewsService.adminListReportedReviews.mockResolvedValue(queue);
+    reviewsService.adminListReportedReviews.mockResolvedValue({ items: queue, totalItems: 1 });
 
     const allowed = await request(app.getHttpServer())
       .get('/api/v1/admin/reviews/reported')
       .set('Authorization', 'Bearer admin');
     expect(allowed.status).toBe(200);
     expect(allowed.header['cache-control']).toBe('private, no-store');
-    expect(allowed.body).toEqual({ items: queue });
+    expect(allowed.body).toEqual({ items: queue, page: 1, pageSize: 10, totalItems: 1, totalPages: 1 });
+    expect(reviewsService.adminListReportedReviews).toHaveBeenCalledWith(1);
 
     const denied = await request(app.getHttpServer())
       .get('/api/v1/admin/reviews/reported')

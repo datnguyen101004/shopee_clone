@@ -15,6 +15,10 @@ T27 adds the operational Admin Console, enabling platform administrators to over
 | **Review Moderation** | `GET /api/v1/admin/reviews/reported`, `GET /api/v1/admin/reviews/:reviewId`, `POST .../actions` | `AuthGuard` + `RolesGuard('admin')` + Trusted Origin + Idempotency | Private seller-report queue, safe report context without seller identity, atomic hide/keep-visible resolution, rating aggregate refresh and optimistic locking |
 | **Privileged Audit** | `GET /api/v1/admin/audit` | `AuthGuard` + `RolesGuard('admin')` | Append-only in PostgreSQL, transactional writes, no update/delete routes |
 
+### Homepage banner image storage
+
+The Admin homepage image picker stages JPG, PNG, and WebP files through a signed S3 `PUT` and a server-side completion check. Banner objects use the fixed `admin-banner-media/*` prefix in the configured private bucket and are served through the configured CloudFront viewer base. The bucket policy and S3 CORS rule must permit this prefix for the signed upload and the CloudFront origin; no credentials are stored in the browser. Apply the accompanying Prisma migration before enabling the upload endpoints.
+
 ## Multi-Device Session Invalidation on Suspend
 
 When an administrator suspends a user via `POST /api/v1/admin/users/:userId/actions`:

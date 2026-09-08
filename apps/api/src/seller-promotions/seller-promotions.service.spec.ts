@@ -17,6 +17,32 @@ function voucher(overrides: Record<string, unknown> = {}) {
 }
 
 describe('SellerPromotionsService concurrency boundary', () => {
+  it('uses a stable ten-item page and total metadata for discount lists', async () => {
+    const prisma = {
+      $queryRaw: jest.fn().mockResolvedValue([{ now: date('2026-08-20T00:00:00.000Z') }]),
+      shopDiscountCampaign: {
+        count: jest.fn().mockResolvedValue(24),
+        findMany: jest.fn().mockResolvedValue([]),
+      },
+    };
+    const scope = { resolve: jest.fn().mockResolvedValue({ id: 'shop-1', timeZone: 'Asia/Ho_Chi_Minh' }) };
+    const service = new SellerPromotionsService(prisma as never, scope as never);
+
+    await expect(service.listDiscounts('owner-1', { state: 'ALL', page: 3 })).resolves.toMatchObject({
+      page: 3,
+      pageSize: 10,
+      totalItems: 24,
+      totalPages: 3,
+    });
+    expect(prisma.shopDiscountCampaign.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        skip: 20,
+        take: 10,
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      }),
+    );
+  });
+
   it('generates a unique shop voucher code inside the create transaction', async () => {
     const created = voucher({ code: 'SHOP-ABCDEF1234', usedCount: 0 });
     const tx = {

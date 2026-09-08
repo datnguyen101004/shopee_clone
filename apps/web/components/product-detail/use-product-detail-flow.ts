@@ -2,7 +2,7 @@
 
 import type { ProductDetailResponse } from '@shopee-clone/contracts';
 import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 import { useAuthSession } from '../auth-session-provider';
 import { useCart } from '../cart/cart-provider';
@@ -16,6 +16,9 @@ import {
   quantityError,
   selectProductVariant,
 } from './product-detail-interactions';
+
+import { useFlashSaleStatusPolling } from '../../lib/use-flash-sale-status-polling';
+import { getVariantFlashSaleOffer } from './product-detail-flash-sale';
 
 function isSelfPurchaseError(error: unknown): boolean {
   return (
@@ -34,6 +37,23 @@ export function useProductDetailFlow({ product }: { product: ProductDetailRespon
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [selfPurchaseWarningOpen, setSelfPurchaseWarningOpen] = useState(false);
 
+  // Detect if any variant is tied to a Flash Sale campaign
+  const flashSaleCampaignId = product.variants.find(
+    (v) => v.scheduledPrice?.campaignTypeCode === 'FLASH_SALE',
+  )?.scheduledPrice?.campaignId ?? '';
+
+  const flashSaleVariantIds = useMemo(
+    () => product.variants
+      .filter((variant) => variant.scheduledPrice?.campaignTypeCode === 'FLASH_SALE')
+      .map((variant) => variant.id),
+    [product.variants],
+  );
+  const polling = useFlashSaleStatusPolling({
+    campaignId: flashSaleCampaignId,
+    variantIds: flashSaleVariantIds,
+    enabled: Boolean(flashSaleCampaignId),
+  });
+
   useEffect(() => {
     if (!toastMessage) return;
     const timer = setTimeout(() => {
@@ -43,20 +63,39 @@ export function useProductDetailFlow({ product }: { product: ProductDetailRespon
   }, [toastMessage]);
 
   const selectedVariant = getVariant(product, selection.variantId);
+  const flashSaleOffer = getVariantFlashSaleOffer(selectedVariant, polling.statusMap);
+
   const image = activeProductImage(product, selection.activeImageId);
-  const error = quantityError(selection.quantity, selectedVariant);
-  const purchaseReady = canPurchase(selection.quantity, selectedVariant);
+
+  // If Flash Sale sold out, purchase is strictly blocked
+  const isFsSoldOut = flashSaleOffer.isFlashSale && flashSaleOffer.state === 'SOLD_OUT';
+  const isFsActive = flashSaleOffer.isFlashSale && flashSaleOffer.state === 'ACTIVE' && flashSaleOffer.canPurchase;
+
+  let rawError = quantityError(selection.quantity, selectedVariant);
+  if (isFsSoldOut) {
+    rawError = 'Biến thể Flash Sale này đã hết suất.';
+  }
+
+  const purchaseReady = !isFsSoldOut && canPurchase(isFsActive ? '1' : selection.quantity, selectedVariant);
   const ownsShop =
     auth.state.status === 'authenticated' && auth.state.user.id === product.shop.ownerUserId;
+
   const liveMessage =
     cartMessage ||
-    error ||
-    (selectedVariant ? `Đã chọn ${selectedVariant.name}.` : 'Chưa có biến thể để chọn.');
+    rawError ||
+    (isFsActive
+      ? `Đã chọn ${selectedVariant?.name} (Flash Sale). Số lượng mua cố định là 1.`
+      : selectedVariant
+        ? `Đã chọn ${selectedVariant.name}.`
+        : 'Chưa có biến thể để chọn.');
+
+  const effectiveQuantity = isFsActive ? '1' : selection.quantity;
+
   const handoffs =
     selectedVariant && purchaseReady
       ? {
-          add: productLoginHandoff(product, selectedVariant.id, selection.quantity, 'add-to-cart'),
-          buy: productLoginHandoff(product, selectedVariant.id, selection.quantity, 'buy-now'),
+          add: productLoginHandoff(product, selectedVariant.id, effectiveQuantity, 'add-to-cart'),
+          buy: productLoginHandoff(product, selectedVariant.id, effectiveQuantity, 'buy-now'),
         }
       : null;
   const canMutateCart =
@@ -96,9 +135,9 @@ export function useProductDetailFlow({ product }: { product: ProductDetailRespon
     }
     setCartMessage('');
     try {
-      const result = await cart.addItem(selectedVariant.id, Number(selection.quantity));
+      const result = await cart.addItem(selectedVariant.id, Number(effectiveQuantity));
       const message =
-        result.adjustments[0]?.message ?? `Đã thêm ${selection.quantity} sản phẩm vào giỏ hàng.`;
+        result.adjustments[0]?.message ?? `Đã thêm ${effectiveQuantity} sản phẩm vào giỏ hàng.`;
       setCartMessage(message);
       setToastMessage(message);
     } catch (caught: unknown) {
@@ -112,14 +151,18 @@ export function useProductDetailFlow({ product }: { product: ProductDetailRespon
   };
 
   const handleBuyNow = async () => {
-    if (!canMutateCart || !selectedVariant) return;
+    if (!purchaseReady || !selectedVariant) return;
+    if (auth.state.status !== 'authenticated') {
+      if (handoffs?.buy) router.push(handoffs.buy);
+      return;
+    }
     if (ownsShop) {
       setSelfPurchaseWarningOpen(true);
       return;
     }
     setCartMessage('');
     try {
-      await cart.addItem(selectedVariant.id, Number(selection.quantity));
+      await cart.addItem(selectedVariant.id, Number(effectiveQuantity));
       router.push('/cart');
     } catch (caught: unknown) {
       if (isSelfPurchaseError(caught)) {
@@ -137,8 +180,10 @@ export function useProductDetailFlow({ product }: { product: ProductDetailRespon
   return {
     selection,
     selectedVariant,
+    flashSaleOffer,
+    statusMap: polling.statusMap,
     image,
-    error,
+    error: rawError,
     purchaseReady,
     liveMessage,
     handoffs,

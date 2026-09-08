@@ -110,7 +110,8 @@ function purchaseBlockers(
 
 function CartLineRow({ line, pricingLine }: { line: CartLine; pricingLine?: PricingQuoteLine }) {
   const cart = useCart();
-  const maximum = Math.max(1, line.maxPurchaseQuantity);
+  const isFlashSale = pricingLine?.campaignPrice?.campaignTypeCode === 'FLASH_SALE';
+  const maximum = isFlashSale ? 1 : Math.max(1, line.maxPurchaseQuantity);
   const [draft, setDraft] = useState<string | null>(null);
 
   function commitQuantity() {
@@ -119,7 +120,8 @@ function CartLineRow({ line, pricingLine }: { line: CartLine; pricingLine?: Pric
     if (!Number.isSafeInteger(quantity) || quantity < 1 || quantity > 99) {
       return;
     }
-    if (quantity !== line.quantity) ignoreRejected(cart.updateQuantity(line.id, quantity));
+    const normalizedQuantity = isFlashSale ? 1 : quantity;
+    if (normalizedQuantity !== line.quantity) ignoreRejected(cart.updateQuantity(line.id, normalizedQuantity));
   }
 
   return (
@@ -154,6 +156,9 @@ function CartLineRow({ line, pricingLine }: { line: CartLine; pricingLine?: Pric
           <span className="font-medium">{line.product.name}</span>
         )}
         <span>Phân loại: {line.variant.name}</span>
+        {pricingLine?.campaignPrice?.campaignTypeCode === 'FLASH_SALE' && (
+          <span className="cart-line__fs-badge">⚡ Flash Sale (Tối đa 1 sản phẩm)</span>
+        )}
         {line.issues.map((issue) => (
           <p key={issue.code} className="cart-line__issue" role="status">
             {issue.message}
@@ -190,7 +195,7 @@ function CartLineRow({ line, pricingLine }: { line: CartLine; pricingLine?: Pric
         <input
           aria-label={`Nhập số lượng ${line.product.name}`}
           inputMode="numeric"
-          value={draft ?? String(line.quantity)}
+          value={draft ?? String(isFlashSale ? Math.min(line.quantity, 1) : line.quantity)}
           disabled={cart.pending || !line.eligible}
           onChange={(event) => setDraft(event.target.value)}
           onBlur={commitQuantity}
@@ -209,7 +214,7 @@ function CartLineRow({ line, pricingLine }: { line: CartLine; pricingLine?: Pric
         >
           +
         </button>
-        <small>Còn {line.availableQuantity}</small>
+        {!isFlashSale ? <small>Còn {line.availableQuantity}</small> : null}
       </div>
       <span className="cart-line__subtotal font-semibold">
         {formatCurrency(pricingLine?.merchandiseSubtotalMinor ?? line.lineSubtotalMinor)}
@@ -446,6 +451,11 @@ export function CartScreen() {
     pricing.quote?.cartVersion === current.version &&
     pricing.quote.summary.selectedLineCount === current.summary.selectedValidLineCount &&
     pricing.quote.exclusions.length === 0;
+  const hasFlashSaleLine = Boolean(
+    pricing.quote?.shops.some((shop) =>
+      shop.lines.some((line) => line.campaignPrice?.campaignTypeCode === 'FLASH_SALE'),
+    ),
+  );
   const displayedPurchaseBlockers = canPurchase
     ? []
     : purchaseBlockerMessages.length
@@ -546,6 +556,11 @@ export function CartScreen() {
             </>
           )}
         </div>
+        {hasFlashSaleLine && (
+          <div className="cart-fs-cod-notice" role="note">
+            ⚡ Đơn có sản phẩm Flash Sale chỉ hỗ trợ thanh toán khi nhận hàng (COD).
+          </div>
+        )}
         <button
           type="button"
           disabled={!canPurchase}

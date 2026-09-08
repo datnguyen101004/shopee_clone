@@ -1,0 +1,153 @@
+{
+    "metrics": {
+        "iterations": {
+            "count": 10,
+            "rate": 0.6830758937551132
+        },
+        "http_req_connecting": {
+            "min": 4.291,
+            "med": 4.291,
+            "max": 4.291,
+            "p(90)": 4.291,
+            "p(95)": 4.291,
+            "avg": 4.2909999999999995
+        },
+        "http_req_sending": {
+            "p(90)": 0.5969,
+            "p(95)": 0.5969,
+            "avg": 0.5968999999999999,
+            "min": 0.5969,
+            "med": 0.5969,
+            "max": 0.5969
+        },
+        "checks": {
+            "passes": 20,
+            "fails": 0,
+            "value": 1
+        },
+        "t35_unexpected": {
+            "count": 0,
+            "rate": 0,
+            "thresholds": {
+                "count==0": false
+            }
+        },
+        "http_req_failed": {
+            "passes": 0,
+            "fails": 10,
+            "value": 0
+        },
+        "http_req_tls_handshaking": {
+            "med": 0,
+            "max": 0,
+            "p(90)": 0,
+            "p(95)": 0,
+            "avg": 0,
+            "min": 0
+        },
+        "vus": {
+            "value": 1,
+            "min": 1,
+            "max": 10
+        },
+        "vus_max": {
+            "value": 10,
+            "min": 10,
+            "max": 10
+        },
+        "iteration_duration": {
+            "min": 10221.9572,
+            "med": 12753.11915,
+            "max": 14638.6654,
+            "p(90)": 13776.90712,
+            "p(95)": 14207.786259999999,
+            "avg": 12618.26762
+        },
+        "http_req_waiting": {
+            "p(95)": 73.8582,
+            "avg": 68.60951,
+            "min": 31.3309,
+            "med": 72.4759,
+            "max": 73.8582,
+            "p(90)": 73.8582
+        },
+        "data_sent": {
+            "count": 6170,
+            "rate": 421.45782644690485
+        },
+        "http_req_receiving": {
+            "p(90)": 0.5559,
+            "p(95)": 0.55635,
+            "avg": 0.16645,
+            "min": 0,
+            "med": 0,
+            "max": 0.5568
+        },
+        "http_req_duration{expected_response:true}": {
+            "p(90)": 74.51029,
+            "p(95)": 74.758645,
+            "avg": 69.37286000000002,
+            "min": 32.4846,
+            "med": 73.3507,
+            "max": 75.007
+        },
+        "http_req_blocked": {
+            "avg": 6.977000000000002,
+            "min": 6.977,
+            "med": 6.977,
+            "max": 6.977,
+            "p(90)": 6.977,
+            "p(95)": 6.977
+        },
+        "t35_api_latency": {
+            "avg": 69.37286000000002,
+            "min": 32.4846,
+            "med": 73.3507,
+            "max": 75.007,
+            "p(90)": 74.51029,
+            "p(95)": 74.758645
+        },
+        "http_req_duration": {
+            "avg": 69.37286000000002,
+            "min": 32.4846,
+            "med": 73.3507,
+            "max": 75.007,
+            "p(90)": 74.51029,
+            "p(95)": 74.758645
+        },
+        "data_received": {
+            "rate": 588.1283445231525,
+            "count": 8610
+        },
+        "t35_requests": {
+            "count": 10,
+            "rate": 0.6830758937551132
+        },
+        "http_reqs": {
+            "count": 10,
+            "rate": 0.6830758937551132
+        }
+    },
+    "root_group": {
+        "id": "d41d8cd98f00b204e9800998ecf8427e",
+        "groups": {},
+        "checks": {
+                "status endpoint returns success": {
+                    "name": "status endpoint returns success",
+                    "path": "::status endpoint returns success",
+                    "id": "ea15bc1b497baf84e41c06892887ae35",
+                    "passes": 10,
+                    "fails": 0
+                },
+                "public response does not expose exact quota": {
+                    "path": "::public response does not expose exact quota",
+                    "id": "9cbe19b22b4c1282854e7efa712b3966",
+                    "passes": 10,
+                    "fails": 0,
+                    "name": "public response does not expose exact quota"
+                }
+            },
+        "name": "",
+        "path": ""
+    }
+}

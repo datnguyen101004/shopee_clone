@@ -1,0 +1,154 @@
+{
+    "root_group": {
+        "groups": {},
+        "checks": {
+                "join response is HTTP 200": {
+                    "name": "join response is HTTP 200",
+                    "path": "::join response is HTTP 200",
+                    "id": "b15d29fa813591bce348e632db8be8ee",
+                    "passes": 21,
+                    "fails": 0
+                }
+            },
+        "name": "",
+        "path": "",
+        "id": "d41d8cd98f00b204e9800998ecf8427e"
+    },
+    "metrics": {
+        "http_req_waiting": {
+            "avg": 166.0037731182796,
+            "min": 15.691,
+            "med": 46.568,
+            "max": 615.5213,
+            "p(90)": 526.2804,
+            "p(95)": 581.8056399999998
+        },
+        "http_req_duration": {
+            "min": 15.691,
+            "med": 54.0165,
+            "max": 617.7948,
+            "p(90)": 528.4183,
+            "p(95)": 583.3421399999997,
+            "avg": 166.8468
+        },
+        "t35_waiting": {
+            "rate": 1.0399480941107266,
+            "count": 52
+        },
+        "http_req_failed": {
+            "passes": 0,
+            "fails": 93,
+            "value": 0
+        },
+        "checks": {
+            "passes": 21,
+            "fails": 0,
+            "value": 1
+        },
+        "http_req_connecting": {
+            "p(90)": 4.9156,
+            "p(95)": 5.459,
+            "avg": 1.329710752688172,
+            "min": 0,
+            "med": 0.5065,
+            "max": 6.1983
+        },
+        "http_req_tls_handshaking": {
+            "avg": 0,
+            "min": 0,
+            "med": 0,
+            "max": 0,
+            "p(90)": 0,
+            "p(95)": 0
+        },
+        "vus": {
+            "value": 1,
+            "min": 1,
+            "max": 21
+        },
+        "vus_max": {
+            "value": 21,
+            "min": 21,
+            "max": 21
+        },
+        "data_received": {
+            "count": 62895,
+            "rate": 1257.8372188287337
+        },
+        "http_req_duration{expected_response:true}": {
+            "p(95)": 583.3421399999997,
+            "avg": 166.8468,
+            "min": 15.691,
+            "med": 54.0165,
+            "max": 617.7948,
+            "p(90)": 528.4183
+        },
+        "http_reqs": {
+            "count": 93,
+            "rate": 1.859907168313415
+        },
+        "t35_admitted": {
+            "count": 20,
+            "rate": 0.39998003619643335
+        },
+        "iteration_duration": {
+            "p(90)": 18926.930030000003,
+            "p(95)": 20794.34442,
+            "avg": 15898.018594999998,
+            "min": 12746.3056,
+            "med": 15839.471450000001,
+            "max": 20805.2128
+        },
+        "data_sent": {
+            "count": 57456,
+            "rate": 1149.0626479851137
+        },
+        "iterations": {
+            "count": 20,
+            "rate": 0.39998003619643335
+        },
+        "http_req_blocked": {
+            "p(90)": 7.5469,
+            "p(95)": 8.0552,
+            "avg": 1.9762526881720428,
+            "min": 0,
+            "med": 0.8208,
+            "max": 8.7945
+        },
+        "http_req_sending": {
+            "p(95)": 2.9704199999999847,
+            "avg": 0.6833311827956988,
+            "min": 0,
+            "med": 0,
+            "max": 7.8801,
+            "p(90)": 2.2735
+        },
+        "http_req_receiving": {
+            "max": 5.2969,
+            "p(90)": 0.5486,
+            "p(95)": 0.57194,
+            "avg": 0.15969569892473115,
+            "min": 0,
+            "med": 0
+        },
+        "t35_requests": {
+            "count": 93,
+            "rate": 1.859907168313415
+        },
+        "t35_api_latency": {
+            "med": 54.0165,
+            "max": 617.7948,
+            "p(90)": 528.4183,
+            "p(95)": 583.3421399999997,
+            "avg": 166.8468,
+            "min": 15.691
+        },
+        "t35_unexpected": {
+            "rate": 0,
+            "count": 0,
+            "thresholds": {
+                "count==0": false
+            }
+        }
+    }
+}

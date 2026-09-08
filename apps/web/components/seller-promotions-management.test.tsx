@@ -60,8 +60,8 @@ const products: SellerProductSummary[] = [
 describe('SellerPromotionsManagement', () => {
   beforeEach(() => {
     for (const mock of Object.values(api)) mock.mockReset();
-    api.vouchers.mockResolvedValue({ sellerPromotionVersion: 'seller-promotions-v1', items: [voucher], nextCursor: null });
-    api.products.mockResolvedValue({ items: products, nextCursor: null });
+    api.vouchers.mockResolvedValue({ sellerPromotionVersion: 'seller-promotions-v1', items: [voucher], page: 1, pageSize: 10, totalItems: 1, totalPages: 1 });
+    api.products.mockResolvedValue({ items: products, page: 1, pageSize: 10, totalItems: products.length, totalPages: 1 });
     api.createVoucher.mockResolvedValue(voucher);
     api.updateVoucher.mockResolvedValue(voucher);
     api.actionVoucher.mockResolvedValue({ ...voucher, state: 'PAUSED', version: 3 });
@@ -110,7 +110,7 @@ describe('SellerPromotionsManagement', () => {
   });
 
   it('confirms deletion of a paused voucher and sends its current version', async () => {
-    api.vouchers.mockResolvedValue({ sellerPromotionVersion: 'seller-promotions-v1', items: [{ ...voucher, state: 'PAUSED' }], nextCursor: null });
+    api.vouchers.mockResolvedValue({ sellerPromotionVersion: 'seller-promotions-v1', items: [{ ...voucher, state: 'PAUSED' }], page: 1, pageSize: 10, totalItems: 1, totalPages: 1 });
     renderPromotions();
     await screen.findByText('SHOP10');
     fireEvent.click(screen.getByRole('button', { name: 'Xóa voucher SHOP10' }));
@@ -135,7 +135,7 @@ describe('SellerPromotionsManagement', () => {
     api.vouchers.mockResolvedValue({
       sellerPromotionVersion: 'seller-promotions-v1',
       items: [{ ...voucher, productIds: [products[0]!.id] }],
-      nextCursor: null,
+      page: 1, pageSize: 10, totalItems: 1, totalPages: 1,
     });
     renderPromotions();
     await screen.findByText('SHOP10');
@@ -218,7 +218,7 @@ describe('SellerPromotionsManagement', () => {
     api.vouchers.mockResolvedValue({
       sellerPromotionVersion: 'seller-promotions-v1',
       items: [voucher, secondVoucher],
-      nextCursor: null,
+      page: 1, pageSize: 10, totalItems: 2, totalPages: 1,
     });
 
     renderPromotions();
@@ -228,6 +228,6 @@ describe('SellerPromotionsManagement', () => {
     fireEvent.change(screen.getByLabelText('Tìm kiếm voucher'), { target: { value: 'SHOP10' } });
     expect(screen.getByText('SHOP10')).toBeInTheDocument();
     expect(screen.queryByText('SHOP50')).not.toBeInTheDocument();
-    expect(screen.getByText(/voucher đã tải/)).toHaveTextContent('Hiển thị 1 trong 2 voucher đã tải');
+    expect(screen.getByText(/Hiển thị 1–2 trong 2 voucher/)).toBeInTheDocument();
   });
 });

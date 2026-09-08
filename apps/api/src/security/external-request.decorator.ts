@@ -1,7 +1,10 @@
 import { SetMetadata } from '@nestjs/common';
 
 export const EXTERNAL_REQUEST_CLASS = 'external-request-class';
-export type ExternalRequestClass = 'google-oauth-callback' | 'provider-signed-webhook';
+export type ExternalRequestClass =
+  | 'google-oauth-callback'
+  | 'provider-signed-webhook'
+  | 'internal-signed';
 
 export const ExternalRequest = (requestClass: ExternalRequestClass) =>
   SetMetadata(EXTERNAL_REQUEST_CLASS, requestClass);

@@ -178,6 +178,54 @@ export class SellerOrderCompensationService {
         reason: input.reasonCode,
       },
     });
+    await this.restoreFlashSaleQuota(tx, input.orderId);
+  }
+
+  /**
+   * Physical inventory is restored above for every consumed order. A still-live
+   * Flash Sale also gets its sale allocation restored; after the campaign/SKU
+   * has ended the restored unit is ordinary inventory only. Buyer claims stay
+   * permanent so a cancelled Flash Sale order cannot be used to buy again.
+   */
+  private async restoreFlashSaleQuota(tx: Tx, orderId: string): Promise<void> {
+    const delegate = (tx as unknown as { flashSaleConsumption?: { findMany: (args: unknown) => Promise<unknown[]> } }).flashSaleConsumption;
+    if (!delegate) return;
+    const rows = await delegate.findMany({
+      where: { orderLine: { orderId }, reversedAt: null },
+      include: { flashSaleSku: { include: { campaign: true } } },
+    }) as Array<{ id: string; quantity: number; flashSaleSkuId: string; flashSaleSku: { endedAt: Date | null; campaign: { cancelledAt: Date | null; endsAt: Date } } }>;
+    if (rows.length === 0) return;
+    const now = new Date();
+    for (const row of rows) {
+      const live = row.flashSaleSku.endedAt === null &&
+        row.flashSaleSku.campaign.cancelledAt === null &&
+        row.flashSaleSku.campaign.endsAt > now;
+      if (live) {
+        const updated = await tx.flashSaleSku.update({
+          where: { id: row.flashSaleSkuId },
+          data: {
+            remainingQuantity: { increment: row.quantity },
+            netConsumedQuantity: { decrement: row.quantity },
+            version: { increment: 1 },
+          },
+        });
+        await tx.flashSaleOutbox.create({
+          data: {
+            id: randomUUID(),
+            eventId: randomUUID(),
+            flashSaleSkuId: updated.id,
+            sequence: updated.version,
+            managementEpoch: updated.managementEpoch,
+            admissionDelta: row.quantity,
+            publicSnapshot: { state: 'ACTIVE', stateVersion: updated.version, salePriceMinor: Number(updated.salePriceMinor) },
+          },
+        });
+      }
+      await tx.flashSaleConsumption.update({
+        where: { id: row.id },
+        data: { reversedAt: now, reversalDestination: live ? 'FLASH_SALE_QUOTA' : 'ORDINARY_INVENTORY' },
+      });
+    }
   }
 
   async cancelAndCompensate(tx: Tx, input: SellerOrderCancellationInput): Promise<void> {

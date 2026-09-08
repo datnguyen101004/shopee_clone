@@ -130,7 +130,10 @@ export interface CampaignAdminSummary extends CampaignSummary {
 
 export interface CampaignAdminPage {
   items: CampaignAdminSummary[];
-  nextCursor: string | null;
+  page: number;
+  pageSize: number;
+  totalItems: number;
+  totalPages: number;
 }
 
 export interface CampaignCollectionConfig {
@@ -146,6 +149,43 @@ export interface CampaignPlacementRequest { moduleId: string; sortOrder?: number
 export interface CampaignParticipationReport { shopId: string; state: CampaignParticipationState; version: number; submittedProductCount: number; respondedAt: string | null; }
 export interface CampaignParticipationPage { items: CampaignParticipationReport[]; nextCursor: string | null; }
 
+/** Admin-only participation detail used by the campaign detail page. */
+export interface CampaignAdminParticipantProduct {
+  id: string;
+  productId: string;
+  productName: string;
+  productSlug: string;
+  variantId: string | null;
+  variantName: string | null;
+  sku: string | null;
+  options: string[];
+  regularPriceMinor: number | null;
+  salePriceMinor: number | null;
+  discountBasisPoints: number | null;
+  allocatedQuantity: number | null;
+  remainingQuantity: number | null;
+  physicalInventoryAvailable: number | null;
+}
+
+export interface CampaignAdminParticipantDetail {
+  participationId: string;
+  shopId: string;
+  shopName: string;
+  shopSlug: string;
+  state: CampaignParticipationState;
+  version: number;
+  respondedAt: string | null;
+  products: CampaignAdminParticipantProduct[];
+}
+
+export interface CampaignAdminParticipantPage {
+  items: CampaignAdminParticipantDetail[];
+  page: number;
+  pageSize: number;
+  totalItems: number;
+  totalPages: number;
+}
+
 export interface CampaignNotificationMetadata {
   campaignId: string;
   typeCode: string;
@@ -156,7 +196,10 @@ export interface CampaignNotificationMetadata {
 
 export interface SellerCampaignPage {
   items: CampaignSummary[];
-  nextCursor: string | null;
+  page: number;
+  pageSize: number;
+  totalItems: number;
+  totalPages: number;
 }
 
 export interface SellerCampaignDetail extends CampaignSummary {

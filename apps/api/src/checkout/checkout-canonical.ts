@@ -11,6 +11,17 @@ function sha256(value: unknown): Buffer {
 }
 
 export function checkoutFingerprint(preview: CheckoutPreviewResponse): string {
+  const shops = preview.shops.map((shop) => ({
+    ...shop,
+    lines: shop.lines.map((line) => {
+      if (!line.campaignPrice) return line;
+      // campaignPrice.evaluatedAt is an observation timestamp, not a checkout
+      // fact. Repricing is still detected through the material price/campaign
+      // fields, while a confirm immediately after preview remains valid.
+      const { evaluatedAt: _evaluatedAt, ...campaignPrice } = line.campaignPrice;
+      return { ...line, campaignPrice };
+    }),
+  }));
   return sha256({
     version: CHECKOUT_FINGERPRINT_VERSION,
     pricingVersion: preview.pricingVersion,
@@ -19,7 +30,7 @@ export function checkoutFingerprint(preview: CheckoutPreviewResponse): string {
     currency: preview.currency,
     cartVersion: preview.cartVersion,
     address: preview.address,
-    shops: preview.shops,
+    shops,
     vouchers: preview.vouchers,
     summary: preview.summary,
   }).toString('hex');

@@ -98,7 +98,7 @@ databaseTest('inventory PostgreSQL concurrency', () => {
   });
 
   it('lists published inventory with the primary image projection before pagination', async () => {
-    const page = await service.list(sellerId, { cursor: null, limit: 1, productId, lowStock: null });
+    const page = await service.list(sellerId, { page: 1, productId, lowStock: null });
     expect(page.items).toEqual(expect.arrayContaining([expect.objectContaining({ variantId })]));
     expect(page.items[0]).toHaveProperty('productImageUrl');
   });

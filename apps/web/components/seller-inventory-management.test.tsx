@@ -34,7 +34,7 @@ const item = {
 
 describe('SellerInventoryManagement', () => {
   beforeEach(() => {
-    fetchInventory.mockReset().mockResolvedValue({ items: [item], nextCursor: null });
+    fetchInventory.mockReset().mockResolvedValue({ items: [item], page: 1, pageSize: 10, totalItems: 1, totalPages: 1 });
     adjustInventory.mockReset().mockResolvedValue({ id: 'audit' });
     fetchHistory.mockReset().mockResolvedValue({ items: [], nextCursor: null });
   });
@@ -43,7 +43,7 @@ describe('SellerInventoryManagement', () => {
     render(<SellerInventoryManagement />);
     expect(await screen.findByText('Gương')).toBeInTheDocument();
     expect(screen.getByText('7')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Điều chỉnh' }));
+    fireEvent.click(screen.getByRole('button', { name: /^Điều chỉnh tồn kho / }));
     const input = screen.getByLabelText('Thay đổi số lượng');
     expect(input).toHaveFocus();
     fireEvent.change(input, { target: { value: '5' } });
@@ -56,10 +56,10 @@ describe('SellerInventoryManagement', () => {
     adjustInventory.mockRejectedValueOnce(error);
     render(<SellerInventoryManagement />);
     await screen.findByText('Gương');
-    fireEvent.click(screen.getByRole('button', { name: 'Lịch sử' }));
+    fireEvent.click(screen.getByRole('button', { name: /^Xem lịch sử tồn kho / }));
     expect(await screen.findByText('Lịch sử điều chỉnh')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Đóng' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Điều chỉnh' }));
+    fireEvent.click(screen.getByRole('button', { name: /^Điều chỉnh tồn kho / }));
     fireEvent.change(screen.getByLabelText('Thay đổi số lượng'), { target: { value: '5' } });
     fireEvent.click(screen.getByRole('button', { name: 'Lưu điều chỉnh' }));
     await waitFor(() => expect(screen.getByRole('dialog')).toBeInTheDocument());
@@ -74,7 +74,7 @@ describe('SellerInventoryManagement', () => {
   });
 
   it('explains that only published products are shown in the empty state', async () => {
-    fetchInventory.mockResolvedValue({ items: [], nextCursor: null });
+    fetchInventory.mockResolvedValue({ items: [], page: 1, pageSize: 10, totalItems: 0, totalPages: 0 });
     render(<SellerInventoryManagement />);
     expect(await screen.findByText(/chỉ hiển thị sản phẩm đang bán/i)).toBeInTheDocument();
   });
@@ -89,7 +89,7 @@ describe('SellerInventoryManagement', () => {
       availableQuantity: 30,
       updatedAt: '2026-07-18T00:00:00.000Z',
     };
-    fetchInventory.mockResolvedValue({ items: [item, olderItem], nextCursor: null });
+    fetchInventory.mockResolvedValue({ items: [item, olderItem], page: 1, pageSize: 10, totalItems: 2, totalPages: 1 });
     render(<SellerInventoryManagement />);
 
     expect(await screen.findByText('Gương')).toBeInTheDocument();

@@ -19,6 +19,20 @@ const MONTHS = [
   'Tháng Mười Một',
   'Tháng Mười Hai',
 ] as const;
+const MONTHS_EN = [
+  'January',
+  'February',
+  'March',
+  'April',
+  'May',
+  'June',
+  'July',
+  'August',
+  'September',
+  'October',
+  'November',
+  'December',
+] as const;
 const HOURS_12 = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12] as const;
 const MINUTES = Array.from({ length: 60 }, (_, minute) => minute);
 
@@ -47,7 +61,14 @@ function serialize(date: Date, mode: 'date' | 'datetime') {
   return mode === 'date' ? day : `${day}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
-function formatDisplay(date: Date, mode: 'date' | 'datetime') {
+function formatDisplay(date: Date, mode: 'date' | 'datetime', locale: 'vi' | 'en') {
+  if (locale === 'en') {
+    const month = MONTHS_EN[date.getMonth()] ?? MONTHS_EN[0];
+    const day = `${month.slice(0, 3)} ${date.getDate()}, ${date.getFullYear()}`;
+    if (mode === 'date') return day;
+    const hour24 = date.getHours();
+    return `${day} ${pad(hour24 % 12 || 12)}:${pad(date.getMinutes())} ${hour24 < 12 ? 'AM' : 'PM'}`;
+  }
   const day = `${pad(date.getDate())}/${pad(date.getMonth() + 1)}/${date.getFullYear()}`;
   if (mode === 'date') return day;
   const hour24 = date.getHours();
@@ -102,12 +123,18 @@ export function DateTimeLocalPicker({
   onChange,
   mode = 'datetime',
   showClear = true,
+  locale = 'vi',
+  disabled = false,
+  popoverClassName,
   'aria-label': ariaLabel,
 }: {
   value: string;
   onChange: (value: string) => void;
   mode?: 'date' | 'datetime';
   showClear?: boolean;
+  locale?: 'vi' | 'en';
+  disabled?: boolean;
+  popoverClassName?: string;
   'aria-label'?: string;
 }) {
   const labelId = useId();
@@ -121,7 +148,9 @@ export function DateTimeLocalPicker({
 
   const selected = parseValue(value, mode);
   const draft = selected ?? new Date();
-  const placeholder = mode === 'date' ? 'Chọn ngày' : 'Chọn ngày giờ';
+  const placeholder = locale === 'en'
+    ? mode === 'date' ? 'Select date' : 'Select date and time'
+    : mode === 'date' ? 'Chọn ngày' : 'Chọn ngày giờ';
   const cells = useMemo(() => {
     const start = startOfCalendar(view.getFullYear(), view.getMonth());
     return Array.from({ length: 42 }, (_, index) => {
@@ -185,6 +214,7 @@ export function DateTimeLocalPicker({
         aria-expanded={open}
         aria-haspopup="dialog"
         aria-label={ariaLabel}
+        disabled={disabled}
         onClick={() => {
           if (open) {
             setOpen(false);
@@ -195,14 +225,14 @@ export function DateTimeLocalPicker({
           setOpen(true);
         }}
       >
-        <span>{selected ? formatDisplay(selected, mode) : placeholder}</span>
+        <span>{selected ? formatDisplay(selected, mode, locale) : placeholder}</span>
         <CalendarDays aria-hidden="true" className="datetime-local-picker__icon" strokeWidth={2} />
       </button>
       {open
         ? createPortal(
             <div
               ref={rootRef}
-              className="datetime-local-picker__popover"
+              className={`datetime-local-picker__popover${popoverClassName ? ` ${popoverClassName}` : ''}`}
               data-mode={mode}
               role="dialog"
               aria-labelledby={labelId}
@@ -211,12 +241,12 @@ export function DateTimeLocalPicker({
               <div className="datetime-local-picker__calendar">
                 <div className="datetime-local-picker__month">
                   <strong id={labelId}>
-                    {MONTHS[view.getMonth()]} {view.getFullYear()}
+                    {(locale === 'en' ? MONTHS_EN : MONTHS)[view.getMonth()]} {view.getFullYear()}
                   </strong>
                   <div>
                     <button
                       type="button"
-                      aria-label="Tháng trước"
+                      aria-label={locale === 'en' ? 'Previous month' : 'Tháng trước'}
                       onClick={() =>
                         setView(new Date(view.getFullYear(), view.getMonth() - 1, 1))
                       }
@@ -225,7 +255,7 @@ export function DateTimeLocalPicker({
                     </button>
                     <button
                       type="button"
-                      aria-label="Tháng sau"
+                      aria-label={locale === 'en' ? 'Next month' : 'Tháng sau'}
                       onClick={() =>
                         setView(new Date(view.getFullYear(), view.getMonth() + 1, 1))
                       }
@@ -260,7 +290,7 @@ export function DateTimeLocalPicker({
                 <div className="datetime-local-picker__footer">
                   {showClear ? (
                     <button type="button" onClick={() => onChange('')}>
-                      Xóa
+                      {locale === 'en' ? 'Clear' : 'Xóa'}
                     </button>
                   ) : (
                     <span />
@@ -275,13 +305,13 @@ export function DateTimeLocalPicker({
                       setView(new Date(now.getFullYear(), now.getMonth(), 1));
                     }}
                   >
-                    Hôm nay
+                    {locale === 'en' ? 'Today' : 'Hôm nay'}
                   </button>
                 </div>
               </div>
               {mode === 'datetime' ? (
-                <div className="datetime-local-picker__time" aria-label="Chọn giờ">
-                  <div className="datetime-local-picker__column" role="listbox" aria-label="Giờ">
+                <div className="datetime-local-picker__time" aria-label={locale === 'en' ? 'Time' : 'Chọn giờ'}>
+                  <div className="datetime-local-picker__column" role="listbox" aria-label={locale === 'en' ? 'Hour' : 'Giờ'}>
                     {HOURS_12.map((hour) => {
                       const isSelected = hour12Of(draft) === hour;
                       return (
@@ -299,7 +329,7 @@ export function DateTimeLocalPicker({
                       );
                     })}
                   </div>
-                  <div className="datetime-local-picker__column" role="listbox" aria-label="Phút">
+                  <div className="datetime-local-picker__column" role="listbox" aria-label={locale === 'en' ? 'Minute' : 'Phút'}>
                     {MINUTES.map((minute) => {
                       const isSelected = draft.getMinutes() === minute;
                       return (

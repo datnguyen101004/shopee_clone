@@ -38,6 +38,7 @@ export interface CheckoutPreviewState {
 export function useCheckoutPreview(
   cart: CartResponse | null,
   refreshCart: () => Promise<CartResponse | null>,
+  onAdmissionRequired?: (message?: string, retryAfterSeconds?: number) => void,
 ): CheckoutPreviewState {
   const auth = useAuthSession();
   const [status, setStatus] = useState<CheckoutPreviewStatus>('loading');
@@ -163,6 +164,17 @@ export function useCheckoutPreview(
           setMessage('Địa chỉ này không còn khả dụng. Hãy chọn địa chỉ khác.');
           return;
         }
+        if (
+          error instanceof CheckoutApiError &&
+          (error.status === 428 ||
+            error.problem?.type?.includes('admission') ||
+            error.problem?.type?.includes('waiting-room'))
+        ) {
+          onAdmissionRequired?.(error.problem?.detail, 5);
+          setStatus('blocked');
+          setMessage('Đang chuyển bạn vào phòng chờ thanh toán…');
+          return;
+        }
         setStatus('error');
         setMessage('Chưa thể xác nhận đơn hàng. Vui lòng thử lại.');
       });
@@ -176,6 +188,7 @@ export function useCheckoutPreview(
     refreshCart,
     requestSignature,
     retryGeneration,
+    onAdmissionRequired,
   ]);
 
   return {

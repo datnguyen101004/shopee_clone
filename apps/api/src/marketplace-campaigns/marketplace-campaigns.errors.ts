@@ -1,6 +1,10 @@
-export class MarketplaceCampaignError extends Error { constructor(public readonly code: string, message: string, public readonly status = 400) { super(message); } }
+export class MarketplaceCampaignError extends Error { constructor(public readonly code: string, message: string, public readonly status = 400, public readonly retryAfterSeconds?: number) { super(message); } }
 export class MarketplaceCampaignNotFoundError extends MarketplaceCampaignError { constructor() { super('CAMPAIGN_NOT_FOUND', 'Campaign is unavailable.', 404); } }
 export class MarketplaceCampaignValidationError extends MarketplaceCampaignError { constructor(public readonly fields: string[], message = 'One or more campaign fields are invalid.') { super('INVALID_CAMPAIGN_REQUEST', message, 400); } }
 export class MarketplaceCampaignConflictError extends MarketplaceCampaignError { constructor(code: string, message: string) { super(code, message, 409); } }
 export class MarketplaceCampaignStaleError extends MarketplaceCampaignError { constructor(public readonly currentVersion: number) { super('CAMPAIGN_STALE', 'Campaign was changed by another administrator.', 412); } }
 export class MarketplaceCampaignForbiddenError extends MarketplaceCampaignError { constructor() { super('CAMPAIGN_FORBIDDEN', 'The account cannot manage this campaign.', 403); } }
+export class FlashSaleNotFoundError extends MarketplaceCampaignError { constructor() { super('FLASH_SALE_NOT_FOUND', 'Flash Sale SKU is unavailable.', 404); } }
+export class FlashSaleValidationError extends MarketplaceCampaignError { constructor(fields: string[], message = 'One or more Flash Sale fields are invalid.') { super('INVALID_FLASH_SALE_REQUEST', message, 400); this.fields = fields; } readonly fields: string[]; }
+export class FlashSaleConflictError extends MarketplaceCampaignError { constructor(code: string, message: string, status = 409, retryAfterSeconds?: number) { super(code, message, status, retryAfterSeconds); } }
+export class FlashSaleStaleError extends MarketplaceCampaignError { constructor(public readonly currentVersion: number) { super('FLASH_SALE_STALE', 'Flash Sale state was changed by another request.', 412); } }

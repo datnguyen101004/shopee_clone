@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import {
   HomepageModuleType,
   MarketplaceRole,
@@ -323,7 +324,7 @@ async function seedMarketplace() {
   const summary = await importCanonicalDataset(prisma);
   const availableProducts = await prisma.product.findMany({
     where: { datasetRecord: { isActive: true } },
-    select: { id: true, shopId: true },
+    select: { id: true, shopId: true, variants: { where: { status: 'ACTIVE', deletedAt: null }, select: { id: true, priceMinor: true, inventory: { select: { quantityOnHand: true, quantityReserved: true } } }, orderBy: { id: 'asc' }, take: 4 } },
     orderBy: [{ id: 'asc' }],
     take: 50,
   });
@@ -488,6 +489,18 @@ async function seedMarketplace() {
       create: { id: seedMarketplaceCampaignFixtureIds.activeReservation, productId: fixtureProduct.id, shopId: fixtureProduct.shopId, source: 'MARKETPLACE_CAMPAIGN', marketplaceCampaignId: seedMarketplaceCampaignFixtureIds.active, discountBasisPoints: 1_500, startsAt: new Date('2026-09-01T00:00:00.000Z'), endsAt: new Date('2026-09-30T00:00:00.000Z'), isEnabled: true },
       update: { productId: fixtureProduct.id, shopId: fixtureProduct.shopId, marketplaceCampaignId: seedMarketplaceCampaignFixtureIds.active, discountBasisPoints: 1_500, startsAt: new Date('2026-09-01T00:00:00.000Z'), endsAt: new Date('2026-09-30T00:00:00.000Z'), isEnabled: true },
     });
+    const activeVariant = fixtureProduct.variants.find((variant) => (variant.inventory?.quantityOnHand ?? 0) - (variant.inventory?.quantityReserved ?? 0) > 0);
+    if (activeVariant) {
+      const available = Math.max(1, (activeVariant.inventory?.quantityOnHand ?? 1) - (activeVariant.inventory?.quantityReserved ?? 0));
+      const quota = Math.min(3, available);
+      const skuId = '00000000-0000-4000-8000-000000000941';
+      const sku = await transaction.flashSaleSku.upsert({
+        where: { campaignId_variantId: { campaignId: seedMarketplaceCampaignFixtureIds.active, variantId: activeVariant.id } },
+        create: { id: skuId, campaignId: seedMarketplaceCampaignFixtureIds.active, participationId: joined.id, productId: fixtureProduct.id, variantId: activeVariant.id, referencePriceMinor: activeVariant.priceMinor, salePriceMinor: (activeVariant.priceMinor * 85n) / 100n, allocatedQuantity: quota, remainingQuantity: quota, version: 1, managementEpoch: 1 },
+        update: { participationId: joined.id, productId: fixtureProduct.id, referencePriceMinor: activeVariant.priceMinor, salePriceMinor: (activeVariant.priceMinor * 85n) / 100n, allocatedQuantity: quota, remainingQuantity: quota, endedAt: null, endedReason: null },
+      });
+      await transaction.flashSaleOutbox.upsert({ where: { flashSaleSkuId_sequence: { flashSaleSkuId: sku.id, sequence: 1 } }, create: { id: randomUUID(), eventId: randomUUID(), flashSaleSkuId: sku.id, sequence: 1, managementEpoch: sku.managementEpoch, admissionDelta: quota, publicSnapshot: { state: 'ACTIVE', stateVersion: sku.version, salePriceMinor: Number(sku.salePriceMinor) } }, update: { admissionDelta: quota, managementEpoch: sku.managementEpoch, publicSnapshot: { state: 'ACTIVE', stateVersion: sku.version, salePriceMinor: Number(sku.salePriceMinor) } } });
+    }
 
     const enrollingJoined = await transaction.sellerCampaignParticipation.upsert({
       where: { campaignId_shopId: { campaignId: seedMarketplaceCampaignFixtureIds.enrolling, shopId: fixtureProduct.shopId } },

@@ -11,6 +11,7 @@ import {
   Param,
   ParseUUIDPipe,
   Post,
+  Query,
   Req,
   UseFilters,
   UseGuards,
@@ -31,7 +32,7 @@ import { ReviewsService } from '../reviews/reviews.service';
 import { AdminExceptionFilter } from './admin-exception.filter';
 // DTO classes must remain runtime values for Nest validation metadata.
 // eslint-disable-next-line @typescript-eslint/consistent-type-imports
-import { AdminReviewActionDto } from './admin-reviews.dto';
+import { AdminReportedReviewPageQueryDto, AdminReviewActionDto } from './admin-reviews.dto';
 import { AdminInvalidInputError } from './admin.errors';
 
 @ApiTags('admin-reviews')
@@ -50,9 +51,17 @@ export class AdminReviewsController {
 
   @Get('reported')
   @Header('Cache-Control', 'private, no-store')
-  @ApiOperation({ summary: 'List reviews currently reported by their seller' })
-  async listReportedReviews(): Promise<AdminReportedReviewListResponse> {
-    return { items: await this.reviewsService.adminListReportedReviews() };
+  @ApiOperation({ summary: 'List reviews currently reported by their seller, 10 items per page' })
+  async listReportedReviews(
+    @Query() query: AdminReportedReviewPageQueryDto,
+  ): Promise<AdminReportedReviewListResponse> {
+    const result = await this.reviewsService.adminListReportedReviews(query.page);
+    return {
+      ...result,
+      page: query.page,
+      pageSize: 10,
+      totalPages: Math.ceil(result.totalItems / 10),
+    };
   }
 
   @Get(':reviewId')

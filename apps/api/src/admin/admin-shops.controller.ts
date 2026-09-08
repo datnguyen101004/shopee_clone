@@ -33,7 +33,7 @@ export class AdminShopsController {
 
   @Get()
   @Header('Cache-Control', 'private, no-store')
-  @ApiOperation({ summary: 'List and search shops with keyset pagination' })
+  @ApiOperation({ summary: 'List and search shops by page, with 10 shops per page' })
   list(@Query() query: AdminShopListQueryDto): Promise<AdminShopListResponse> {
     return this.admin.listShops(query);
   }

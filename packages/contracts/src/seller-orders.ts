@@ -2,8 +2,7 @@ import type { CheckoutAddressSnapshot, PurchasePaymentStatus, ShopOrderStatus } 
 import type { ShippingBreakdown, ShippingServiceCode } from './pricing';
 
 export const SELLER_ORDER_VERSION = 'seller-orders-v1' as const;
-export const SELLER_ORDER_DEFAULT_LIMIT = 20;
-export const SELLER_ORDER_MAX_LIMIT = 50;
+export const SELLER_ORDER_PAGE_SIZE = 10;
 export const SELLER_ORDER_NOTE_MAX_LENGTH = 500;
 export const SELLER_ORDER_QUEUE_FILTERS = [
   'ALL',
@@ -51,8 +50,7 @@ export interface SellerOrderQueueQuery {
   from: string | null;
   to: string | null;
   orderReference: string | null;
-  limit: number;
-  cursor: string | null;
+  page: number;
 }
 
 export interface SellerOrderActionRequest {
@@ -203,7 +201,10 @@ export interface SellerOrderOrderTimelineEvent {
 export interface SellerOrderListResponse {
   sellerOrderVersion: typeof SELLER_ORDER_VERSION;
   items: SellerOrderSummary[];
-  page: { limit: number; nextCursor: string | null };
+  page: number;
+  pageSize: number;
+  totalItems: number;
+  totalPages: number;
 }
 
 export interface SellerOrderDetailResponse {
@@ -223,7 +224,6 @@ export interface SellerOrderProblemDetails {
 }
 
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-const cursor = /^[A-Za-z0-9_-]{1,2048}$/;
 const date = /^\d{4}-\d{2}-\d{2}$/;
 const exact = (value: Record<string, unknown>, required: string[], optional: string[] = []) => {
   const allowed = new Set([...required, ...optional]);
@@ -254,36 +254,33 @@ export function normalizeSellerOrderNote(value: unknown): string | null | undefi
 export function parseSellerOrderQueueQuery(value: unknown): SellerOrderQueueQuery | null {
   if (
     !record(value) ||
-    !exact(value, [], ['status', 'fulfillment', 'from', 'to', 'orderReference', 'limit', 'cursor'])
+    !exact(value, [], ['status', 'fulfillment', 'from', 'to', 'orderReference', 'page'])
   )
     return null;
   if (Object.values(value).some((item) => Array.isArray(item))) return null;
   const one = (item: unknown) => (typeof item === 'string' ? item : undefined);
   const status = one(value.status) ?? 'ALL';
   const fulfillment = one(value.fulfillment) ?? 'ALL';
-  const rawLimit = one(value.limit) ?? String(SELLER_ORDER_DEFAULT_LIMIT);
+  const rawPage = one(value.page) ?? '1';
   const from = one(value.from) ?? null;
   const to = one(value.to) ?? null;
   const orderReference = one(value.orderReference) ?? null;
-  const rawCursor = one(value.cursor) ?? null;
-  const limit = Number(rawLimit);
+  const page = Number(rawPage);
   if (
     !hasValue(SELLER_ORDER_QUEUE_FILTERS, status) ||
     !hasValue(SELLER_ORDER_FULFILLMENT_FILTERS, fulfillment) ||
-    !/^[1-9]\d*$/.test(rawLimit) ||
-    !Number.isSafeInteger(limit) ||
-    limit > SELLER_ORDER_MAX_LIMIT
+    !/^[1-9]\d*$/.test(rawPage) ||
+    !Number.isSafeInteger(page)
   )
     return null;
   if (
     (from !== null && !date.test(from)) ||
     (to !== null && !date.test(to)) ||
     (from !== null && to !== null && from > to) ||
-    (orderReference !== null && !isUuid(orderReference)) ||
-    (rawCursor !== null && !cursor.test(rawCursor))
+    (orderReference !== null && !isUuid(orderReference))
   )
     return null;
-  return { status, fulfillment, from, to, orderReference, limit, cursor: rawCursor };
+  return { status, fulfillment, from, to, orderReference, page };
 }
 
 export function parseSellerOrderReference(value: unknown): string | null {
@@ -443,15 +440,14 @@ export function isSellerOrderSummary(value: unknown): value is SellerOrderSummar
 export function isSellerOrderListResponse(value: unknown): value is SellerOrderListResponse {
   return (
     record(value) &&
-    exact(value, ['sellerOrderVersion', 'items', 'page']) &&
+    exact(value, ['sellerOrderVersion', 'items', 'page', 'pageSize', 'totalItems', 'totalPages']) &&
     value.sellerOrderVersion === SELLER_ORDER_VERSION &&
     Array.isArray(value.items) &&
     value.items.every(isSellerOrderSummary) &&
-    record(value.page) &&
-    exact(value.page, ['limit', 'nextCursor']) &&
-    isSafeNonNegative(value.page.limit) &&
-    (value.page.nextCursor === null ||
-      (typeof value.page.nextCursor === 'string' && cursor.test(value.page.nextCursor)))
+    typeof value.page === 'number' && Number.isSafeInteger(value.page) && value.page >= 1 &&
+    value.pageSize === SELLER_ORDER_PAGE_SIZE &&
+    isSafeNonNegative(value.totalItems) &&
+    isSafeNonNegative(value.totalPages)
   );
 }
 

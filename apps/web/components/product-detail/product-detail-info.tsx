@@ -13,11 +13,52 @@ export function formatCurrency(value: number): string {
   return `₫${new Intl.NumberFormat('vi-VN').format(value)}`;
 }
 
+import type { VariantFlashSaleOffer } from './product-detail-flash-sale';
+
 export interface ProductPriceDisplayProps {
   selectedVariant: ProductDetailVariant | null;
+  flashSaleOffer?: VariantFlashSaleOffer | null;
 }
 
-export function ProductPriceDisplay({ selectedVariant }: ProductPriceDisplayProps) {
+export function ProductPriceDisplay({ selectedVariant, flashSaleOffer }: ProductPriceDisplayProps) {
+  if (flashSaleOffer?.isFlashSale) {
+    if (flashSaleOffer.state === 'SOLD_OUT') {
+      return (
+        <div className="product-detail-price product-detail-price--soldout" aria-label="Giá sản phẩm">
+          <strong className="text-soldout">Hết hàng (Hết suất Flash Sale)</strong>
+          {selectedVariant?.compareAtPriceMinor ? (
+            <del>{formatCurrency(selectedVariant.compareAtPriceMinor)}</del>
+          ) : selectedVariant?.priceMinor ? (
+            <del>{formatCurrency(selectedVariant.priceMinor)}</del>
+          ) : null}
+          <span className="product-detail-fs-status-hint">
+            Biến thể này đã hết suất trong chương trình Flash Sale.
+          </span>
+        </div>
+      );
+    }
+
+    if (flashSaleOffer.state === 'ACTIVE' && flashSaleOffer.canPurchase) {
+      return (
+        <div className="product-detail-price product-detail-price--flashsale" aria-label="Giá Flash Sale">
+          <strong className="product-detail-fs-price">
+            {formatCurrency(flashSaleOffer.salePriceMinor)}
+          </strong>
+          {selectedVariant?.compareAtPriceMinor ? (
+            <del>{formatCurrency(selectedVariant.compareAtPriceMinor)}</del>
+          ) : selectedVariant?.priceMinor ? (
+            <del>{formatCurrency(selectedVariant.priceMinor)}</del>
+          ) : null}
+          <span className="product-detail-fs-badge">⚡ FLASH SALE</span>
+          <span className="product-detail-fs-cod-badge">Thanh toán khi nhận hàng (COD)</span>
+          <p className="product-detail-fs-limit-msg">
+            ℹ️ Mỗi người chỉ mua 1 sản phẩm trong chiến dịch
+          </p>
+        </div>
+      );
+    }
+  }
+
   return (
     <div className="product-detail-price" aria-label="Giá sản phẩm">
       <strong>
@@ -61,10 +102,13 @@ export function ProductPriceDisplay({ selectedVariant }: ProductPriceDisplayProp
 
 export interface ProductDetailFactsProps {
   selectedVariant: ProductDetailVariant | null;
+  flashSaleOffer?: VariantFlashSaleOffer | null;
 }
 
-export function ProductDetailFacts({ selectedVariant }: ProductDetailFactsProps) {
+export function ProductDetailFacts({ selectedVariant, flashSaleOffer }: ProductDetailFactsProps) {
   if (!selectedVariant) return null;
+
+  const isSoldOutFlashSale = flashSaleOffer?.isFlashSale && flashSaleOffer.state === 'SOLD_OUT';
 
   return (
     <dl className="product-detail-offer__facts">
@@ -75,9 +119,11 @@ export function ProductDetailFacts({ selectedVariant }: ProductDetailFactsProps)
       <div className="product-detail-fact-pill">
         <dt>Tồn kho</dt>
         <dd>
-          {selectedVariant.availableQuantity > 0
-            ? `${selectedVariant.availableQuantity} sản phẩm`
-            : 'Hết hàng'}
+          {isSoldOutFlashSale
+            ? 'Hết hàng'
+            : selectedVariant.availableQuantity > 0
+              ? `${selectedVariant.availableQuantity} sản phẩm`
+              : 'Hết hàng'}
         </dd>
       </div>
     </dl>

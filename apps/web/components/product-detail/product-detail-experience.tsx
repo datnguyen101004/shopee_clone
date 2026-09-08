@@ -55,16 +55,24 @@ function ProductDetailInner({ product }: { product: ProductDetailResponse }) {
 
         <div className="product-detail-offer__selection">
           <ProductEngagementActions productId={product.id} productName={product.name} />
-          <ProductPriceDisplay selectedVariant={flow.selectedVariant} />
+          <ProductPriceDisplay
+            selectedVariant={flow.selectedVariant}
+            flashSaleOffer={flow.flashSaleOffer}
+          />
           <ProductVariantSelector
             variants={product.variants}
             selectedVariantId={flow.selection.variantId}
+            statusMap={flow.statusMap}
             onSelectVariant={flow.handleSelectVariant}
           />
-          <ProductDetailFacts selectedVariant={flow.selectedVariant} />
+          <ProductDetailFacts
+            selectedVariant={flow.selectedVariant}
+            flashSaleOffer={flow.flashSaleOffer}
+          />
           <ProductQuantityStepper
             quantity={flow.selection.quantity}
             selectedVariant={flow.selectedVariant}
+            flashSaleOffer={flow.flashSaleOffer}
             purchasable={product.purchasable}
             statusMessage={flow.liveMessage}
             isError={Boolean(flow.error)}

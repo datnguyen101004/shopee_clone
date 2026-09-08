@@ -93,7 +93,7 @@ describe('Moderation and Reporting Frontend API Clients', () => {
   });
 
   it('handles admin reported-review queue, lookup, and hide action', async () => {
-    const reportedRes = { items: [{ reviewId: 'rev-1', reportCount: 1 }] };
+    const reportedRes = { items: [{ reviewId: 'rev-1', reportCount: 1 }], page: 1, pageSize: 10, totalItems: 1, totalPages: 1 };
     const reviewRes = { id: 'rev-1', visibility: 'VISIBLE' };
     const actionRes = { reviewId: 'rev-1', visibility: 'HIDDEN', version: 2 };
 
@@ -105,7 +105,7 @@ describe('Moderation and Reporting Frontend API Clients', () => {
 
     const reported = await listAdminReportedReviews(fetcher);
     expect(reported).toEqual(reportedRes);
-    expect(String(fetcher.mock.calls[0]![0])).toBe('http://localhost:3001/api/v1/admin/reviews/reported');
+    expect(String(fetcher.mock.calls[0]![0])).toBe('http://localhost:3001/api/v1/admin/reviews/reported?page=1');
 
     const review = await getAdminReviewDetail(fetcher, 'rev-1');
     expect(review).toEqual(reviewRes);

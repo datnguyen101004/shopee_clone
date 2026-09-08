@@ -17,6 +17,7 @@ import { PrivilegedAction, PrivilegedTargetType } from '../generated/prisma/clie
 import { AdminInvalidInputError, AdminNotFoundError } from '../admin/admin.errors';
 import { recordPrivilegedAudit } from '../admin/privileged-audit.helper';
 import { PrismaService } from '../prisma/prisma.service';
+import { HomepageBannerMediaService } from './homepage-banner-media.service';
 
 type BannerTargetType = 'CAMPAIGN' | 'PRODUCT' | 'SHOP' | 'CATEGORY' | 'SEARCH' | 'URL';
 
@@ -52,7 +53,10 @@ function targetTypeOf(banner: { targetType: string | null }): BannerTargetType {
 
 @Injectable()
 export class HomepageCmsService {
-  constructor(@Inject(PrismaService) private readonly prisma: PrismaService) {}
+  constructor(
+    @Inject(PrismaService) private readonly prisma: PrismaService,
+    @Inject(HomepageBannerMediaService) private readonly bannerMedia: HomepageBannerMediaService,
+  ) {}
 
   private async campaignIsActive(client: PrismaService | Prisma.TransactionClient, id: string) {
     const campaign = await client.marketplaceCampaign.findUnique({
@@ -346,7 +350,8 @@ export class HomepageCmsService {
     const theme = asText(input.theme, 50) ?? 'brand';
     if (!title || !altText)
       throw new AdminInvalidInputError('Banner title and alt text are required.');
-    if (input.imageUrl && !isAllowedMediaUrl(input.imageUrl))
+    const hasImageAsset = Boolean(input.imageAssetId);
+    if (!hasImageAsset && input.imageUrl && !isAllowedMediaUrl(input.imageUrl))
       throw new AdminInvalidInputError('Banner image URL is not allowlisted.');
     const displayFrom = asDate(input.displayFrom, 'displayFrom');
     const displayUntil = asDate(input.displayUntil, 'displayUntil');
@@ -356,6 +361,9 @@ export class HomepageCmsService {
     return this.prisma.$transaction(async (tx) => {
       const module = await tx.homepageModule.findFirst({ where: { type: 'CAMPAIGN_BANNER' } });
       if (!module) throw new AdminNotFoundError('Campaign banner homepage module');
+      const imageAsset = input.imageAssetId
+        ? await this.bannerMedia.requireStagedAsset(tx, actorUserId, input.imageAssetId)
+        : null;
       const target = await this.validateTarget(tx, input);
       const priority = input.priority ?? input.sortOrder ?? 0;
       const lastBanner = await tx.homepageBanner.findFirst({
@@ -370,7 +378,9 @@ export class HomepageCmsService {
           eyebrow: asText(input.eyebrow, 80),
           title,
           description: asText(input.description, 320),
-          imageUrl: input.imageUrl ?? null,
+          imageUrl: imageAsset
+            ? this.bannerMedia.publicUrl(imageAsset.storageKey)
+            : input.imageUrl ?? null,
           altText,
           themeKey: theme,
           sortOrder: (lastBanner?.sortOrder ?? -1) + 1,
@@ -383,6 +393,7 @@ export class HomepageCmsService {
           priority,
         },
       });
+      if (imageAsset) await this.bannerMedia.attachAsset(tx, imageAsset.id, banner.id);
       await recordPrivilegedAudit(tx, {
         actorUserId,
         targetType: PrivilegedTargetType.BANNER,
@@ -405,12 +416,6 @@ export class HomepageCmsService {
     id: string,
     input: UpdateAdminBannerRequest,
   ): Promise<AdminBannerSummary> {
-    if (
-      input.imageUrl !== undefined &&
-      input.imageUrl !== null &&
-      !isAllowedMediaUrl(input.imageUrl)
-    )
-      throw new AdminInvalidInputError('Banner image URL is not allowlisted.');
     const displayFrom =
       input.displayFrom === undefined ? undefined : asDate(input.displayFrom, 'displayFrom');
     const displayUntil =
@@ -419,8 +424,16 @@ export class HomepageCmsService {
       throw new AdminInvalidInputError('displayUntil must be later than displayFrom.');
 
     return this.prisma.$transaction(async (tx) => {
-      const current = await tx.homepageBanner.findUnique({ where: { id } });
+      const current = await tx.homepageBanner.findUnique({ where: { id }, include: { imageAsset: true } });
       if (!current) throw new AdminNotFoundError('Banner');
+      const imageUrlChanged = input.imageUrl !== undefined && input.imageUrl !== current.imageUrl;
+      const hasImageAsset = Boolean(input.imageAssetId);
+      if (imageUrlChanged && !hasImageAsset && input.imageUrl !== null && !isAllowedMediaUrl(input.imageUrl))
+        throw new AdminInvalidInputError('Banner image URL is not allowlisted.');
+      const imageAsset = input.imageAssetId
+        ? await this.bannerMedia.requireStagedAsset(tx, actorUserId, input.imageAssetId)
+        : null;
+      const imageChanged = input.imageAssetId !== undefined || imageUrlChanged;
       const nextDisplayFrom = input.displayFrom === undefined ? current.displayFrom : displayFrom;
       const nextDisplayUntil =
         input.displayUntil === undefined ? current.displayUntil : displayUntil;
@@ -452,7 +465,11 @@ export class HomepageCmsService {
           eyebrow: input.eyebrow === undefined ? undefined : asText(input.eyebrow, 80),
           title,
           description: input.description === undefined ? undefined : asText(input.description, 320),
-          imageUrl: input.imageUrl,
+          imageUrl: input.imageAssetId !== undefined
+            ? imageAsset
+              ? this.bannerMedia.publicUrl(imageAsset.storageKey)
+              : input.imageUrl ?? null
+            : input.imageUrl,
           altText: input.altText === undefined ? undefined : asText(input.altText, 240),
           themeKey: input.theme === undefined ? undefined : (asText(input.theme, 50) ?? 'brand'),
           sortOrder: priority,
@@ -465,6 +482,8 @@ export class HomepageCmsService {
           priority,
         },
       });
+      if (imageChanged && current.imageAsset) await this.bannerMedia.detachAsset(tx, current.imageAsset.id);
+      if (imageAsset) await this.bannerMedia.attachAsset(tx, imageAsset.id, banner.id);
       await recordPrivilegedAudit(tx, {
         actorUserId,
         targetType: PrivilegedTargetType.BANNER,
@@ -489,9 +508,10 @@ export class HomepageCmsService {
 
   async deleteBanner(actorUserId: string, id: string): Promise<void> {
     return this.prisma.$transaction(async (tx) => {
-      const banner = await tx.homepageBanner.findUnique({ where: { id } });
+      const banner = await tx.homepageBanner.findUnique({ where: { id }, include: { imageAsset: true } });
       if (!banner) throw new AdminNotFoundError('Banner');
       await tx.homepageBanner.delete({ where: { id } });
+      if (banner.imageAsset) await this.bannerMedia.detachAsset(tx, banner.imageAsset.id);
       await recordPrivilegedAudit(tx, {
         actorUserId,
         targetType: PrivilegedTargetType.BANNER,

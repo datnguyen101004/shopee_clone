@@ -16,6 +16,7 @@ import {
 } from './admin-icons';
 import { useAuthSession } from '../auth-session-provider';
 import { OperationalRoleGate } from '../operational-role-gate';
+import { WorkspaceColumnResizer } from '../workspace-column-resizer';
 
 const navigation = [
   {
@@ -96,6 +97,7 @@ export function AdminCenterLayout({ children }: { children: ReactNode }) {
   return (
     <OperationalRoleGate role="admin">
       <div className="admin-page-frame admin-workspace" data-density="compact">
+        <WorkspaceColumnResizer rootSelector=".admin-workspace" />
         <div className="admin-shell">
           <aside className="admin-sidebar" aria-label="Menu quản trị">
             <div className="admin-sidebar__brand">

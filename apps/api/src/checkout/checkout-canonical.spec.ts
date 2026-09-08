@@ -94,6 +94,64 @@ describe('checkout canonicalization', () => {
     ).not.toBe(first);
   });
 
+  it('ignores campaign observation time but keeps campaign facts in fingerprints', () => {
+    const withCampaign = {
+      ...preview,
+      shops: [
+        {
+          shop: { id: shopId, ownerUserId: userId, slug: 'shop', name: 'Shop' },
+          note: '',
+          lines: [
+            {
+              lineId: 'line-1',
+              variantId: 'variant-1',
+              productId: 'product-1',
+              quantity: 1,
+              campaignPrice: {
+                sourceKind: 'MARKETPLACE',
+                campaignId: 'campaign-1',
+                campaignTypeCode: 'FLASH_SALE',
+                policyVersion: 1,
+                discountBasisPoints: 1500,
+                evaluatedAt: '2026-08-14T05:00:00.000Z',
+              },
+            },
+          ],
+        },
+      ],
+    } as unknown as CheckoutPreviewResponse;
+    const first = checkoutFingerprint(withCampaign);
+    const changedTime = {
+      ...withCampaign,
+      shops: withCampaign.shops.map((shop) => ({
+        ...shop,
+        lines: shop.lines.map((line) => ({
+          ...line,
+          campaignPrice: {
+            ...line.campaignPrice,
+            evaluatedAt: '2027-01-01T00:00:00.000Z',
+          },
+        })),
+      })),
+    } as unknown as CheckoutPreviewResponse;
+    expect(
+      checkoutFingerprint(changedTime),
+    ).toBe(first);
+    const changedCampaign = {
+      ...withCampaign,
+      shops: withCampaign.shops.map((shop) => ({
+        ...shop,
+        lines: shop.lines.map((line) => ({
+          ...line,
+          campaignPrice: { ...line.campaignPrice, campaignId: 'campaign-2' },
+        })),
+      })),
+    } as unknown as CheckoutPreviewResponse;
+    expect(
+      checkoutFingerprint(changedCampaign),
+    ).not.toBe(first);
+  });
+
   it('derives deterministic signed advisory keys and compares digests safely', () => {
     expect(advisoryLockKeys(userId, '00000000-0000-4000-8000-000000000005')).toEqual(
       advisoryLockKeys(userId, '00000000-0000-4000-8000-000000000005'),

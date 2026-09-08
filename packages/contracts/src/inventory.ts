@@ -1,5 +1,6 @@
-export const INVENTORY_DEFAULT_PAGE_SIZE = 20;
-export const INVENTORY_MAX_PAGE_SIZE = 50;
+export const INVENTORY_PAGE_SIZE = 10;
+export const INVENTORY_HISTORY_DEFAULT_PAGE_SIZE = 20;
+export const INVENTORY_HISTORY_MAX_PAGE_SIZE = 50;
 export const INVENTORY_ADJUSTMENT_NOTE_MAX_LENGTH = 500;
 export const INVENTORY_VERSION = 'inventory-v1' as const;
 export const INVENTORY_IDEMPOTENCY_KEY_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -33,7 +34,10 @@ export interface InventoryBalance {
 
 export interface InventoryPage {
   items: InventoryBalance[];
-  nextCursor: string | null;
+  page: number;
+  pageSize: number;
+  totalItems: number;
+  totalPages: number;
 }
 
 export interface InventoryAdjustmentRequest {
@@ -117,17 +121,25 @@ export function parseInventoryIdempotencyKey(value: unknown): string | null {
   return typeof value === 'string' && INVENTORY_IDEMPOTENCY_KEY_PATTERN.test(value) ? value : null;
 }
 
-export function parseInventoryPageQuery(value: unknown): { cursor: string | null; limit: number; productId: string | null; lowStock: boolean | null } | null {
-  if (!isRecord(value) || !exact(value, [], ['cursor', 'limit', 'productId', 'lowStock'])) return null;
-  const cursor = value.cursor === undefined ? null : value.cursor;
+export function parseInventoryPageQuery(value: unknown): { page: number; productId: string | null; lowStock: boolean | null } | null {
+  if (!isRecord(value) || !exact(value, [], ['page', 'productId', 'lowStock'])) return null;
+  const rawPage = value.page === undefined ? '1' : value.page;
   const productId = value.productId === undefined ? null : value.productId;
-  const rawLimit = value.limit === undefined ? String(INVENTORY_DEFAULT_PAGE_SIZE) : value.limit;
   const rawLowStock = value.lowStock === undefined ? null : value.lowStock;
   const lowStock = rawLowStock === null ? null : rawLowStock === true || rawLowStock === 'true' ? true : rawLowStock === false || rawLowStock === 'false' ? false : rawLowStock;
-  if ((cursor !== null && (typeof cursor !== 'string' || !cursorPattern.test(cursor))) || (productId !== null && !isUuid(productId)) || typeof rawLimit !== 'string' || !/^[1-9][0-9]*$/.test(rawLimit) || (lowStock !== null && typeof lowStock !== 'boolean')) return null;
+  if ((productId !== null && !isUuid(productId)) || typeof rawPage !== 'string' || !/^[1-9][0-9]*$/.test(rawPage) || (lowStock !== null && typeof lowStock !== 'boolean')) return null;
+  const page = Number(rawPage);
+  if (!Number.isSafeInteger(page)) return null;
+  return { page, productId: productId as string | null, lowStock: lowStock as boolean | null };
+}
+
+export function parseInventoryAdjustmentPageQuery(value: unknown): { cursor: string | null; limit: number } | null {
+  if (!isRecord(value) || !exact(value, [], ['cursor', 'limit'])) return null;
+  const cursor = value.cursor === undefined ? null : value.cursor;
+  const rawLimit = value.limit === undefined ? String(INVENTORY_HISTORY_DEFAULT_PAGE_SIZE) : value.limit;
+  if ((cursor !== null && (typeof cursor !== 'string' || !cursorPattern.test(cursor))) || typeof rawLimit !== 'string' || !/^[1-9][0-9]*$/.test(rawLimit)) return null;
   const limit = Number(rawLimit);
-  if (!Number.isSafeInteger(limit) || limit > INVENTORY_MAX_PAGE_SIZE) return null;
-  return { cursor: cursor as string | null, limit, productId: productId as string | null, lowStock: lowStock as boolean | null };
+  return Number.isSafeInteger(limit) && limit <= INVENTORY_HISTORY_MAX_PAGE_SIZE ? { cursor: cursor as string | null, limit } : null;
 }
 
 export function parseInventoryAdjustmentRequest(value: unknown): InventoryAdjustmentRequest | null {
@@ -144,7 +156,7 @@ function isBalance(value: unknown): value is InventoryBalance {
 }
 
 export function isInventoryPage(value: unknown): value is InventoryPage {
-  return isRecord(value) && exact(value, ['items', 'nextCursor']) && Array.isArray(value.items) && value.items.every(isBalance) && (value.nextCursor === null || (typeof value.nextCursor === 'string' && cursorPattern.test(value.nextCursor)));
+  return isRecord(value) && exact(value, ['items', 'page', 'pageSize', 'totalItems', 'totalPages']) && Array.isArray(value.items) && value.items.every(isBalance) && safeInteger(value.page) && value.page >= 1 && value.pageSize === INVENTORY_PAGE_SIZE && nonNegative(value.totalItems) && nonNegative(value.totalPages);
 }
 
 export function isInventoryAdjustment(value: unknown): value is InventoryAdjustment {

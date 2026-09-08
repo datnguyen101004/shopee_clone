@@ -9,6 +9,9 @@ import { MarketplaceCampaignExceptionFilter } from './marketplace-campaigns.exce
 import { MarketplaceCampaignsService } from './marketplace-campaigns.service';
 import { SellerMarketplaceCampaignsController } from './seller-marketplace-campaigns.controller';
 import { CampaignNotificationScheduler } from './campaign-notification.scheduler';
+import { FlashSaleService } from './flash-sale.service';
+import { CacheModule } from '../cache/cache.module';
+import { FlashSaleOutboxProcessor } from './flash-sale-outbox.processor';
 
-@Module({ imports: [AuthModule, NotificationsModule], controllers: [MarketplaceCampaignsController, AdminMarketplaceCampaignsController, AdminCampaignTypesController, SellerMarketplaceCampaignsController], providers: [MarketplaceCampaignsService, MarketplaceCampaignExceptionFilter, SellerShopScopeService, CampaignNotificationScheduler], exports: [MarketplaceCampaignsService] })
+@Module({ imports: [AuthModule, NotificationsModule, CacheModule], controllers: [MarketplaceCampaignsController, AdminMarketplaceCampaignsController, AdminCampaignTypesController, SellerMarketplaceCampaignsController], providers: [MarketplaceCampaignsService, FlashSaleService, FlashSaleOutboxProcessor, MarketplaceCampaignExceptionFilter, SellerShopScopeService, CampaignNotificationScheduler], exports: [MarketplaceCampaignsService, FlashSaleService] })
 export class MarketplaceCampaignsModule {}

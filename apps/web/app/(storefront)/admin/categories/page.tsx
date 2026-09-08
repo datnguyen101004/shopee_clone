@@ -1,9 +1,16 @@
 'use client';
 
 import type { AdminCategorySummary, AdminCategoryTreeNode } from '@shopee-clone/contracts';
+import { Plus } from '@shopee-clone/ui';
 import { useCallback, useEffect, useState } from 'react';
 
-import { FolderIcon, FolderOpenIcon, TagIcon } from '../../../../components/admin/admin-icons';
+import {
+  EditIcon,
+  FolderIcon,
+  FolderOpenIcon,
+  TagIcon,
+  TrashIcon,
+} from '../../../../components/admin/admin-icons';
 import { AdminEntityLink } from '../../../../components/admin/admin-entity-link';
 import { useAuthSession } from '../../../../components/auth-session-provider';
 import {
@@ -180,50 +187,32 @@ export default function AdminCategoriesPage() {
             <div className="admin-category-tree__actions">
               {depth < 2 && (
                 <button
-                  className="admin-btn admin-btn-soft admin-btn-small"
+                  type="button"
+                  className="admin-icon-btn admin-icon-btn--secondary"
+                  aria-label={`Thêm danh mục con cho ${node.name}`}
+                  title="Thêm danh mục con"
                   onClick={() => openCreateModal(node.id)}
-                  style={{
-                    padding: '3px 8px',
-                    fontSize: '12px',
-                    color: '#2563eb',
-                    background: '#eff6ff',
-                    border: 'none',
-                    borderRadius: '4px',
-                    cursor: 'pointer',
-                  }}
                 >
-                  + Con
+                  <Plus size={16} aria-hidden="true" />
                 </button>
               )}
               <button
-                className="admin-btn admin-btn-secondary admin-btn-small"
+                type="button"
+                className="admin-icon-btn admin-icon-btn--secondary"
+                aria-label={`Sửa danh mục ${node.name}`}
+                title="Sửa danh mục"
                 onClick={() => openEditModal(node)}
-                style={{
-                  padding: '3px 8px',
-                  fontSize: '12px',
-                  color: '#4b5563',
-                  background: '#f3f4f6',
-                  border: 'none',
-                  borderRadius: '4px',
-                  cursor: 'pointer',
-                }}
               >
-                Sửa
+                <EditIcon size={16} aria-hidden="true" />
               </button>
               <button
-                className="admin-btn admin-btn-danger-outline admin-btn-small"
+                type="button"
+                className="admin-icon-btn admin-icon-btn--danger"
+                aria-label={`Xóa danh mục ${node.name}`}
+                title="Xóa danh mục"
                 onClick={() => handleDelete(node)}
-                style={{
-                  padding: '3px 8px',
-                  fontSize: '12px',
-                  color: '#dc2626',
-                  background: '#fee2e2',
-                  border: 'none',
-                  borderRadius: '4px',
-                  cursor: 'pointer',
-                }}
               >
-                Xóa
+                <TrashIcon size={16} aria-hidden="true" />
               </button>
             </div>
           </div>

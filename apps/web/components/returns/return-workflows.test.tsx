@@ -292,11 +292,11 @@ describe('return workflows', () => {
     render(<AdminReturnQueueScreen />);
     expect(await screen.findByText('Cần quản trị viên xử lý')).toBeInTheDocument();
     expect(screen.getByRole('columnheader', { name: 'Yêu cầu' })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Xử lý yêu cầu' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: `Xử lý yêu cầu ${returnReference}` })).toHaveAttribute(
       'href',
       `/admin/returns/${returnReference}#admin-return-actions`,
     );
-    expect(screen.getByRole('link', { name: 'Xem chi tiết' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: `Xem chi tiết yêu cầu ${returnReference}` })).toHaveAttribute(
       'href',
       `/admin/returns/${returnReference}`,
     );

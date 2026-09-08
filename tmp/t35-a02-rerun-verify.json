@@ -1,0 +1,13 @@
+{
+  "runId": "t35-poc-rerun-20260907",
+  "observed": {
+    "peakActiveLeases": 20,
+    "peakExecutingConfirmations": 0,
+    "duplicateOrders": 0,
+    "duplicateReversals": 0,
+    "negativeQuotaRows": 0,
+    "negativeStockRows": 0,
+    "lambdaInvocations": 57,
+    "pollingQueriesCheckout": 0
+  }
+}

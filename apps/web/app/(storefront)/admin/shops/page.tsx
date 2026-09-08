@@ -5,6 +5,8 @@ import { useCallback, useEffect, useState } from 'react';
 
 import { useAuthSession } from '../../../../components/auth-session-provider';
 import { AdminEntityLink } from '../../../../components/admin/admin-entity-link';
+import { CheckIcon, LockIcon, UnlockIcon, XIcon } from '../../../../components/admin/admin-icons';
+import { AdminPagination } from '../../../../components/admin/admin-pagination';
 import {
   adminErrorMessage,
   executeAdminShopAction,
@@ -19,6 +21,7 @@ export default function AdminShopsPage() {
   const [error, setError] = useState<string | null>(null);
 
   // Filters
+  const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'ACTIVE' | 'INACTIVE' | 'SUSPENDED'>(
     'ALL',
@@ -26,6 +29,9 @@ export default function AdminShopsPage() {
   const [onboardingFilter, setOnboardingFilter] = useState<
     'ALL' | 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED'
   >('ALL');
+  const [page, setPage] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
 
   // Modal State
   const [selectedShop, setSelectedShop] = useState<AdminShopSummary | null>(null);
@@ -36,23 +42,30 @@ export default function AdminShopsPage() {
   const [submitting, setSubmitting] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
 
-  const loadShops = useCallback(() => {
+  const loadShops = useCallback(async () => {
     setLoading(true);
     setError(null);
-    fetchAdminShops(authenticatedFetch, {
-      status: statusFilter === 'ALL' ? undefined : statusFilter,
-      onboardingStatus: onboardingFilter === 'ALL' ? undefined : onboardingFilter,
-      q: search.trim() || undefined,
-    })
-      .then((res) => {
-        setShops(res.items);
-        setLoading(false);
-      })
-      .catch((err) => {
-        setError(err.message || 'Không thể tải danh sách cửa hàng');
-        setLoading(false);
+    try {
+      const response = await fetchAdminShops(authenticatedFetch, {
+        page,
+        status: statusFilter === 'ALL' ? undefined : statusFilter,
+        onboardingStatus: onboardingFilter === 'ALL' ? undefined : onboardingFilter,
+        q: search || undefined,
       });
-  }, [authenticatedFetch, onboardingFilter, search, statusFilter]);
+      const lastAvailablePage = Math.max(1, response.totalPages);
+      if (page > lastAvailablePage) {
+        setPage(lastAvailablePage);
+        return;
+      }
+      setShops(response.items);
+      setTotalItems(response.totalItems);
+      setTotalPages(response.totalPages);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Không thể tải danh sách cửa hàng');
+    } finally {
+      setLoading(false);
+    }
+  }, [authenticatedFetch, onboardingFilter, page, search, statusFilter]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => void loadShops(), 0);
@@ -61,7 +74,13 @@ export default function AdminShopsPage() {
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    loadShops();
+    const nextSearch = searchInput.trim();
+    if (page === 1 && search === nextSearch) {
+      void loadShops();
+      return;
+    }
+    setSearch(nextSearch);
+    setPage(1);
   };
 
   const handleActionSubmit = async (e: React.FormEvent) => {
@@ -83,13 +102,13 @@ export default function AdminShopsPage() {
         });
         setShops((prev) => prev.map((s) => (s.id === updated.id ? updated : s)));
         // Refetch the authoritative list after the paired account transition commits.
-        loadShops();
+        void loadShops();
       } else if (actionType === 'APPROVE' || actionType === 'REJECT') {
         await approveSellerShop(authenticatedFetch, selectedShop.id, {
           decision: actionType === 'APPROVE' ? 'approve' : 'reject',
           reason: reason.trim(),
         });
-        loadShops();
+        void loadShops();
       }
 
       closeModal();
@@ -144,8 +163,8 @@ export default function AdminShopsPage() {
             className="admin-control admin-toolbar__search-input"
             type="text"
             placeholder="Tìm theo tên shop hoặc slug..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
             style={{
               flex: 1,
               padding: '8px 12px',
@@ -173,9 +192,10 @@ export default function AdminShopsPage() {
               id="admin-shop-status"
               className="admin-control"
               value={statusFilter}
-              onChange={(e) =>
-                setStatusFilter(e.target.value as 'ALL' | 'ACTIVE' | 'INACTIVE' | 'SUSPENDED')
-              }
+              onChange={(e) => {
+                setStatusFilter(e.target.value as 'ALL' | 'ACTIVE' | 'INACTIVE' | 'SUSPENDED');
+                setPage(1);
+              }}
               style={{
                 padding: '6px 10px',
                 borderRadius: '6px',
@@ -196,11 +216,12 @@ export default function AdminShopsPage() {
               id="admin-shop-onboarding"
               className="admin-control"
               value={onboardingFilter}
-              onChange={(e) =>
+              onChange={(e) => {
                 setOnboardingFilter(
                   e.target.value as 'ALL' | 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED',
-                )
-              }
+                );
+                setPage(1);
+              }}
               style={{
                 padding: '6px 10px',
                 borderRadius: '6px',
@@ -235,180 +256,185 @@ export default function AdminShopsPage() {
         ) : shops.length === 0 ? (
           <div className="admin-state-card__message">Không tìm thấy cửa hàng nào phù hợp.</div>
         ) : (
-          <table
-            className="admin-data-table"
-            style={{
-              width: '100%',
-              borderCollapse: 'collapse',
-              textAlign: 'left',
-              fontSize: '14px',
-            }}
-          >
-            <thead>
-              <tr
+          <>
+            <div className="admin-table-scroll">
+              <table
+                className="admin-data-table admin-management-table"
                 style={{
-                  background: '#f9fafb',
-                  borderBottom: '1px solid #e5e7eb',
-                  color: '#4b5563',
-                  fontSize: '13px',
+                  width: '100%',
+                  borderCollapse: 'collapse',
+                  textAlign: 'left',
+                  fontSize: '14px',
                 }}
               >
-                <th style={{ padding: '12px 16px' }}>Tên shop & Slug</th>
-                <th style={{ padding: '12px 16px' }}>Trạng thái bán</th>
-                <th style={{ padding: '12px 16px' }}>Xét duyệt Onboarding</th>
-                <th style={{ padding: '12px 16px' }}>Ghi chú duyệt</th>
-                <th style={{ padding: '12px 16px' }}>Cập nhật</th>
-                <th style={{ padding: '12px 16px', textAlign: 'right' }}>Thao tác</th>
-              </tr>
-            </thead>
-            <tbody>
-              {shops.map((s) => (
-                <tr key={s.id}>
-                  <td style={{ padding: '14px 16px' }}>
-                    <AdminEntityLink
-                      href={`/admin/shops/${s.id}`}
-                      name={s.name}
-                      imageUrl={s.logoUrl}
-                      meta={`/${s.slug}`}
-                    />
-                  </td>
-                  <td style={{ padding: '14px 16px' }}>
-                    <span
-                      className={`admin-badge ${s.status === 'ACTIVE' ? 'admin-badge--success' : s.status === 'SUSPENDED' ? 'admin-badge--danger' : 'admin-badge--neutral'}`}
-                      style={{
-                        display: 'inline-block',
-                        padding: '3px 10px',
-                        borderRadius: 'var(--sc-radius-card, 2px)',
-                        fontSize: '12px',
-                        fontWeight: 600,
-                        background:
-                          s.status === 'ACTIVE'
-                            ? '#d1fae5'
-                            : s.status === 'SUSPENDED'
-                              ? '#fee2e2'
-                              : '#f3f4f6',
-                        color:
-                          s.status === 'ACTIVE'
-                            ? '#065f46'
-                            : s.status === 'SUSPENDED'
-                              ? '#991b1b'
-                              : '#4b5563',
-                      }}
-                    >
-                      {s.status === 'ACTIVE'
-                        ? 'Hoạt động'
-                        : s.status === 'SUSPENDED'
-                          ? 'Tạm khóa'
-                          : 'Tạm ngừng'}
-                    </span>
-                  </td>
-                  <td style={{ padding: '14px 16px' }}>
-                    <span
-                      className={`admin-badge ${s.onboardingStatus === 'APPROVED' ? 'admin-badge--success' : s.onboardingStatus === 'REJECTED' ? 'admin-badge--danger' : 'admin-badge--warning'}`}
-                      style={{
-                        display: 'inline-block',
-                        padding: '3px 10px',
-                        borderRadius: 'var(--sc-radius-card, 2px)',
-                        fontSize: '12px',
-                        fontWeight: 600,
-                        background:
-                          s.onboardingStatus === 'APPROVED'
-                            ? '#d1fae5'
-                            : s.onboardingStatus === 'REJECTED'
-                              ? '#fee2e2'
-                              : '#fef3c7',
-                        color:
-                          s.onboardingStatus === 'APPROVED'
-                            ? '#065f46'
-                            : s.onboardingStatus === 'REJECTED'
-                              ? '#991b1b'
-                              : '#92400e',
-                      }}
-                    >
-                      {s.onboardingStatus === 'APPROVED'
-                        ? 'Đã duyệt'
-                        : s.onboardingStatus === 'REJECTED'
-                          ? 'Bị từ chối'
-                          : 'Chờ duyệt'}
-                    </span>
-                  </td>
-                  <td
+                <thead>
+                  <tr
                     style={{
-                      padding: '14px 16px',
-                      color: '#6b7280',
+                      background: '#f9fafb',
+                      borderBottom: '1px solid #e5e7eb',
+                      color: '#4b5563',
                       fontSize: '13px',
-                      maxWidth: '200px',
                     }}
                   >
-                    {s.onboardingReason || '—'}
-                  </td>
-                  <td style={{ padding: '14px 16px', color: '#6b7280', fontSize: '13px' }}>
-                    {new Date(s.updatedAt).toLocaleDateString('vi-VN')}
-                  </td>
-                  <td style={{ padding: '14px 16px', textAlign: 'right' }}>
-                    <div className="admin-table-actions">
-                      {s.onboardingStatus === 'PENDING_APPROVAL' && (
-                        <>
-                          <button
-                            onClick={() => openModal(s, 'APPROVE')}
-                            className="admin-btn admin-btn-success-outline"
-                            style={{
-                              borderRadius: '6px',
-                              cursor: 'pointer',
-                              fontWeight: 600,
-                            }}
-                          >
-                            Duyệt
-                          </button>
-                          <button
-                            onClick={() => openModal(s, 'REJECT')}
-                            className="admin-btn admin-btn-danger-outline"
-                            style={{
-                              borderRadius: '6px',
-                              cursor: 'pointer',
-                              fontWeight: 600,
-                            }}
-                          >
-                            Từ chối
-                          </button>
-                        </>
-                      )}
-
-                      {s.onboardingStatus === 'APPROVED' && (
-                        <>
-                          {s.status === 'ACTIVE' ? (
-                            <button
-                              onClick={() => openModal(s, 'SUSPEND')}
-                              className="admin-btn admin-btn-danger-outline"
-                              style={{
-                                borderRadius: '6px',
-                                cursor: 'pointer',
-                                fontWeight: 600,
-                              }}
-                            >
-                              Khóa
-                            </button>
-                          ) : (
-                            <button
-                              onClick={() => openModal(s, 'RESTORE')}
-                              className="admin-btn admin-btn-success-outline"
-                              style={{
-                                borderRadius: '6px',
-                                cursor: 'pointer',
-                                fontWeight: 600,
-                              }}
-                            >
-                              Mở khóa
-                            </button>
+                    <th style={{ padding: '12px 16px' }} className="management-table-id-cell">ID</th>
+                    <th style={{ padding: '12px 16px' }}>Tên shop</th>
+                    <th style={{ padding: '12px 16px' }}>Trạng thái bán</th>
+                    <th style={{ padding: '12px 16px' }}>Xét duyệt Onboarding</th>
+                    <th style={{ padding: '12px 16px' }}>Ghi chú duyệt</th>
+                    <th style={{ padding: '12px 16px' }}>Cập nhật</th>
+                    <th className="admin-table-cell--actions">Thao tác</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {shops.map((s) => (
+                    <tr key={s.id}>
+                      <td className="management-table-id-cell" style={{ padding: '14px 16px' }}>{s.id}</td>
+                      <td style={{ padding: '14px 16px' }}>
+                        <AdminEntityLink
+                          href={`/admin/shops/${s.id}`}
+                          name={s.name}
+                          imageUrl={s.logoUrl}
+                        />
+                      </td>
+                      <td style={{ padding: '14px 16px' }}>
+                        <span
+                          className={`admin-badge admin-table-status ${s.status === 'ACTIVE' ? 'admin-badge--success' : s.status === 'SUSPENDED' ? 'admin-badge--danger' : 'admin-badge--neutral'}`}
+                          style={{
+                            display: 'inline-block',
+                            padding: '3px 10px',
+                            borderRadius: 'var(--sc-radius-card, 2px)',
+                            fontSize: '12px',
+                            fontWeight: 600,
+                            background:
+                              s.status === 'ACTIVE'
+                                ? '#d1fae5'
+                                : s.status === 'SUSPENDED'
+                                  ? '#fee2e2'
+                                  : '#f3f4f6',
+                            color:
+                              s.status === 'ACTIVE'
+                                ? '#065f46'
+                                : s.status === 'SUSPENDED'
+                                  ? '#991b1b'
+                                  : '#4b5563',
+                          }}
+                        >
+                          {s.status === 'ACTIVE'
+                            ? 'Hoạt động'
+                            : s.status === 'SUSPENDED'
+                              ? 'Tạm khóa'
+                              : 'Tạm ngừng'}
+                        </span>
+                      </td>
+                      <td style={{ padding: '14px 16px' }}>
+                        <span
+                          className={`admin-badge admin-table-status ${s.onboardingStatus === 'APPROVED' ? 'admin-badge--success' : s.onboardingStatus === 'REJECTED' ? 'admin-badge--danger' : 'admin-badge--warning'}`}
+                          style={{
+                            display: 'inline-block',
+                            padding: '3px 10px',
+                            borderRadius: 'var(--sc-radius-card, 2px)',
+                            fontSize: '12px',
+                            fontWeight: 600,
+                            background:
+                              s.onboardingStatus === 'APPROVED'
+                                ? '#d1fae5'
+                                : s.onboardingStatus === 'REJECTED'
+                                  ? '#fee2e2'
+                                  : '#fef3c7',
+                            color:
+                              s.onboardingStatus === 'APPROVED'
+                                ? '#065f46'
+                                : s.onboardingStatus === 'REJECTED'
+                                  ? '#991b1b'
+                                  : '#92400e',
+                          }}
+                        >
+                          {s.onboardingStatus === 'APPROVED'
+                            ? 'Đã duyệt'
+                            : s.onboardingStatus === 'REJECTED'
+                              ? 'Bị từ chối'
+                              : 'Chờ duyệt'}
+                        </span>
+                      </td>
+                      <td
+                        style={{
+                          padding: '14px 16px',
+                          color: '#6b7280',
+                          fontSize: '13px',
+                          maxWidth: '200px',
+                        }}
+                      >
+                        {s.onboardingReason || '—'}
+                      </td>
+                      <td style={{ padding: '14px 16px', color: '#6b7280', fontSize: '13px' }}>
+                        {new Date(s.updatedAt).toLocaleDateString('vi-VN')}
+                      </td>
+                      <td className="admin-table-cell--actions">
+                        <div className="admin-table-actions">
+                          {s.onboardingStatus === 'PENDING_APPROVAL' && (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => openModal(s, 'APPROVE')}
+                                className="admin-icon-btn admin-icon-btn--success"
+                                aria-label={`Duyệt cửa hàng ${s.name}`}
+                                title="Duyệt cửa hàng"
+                              >
+                                <CheckIcon aria-hidden="true" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => openModal(s, 'REJECT')}
+                                className="admin-icon-btn admin-icon-btn--danger"
+                                aria-label={`Từ chối cửa hàng ${s.name}`}
+                                title="Từ chối cửa hàng"
+                              >
+                                <XIcon aria-hidden="true" />
+                              </button>
+                            </>
                           )}
-                        </>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+
+                          {s.onboardingStatus === 'APPROVED' && (
+                            <>
+                              {s.status === 'ACTIVE' ? (
+                                <button
+                                  type="button"
+                                  onClick={() => openModal(s, 'SUSPEND')}
+                                  className="admin-icon-btn admin-icon-btn--danger"
+                                  aria-label={`Khóa cửa hàng ${s.name}`}
+                                  title="Khóa cửa hàng"
+                                >
+                                  <LockIcon aria-hidden="true" />
+                                </button>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => openModal(s, 'RESTORE')}
+                                  className="admin-icon-btn admin-icon-btn--success"
+                                  aria-label={`Mở khóa cửa hàng ${s.name}`}
+                                  title="Mở khóa cửa hàng"
+                                >
+                                  <UnlockIcon aria-hidden="true" />
+                                </button>
+                              )}
+                            </>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <AdminPagination
+              itemLabel="cửa hàng"
+              page={page}
+              totalItems={totalItems}
+              totalPages={totalPages}
+              disabled={loading}
+              onPageChange={setPage}
+            />
+          </>
         )}
       </div>
 

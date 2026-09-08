@@ -41,7 +41,7 @@ export class AdminProductsController {
 
   @Get()
   @Header('Cache-Control', 'private, no-store')
-  @ApiOperation({ summary: 'List products for marketplace moderation' })
+  @ApiOperation({ summary: 'List products for marketplace moderation, with 10 products per page' })
   list(@Query() query: AdminProductListQueryDto): Promise<AdminProductListResponse> {
     return this.admin.listProducts(query);
   }

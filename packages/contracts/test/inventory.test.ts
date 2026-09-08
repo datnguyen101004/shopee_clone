@@ -26,16 +26,17 @@ describe('inventory contracts', () => {
       version: 1,
       updatedAt: '2026-08-18T00:00:00.000Z',
     };
-    expect(isInventoryPage({ items: [balance], nextCursor: null })).toBe(true);
+    const page = { page: 1, pageSize: 10, totalItems: 1, totalPages: 1 };
+    expect(isInventoryPage({ items: [balance], ...page })).toBe(true);
     const withoutImage = { ...balance } as Record<string, unknown>;
     delete withoutImage.productImageUrl;
-    expect(isInventoryPage({ items: [withoutImage], nextCursor: null })).toBe(false);
-    expect(isInventoryPage({ items: [{ ...balance, productImageUrl: 42 }], nextCursor: null })).toBe(false);
+    expect(isInventoryPage({ items: [withoutImage], ...page })).toBe(false);
+    expect(isInventoryPage({ items: [{ ...balance, productImageUrl: 42 }], ...page })).toBe(false);
   });
 
-  it('accepts URL query strings and rejects unsafe page sizes', () => {
-    expect(parseInventoryPageQuery({ lowStock: 'true', limit: '20' })).toEqual({ cursor: null, limit: 20, productId: null, lowStock: true });
-    expect(parseInventoryPageQuery({ limit: '51' })).toBeNull();
+  it('accepts URL query strings and rejects invalid pages', () => {
+    expect(parseInventoryPageQuery({ lowStock: 'true', page: '2' })).toEqual({ page: 2, productId: null, lowStock: true });
+    expect(parseInventoryPageQuery({ page: '0' })).toBeNull();
   });
 
   it('keeps request digests and UTC timestamp inputs canonical', () => {

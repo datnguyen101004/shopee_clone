@@ -5,6 +5,11 @@ import { PricingModule } from '../pricing/pricing.module';
 import { VouchersModule } from '../vouchers/vouchers.module';
 import { InventoryModule } from '../inventory/inventory.module';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { TrafficAdmissionModule } from '../traffic-admission/traffic-admission.module';
+import { CacheModule } from '../cache/cache.module';
+import { FlashSaleAdmissionService } from './flash-sale-admission.service';
+import { AdmissionResultController } from './admission-result.controller';
+import { TrafficAdmissionFilter } from '../traffic-admission/traffic-admission.filter';
 import { CheckoutAssembler } from './checkout-assembler';
 import { CheckoutPurchaseBuilder } from './checkout-purchase-builder';
 import { CheckoutController } from './checkout.controller';
@@ -14,8 +19,8 @@ import { OrderWriter } from './order-writer';
 import { PurchaseProjector } from './purchase-projector';
 
 @Module({
-  imports: [AuthModule, PricingModule, VouchersModule, InventoryModule, NotificationsModule],
-  controllers: [CheckoutController],
+  imports: [AuthModule, PricingModule, VouchersModule, InventoryModule, NotificationsModule, TrafficAdmissionModule, CacheModule],
+  controllers: [CheckoutController, AdmissionResultController],
   providers: [
     CheckoutExceptionFilter,
     CheckoutAssembler,
@@ -23,6 +28,8 @@ import { PurchaseProjector } from './purchase-projector';
     CheckoutService,
     OrderWriter,
     PurchaseProjector,
+    FlashSaleAdmissionService,
+    TrafficAdmissionFilter,
   ],
   exports: [CheckoutService, OrderWriter],
 })

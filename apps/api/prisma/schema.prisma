@@ -248,23 +248,23 @@ enum NotificationChannel {
 }
 
 enum NotificationType {
-  ORDER_CREATED                @map("order_created")
-  ORDER_CONFIRMED              @map("order_confirmed")
-  ORDER_SHIPPING               @map("order_shipping")
-  ORDER_DELIVERED              @map("order_delivered")
-  ORDER_CANCELLED              @map("order_cancelled")
-  RETURN_REQUESTED             @map("return_requested")
-  RETURN_ACCEPTED              @map("return_accepted")
-  DISPUTE_ESCALATED            @map("dispute_escalated")
-  REFUNDED                     @map("refunded")
-  PRODUCT_APPROVED             @map("product_approved")
-  PRODUCT_REJECTED             @map("product_rejected")
-  VOUCHER_ASSIGNED             @map("voucher_assigned")
-  CAMPAIGN_ANNOUNCED           @map("campaign_announced")
-  CAMPAIGN_ENROLLMENT_REMINDER @map("campaign_enrollment_reminder")
+  ORDER_CREATED                      @map("order_created")
+  ORDER_CONFIRMED                    @map("order_confirmed")
+  ORDER_SHIPPING                     @map("order_shipping")
+  ORDER_DELIVERED                    @map("order_delivered")
+  ORDER_CANCELLED                    @map("order_cancelled")
+  RETURN_REQUESTED                   @map("return_requested")
+  RETURN_ACCEPTED                    @map("return_accepted")
+  DISPUTE_ESCALATED                  @map("dispute_escalated")
+  REFUNDED                           @map("refunded")
+  PRODUCT_APPROVED                   @map("product_approved")
+  PRODUCT_REJECTED                   @map("product_rejected")
+  VOUCHER_ASSIGNED                   @map("voucher_assigned")
+  CAMPAIGN_ANNOUNCED                 @map("campaign_announced")
+  CAMPAIGN_ENROLLMENT_REMINDER       @map("campaign_enrollment_reminder")
   BANNER_CAMPAIGN_TARGET_UNAVAILABLE @map("banner_campaign_target_unavailable")
-  CHAT_MESSAGE                 @map("chat_message")
-  SYSTEM_NOTICE                @map("system_notice")
+  CHAT_MESSAGE                       @map("chat_message")
+  SYSTEM_NOTICE                      @map("system_notice")
 
   @@map("notification_type")
 }
@@ -423,6 +423,15 @@ enum SellerProductMediaState {
   ATTACHED       @map("attached")
 
   @@map("seller_product_media_state")
+}
+
+enum HomepageBannerMediaState {
+  PENDING_UPLOAD @map("pending_upload")
+  STAGED         @map("staged")
+  ATTACHED       @map("attached")
+  DELETING       @map("deleting")
+
+  @@map("homepage_banner_media_state")
 }
 
 enum InventoryAdjustmentReason {
@@ -601,6 +610,7 @@ model User {
   sellerReviewReports         SellerReviewReport[]               @relation("SellerReviewReporter")
   stagedReviewMedia           ReviewMedia[]                      @relation("ReviewMediaUploader")
   stagedSellerProductMedia    SellerProductMediaAsset[]          @relation("SellerProductMediaUploader")
+  stagedHomepageBannerMedia   HomepageBannerMediaAsset[]         @relation("HomepageBannerMediaUploader")
   reviewModeration            ReviewModerationEvent[]            @relation("ReviewModerationActor")
   inventoryAdjustments        InventoryAdjustment[]              @relation("InventoryAdjustmentActor")
   inventoryReservations       InventoryReservation[]             @relation("InventoryReservationBuyer")
@@ -634,9 +644,12 @@ model User {
   chatReportsTargeted         UserReport[]                       @relation("UserReportsTarget")
   marketplaceCampaignCommands MarketplaceCampaignCommand[]       @relation("MarketplaceCampaignCommandActor")
   marketplaceCampaignAudits   MarketplaceCampaignAudit[]         @relation("MarketplaceCampaignAuditActor")
+  flashSaleBuyerClaims        FlashSaleBuyerClaim[]
 
   @@index([status])
   @@index([deletedAt])
+  @@index([deletedAt, createdAt(sort: Desc), id(sort: Desc)])
+  @@index([deletedAt, status, createdAt(sort: Desc), id(sort: Desc)])
   @@map("users")
 }
 
@@ -846,6 +859,8 @@ model Shop {
   @@index([status])
   @@index([onboardingStatus])
   @@index([deletedAt])
+  @@index([deletedAt, updatedAt(sort: Desc), id(sort: Desc)])
+  @@index([deletedAt, status, onboardingStatus, updatedAt(sort: Desc), id(sort: Desc)])
   @@map("shops")
 }
 
@@ -983,14 +998,20 @@ model Product {
   moderationCases          ModerationCase[]
   moderationNotices        SellerModerationNotice[]
   sellerCampaignProducts   SellerCampaignProduct[]
+  flashSaleSkus            FlashSaleSku[]
+  flashSaleBuyerClaims     FlashSaleBuyerClaim[]
   promotionReservations    ProductPromotionReservation[] @relation("ReservationProduct")
 
   @@unique([shopId, slug])
   @@index([shopId, status])
+  @@index([shopId, deletedAt, updatedAt(sort: Desc), id(sort: Desc)])
+  @@index([shopId, deletedAt, status, updatedAt(sort: Desc), id(sort: Desc)])
   @@index([status, moderationStatus])
   @@index([categoryId, status])
   @@index([status, createdAt, id])
   @@index([deletedAt])
+  @@index([deletedAt, status, updatedAt(sort: Desc), id(sort: Desc)])
+  @@index([deletedAt, status, moderationStatus, updatedAt(sort: Desc), id(sort: Desc)])
   @@index([deletedAt, purgeBlockedAt, id])
   @@map("products")
 }
@@ -1097,6 +1118,8 @@ model ProductVariant {
   cartLines            CartLine[]
   orderLines           OrderLine[]
   optionValues         ProductVariantOptionValue[]
+  flashSaleSkus        FlashSaleSku[]
+  flashSaleBuyerClaims FlashSaleBuyerClaim[]
 
   @@unique([productId, id])
   @@index([productId, status])
@@ -1240,6 +1263,8 @@ model Voucher {
   @@index([shopId, isEnabled, startsAt, endsAt])
   @@index([isEnabled, startsAt, endsAt])
   @@index([shopId, version, updatedAt(sort: Desc), id])
+  @@index([shopId, archivedAt, createdAt(sort: Desc), id(sort: Desc)])
+  @@index([shopId, isEnabled, createdAt(sort: Desc), id(sort: Desc)])
   @@map("vouchers")
 }
 
@@ -1299,43 +1324,46 @@ model MarketplaceCampaignType {
 }
 
 model MarketplaceCampaign {
-  id                         String                        @id @default(uuid()) @db.Uuid
-  typeId                     String                        @map("type_id") @db.Uuid
-  name                       String                        @db.VarChar(160)
-  description                String?                       @db.VarChar(500)
-  announceAt                 DateTime                      @map("announce_at") @db.Timestamptz(3)
-  enrollmentStartsAt         DateTime                      @map("enrollment_starts_at") @db.Timestamptz(3)
-  enrollmentEndsAt           DateTime                      @map("enrollment_ends_at") @db.Timestamptz(3)
-  startsAt                   DateTime                      @map("starts_at") @db.Timestamptz(3)
-  endsAt                     DateTime                      @map("ends_at") @db.Timestamptz(3)
-  minimumDiscountBasisPoints Int                           @map("minimum_discount_basis_points")
-  policyVersionSnapshot     Int?                          @map("policy_version_snapshot")
-  importanceClassSnapshot   MarketplaceCampaignImportanceClass? @map("importance_class_snapshot")
-  presentationKeySnapshot   String?                       @map("presentation_key_snapshot") @db.VarChar(80)
-  productOrderKeySnapshot   String?                       @map("product_order_key_snapshot") @db.VarChar(80)
-  rankingProfileKeySnapshot String?                       @map("ranking_profile_key_snapshot") @db.VarChar(80)
-  version                    Int                           @default(1)
-  publishedAt                DateTime?                     @map("published_at") @db.Timestamptz(3)
-  cancelledAt                DateTime?                     @map("cancelled_at") @db.Timestamptz(3)
-  cancellationReason         String?                       @map("cancellation_reason") @db.VarChar(240)
-  detailEyebrow              String?                       @map("detail_eyebrow") @db.VarChar(80)
-  detailImageUrl             String?                       @map("detail_image_url") @db.Text
-  detailAltText              String?                       @map("detail_alt_text") @db.VarChar(240)
-  detailThemeKey             String?                       @map("detail_theme_key") @db.VarChar(40)
-  detailContentJson           Json?                         @map("detail_content_json") @db.JsonB
-  createdAt                  DateTime                      @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt                  DateTime                      @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
-  type                       MarketplaceCampaignType       @relation(fields: [typeId], references: [id], onDelete: Restrict)
+  id                         String                              @id @default(uuid()) @db.Uuid
+  typeId                     String                              @map("type_id") @db.Uuid
+  name                       String                              @db.VarChar(160)
+  description                String?                             @db.VarChar(500)
+  announceAt                 DateTime                            @map("announce_at") @db.Timestamptz(3)
+  enrollmentStartsAt         DateTime                            @map("enrollment_starts_at") @db.Timestamptz(3)
+  enrollmentEndsAt           DateTime                            @map("enrollment_ends_at") @db.Timestamptz(3)
+  startsAt                   DateTime                            @map("starts_at") @db.Timestamptz(3)
+  endsAt                     DateTime                            @map("ends_at") @db.Timestamptz(3)
+  minimumDiscountBasisPoints Int                                 @map("minimum_discount_basis_points")
+  policyVersionSnapshot      Int?                                @map("policy_version_snapshot")
+  importanceClassSnapshot    MarketplaceCampaignImportanceClass? @map("importance_class_snapshot")
+  presentationKeySnapshot    String?                             @map("presentation_key_snapshot") @db.VarChar(80)
+  productOrderKeySnapshot    String?                             @map("product_order_key_snapshot") @db.VarChar(80)
+  rankingProfileKeySnapshot  String?                             @map("ranking_profile_key_snapshot") @db.VarChar(80)
+  version                    Int                                 @default(1)
+  publishedAt                DateTime?                           @map("published_at") @db.Timestamptz(3)
+  cancelledAt                DateTime?                           @map("cancelled_at") @db.Timestamptz(3)
+  cancellationReason         String?                             @map("cancellation_reason") @db.VarChar(240)
+  detailEyebrow              String?                             @map("detail_eyebrow") @db.VarChar(80)
+  detailImageUrl             String?                             @map("detail_image_url") @db.Text
+  detailAltText              String?                             @map("detail_alt_text") @db.VarChar(240)
+  detailThemeKey             String?                             @map("detail_theme_key") @db.VarChar(40)
+  detailContentJson          Json?                               @map("detail_content_json") @db.JsonB
+  createdAt                  DateTime                            @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt                  DateTime                            @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  type                       MarketplaceCampaignType             @relation(fields: [typeId], references: [id], onDelete: Restrict)
   categories                 MarketplaceCampaignCategory[]
   participations             SellerCampaignParticipation[]
   commands                   MarketplaceCampaignCommand[]
   audits                     MarketplaceCampaignAudit[]
   placements                 HomepageCampaignCollection[]
-  promotionReservations      ProductPromotionReservation[] @relation("MarketplaceCampaignReservation")
+  promotionReservations      ProductPromotionReservation[]       @relation("MarketplaceCampaignReservation")
+  flashSaleSkus              FlashSaleSku[]
+  flashSaleBuyerClaims       FlashSaleBuyerClaim[]
 
   @@index([typeId, publishedAt, startsAt, endsAt])
   @@index([publishedAt, announceAt, enrollmentEndsAt])
   @@index([cancelledAt])
+  @@index([createdAt(sort: Desc), id(sort: Desc)])
   @@map("marketplace_campaigns")
 }
 
@@ -1351,18 +1379,19 @@ model MarketplaceCampaignCategory {
 }
 
 model SellerCampaignParticipation {
-  id          String                                @id @default(uuid()) @db.Uuid
-  campaignId  String                                @map("campaign_id") @db.Uuid
-  shopId      String                                @map("shop_id") @db.Uuid
-  state       MarketplaceCampaignParticipationState @default(UNRESPONDED)
-  version     Int                                   @default(1)
-  respondedAt DateTime?                             @map("responded_at") @db.Timestamptz(3)
-  lockedAt    DateTime?                             @map("locked_at") @db.Timestamptz(3)
-  createdAt   DateTime                              @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt   DateTime                              @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
-  campaign    MarketplaceCampaign                   @relation(fields: [campaignId], references: [id], onDelete: Cascade)
-  shop        Shop                                  @relation(fields: [shopId], references: [id], onDelete: Restrict)
-  products    SellerCampaignProduct[]
+  id            String                                @id @default(uuid()) @db.Uuid
+  campaignId    String                                @map("campaign_id") @db.Uuid
+  shopId        String                                @map("shop_id") @db.Uuid
+  state         MarketplaceCampaignParticipationState @default(UNRESPONDED)
+  version       Int                                   @default(1)
+  respondedAt   DateTime?                             @map("responded_at") @db.Timestamptz(3)
+  lockedAt      DateTime?                             @map("locked_at") @db.Timestamptz(3)
+  createdAt     DateTime                              @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt     DateTime                              @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  campaign      MarketplaceCampaign                   @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  shop          Shop                                  @relation(fields: [shopId], references: [id], onDelete: Restrict)
+  products      SellerCampaignProduct[]
+  flashSaleSkus FlashSaleSku[]
 
   @@unique([campaignId, shopId])
   @@index([shopId, state, updatedAt(sort: Desc), id])
@@ -1382,6 +1411,97 @@ model SellerCampaignProduct {
   @@id([participationId, productId])
   @@index([productId, acceptedAt(sort: Desc)])
   @@map("seller_campaign_products")
+}
+
+model FlashSaleSku {
+  id                  String                      @id @default(uuid()) @db.Uuid
+  campaignId          String                      @map("campaign_id") @db.Uuid
+  participationId     String                      @map("participation_id") @db.Uuid
+  productId           String                      @map("product_id") @db.Uuid
+  variantId           String                      @map("variant_id") @db.Uuid
+  referencePriceMinor BigInt                      @map("reference_price_minor")
+  salePriceMinor      BigInt                      @map("sale_price_minor")
+  allocatedQuantity   Int                         @map("allocated_quantity")
+  remainingQuantity   Int                         @map("remaining_quantity")
+  netConsumedQuantity Int                         @default(0) @map("net_consumed_quantity")
+  version             Int                         @default(1)
+  managementEpoch     Int                         @default(1) @map("management_epoch")
+  endedAt             DateTime?                   @map("ended_at") @db.Timestamptz(3)
+  endedReason         String?                     @map("ended_reason") @db.VarChar(80)
+  createdAt           DateTime                    @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt           DateTime                    @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  campaign            MarketplaceCampaign         @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  participation       SellerCampaignParticipation @relation(fields: [participationId], references: [id], onDelete: Cascade)
+  product             Product                     @relation(fields: [productId], references: [id], onDelete: Restrict)
+  variant             ProductVariant              @relation(fields: [variantId], references: [id], onDelete: Restrict)
+  claims              FlashSaleBuyerClaim[]
+  consumptions        FlashSaleConsumption[]
+  outboxEvents        FlashSaleOutbox[]
+
+  @@unique([campaignId, variantId])
+  @@index([campaignId, productId, remainingQuantity])
+  @@index([participationId, remainingQuantity, endedAt])
+  @@index([variantId, campaignId])
+  @@map("flash_sale_skus")
+}
+
+model FlashSaleBuyerClaim {
+  id             String              @id @default(uuid()) @db.Uuid
+  campaignId     String              @map("campaign_id") @db.Uuid
+  buyerId        String              @map("buyer_id") @db.Uuid
+  productId      String              @map("product_id") @db.Uuid
+  variantId      String              @map("variant_id") @db.Uuid
+  purchaseId     String              @map("purchase_id") @db.Uuid
+  orderLineId    String              @map("order_line_id") @db.Uuid
+  createdAt      DateTime            @default(now()) @map("created_at") @db.Timestamptz(3)
+  campaign       MarketplaceCampaign @relation(fields: [campaignId], references: [id], onDelete: Restrict)
+  buyer          User                @relation(fields: [buyerId], references: [id], onDelete: Restrict)
+  product        Product             @relation(fields: [productId], references: [id], onDelete: Restrict)
+  variant        ProductVariant      @relation(fields: [variantId], references: [id], onDelete: Restrict)
+  purchase       Purchase            @relation(fields: [purchaseId], references: [id], onDelete: Restrict)
+  orderLine      OrderLine           @relation(fields: [orderLineId], references: [id], onDelete: Restrict)
+  flashSaleSku   FlashSaleSku?       @relation(fields: [flashSaleSkuId], references: [id])
+  flashSaleSkuId String?             @map("flash_sale_sku_id") @db.Uuid
+
+  @@unique([campaignId, buyerId, productId])
+  @@unique([orderLineId])
+  @@index([buyerId, createdAt(sort: Desc)])
+  @@index([campaignId, productId])
+  @@map("flash_sale_buyer_claims")
+}
+
+model FlashSaleConsumption {
+  id                  String       @id @default(uuid()) @db.Uuid
+  orderLineId         String       @unique @map("order_line_id") @db.Uuid
+  flashSaleSkuId      String       @map("flash_sale_sku_id") @db.Uuid
+  quantity            Int          @default(1)
+  salePriceMinor      BigInt       @map("sale_price_minor")
+  reversedAt          DateTime?    @map("reversed_at") @db.Timestamptz(3)
+  reversalDestination String?      @map("reversal_destination") @db.VarChar(16)
+  createdAt           DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
+  flashSaleSku        FlashSaleSku @relation(fields: [flashSaleSkuId], references: [id], onDelete: Restrict)
+  orderLine           OrderLine    @relation(fields: [orderLineId], references: [id], onDelete: Restrict)
+
+  @@index([flashSaleSkuId, reversedAt])
+  @@map("flash_sale_consumptions")
+}
+
+model FlashSaleOutbox {
+  id              String       @id @default(uuid()) @db.Uuid
+  eventId         String       @unique @map("event_id") @db.Uuid
+  flashSaleSkuId  String       @map("flash_sale_sku_id") @db.Uuid
+  sequence        Int
+  managementEpoch Int          @map("management_epoch")
+  operationToken  String?      @map("operation_token") @db.Uuid
+  admissionDelta  Int          @default(0) @map("admission_delta")
+  publicSnapshot  Json         @map("public_snapshot") @db.JsonB
+  processedAt     DateTime?    @map("processed_at") @db.Timestamptz(3)
+  createdAt       DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
+  flashSaleSku    FlashSaleSku @relation(fields: [flashSaleSkuId], references: [id], onDelete: Cascade)
+
+  @@unique([flashSaleSkuId, sequence])
+  @@index([processedAt, createdAt])
+  @@map("flash_sale_outbox")
 }
 
 model MarketplaceCampaignCommand {
@@ -1529,6 +1649,7 @@ model Purchase {
   voucherConsumption              VoucherConsumption?
   inventoryReservation            InventoryReservation?
   paymentAttempts                 PaymentAttempt[]
+  flashSaleClaims                 FlashSaleBuyerClaim[]
 
   @@unique([buyerId, idempotencyKey])
   @@index([buyerId, createdAt(sort: Desc), id])
@@ -1776,6 +1897,7 @@ model SellerReviewReport {
 
   @@unique([sellerUserId, idempotencyKey])
   @@index([reviewId, status, createdAt(sort: Desc), id])
+  @@index([status, createdAt(sort: Desc), id(sort: Desc), reviewId])
   @@index([shopId, sellerUserId, createdAt(sort: Desc), id])
   @@map("seller_review_reports")
 }
@@ -1981,6 +2103,8 @@ model OrderLine {
   voucherAllocations              PurchaseVoucherAllocation[]
   review                          ProductReview?
   returnItems                     ReturnRequestItem[]
+  flashSaleConsumption            FlashSaleConsumption?
+  flashSaleClaim                  FlashSaleBuyerClaim?
 
   @@unique([orderId, sourceCartLineId])
   @@index([productId, createdAt, id])
@@ -2369,26 +2493,50 @@ model HomepageModule {
 }
 
 model HomepageBanner {
-  id              String               @id @default(uuid()) @db.Uuid
-  moduleId        String               @map("module_id") @db.Uuid
-  eyebrow         String?              @db.VarChar(80)
-  title           String               @db.VarChar(160)
-  description     String?              @db.VarChar(320)
-  imageUrl        String?              @map("image_url") @db.Text
-  altText         String?              @map("alt_text") @db.VarChar(240)
-  themeKey        String               @default("brand") @map("theme_key") @db.VarChar(40)
-  sortOrder       Int                  @default(0) @map("sort_order")
-  targetType      String               @map("target_type") @db.VarChar(24)
-  targetId        String?              @map("target_id") @db.Uuid
-  targetQuery     String?              @map("target_query") @db.VarChar(500)
-  displayFrom     DateTime?            @map("display_from") @db.Timestamptz(3)
-  displayUntil    DateTime?            @map("display_until") @db.Timestamptz(3)
-  isEnabled       Boolean              @default(true) @map("is_enabled")
-  priority        Int                  @default(0)
-  module          HomepageModule       @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  id           String         @id @default(uuid()) @db.Uuid
+  moduleId     String         @map("module_id") @db.Uuid
+  eyebrow      String?        @db.VarChar(80)
+  title        String         @db.VarChar(160)
+  description  String?        @db.VarChar(320)
+  imageUrl     String?        @map("image_url") @db.Text
+  altText      String?        @map("alt_text") @db.VarChar(240)
+  themeKey     String         @default("brand") @map("theme_key") @db.VarChar(40)
+  sortOrder    Int            @default(0) @map("sort_order")
+  targetType   String         @map("target_type") @db.VarChar(24)
+  targetId     String?        @map("target_id") @db.Uuid
+  targetQuery  String?        @map("target_query") @db.VarChar(500)
+  displayFrom  DateTime?      @map("display_from") @db.Timestamptz(3)
+  displayUntil DateTime?      @map("display_until") @db.Timestamptz(3)
+  isEnabled    Boolean        @default(true) @map("is_enabled")
+  priority     Int            @default(0)
+  module       HomepageModule @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  imageAsset   HomepageBannerMediaAsset?
 
   @@unique([moduleId, sortOrder])
   @@map("homepage_banners")
+}
+
+model HomepageBannerMediaAsset {
+  id              String                    @id @default(uuid()) @db.Uuid
+  uploaderId      String                    @map("uploader_id") @db.Uuid
+  bannerId        String?                   @unique @map("banner_id") @db.Uuid
+  storageKey      String                    @unique @map("storage_key") @db.VarChar(255)
+  mimeType        String                    @map("mime_type") @db.VarChar(32)
+  byteSize        Int                       @map("byte_size")
+  width           Int?
+  height          Int?
+  checksumSha256  String?                   @map("checksum_sha256") @db.VarChar(64)
+  uploadExpiresAt DateTime?                 @map("upload_expires_at") @db.Timestamptz(3)
+  state           HomepageBannerMediaState  @default(STAGED)
+  expiresAt       DateTime?                 @map("expires_at") @db.Timestamptz(3)
+  createdAt       DateTime                  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt       DateTime                  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  uploader        User                      @relation("HomepageBannerMediaUploader", fields: [uploaderId], references: [id], onDelete: Restrict)
+  banner          HomepageBanner?           @relation(fields: [bannerId], references: [id], onDelete: SetNull)
+
+  @@index([uploaderId, state, expiresAt])
+  @@index([state, expiresAt])
+  @@map("homepage_banner_media_assets")
 }
 
 model HomepageCampaignCollection {

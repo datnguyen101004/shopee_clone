@@ -585,6 +585,10 @@ function ProductSection({ module }: { module: HomepageProductModule }) {
     return <DailyRecommendationsSection module={module} />;
   }
 
+  if (module.type === 'flash-sale' && module.products.length === 0) {
+    return null;
+  }
+
   const titleContent =
     module.type === 'flash-sale' ? (
       <span className="homepage-section-title--flash">

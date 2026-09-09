@@ -1,0 +1,5724 @@
+{
+  "schemaVersion": "t35-admission-relinquishment-v1",
+  "runId": "admission-100x40-20260909-151947",
+  "status": "PASS",
+  "startedAt": "2026-09-09T08:19:47.126Z",
+  "finishedAt": "2026-09-09T08:20:18.713Z",
+  "mode": "run",
+  "fixture": {
+    "path": "D:\\Web_Project\\Shopee_clone\\.runtime\\t35-admission-100-buyers.json",
+    "userCount": 100,
+    "sku": {
+      "id": "00000000-0000-4000-8000-000000000941",
+      "variantId": "cbc97eff-fe53-580a-a0fa-5e336366728b",
+      "campaignId": "00000000-0000-4000-8000-000000000914",
+      "expectedQuota": 10
+    }
+  },
+  "config": {
+    "buyers": 100,
+    "skuQuota": 10,
+    "admissionPool": 40,
+    "confirmationConcurrency": 5,
+    "relinquishBatch": 10,
+    "relinquishIntervalMs": 2000,
+    "relinquishWaves": 6,
+    "finalWaveBuyers": 10,
+    "finalRemainingQuota": 5,
+    "requestTimeoutMs": 10000,
+    "pollIntervalMs": 500,
+    "admissionWaitTimeoutMs": 45000,
+    "confirmationRetryLimit": 4,
+    "confirmationRetryDelayMs": 350
+  },
+  "prerequisites": {
+    "api": {
+      "required": true,
+      "available": true,
+      "reachable": true,
+      "status": 200,
+      "latencyMs": 433,
+      "detail": "Public API health endpoint responded successfully."
+    },
+    "redis": {
+      "required": true,
+      "available": true,
+      "detail": "PING/PONG"
+    },
+    "postgres": {
+      "required": true,
+      "available": true,
+      "detail": "SELECT 1"
+    },
+    "localstack": {
+      "required": true,
+      "available": true,
+      "status": 200,
+      "detail": "LocalStack health endpoint responded."
+    },
+    "fixture": {
+      "required": true,
+      "available": true,
+      "users": 100
+    },
+    "sku": {
+      "required": true,
+      "available": true,
+      "detail": "Initial SKU snapshot captured.",
+      "remainingQuantity": 10,
+      "expectedRemainingQuantity": 10
+    },
+    "redisState": {
+      "required": true,
+      "available": true,
+      "detail": "activeLeases=0, pendingReleases=0"
+    }
+  },
+  "serviceDownMatrix": {
+    "api": {
+      "availability": "AVAILABLE",
+      "correctness": "NOT_RUN",
+      "recovery": "NOT_RUN"
+    },
+    "redis": {
+      "availability": "AVAILABLE",
+      "correctness": "NOT_RUN",
+      "recovery": "NOT_RUN"
+    },
+    "postgres": {
+      "availability": "AVAILABLE",
+      "correctness": "NOT_RUN",
+      "recovery": "NOT_RUN"
+    },
+    "localstack": {
+      "availability": "AVAILABLE",
+      "correctness": "NOT_RUN",
+      "recovery": "NOT_RUN"
+    }
+  },
+  "architectureFailureAssessment": [
+    {
+      "service": "SQS",
+      "impact": "New queue delivery pauses. Existing admitted leases and in-flight checkout remain usable, but WAITING tickets may not progress through the Lambda delivery path until SQS recovers.",
+      "safety": "Redis ticket/idempotency state prevents duplicate grants when SQS redelivers duplicate or previously invisible messages.",
+      "recovery": "SQS Standard redelivers unacknowledged messages after visibility timeout; recovery is bounded by visibility/backoff and message retention, not polling."
+    },
+    {
+      "service": "Lambda",
+      "impact": "SQS can retain ticket messages, but the Lambda grant consumer stops. Existing admitted buyers can still preview/confirm while new WAITING tickets accumulate.",
+      "safety": "No process-local token fallback is introduced; duplicate invocation remains fenced by Redis ticket state.",
+      "recovery": "Queued messages are retried when Lambda is available again. Expiry/page-leave reapers also call grantWaiting immediately after reclaiming capacity, but cannot replace initial message delivery indefinitely."
+    },
+    {
+      "service": "Redis",
+      "impact": "Admission join/status/token validation, lease accounting and confirmation-slot admission fail closed; Flash Sale checkout availability is interrupted.",
+      "safety": "PostgreSQL remains the durable order/quota authority, so the system does not grant unverified purchases or knowingly oversell.",
+      "recovery": "Automatic Redis cache-loss rebuilding/reconciliation is explicitly deferred in this POC. Redis is therefore the highest-availability-risk dependency."
+    },
+    {
+      "service": "PostgreSQL",
+      "impact": "Tickets and leases may still exist in Redis, but order creation and durable quota/claim persistence stop.",
+      "safety": "Checkout fails instead of treating Redis admission as a purchase guarantee; owned provisional attempts are compensated only after a definitive rollback.",
+      "recovery": "Database recovery is outside this POC; idempotency/result lookup must resolve any ambiguous commit before retry compensation."
+    }
+  ],
+  "phases": [
+    {
+      "name": "preflight",
+      "description": "Check fixture and real API/Redis/PostgreSQL/LocalStack availability.",
+      "startedAt": "2026-09-09T08:19:47.129Z",
+      "endedAt": "2026-09-09T08:19:47.616Z",
+      "durationMs": 487,
+      "details": {
+        "api": {
+          "required": true,
+          "available": true,
+          "reachable": true,
+          "status": 200,
+          "latencyMs": 433,
+          "detail": "Public API health endpoint responded successfully."
+        },
+        "redis": {
+          "required": true,
+          "available": true,
+          "detail": "PING/PONG"
+        },
+        "postgres": {
+          "required": true,
+          "available": true,
+          "detail": "SELECT 1"
+        },
+        "localstack": {
+          "required": true,
+          "available": true,
+          "status": 200,
+          "detail": "LocalStack health endpoint responded."
+        },
+        "fixture": {
+          "required": true,
+          "available": true,
+          "users": 100
+        },
+        "sku": {
+          "required": true,
+          "available": true,
+          "detail": "Initial SKU snapshot captured.",
+          "remainingQuantity": 10,
+          "expectedRemainingQuantity": 10
+        },
+        "redisState": {
+          "required": true,
+          "available": true,
+          "detail": "activeLeases=0, pendingReleases=0"
+        }
+      }
+    },
+    {
+      "name": "join-100",
+      "description": "Join 100 authenticated buyers concurrently with distinct admission idempotency keys.",
+      "startedAt": "2026-09-09T08:19:47.639Z",
+      "endedAt": "2026-09-09T08:19:48.438Z",
+      "durationMs": 799,
+      "details": {
+        "buyers": 100,
+        "http200": 100,
+        "admitted": 0,
+        "waiting": 100,
+        "errors": 0
+      }
+    },
+    {
+      "name": "initial-admission-snapshot",
+      "description": "Observe initial admission pool after the 100 concurrent joins.",
+      "startedAt": "2026-09-09T08:19:54.059Z",
+      "endedAt": "2026-09-09T08:19:54.059Z",
+      "durationMs": 0,
+      "details": {
+        "capturedAt": "2026-09-09T08:19:54.059Z",
+        "postgres": {
+          "available": true,
+          "sku": {
+            "id": "00000000-0000-4000-8000-000000000941",
+            "campaignId": "00000000-0000-4000-8000-000000000914",
+            "variantId": "cbc97eff-fe53-580a-a0fa-5e336366728b",
+            "allocatedQuantity": 10,
+            "remainingQuantity": 10,
+            "netConsumedQuantity": 0,
+            "version": 34
+          },
+          "globalClaims": 16,
+          "globalActiveConsumptions": 0,
+          "globalOrders": 16,
+          "runClaims": 0,
+          "runActiveConsumptions": 0,
+          "runOrders": 0
+        },
+        "redis": {
+          "available": true,
+          "activeLeases": 40,
+          "pendingReleases": 0,
+          "confirmationSlotsAvailable": null,
+          "skuRemainingAdmission": null
+        }
+      }
+    },
+    {
+      "name": "seed-confirmation",
+      "description": "Preview and confirm 5 buyers concurrently; retry only explicit 429 busy responses with the same order key.",
+      "startedAt": "2026-09-09T08:19:54.060Z",
+      "endedAt": "2026-09-09T08:19:58.232Z",
+      "durationMs": 4172,
+      "details": {
+        "buyers": 5,
+        "targetSuccessful": 5,
+        "successful": 5,
+        "busy": 2,
+        "conflict": 0,
+        "soldOut": 0,
+        "attempts": [
+          {
+            "attempt": 1,
+            "buyers": [
+              1,
+              2,
+              4,
+              5,
+              11
+            ],
+            "successful": 3,
+            "busy": 2,
+            "conflict": 0,
+            "soldOut": 0,
+            "responses": [
+              {
+                "status": 201,
+                "type": null,
+                "code": null,
+                "detail": null
+              },
+              {
+                "status": 201,
+                "type": null,
+                "code": null,
+                "detail": null
+              },
+              {
+                "status": 429,
+                "type": "https://shopee-clone.local/problems/flash-sale-busy",
+                "code": "FLASH_SALE_BUSY",
+                "detail": "Flash Sale confirmation capacity is temporarily full"
+              },
+              {
+                "status": 201,
+                "type": null,
+                "code": null,
+                "detail": null
+              },
+              {
+                "status": 429,
+                "type": "https://shopee-clone.local/problems/flash-sale-busy",
+                "code": "FLASH_SALE_BUSY",
+                "detail": "Flash Sale confirmation capacity is temporarily full"
+              }
+            ],
+            "slotSamples": [
+              {
+                "at": "2026-09-09T08:19:54.203Z",
+                "available": null
+              },
+              {
+                "at": "2026-09-09T08:19:54.270Z",
+                "available": 0
+              },
+              {
+                "at": "2026-09-09T08:19:54.335Z",
+                "available": 0
+              },
+              {
+                "at": "2026-09-09T08:19:54.401Z",
+                "available": 0
+              },
+              {
+                "at": "2026-09-09T08:19:54.470Z",
+                "available": 0
+              },
+              {
+                "at": "2026-09-09T08:19:54.536Z",
+                "available": 0
+              },
+              {
+                "at": "2026-09-09T08:19:54.593Z",
+                "available": 0
+              },
+              {
+                "at": "2026-09-09T08:19:54.656Z",
+                "available": 0
+              },
+              {
+                "at": "2026-09-09T08:19:54.717Z",
+                "available": 0
+              },
+              {
+                "at": "2026-09-09T08:19:54.780Z",
+                "available": 0
+              },
+              {
+                "at": "2026-09-09T08:19:54.841Z",
+                "available": 0
+              },
+              {
+                "at": "2026-09-09T08:19:54.911Z",
+                "available": 0
+              },
+              {
+                "at": "2026-09-09T08:19:54.971Z",
+                "available": 0
+              },
+              {
+                "at": "2026-09-09T08:19:55.045Z",
+                "available": 0
+              },
+              {
+                "at": "2026-09-09T08:19:55.106Z",
+                "available": 0
+              },
+              {
+                "at": "2026-09-09T08:19:55.170Z",
+                "available": 0
+              },
+              {
+                "at": "2026-09-09T08:19:55.239Z",
+                "available": 0
+              },
+              {
+                "at": "2026-09-09T08:19:55.309Z",
+                "available": 0
+              },
+              {
+                "at": "2026-09-09T08:19:55.369Z",
+                "available": 0
+              },
+              {
+                "at": "2026-09-09T08:19:55.439Z",
+                "available": 0
+              },
+              {
+                "at": "2026-09-09T08:19:55.505Z",
+                "available": 0
+              },
+              {
+                "at": "2026-09-09T08:19:55.568Z",
+                "available": 0
+              },
+              {
+                "at": "2026-09-09T08:19:55.636Z",
+                "available": 0
+              },
+              {
+                "at": "2026-09-09T08:19:55.704Z",
+                "available": 1
+              },
+              {
+                "at": "2026-09-09T08:19:55.768Z",
+                "available": 1
+              },
+              {
+                "at": "2026-09-09T08:19:55.823Z",
+                "available": 1
+              },
+              {
+                "at": "2026-09-09T08:19:55.884Z",
+                "available": 1
+              },
+              {
+                "at": "2026-09-09T08:19:55.945Z",
+                "available": 2
+              },
+              {
+                "at": "2026-09-09T08:19:56.013Z",
+                "available": 2
+              },
+              {
+                "at": "2026-09-09T08:19:56.076Z",
+                "available": 5
+              },
+              {
+                "at": "2026-09-09T08:19:56.137Z",
+                "available": 5
+              }
+            ]
+          },
+          {
+            "attempt": 2,
+            "buyers": [
+              4,
+              11
+            ],
+            "successful": 2,
+            "busy": 0,
+            "conflict": 0,
+            "soldOut": 0,
+            "responses": [
+              {
+                "status": 201,
+                "type": null,
+                "code": null,
+                "detail": null
+              },
+              {
+                "status": 201,
+                "type": null,
+                "code": null,
+                "detail": null
+              }
+            ],
+            "slotSamples": [
+              {
+                "at": "2026-09-09T08:19:56.554Z",
+                "available": 5
+              },
+              {
+                "at": "2026-09-09T08:19:56.625Z",
+                "available": 3
+              },
+              {
+                "at": "2026-09-09T08:19:56.685Z",
+                "available": 3
+              },
+              {
+                "at": "2026-09-09T08:19:56.742Z",
+                "available": 3
+              },
+              {
+                "at": "2026-09-09T08:19:56.808Z",
+                "available": 3
+              },
+              {
+                "at": "2026-09-09T08:19:56.867Z",
+                "available": 3
+              },
+              {
+                "at": "2026-09-09T08:19:56.935Z",
+                "available": 3
+              },
+              {
+                "at": "2026-09-09T08:19:56.996Z",
+                "available": 3
+              },
+              {
+                "at": "2026-09-09T08:19:57.054Z",
+                "available": 3
+              },
+              {
+                "at": "2026-09-09T08:19:57.115Z",
+                "available": 3
+              },
+              {
+                "at": "2026-09-09T08:19:57.175Z",
+                "available": 3
+              },
+              {
+                "at": "2026-09-09T08:19:57.240Z",
+                "available": 3
+              },
+              {
+                "at": "2026-09-09T08:19:57.295Z",
+                "available": 3
+              },
+              {
+                "at": "2026-09-09T08:19:57.353Z",
+                "available": 3
+              },
+              {
+                "at": "2026-09-09T08:19:57.425Z",
+                "available": 3
+              },
+              {
+                "at": "2026-09-09T08:19:57.500Z",
+                "available": 3
+              },
+              {
+                "at": "2026-09-09T08:19:57.561Z",
+                "available": 3
+              },
+              {
+                "at": "2026-09-09T08:19:57.623Z",
+                "available": 3
+              },
+              {
+                "at": "2026-09-09T08:19:57.682Z",
+                "available": 3
+              },
+              {
+                "at": "2026-09-09T08:19:57.745Z",
+                "available": 3
+              },
+              {
+                "at": "2026-09-09T08:19:57.809Z",
+                "available": 3
+              },
+              {
+                "at": "2026-09-09T08:19:57.876Z",
+                "available": 3
+              },
+              {
+                "at": "2026-09-09T08:19:57.938Z",
+                "available": 3
+              },
+              {
+                "at": "2026-09-09T08:19:57.992Z",
+                "available": 4
+              },
+              {
+                "at": "2026-09-09T08:19:58.057Z",
+                "available": 4
+              },
+              {
+                "at": "2026-09-09T08:19:58.120Z",
+                "available": 4
+              },
+              {
+                "at": "2026-09-09T08:19:58.180Z",
+                "available": 5
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "relinquish-wave-1",
+      "description": "Explicitly relinquish 10 admitted buyers at t=2000ms.",
+      "startedAt": "2026-09-09T08:20:00.842Z",
+      "endedAt": "2026-09-09T08:20:01.298Z",
+      "durationMs": 456,
+      "details": {
+        "targets": [
+          11,
+          12,
+          14,
+          16,
+          19,
+          2,
+          7,
+          13,
+          15,
+          17
+        ],
+        "relinquished": 10,
+        "everAdmitted": 55,
+        "expectedEverAdmitted": 55,
+        "snapshot": {
+          "capturedAt": "2026-09-09T08:20:01.298Z",
+          "postgres": {
+            "available": true,
+            "sku": {
+              "id": "00000000-0000-4000-8000-000000000941",
+              "campaignId": "00000000-0000-4000-8000-000000000914",
+              "variantId": "cbc97eff-fe53-580a-a0fa-5e336366728b",
+              "allocatedQuantity": 10,
+              "remainingQuantity": 5,
+              "netConsumedQuantity": 5,
+              "version": 39
+            },
+            "globalClaims": 21,
+            "globalActiveConsumptions": 5,
+            "globalOrders": 21,
+            "runClaims": null,
+            "runActiveConsumptions": null,
+            "runOrders": null
+          },
+          "redis": {
+            "available": true,
+            "activeLeases": 40,
+            "pendingReleases": 0,
+            "confirmationSlotsAvailable": 5,
+            "skuRemainingAdmission": 5
+          }
+        }
+      }
+    },
+    {
+      "name": "relinquish-wave-2",
+      "description": "Explicitly relinquish 10 admitted buyers at t=4000ms.",
+      "startedAt": "2026-09-09T08:20:03.599Z",
+      "endedAt": "2026-09-09T08:20:04.024Z",
+      "durationMs": 425,
+      "details": {
+        "targets": [
+          18,
+          23,
+          22,
+          25,
+          26,
+          5,
+          20,
+          21,
+          24,
+          6
+        ],
+        "relinquished": 10,
+        "everAdmitted": 65,
+        "expectedEverAdmitted": 65,
+        "snapshot": {
+          "capturedAt": "2026-09-09T08:20:04.024Z",
+          "postgres": {
+            "available": true,
+            "sku": {
+              "id": "00000000-0000-4000-8000-000000000941",
+              "campaignId": "00000000-0000-4000-8000-000000000914",
+              "variantId": "cbc97eff-fe53-580a-a0fa-5e336366728b",
+              "allocatedQuantity": 10,
+              "remainingQuantity": 5,
+              "netConsumedQuantity": 5,
+              "version": 39
+            },
+            "globalClaims": 21,
+            "globalActiveConsumptions": 5,
+            "globalOrders": 21,
+            "runClaims": null,
+            "runActiveConsumptions": null,
+            "runOrders": null
+          },
+          "redis": {
+            "available": true,
+            "activeLeases": 40,
+            "pendingReleases": 0,
+            "confirmationSlotsAvailable": 5,
+            "skuRemainingAdmission": 5
+          }
+        }
+      }
+    },
+    {
+      "name": "relinquish-wave-3",
+      "description": "Explicitly relinquish 10 admitted buyers at t=6000ms.",
+      "startedAt": "2026-09-09T08:20:06.337Z",
+      "endedAt": "2026-09-09T08:20:06.749Z",
+      "durationMs": 412,
+      "details": {
+        "targets": [
+          27,
+          28,
+          37,
+          38,
+          40,
+          8,
+          29,
+          30,
+          33,
+          39
+        ],
+        "relinquished": 10,
+        "everAdmitted": 75,
+        "expectedEverAdmitted": 75,
+        "snapshot": {
+          "capturedAt": "2026-09-09T08:20:06.749Z",
+          "postgres": {
+            "available": true,
+            "sku": {
+              "id": "00000000-0000-4000-8000-000000000941",
+              "campaignId": "00000000-0000-4000-8000-000000000914",
+              "variantId": "cbc97eff-fe53-580a-a0fa-5e336366728b",
+              "allocatedQuantity": 10,
+              "remainingQuantity": 5,
+              "netConsumedQuantity": 5,
+              "version": 39
+            },
+            "globalClaims": 21,
+            "globalActiveConsumptions": 5,
+            "globalOrders": 21,
+            "runClaims": null,
+            "runActiveConsumptions": null,
+            "runOrders": null
+          },
+          "redis": {
+            "available": true,
+            "activeLeases": 40,
+            "pendingReleases": 0,
+            "confirmationSlotsAvailable": 5,
+            "skuRemainingAdmission": 5
+          }
+        }
+      }
+    },
+    {
+      "name": "relinquish-wave-4",
+      "description": "Explicitly relinquish 10 admitted buyers at t=8000ms.",
+      "startedAt": "2026-09-09T08:20:08.953Z",
+      "endedAt": "2026-09-09T08:20:09.325Z",
+      "durationMs": 372,
+      "details": {
+        "targets": [
+          41,
+          42,
+          44,
+          45,
+          46,
+          9,
+          32,
+          31,
+          34,
+          70
+        ],
+        "relinquished": 10,
+        "everAdmitted": 85,
+        "expectedEverAdmitted": 85,
+        "snapshot": {
+          "capturedAt": "2026-09-09T08:20:09.325Z",
+          "postgres": {
+            "available": true,
+            "sku": {
+              "id": "00000000-0000-4000-8000-000000000941",
+              "campaignId": "00000000-0000-4000-8000-000000000914",
+              "variantId": "cbc97eff-fe53-580a-a0fa-5e336366728b",
+              "allocatedQuantity": 10,
+              "remainingQuantity": 5,
+              "netConsumedQuantity": 5,
+              "version": 39
+            },
+            "globalClaims": 21,
+            "globalActiveConsumptions": 5,
+            "globalOrders": 21,
+            "runClaims": null,
+            "runActiveConsumptions": null,
+            "runOrders": null
+          },
+          "redis": {
+            "available": true,
+            "activeLeases": 40,
+            "pendingReleases": 0,
+            "confirmationSlotsAvailable": 5,
+            "skuRemainingAdmission": 5
+          }
+        }
+      }
+    },
+    {
+      "name": "relinquish-wave-5",
+      "description": "Explicitly relinquish 10 admitted buyers at t=10000ms.",
+      "startedAt": "2026-09-09T08:20:11.492Z",
+      "endedAt": "2026-09-09T08:20:11.773Z",
+      "durationMs": 281,
+      "details": {
+        "targets": [
+          36,
+          35,
+          43,
+          47,
+          48,
+          49,
+          50,
+          51,
+          53,
+          54
+        ],
+        "relinquished": 10,
+        "everAdmitted": 95,
+        "expectedEverAdmitted": 95,
+        "snapshot": {
+          "capturedAt": "2026-09-09T08:20:11.773Z",
+          "postgres": {
+            "available": true,
+            "sku": {
+              "id": "00000000-0000-4000-8000-000000000941",
+              "campaignId": "00000000-0000-4000-8000-000000000914",
+              "variantId": "cbc97eff-fe53-580a-a0fa-5e336366728b",
+              "allocatedQuantity": 10,
+              "remainingQuantity": 5,
+              "netConsumedQuantity": 5,
+              "version": 39
+            },
+            "globalClaims": 21,
+            "globalActiveConsumptions": 5,
+            "globalOrders": 21,
+            "runClaims": null,
+            "runActiveConsumptions": null,
+            "runOrders": null
+          },
+          "redis": {
+            "available": true,
+            "activeLeases": 40,
+            "pendingReleases": 0,
+            "confirmationSlotsAvailable": 5,
+            "skuRemainingAdmission": 5
+          }
+        }
+      }
+    },
+    {
+      "name": "relinquish-wave-6",
+      "description": "Explicitly relinquish 10 admitted buyers at t=12000ms.",
+      "startedAt": "2026-09-09T08:20:13.917Z",
+      "endedAt": "2026-09-09T08:20:14.114Z",
+      "durationMs": 197,
+      "details": {
+        "targets": [
+          52,
+          55,
+          56,
+          57,
+          58,
+          59,
+          60,
+          64,
+          65,
+          68
+        ],
+        "relinquished": 10,
+        "everAdmitted": 100,
+        "expectedEverAdmitted": 100,
+        "snapshot": {
+          "capturedAt": "2026-09-09T08:20:14.114Z",
+          "postgres": {
+            "available": true,
+            "sku": {
+              "id": "00000000-0000-4000-8000-000000000941",
+              "campaignId": "00000000-0000-4000-8000-000000000914",
+              "variantId": "cbc97eff-fe53-580a-a0fa-5e336366728b",
+              "allocatedQuantity": 10,
+              "remainingQuantity": 5,
+              "netConsumedQuantity": 5,
+              "version": 39
+            },
+            "globalClaims": 21,
+            "globalActiveConsumptions": 5,
+            "globalOrders": 21,
+            "runClaims": null,
+            "runActiveConsumptions": null,
+            "runOrders": null
+          },
+          "redis": {
+            "available": true,
+            "activeLeases": 35,
+            "pendingReleases": 0,
+            "confirmationSlotsAvailable": 5,
+            "skuRemainingAdmission": 5
+          }
+        }
+      }
+    },
+    {
+      "name": "final-confirmation",
+      "description": "Preview and confirm 10 buyers concurrently; retry only explicit 429 busy responses with the same order key.",
+      "startedAt": "2026-09-09T08:20:14.250Z",
+      "endedAt": "2026-09-09T08:20:18.332Z",
+      "durationMs": 4082,
+      "details": {
+        "buyers": 10,
+        "targetSuccessful": 5,
+        "successful": 5,
+        "busy": 2,
+        "conflict": 5,
+        "soldOut": 0,
+        "attempts": [
+          {
+            "attempt": 1,
+            "buyers": [
+              97,
+              100,
+              92,
+              94,
+              95,
+              98,
+              99,
+              96,
+              90,
+              91
+            ],
+            "successful": 3,
+            "busy": 2,
+            "conflict": 5,
+            "soldOut": 0,
+            "responses": [
+              {
+                "status": 429,
+                "type": "https://shopee-clone.local/problems/flash-sale-busy",
+                "code": "FLASH_SALE_BUSY",
+                "detail": "Flash Sale confirmation capacity is temporarily full"
+              },
+              {
+                "status": 409,
+                "type": "https://shopee-clone.local/problems/checkout-not-ready",
+                "code": null,
+                "detail": "Resolve the reported checkout blockers and preview again."
+              },
+              {
+                "status": 201,
+                "type": null,
+                "code": null,
+                "detail": null
+              },
+              {
+                "status": 201,
+                "type": null,
+                "code": null,
+                "detail": null
+              },
+              {
+                "status": 409,
+                "type": "https://shopee-clone.local/problems/checkout-not-ready",
+                "code": null,
+                "detail": "Resolve the reported checkout blockers and preview again."
+              },
+              {
+                "status": 409,
+                "type": "https://shopee-clone.local/problems/checkout-not-ready",
+                "code": null,
+                "detail": "Resolve the reported checkout blockers and preview again."
+              },
+              {
+                "status": 201,
+                "type": null,
+                "code": null,
+                "detail": null
+              },
+              {
+                "status": 409,
+                "type": "https://shopee-clone.local/problems/checkout-not-ready",
+                "code": null,
+                "detail": "Resolve the reported checkout blockers and preview again."
+              },
+              {
+                "status": 409,
+                "type": "https://shopee-clone.local/problems/checkout-not-ready",
+                "code": null,
+                "detail": "Resolve the reported checkout blockers and preview again."
+              },
+              {
+                "status": 429,
+                "type": "https://shopee-clone.local/problems/flash-sale-busy",
+                "code": "FLASH_SALE_BUSY",
+                "detail": "Flash Sale confirmation capacity is temporarily full"
+              }
+            ],
+            "slotSamples": [
+              {
+                "at": "2026-09-09T08:20:14.436Z",
+                "available": 5
+              },
+              {
+                "at": "2026-09-09T08:20:14.503Z",
+                "available": 5
+              },
+              {
+                "at": "2026-09-09T08:20:14.564Z",
+                "available": 0
+              },
+              {
+                "at": "2026-09-09T08:20:14.633Z",
+                "available": 0
+              },
+              {
+                "at": "2026-09-09T08:20:14.695Z",
+                "available": 0
+              },
+              {
+                "at": "2026-09-09T08:20:14.755Z",
+                "available": 0
+              },
+              {
+                "at": "2026-09-09T08:20:14.819Z",
+                "available": 0
+              },
+              {
+                "at": "2026-09-09T08:20:14.885Z",
+                "available": 0
+              },
+              {
+                "at": "2026-09-09T08:20:14.940Z",
+                "available": 0
+              },
+              {
+                "at": "2026-09-09T08:20:15.010Z",
+                "available": 0
+              },
+              {
+                "at": "2026-09-09T08:20:15.078Z",
+                "available": 0
+              },
+              {
+                "at": "2026-09-09T08:20:15.137Z",
+                "available": 0
+              },
+              {
+                "at": "2026-09-09T08:20:15.193Z",
+                "available": 0
+              },
+              {
+                "at": "2026-09-09T08:20:15.250Z",
+                "available": 0
+              },
+              {
+                "at": "2026-09-09T08:20:15.309Z",
+                "available": 0
+              },
+              {
+                "at": "2026-09-09T08:20:15.377Z",
+                "available": 0
+              },
+              {
+                "at": "2026-09-09T08:20:15.447Z",
+                "available": 0
+              },
+              {
+                "at": "2026-09-09T08:20:15.508Z",
+                "available": 0
+              },
+              {
+                "at": "2026-09-09T08:20:15.571Z",
+                "available": 0
+              },
+              {
+                "at": "2026-09-09T08:20:15.635Z",
+                "available": 0
+              },
+              {
+                "at": "2026-09-09T08:20:15.700Z",
+                "available": 0
+              },
+              {
+                "at": "2026-09-09T08:20:15.768Z",
+                "available": 0
+              },
+              {
+                "at": "2026-09-09T08:20:15.827Z",
+                "available": 0
+              },
+              {
+                "at": "2026-09-09T08:20:15.888Z",
+                "available": 0
+              },
+              {
+                "at": "2026-09-09T08:20:15.953Z",
+                "available": 0
+              },
+              {
+                "at": "2026-09-09T08:20:16.013Z",
+                "available": 1
+              },
+              {
+                "at": "2026-09-09T08:20:16.079Z",
+                "available": 1
+              },
+              {
+                "at": "2026-09-09T08:20:16.141Z",
+                "available": 1
+              },
+              {
+                "at": "2026-09-09T08:20:16.201Z",
+                "available": 2
+              },
+              {
+                "at": "2026-09-09T08:20:16.262Z",
+                "available": 2
+              },
+              {
+                "at": "2026-09-09T08:20:16.319Z",
+                "available": 2
+              }
+            ]
+          },
+          {
+            "attempt": 2,
+            "buyers": [
+              97,
+              91
+            ],
+            "successful": 2,
+            "busy": 0,
+            "conflict": 0,
+            "soldOut": 0,
+            "responses": [
+              {
+                "status": 201,
+                "type": null,
+                "code": null,
+                "detail": null
+              },
+              {
+                "status": 201,
+                "type": null,
+                "code": null,
+                "detail": null
+              }
+            ],
+            "slotSamples": [
+              {
+                "at": "2026-09-09T08:20:16.744Z",
+                "available": 5
+              },
+              {
+                "at": "2026-09-09T08:20:16.802Z",
+                "available": 3
+              },
+              {
+                "at": "2026-09-09T08:20:16.870Z",
+                "available": 3
+              },
+              {
+                "at": "2026-09-09T08:20:16.934Z",
+                "available": 3
+              },
+              {
+                "at": "2026-09-09T08:20:16.999Z",
+                "available": 3
+              },
+              {
+                "at": "2026-09-09T08:20:17.059Z",
+                "available": 3
+              },
+              {
+                "at": "2026-09-09T08:20:17.116Z",
+                "available": 3
+              },
+              {
+                "at": "2026-09-09T08:20:17.176Z",
+                "available": 3
+              },
+              {
+                "at": "2026-09-09T08:20:17.247Z",
+                "available": 3
+              },
+              {
+                "at": "2026-09-09T08:20:17.325Z",
+                "available": 3
+              },
+              {
+                "at": "2026-09-09T08:20:17.389Z",
+                "available": 3
+              },
+              {
+                "at": "2026-09-09T08:20:17.456Z",
+                "available": 3
+              },
+              {
+                "at": "2026-09-09T08:20:17.524Z",
+                "available": 3
+              },
+              {
+                "at": "2026-09-09T08:20:17.580Z",
+                "available": 3
+              },
+              {
+                "at": "2026-09-09T08:20:17.643Z",
+                "available": 3
+              },
+              {
+                "at": "2026-09-09T08:20:17.702Z",
+                "available": 3
+              },
+              {
+                "at": "2026-09-09T08:20:17.766Z",
+                "available": 3
+              },
+              {
+                "at": "2026-09-09T08:20:17.829Z",
+                "available": 3
+              },
+              {
+                "at": "2026-09-09T08:20:17.894Z",
+                "available": 3
+              },
+              {
+                "at": "2026-09-09T08:20:17.957Z",
+                "available": 3
+              },
+              {
+                "at": "2026-09-09T08:20:18.027Z",
+                "available": 3
+              },
+              {
+                "at": "2026-09-09T08:20:18.087Z",
+                "available": 3
+              },
+              {
+                "at": "2026-09-09T08:20:18.155Z",
+                "available": 3
+              },
+              {
+                "at": "2026-09-09T08:20:18.209Z",
+                "available": 4
+              },
+              {
+                "at": "2026-09-09T08:20:18.272Z",
+                "available": 4
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "cleanup-leases",
+      "description": "Release any leases left by the POC so the local admission pool is not polluted.",
+      "startedAt": "2026-09-09T08:20:18.332Z",
+      "endedAt": "2026-09-09T08:20:18.675Z",
+      "durationMs": 343,
+      "details": {
+        "rounds": 2,
+        "released": 30
+      }
+    }
+  ],
+  "buyers": [
+    {
+      "index": 0,
+      "userId": "6d4610af-c650-4d88-b6b5-322e09963e5e",
+      "ticketId": "7b2f6aa2-6ab9-4e8f-b09c-0c5b4a8cdd29",
+      "finalState": "CLOSED",
+      "waitTimeMs": 2787,
+      "admittedAt": "2026-09-09T08:19:50.426Z",
+      "joinedAt": "2026-09-09T08:19:47.639Z",
+      "admissionWave": 1,
+      "relinquishedAt": null,
+      "outcome": "ORDER_CREATED",
+      "confirmation": {
+        "phase": "seed-confirmation",
+        "status": 201,
+        "latencyMs": 1822,
+        "code": null
+      },
+      "events": [
+        {
+          "type": "join",
+          "at": "2026-09-09T08:19:47.933Z",
+          "status": 200,
+          "state": "WAITING",
+          "latencyMs": 293,
+          "cookieSet": false,
+          "error": null
+        },
+        {
+          "type": "state",
+          "at": "2026-09-09T08:19:50.426Z",
+          "from": "WAITING",
+          "to": "ADMITTED",
+          "status": 200,
+          "latencyMs": 246
+        },
+        {
+          "type": "preview",
+          "at": "2026-09-09T08:19:54.182Z",
+          "status": 200,
+          "latencyMs": 122,
+          "error": null
+        },
+        {
+          "type": "confirm",
+          "at": "2026-09-09T08:19:56.011Z",
+          "phase": "seed-confirmation",
+          "status": 201,
+          "latencyMs": 1822,
+          "code": null,
+          "error": null
+        }
+      ]
+    },
+    {
+      "index": 1,
+      "userId": "c98256c3-13e9-4071-ab5a-e1f8a4402f17",
+      "ticketId": "650c3e5e-72f8-4c97-acad-c628007801bd",
+      "finalState": "CLOSED",
+      "waitTimeMs": 2787,
+      "admittedAt": "2026-09-09T08:19:50.427Z",
+      "joinedAt": "2026-09-09T08:19:47.640Z",
+      "admissionWave": 1,
+      "relinquishedAt": null,
+      "outcome": "ORDER_CREATED",
+      "confirmation": {
+        "phase": "seed-confirmation",
+        "status": 201,
+        "latencyMs": 1955,
+        "code": null
+      },
+      "events": [
+        {
+          "type": "join",
+          "at": "2026-09-09T08:19:48.279Z",
+          "status": 200,
+          "state": "WAITING",
+          "latencyMs": 639,
+          "cookieSet": false,
+          "error": null
+        },
+        {
+          "type": "state",
+          "at": "2026-09-09T08:19:50.427Z",
+          "from": "WAITING",
+          "to": "ADMITTED",
+          "status": 200,
+          "latencyMs": 246
+        },
+        {
+          "type": "preview",
+          "at": "2026-09-09T08:19:54.184Z",
+          "status": 200,
+          "latencyMs": 122,
+          "error": null
+        },
+        {
+          "type": "confirm",
+          "at": "2026-09-09T08:19:56.145Z",
+          "phase": "seed-confirmation",
+          "status": 201,
+          "latencyMs": 1955,
+          "code": null,
+          "error": null
+        }
+      ]
+    },
+    {
+      "index": 2,
+      "userId": "afea2d02-5bc7-4909-b028-416878545ce6",
+      "ticketId": "3795defa-588f-4558-86e3-7fc35568fee2",
+      "finalState": "CLOSED",
+      "waitTimeMs": 3677,
+      "admittedAt": "2026-09-09T08:19:51.318Z",
+      "joinedAt": "2026-09-09T08:19:47.641Z",
+      "admissionWave": 1,
+      "relinquishedAt": "2026-09-09T08:20:01.027Z",
+      "outcome": "RELINQUISHED",
+      "confirmation": null,
+      "events": [
+        {
+          "type": "join",
+          "at": "2026-09-09T08:19:48.342Z",
+          "status": 200,
+          "state": "WAITING",
+          "latencyMs": 701,
+          "cookieSet": false,
+          "error": null
+        },
+        {
+          "type": "state",
+          "at": "2026-09-09T08:19:51.318Z",
+          "from": "WAITING",
+          "to": "ADMITTED",
+          "status": 200,
+          "latencyMs": 292
+        },
+        {
+          "type": "relinquish",
+          "at": "2026-09-09T08:20:01.027Z",
+          "mode": "EXPLICIT",
+          "status": 204,
+          "latencyMs": 183,
+          "error": null
+        }
+      ]
+    },
+    {
+      "index": 3,
+      "userId": "3cb8aab6-01b5-423e-ab0d-6a2a2ffff395",
+      "ticketId": "751e22b6-8334-402a-99a1-35616249ef33",
+      "finalState": "CLOSED",
+      "waitTimeMs": 2799,
+      "admittedAt": "2026-09-09T08:19:50.440Z",
+      "joinedAt": "2026-09-09T08:19:47.641Z",
+      "admissionWave": 1,
+      "relinquishedAt": null,
+      "outcome": "ORDER_CREATED",
+      "confirmation": {
+        "phase": "seed-confirmation",
+        "status": 201,
+        "latencyMs": 1688,
+        "code": null
+      },
+      "events": [
+        {
+          "type": "join",
+          "at": "2026-09-09T08:19:48.318Z",
+          "status": 200,
+          "state": "WAITING",
+          "latencyMs": 677,
+          "cookieSet": false,
+          "error": null
+        },
+        {
+          "type": "state",
+          "at": "2026-09-09T08:19:50.440Z",
+          "from": "WAITING",
+          "to": "ADMITTED",
+          "status": 200,
+          "latencyMs": 259
+        },
+        {
+          "type": "preview",
+          "at": "2026-09-09T08:19:54.183Z",
+          "status": 200,
+          "latencyMs": 120,
+          "error": null
+        },
+        {
+          "type": "confirm",
+          "at": "2026-09-09T08:19:56.039Z",
+          "phase": "seed-confirmation",
+          "status": 429,
+          "latencyMs": 1849,
+          "code": "FLASH_SALE_BUSY",
+          "error": null
+        },
+        {
+          "type": "confirm",
+          "at": "2026-09-09T08:19:58.232Z",
+          "phase": "seed-confirmation",
+          "status": 201,
+          "latencyMs": 1688,
+          "code": null,
+          "error": null
+        }
+      ]
+    },
+    {
+      "index": 4,
+      "userId": "3e199044-2b02-4b61-8645-3152c03e39a2",
+      "ticketId": "28ca419d-3e89-419c-8507-1c1070f42c8a",
+      "finalState": "CLOSED",
+      "waitTimeMs": 2799,
+      "admittedAt": "2026-09-09T08:19:50.441Z",
+      "joinedAt": "2026-09-09T08:19:47.642Z",
+      "admissionWave": 1,
+      "relinquishedAt": null,
+      "outcome": "ORDER_CREATED",
+      "confirmation": {
+        "phase": "seed-confirmation",
+        "status": 201,
+        "latencyMs": 1652,
+        "code": null
+      },
+      "events": [
+        {
+          "type": "join",
+          "at": "2026-09-09T08:19:48.302Z",
+          "status": 200,
+          "state": "WAITING",
+          "latencyMs": 660,
+          "cookieSet": false,
+          "error": null
+        },
+        {
+          "type": "state",
+          "at": "2026-09-09T08:19:50.441Z",
+          "from": "WAITING",
+          "to": "ADMITTED",
+          "status": 200,
+          "latencyMs": 259
+        },
+        {
+          "type": "preview",
+          "at": "2026-09-09T08:19:54.187Z",
+          "status": 200,
+          "latencyMs": 124,
+          "error": null
+        },
+        {
+          "type": "confirm",
+          "at": "2026-09-09T08:19:55.842Z",
+          "phase": "seed-confirmation",
+          "status": 201,
+          "latencyMs": 1652,
+          "code": null,
+          "error": null
+        }
+      ]
+    },
+    {
+      "index": 5,
+      "userId": "b6fbb842-ea8f-4f65-a5fa-631d01086a90",
+      "ticketId": "1b1c695b-be6e-4b02-b8cd-dd5e10fcfba2",
+      "finalState": "CLOSED",
+      "waitTimeMs": 4552,
+      "admittedAt": "2026-09-09T08:19:52.194Z",
+      "joinedAt": "2026-09-09T08:19:47.642Z",
+      "admissionWave": 1,
+      "relinquishedAt": "2026-09-09T08:20:03.811Z",
+      "outcome": "RELINQUISHED",
+      "confirmation": null,
+      "events": [
+        {
+          "type": "join",
+          "at": "2026-09-09T08:19:48.369Z",
+          "status": 200,
+          "state": "WAITING",
+          "latencyMs": 727,
+          "cookieSet": false,
+          "error": null
+        },
+        {
+          "type": "state",
+          "at": "2026-09-09T08:19:52.194Z",
+          "from": "WAITING",
+          "to": "ADMITTED",
+          "status": 200,
+          "latencyMs": 287
+        },
+        {
+          "type": "relinquish",
+          "at": "2026-09-09T08:20:03.811Z",
+          "mode": "EXPLICIT",
+          "status": 204,
+          "latencyMs": 210,
+          "error": null
+        }
+      ]
+    },
+    {
+      "index": 6,
+      "userId": "601ecf1e-31d9-43de-8964-713e82d7fb60",
+      "ticketId": "58e841f9-61d7-46e2-91d5-f248612cd410",
+      "finalState": "CLOSED",
+      "waitTimeMs": 5420,
+      "admittedAt": "2026-09-09T08:19:53.063Z",
+      "joinedAt": "2026-09-09T08:19:47.643Z",
+      "admissionWave": 1,
+      "relinquishedAt": "2026-09-09T08:20:03.812Z",
+      "outcome": "RELINQUISHED",
+      "confirmation": null,
+      "events": [
+        {
+          "type": "join",
+          "at": "2026-09-09T08:19:48.369Z",
+          "status": 200,
+          "state": "WAITING",
+          "latencyMs": 726,
+          "cookieSet": false,
+          "error": null
+        },
+        {
+          "type": "state",
+          "at": "2026-09-09T08:19:53.063Z",
+          "from": "WAITING",
+          "to": "ADMITTED",
+          "status": 200,
+          "latencyMs": 267
+        },
+        {
+          "type": "relinquish",
+          "at": "2026-09-09T08:20:03.812Z",
+          "mode": "EXPLICIT",
+          "status": 204,
+          "latencyMs": 210,
+          "error": null
+        }
+      ]
+    },
+    {
+      "index": 7,
+      "userId": "52c2529e-ae72-42a9-a20f-77cf6ffe24a0",
+      "ticketId": "861a95fa-b482-401b-a052-16d0c3e70912",
+      "finalState": "CLOSED",
+      "waitTimeMs": 3695,
+      "admittedAt": "2026-09-09T08:19:51.339Z",
+      "joinedAt": "2026-09-09T08:19:47.644Z",
+      "admissionWave": 1,
+      "relinquishedAt": "2026-09-09T08:20:01.027Z",
+      "outcome": "RELINQUISHED",
+      "confirmation": null,
+      "events": [
+        {
+          "type": "join",
+          "at": "2026-09-09T08:19:48.367Z",
+          "status": 200,
+          "state": "WAITING",
+          "latencyMs": 723,
+          "cookieSet": false,
+          "error": null
+        },
+        {
+          "type": "state",
+          "at": "2026-09-09T08:19:51.339Z",
+          "from": "WAITING",
+          "to": "ADMITTED",
+          "status": 200,
+          "latencyMs": 311
+        },
+        {
+          "type": "relinquish",
+          "at": "2026-09-09T08:20:01.027Z",
+          "mode": "EXPLICIT",
+          "status": 204,
+          "latencyMs": 182,
+          "error": null
+        }
+      ]
+    },
+    {
+      "index": 8,
+      "userId": "78af46ad-3f33-4dd3-bf10-ecab68ed999c",
+      "ticketId": "e15a57c9-78e0-4350-952e-ffefb2b142f7",
+      "finalState": "CLOSED",
+      "waitTimeMs": 6308,
+      "admittedAt": "2026-09-09T08:19:53.952Z",
+      "joinedAt": "2026-09-09T08:19:47.644Z",
+      "admissionWave": 1,
+      "relinquishedAt": "2026-09-09T08:20:06.534Z",
+      "outcome": "RELINQUISHED",
+      "confirmation": null,
+      "events": [
+        {
+          "type": "join",
+          "at": "2026-09-09T08:19:48.387Z",
+          "status": 200,
+          "state": "WAITING",
+          "latencyMs": 743,
+          "cookieSet": false,
+          "error": null
+        },
+        {
+          "type": "state",
+          "at": "2026-09-09T08:19:53.952Z",
+          "from": "WAITING",
+          "to": "ADMITTED",
+          "status": 200,
+          "latencyMs": 314
+        },
+        {
+          "type": "relinquish",
+          "at": "2026-09-09T08:20:06.534Z",
+          "mode": "EXPLICIT",
+          "status": 204,
+          "latencyMs": 195,
+          "error": null
+        }
+      ]
+    },
+    {
+      "index": 9,
+      "userId": "ab3f45ae-b3ee-489e-aba8-c83226325d8b",
+      "ticketId": "4f156d33-5380-41b5-8a65-9cb563a358d9",
+      "finalState": "CLOSED",
+      "waitTimeMs": 10641,
+      "admittedAt": "2026-09-09T08:19:58.286Z",
+      "joinedAt": "2026-09-09T08:19:47.645Z",
+      "admissionWave": 2,
+      "relinquishedAt": "2026-09-09T08:20:09.102Z",
+      "outcome": "RELINQUISHED",
+      "confirmation": null,
+      "events": [
+        {
+          "type": "join",
+          "at": "2026-09-09T08:19:48.400Z",
+          "status": 200,
+          "state": "WAITING",
+          "latencyMs": 755,
+          "cookieSet": false,
+          "error": null
+        },
+        {
+          "type": "state",
+          "at": "2026-09-09T08:19:58.286Z",
+          "from": "WAITING",
+          "to": "ADMITTED",
+          "status": 200,
+          "latencyMs": 52
+        },
+        {
+          "type": "relinquish",
+          "at": "2026-09-09T08:20:09.102Z",
+          "mode": "EXPLICIT",
+          "status": 204,
+          "latencyMs": 148,
+          "error": null
+        }
+      ]
+    },
+    {
+      "index": 10,
+      "userId": "9f6c49bd-08b7-4a4e-ab04-56de446f964c",
+      "ticketId": "a5319d04-0c4b-41e9-9cc6-f4fedbc02922",
+      "finalState": "CLOSED",
+      "waitTimeMs": 2822,
+      "admittedAt": "2026-09-09T08:19:50.467Z",
+      "joinedAt": "2026-09-09T08:19:47.645Z",
+      "admissionWave": 1,
+      "relinquishedAt": null,
+      "outcome": "ORDER_CREATED",
+      "confirmation": {
+        "phase": "seed-confirmation",
+        "status": 201,
+        "latencyMs": 1571,
+        "code": null
+      },
+      "events": [
+        {
+          "type": "join",
+          "at": "2026-09-09T08:19:48.300Z",
+          "status": 200,
+          "state": "WAITING",
+          "latencyMs": 655,
+          "cookieSet": false,
+          "error": null
+        },
+        {
+          "type": "state",
+          "at": "2026-09-09T08:19:50.467Z",
+          "from": "WAITING",
+          "to": "ADMITTED",
+          "status": 200,
+          "latencyMs": 284
+        },
+        {
+          "type": "preview",
+          "at": "2026-09-09T08:19:54.188Z",
+          "status": 200,
+          "latencyMs": 124,
+          "error": null
+        },
+        {
+          "type": "confirm",
+          "at": "2026-09-09T08:19:56.037Z",
+          "phase": "seed-confirmation",
+          "status": 429,
+          "latencyMs": 1846,
+          "code": "FLASH_SALE_BUSY",
+          "error": null
+        },
+        {
+          "type": "confirm",
+          "at": "2026-09-09T08:19:58.116Z",
+          "phase": "seed-confirmation",
+          "status": 201,
+          "latencyMs": 1571,
+          "code": null,
+          "error": null
+        }
+      ]
+    },
+    {
+      "index": 11,
+      "userId": "bad6a6a5-e163-4933-b35e-94e63b9efd63",
+      "ticketId": "f3c2369f-ff27-4da3-978f-978106ad9781",
+      "finalState": "CLOSED",
+      "waitTimeMs": 2823,
+      "admittedAt": "2026-09-09T08:19:50.468Z",
+      "joinedAt": "2026-09-09T08:19:47.645Z",
+      "admissionWave": 1,
+      "relinquishedAt": "2026-09-09T08:20:01.025Z",
+      "outcome": "RELINQUISHED",
+      "confirmation": null,
+      "events": [
+        {
+          "type": "join",
+          "at": "2026-09-09T08:19:48.300Z",
+          "status": 200,
+          "state": "WAITING",
+          "latencyMs": 655,
+          "cookieSet": false,
+          "error": null
+        },
+        {
+          "type": "state",
+          "at": "2026-09-09T08:19:50.468Z",
+          "from": "WAITING",
+          "to": "ADMITTED",
+          "status": 200,
+          "latencyMs": 285
+        },
+        {
+          "type": "relinquish",
+          "at": "2026-09-09T08:20:01.025Z",
+          "mode": "EXPLICIT",
+          "status": 204,
+          "latencyMs": 183,
+          "error": null
+        }
+      ]
+    },
+    {
+      "index": 12,
+      "userId": "bb31e9da-34e8-47f9-a256-ed2a7760f1f7",
+      "ticketId": "6625ac14-9db7-48d0-be90-bbd3373d3ebc",
+      "finalState": "CLOSED",
+      "waitTimeMs": 2823,
+      "admittedAt": "2026-09-09T08:19:50.468Z",
+      "joinedAt": "2026-09-09T08:19:47.645Z",
+      "admissionWave": 1,
+      "relinquishedAt": "2026-09-09T08:20:01.026Z",
+      "outcome": "RELINQUISHED",
+      "confirmation": null,
+      "events": [
+        {
+          "type": "join",
+          "at": "2026-09-09T08:19:48.318Z",
+          "status": 200,
+          "state": "WAITING",
+          "latencyMs": 673,
+          "cookieSet": false,
+          "error": null
+        },
+        {
+          "type": "state",
+          "at": "2026-09-09T08:19:50.468Z",
+          "from": "WAITING",
+          "to": "ADMITTED",
+          "status": 200,
+          "latencyMs": 284
+        },
+        {
+          "type": "relinquish",
+          "at": "2026-09-09T08:20:01.026Z",
+          "mode": "EXPLICIT",
+          "status": 204,
+          "latencyMs": 183,
+          "error": null
+        }
+      ]
+    },
+    {
+      "index": 13,
+      "userId": "bd04f4da-37ab-4a3f-afec-c55c7dd1b8cd",
+      "ticketId": "21962ef4-a5f8-49e6-8bf2-ba08f39feaa2",
+      "finalState": "CLOSED",
+      "waitTimeMs": 3712,
+      "admittedAt": "2026-09-09T08:19:51.358Z",
+      "joinedAt": "2026-09-09T08:19:47.646Z",
+      "admissionWave": 1,
+      "relinquishedAt": "2026-09-09T08:20:01.027Z",
+      "outcome": "RELINQUISHED",
+      "confirmation": null,
+      "events": [
+        {
+          "type": "join",
+          "at": "2026-09-09T08:19:48.319Z",
+          "status": 200,
+          "state": "WAITING",
+          "latencyMs": 672,
+          "cookieSet": false,
+          "error": null
+        },
+        {
+          "type": "state",
+          "at": "2026-09-09T08:19:51.358Z",
+          "from": "WAITING",
+          "to": "ADMITTED",
+          "status": 200,
+          "latencyMs": 328
+        },
+        {
+          "type": "relinquish",
+          "at": "2026-09-09T08:20:01.027Z",
+          "mode": "EXPLICIT",
+          "status": 204,
+          "latencyMs": 182,
+          "error": null
+        }
+      ]
+    },
+    {
+      "index": 14,
+      "userId": "51acd83d-d912-4b2c-870b-01b41d63d4ec",
+      "ticketId": "01a20159-8601-4f3a-afcc-499b6c59b329",
+      "finalState": "CLOSED",
+      "waitTimeMs": 2834,
+      "admittedAt": "2026-09-09T08:19:50.480Z",
+      "joinedAt": "2026-09-09T08:19:47.646Z",
+      "admissionWave": 1,
+      "relinquishedAt": "2026-09-09T08:20:01.026Z",
+      "outcome": "RELINQUISHED",
+      "confirmation": null,
+      "events": [
+        {
+          "type": "join",
+          "at": "2026-09-09T08:19:48.316Z",
+          "status": 200,
+          "state": "WAITING",
+          "latencyMs": 670,
+          "cookieSet": false,
+          "error": null
+        },
+        {
+          "type": "state",
+          "at": "2026-09-09T08:19:50.480Z",
+          "from": "WAITING",
+          "to": "ADMITTED",
+          "status": 200,
+          "latencyMs": 296
+        },
+        {
+          "type": "relinquish",
+          "at": "2026-09-09T08:20:01.026Z",
+          "mode": "EXPLICIT",
+          "status": 204,
+          "latencyMs": 183,
+          "error": null
+        }
+      ]
+    },
+    {
+      "index": 15,
+      "userId": "c81966ac-3ff1-428f-abd6-555d742e8ff4",
+      "ticketId": "fd29e24f-e243-4cbe-bd6a-ff308503812f",
+      "finalState": "CLOSED",
+      "waitTimeMs": 3712,
+      "admittedAt": "2026-09-09T08:19:51.358Z",
+      "joinedAt": "2026-09-09T08:19:47.646Z",
+      "admissionWave": 1,
+      "relinquishedAt": "2026-09-09T08:20:01.028Z",
+      "outcome": "RELINQUISHED",
+      "confirmation": null,
+      "events": [
+        {
+          "type": "join",
+          "at": "2026-09-09T08:19:48.367Z",
+          "status": 200,
+          "state": "WAITING",
+          "latencyMs": 721,
+          "cookieSet": false,
+          "error": null
+        },
+        {
+          "type": "state",
+          "at": "2026-09-09T08:19:51.358Z",
+          "from": "WAITING",
+          "to": "ADMITTED",
+          "status": 200,
+          "latencyMs": 327
+        },
+        {
+          "type": "relinquish",
+          "at": "2026-09-09T08:20:01.028Z",
+          "mode": "EXPLICIT",
+          "status": 204,
+          "latencyMs": 183,
+          "error": null
+        }
+      ]
+    },
+    {
+      "index": 16,
+      "userId": "b97b9406-8bf7-4da7-a78e-d3fddf81f287",
+      "ticketId": "d4cec816-917b-4897-b2a2-bb548631a1f3",
+      "finalState": "CLOSED",
+      "waitTimeMs": 2835,
+      "admittedAt": "2026-09-09T08:19:50.481Z",
+      "joinedAt": "2026-09-09T08:19:47.646Z",
+      "admissionWave": 1,
+      "relinquishedAt": "2026-09-09T08:20:01.027Z",
+      "outcome": "RELINQUISHED",
+      "confirmation": null,
+      "events": [
+        {
+          "type": "join",
+          "at": "2026-09-09T08:19:48.317Z",
+          "status": 200,
+          "state": "WAITING",
+          "latencyMs": 671,
+          "cookieSet": false,
+          "error": null
+        },
+        {
+          "type": "state",
+          "at": "2026-09-09T08:19:50.481Z",
+          "from": "WAITING",
+          "to": "ADMITTED",
+          "status": 200,
+          "latencyMs": 296
+        },
+        {
+          "type": "relinquish",
+          "at": "2026-09-09T08:20:01.027Z",
+          "mode": "EXPLICIT",
+          "status": 204,
+          "latencyMs": 183,
+          "error": null
+        }
+      ]
+    },
+    {
+      "index": 17,
+      "userId": "e7bb8543-a154-4fb5-8ae5-1369834c5a80",
+      "ticketId": "94c3926f-274a-4fd6-b021-0e8aefb35d20",
+      "finalState": "CLOSED",
+      "waitTimeMs": 3713,
+      "admittedAt": "2026-09-09T08:19:51.359Z",
+      "joinedAt": "2026-09-09T08:19:47.646Z",
+      "admissionWave": 1,
+      "relinquishedAt": "2026-09-09T08:20:01.028Z",
+      "outcome": "RELINQUISHED",
+      "confirmation": null,
+      "events": [
+        {
+          "type": "join",
+          "at": "2026-09-09T08:19:48.319Z",
+          "status": 200,
+          "state": "WAITING",
+          "latencyMs": 673,
+          "cookieSet": false,
+          "error": null
+        },
+        {
+          "type": "state",
+          "at": "2026-09-09T08:19:51.359Z",
+          "from": "WAITING",
+          "to": "ADMITTED",
+          "status": 200,
+          "latencyMs": 327
+        },
+        {
+          "type": "relinquish",
+          "at": "2026-09-09T08:20:01.028Z",
+          "mode": "EXPLICIT",
+          "status": 204,
+          "latencyMs": 182,
+          "error": null
+        }
+      ]
+    },
+    {
+      "index": 18,
+      "userId": "a6972f86-346a-4bdd-8845-fc0ec5a9a513",
+      "ticketId": "9b5297ca-9f00-445d-912c-dc2d06f2638b",
+      "finalState": "CLOSED",
+      "waitTimeMs": 3712,
+      "admittedAt": "2026-09-09T08:19:51.362Z",
+      "joinedAt": "2026-09-09T08:19:47.650Z",
+      "admissionWave": 1,
+      "relinquishedAt": "2026-09-09T08:20:03.809Z",
+      "outcome": "RELINQUISHED",
+      "confirmation": null,
+      "events": [
+        {
+          "type": "join",
+          "at": "2026-09-09T08:19:48.342Z",
+          "status": 200,
+          "state": "WAITING",
+          "latencyMs": 692,
+          "cookieSet": false,
+          "error": null
+        },
+        {
+          "type": "state",
+          "at": "2026-09-09T08:19:51.362Z",
+          "from": "WAITING",
+          "to": "ADMITTED",
+          "status": 200,
+          "latencyMs": 330
+        },
+        {
+          "type": "relinquish",
+          "at": "2026-09-09T08:20:03.809Z",
+          "mode": "EXPLICIT",
+          "status": 204,
+          "latencyMs": 210,
+          "error": null
+        }
+      ]
+    },
+    {
+      "index": 19,
+      "userId": "5772dc30-42ff-4ea2-a1ac-02faacc2058d",
+      "ticketId": "17764ab1-a602-4058-a069-93f716b18dee",
+      "finalState": "CLOSED",
+      "waitTimeMs": 2834,
+      "admittedAt": "2026-09-09T08:19:50.484Z",
+      "joinedAt": "2026-09-09T08:19:47.650Z",
+      "admissionWave": 1,
+      "relinquishedAt": "2026-09-09T08:20:01.027Z",
+      "outcome": "RELINQUISHED",
+      "confirmation": null,
+      "events": [
+        {
+          "type": "join",
+          "at": "2026-09-09T08:19:48.301Z",
+          "status": 200,
+          "state": "WAITING",
+          "latencyMs": 651,
+          "cookieSet": false,
+          "error": null
+        },
+        {
+          "type": "state",
+          "at": "2026-09-09T08:19:50.484Z",
+          "from": "WAITING",
+          "to": "ADMITTED",
+          "status": 200,
+          "latencyMs": 299
+        },
+        {
+          "type": "relinquish",
+          "at": "2026-09-09T08:20:01.027Z",
+          "mode": "EXPLICIT",
+          "status": 204,
+          "latencyMs": 183,
+          "error": null
+        }
+      ]
+    },
+    {
+      "index": 20,
+      "userId": "f973736a-d118-4b62-9f7a-fb0dc4970152",
+      "ticketId": "30f1b6f3-67b1-4f08-b475-f97301464fc5",
+      "finalState": "CLOSED",
+      "waitTimeMs": 4584,
+      "admittedAt": "2026-09-09T08:19:52.234Z",
+      "joinedAt": "2026-09-09T08:19:47.650Z",
+      "admissionWave": 1,
+      "relinquishedAt": "2026-09-09T08:20:03.811Z",
+      "outcome": "RELINQUISHED",
+      "confirmation": null,
+      "events": [
+        {
+          "type": "join",
+          "at": "2026-09-09T08:19:48.368Z",
+          "status": 200,
+          "state": "WAITING",
+          "latencyMs": 718,
+          "cookieSet": false,
+          "error": null
+        },
+        {
+          "type": "state",
+          "at": "2026-09-09T08:19:52.234Z",
+          "from": "WAITING",
+          "to": "ADMITTED",
+          "status": 200,
+          "latencyMs": 321
+        },
+        {
+          "type": "relinquish",
+          "at": "2026-09-09T08:20:03.811Z",
+          "mode": "EXPLICIT",
+          "status": 204,
+          "latencyMs": 210,
+          "error": null
+        }
+      ]
+    },
+    {
+      "index": 21,
+      "userId": "6831debe-47fd-4cdf-97c7-76e4c41233b3",
+      "ticketId": "dd578421-abeb-4f6d-ad06-e6b891bab269",
+      "finalState": "CLOSED",
+      "waitTimeMs": 4585,
+      "admittedAt": "2026-09-09T08:19:52.235Z",
+      "joinedAt": "2026-09-09T08:19:47.650Z",
+      "admissionWave": 1,
+      "relinquishedAt": "2026-09-09T08:20:03.811Z",
+      "outcome": "RELINQUISHED",
+      "confirmation": null,
+      "events": [
+        {
+          "type": "join",
+          "at": "2026-09-09T08:19:48.368Z",
+          "status": 200,
+          "state": "WAITING",
+          "latencyMs": 718,
+          "cookieSet": false,
+          "error": null
+        },
+        {
+          "type": "state",
+          "at": "2026-09-09T08:19:52.235Z",
+          "from": "WAITING",
+          "to": "ADMITTED",
+          "status": 200,
+          "latencyMs": 321
+        },
+        {
+          "type": "relinquish",
+          "at": "2026-09-09T08:20:03.811Z",
+          "mode": "EXPLICIT",
+          "status": 204,
+          "latencyMs": 209,
+          "error": null
+        }
+      ]
+    },
+    {
+      "index": 22,
+      "userId": "b21fb3aa-db93-40f6-a876-a5c4f3b04c90",
+      "ticketId": "7a4e4f5c-a0c8-4261-b860-34aea8881959",
+      "finalState": "CLOSED",
+      "waitTimeMs": 3719,
+      "admittedAt": "2026-09-09T08:19:51.370Z",
+      "joinedAt": "2026-09-09T08:19:47.651Z",
+      "admissionWave": 1,
+      "relinquishedAt": "2026-09-09T08:20:03.810Z",
+      "outcome": "RELINQUISHED",
+      "confirmation": null,
+      "events": [
+        {
+          "type": "join",
+          "at": "2026-09-09T08:19:48.319Z",
+          "status": 200,
+          "state": "WAITING",
+          "latencyMs": 668,
+          "cookieSet": false,
+          "error": null
+        },
+        {
+          "type": "state",
+          "at": "2026-09-09T08:19:51.370Z",
+          "from": "WAITING",
+          "to": "ADMITTED",
+          "status": 200,
+          "latencyMs": 337
+        },
+        {
+          "type": "relinquish",
+          "at": "2026-09-09T08:20:03.810Z",
+          "mode": "EXPLICIT",
+          "status": 204,
+          "latencyMs": 210,
+          "error": null
+        }
+      ]
+    },
+    {
+      "index": 23,
+      "userId": "1f12ac17-eafd-46e6-b5cf-09c8daf9d3f1",
+      "ticketId": "44123a38-612d-448e-9f69-c70affede46e",
+      "finalState": "CLOSED",
+      "waitTimeMs": 3713,
+      "admittedAt": "2026-09-09T08:19:51.364Z",
+      "joinedAt": "2026-09-09T08:19:47.651Z",
+      "admissionWave": 1,
+      "relinquishedAt": "2026-09-09T08:20:03.810Z",
+      "outcome": "RELINQUISHED",
+      "confirmation": null,
+      "events": [
+        {
+          "type": "join",
+          "at": "2026-09-09T08:19:48.317Z",
+          "status": 200,
+          "state": "WAITING",
+          "latencyMs": 666,
+          "cookieSet": false,
+          "error": null
+        },
+        {
+          "type": "state",
+          "at": "2026-09-09T08:19:51.364Z",
+          "from": "WAITING",
+          "to": "ADMITTED",
+          "status": 200,
+          "latencyMs": 331
+        },
+        {
+          "type": "relinquish",
+          "at": "2026-09-09T08:20:03.810Z",
+          "mode": "EXPLICIT",
+          "status": 204,
+          "latencyMs": 210,
+          "error": null
+        }
+      ]
+    },
+    {
+      "index": 24,
+      "userId": "83fcbd93-d376-432d-9dd0-13ea42a45609",
+      "ticketId": "b746cf1f-83bc-4624-b44d-c491c7ad5eb2",
+      "finalState": "CLOSED",
+      "waitTimeMs": 4587,
+      "admittedAt": "2026-09-09T08:19:52.238Z",
+      "joinedAt": "2026-09-09T08:19:47.651Z",
+      "admissionWave": 1,
+      "relinquishedAt": "2026-09-09T08:20:03.812Z",
+      "outcome": "RELINQUISHED",
+      "confirmation": null,
+      "events": [
+        {
+          "type": "join",
+          "at": "2026-09-09T08:19:48.369Z",
+          "status": 200,
+          "state": "WAITING",
+          "latencyMs": 718,
+          "cookieSet": false,
+          "error": null
+        },
+        {
+          "type": "state",
+          "at": "2026-09-09T08:19:52.238Z",
+          "from": "WAITING",
+          "to": "ADMITTED",
+          "status": 200,
+          "latencyMs": 323
+        },
+        {
+          "type": "relinquish",
+          "at": "2026-09-09T08:20:03.812Z",
+          "mode": "EXPLICIT",
+          "status": 204,
+          "latencyMs": 210,
+          "error": null
+        }
+      ]
+    },
+    {
+      "index": 25,
+      "userId": "612ac2a7-9550-4ffa-9085-c397ac1853f8",
+      "ticketId": "beab068d-2256-4093-bd0f-34ab1b323b9d",
+      "finalState": "CLOSED",
+      "waitTimeMs": 3719,
+      "admittedAt": "2026-09-09T08:19:51.370Z",
+      "joinedAt": "2026-09-09T08:19:47.651Z",
+      "admissionWave": 1,
+      "relinquishedAt": "2026-09-09T08:20:03.811Z",
+      "outcome": "RELINQUISHED",
+      "confirmation": null,
+      "events": [
+        {
+          "type": "join",
+          "at": "2026-09-09T08:19:48.368Z",
+          "status": 200,
+          "state": "WAITING",
+          "latencyMs": 717,
+          "cookieSet": false,
+          "error": null
+        },
+        {
+          "type": "state",
+          "at": "2026-09-09T08:19:51.370Z",
+          "from": "WAITING",
+          "to": "ADMITTED",
+          "status": 200,
+          "latencyMs": 337
+        },
+        {
+          "type": "relinquish",
+          "at": "2026-09-09T08:20:03.811Z",
+          "mode": "EXPLICIT",
+          "status": 204,
+          "latencyMs": 211,
+          "error": null
+        }
+      ]
+    },
+    {
+      "index": 26,
+      "userId": "f98f9d3f-571c-47d0-8267-92fd629cbecc",
+      "ticketId": "3eb5d09c-0c85-4b67-a4f2-dae1a29ba1b5",
+      "finalState": "CLOSED",
+      "waitTimeMs": 3719,
+      "admittedAt": "2026-09-09T08:19:51.370Z",
+      "joinedAt": "2026-09-09T08:19:47.651Z",
+      "admissionWave": 1,
+      "relinquishedAt": "2026-09-09T08:20:03.811Z",
+      "outcome": "RELINQUISHED",
+      "confirmation": null,
+      "events": [
+        {
+          "type": "join",
+          "at": "2026-09-09T08:19:48.368Z",
+          "status": 200,
+          "state": "WAITING",
+          "latencyMs": 717,
+          "cookieSet": false,
+          "error": null
+        },
+        {
+          "type": "state",
+          "at": "2026-09-09T08:19:51.370Z",
+          "from": "WAITING",
+          "to": "ADMITTED",
+          "status": 200,
+          "latencyMs": 337
+        },
+        {
+          "type": "relinquish",
+          "at": "2026-09-09T08:20:03.811Z",
+          "mode": "EXPLICIT",
+          "status": 204,
+          "latencyMs": 210,
+          "error": null
+        }
+      ]
+    },
+    {
+      "index": 27,
+      "userId": "10c8f513-fa00-488c-b6a0-5ce360725630",
+      "ticketId": "6c4b5565-c65b-4fb9-a774-7e141524fabe",
+      "finalState": "CLOSED",
+      "waitTimeMs": 5443,
+      "admittedAt": "2026-09-09T08:19:53.094Z",
+      "joinedAt": "2026-09-09T08:19:47.651Z",
+      "admissionWave": 1,
+      "relinquishedAt": "2026-09-09T08:20:06.532Z",
+      "outcome": "RELINQUISHED",
+      "confirmation": null,
+      "events": [
+        {
+          "type": "join",
+          "at": "2026-09-09T08:19:48.384Z",
+          "status": 200,
+          "state": "WAITING",
+          "latencyMs": 733,
+          "cookieSet": false,
+          "error": null
+        },
+        {
+          "type": "state",
+          "at": "2026-09-09T08:19:53.094Z",
+          "from": "WAITING",
+          "to": "ADMITTED",
+          "status": 200,
+          "latencyMs": 292
+        },
+        {
+          "type": "relinquish",
+          "at": "2026-09-09T08:20:06.532Z",
+          "mode": "EXPLICIT",
+          "status": 204,
+          "latencyMs": 195,
+          "error": null
+        }
+      ]
+    },
+    {
+      "index": 28,
+      "userId": "bdf7adee-b3d7-4122-b523-901507f719c2",
+      "ticketId": "5f3f8ebd-573a-4673-ae66-8d68c6d3bb37",
+      "finalState": "CLOSED",
+      "waitTimeMs": 5444,
+      "admittedAt": "2026-09-09T08:19:53.095Z",
+      "joinedAt": "2026-09-09T08:19:47.651Z",
+      "admissionWave": 1,
+      "relinquishedAt": "2026-09-09T08:20:06.532Z",
+      "outcome": "RELINQUISHED",
+      "confirmation": null,
+      "events": [
+        {
+          "type": "join",
+          "at": "2026-09-09T08:19:48.384Z",
+          "status": 200,
+          "state": "WAITING",
+          "latencyMs": 733,
+          "cookieSet": false,
+          "error": null
+        },
+        {
+          "type": "state",
+          "at": "2026-09-09T08:19:53.095Z",
+          "from": "WAITING",
+          "to": "ADMITTED",
+          "status": 200,
+          "latencyMs": 292
+        },
+        {
+          "type": "relinquish",
+          "at": "2026-09-09T08:20:06.532Z",
+          "mode": "EXPLICIT",
+          "status": 204,
+          "latencyMs": 194,
+          "error": null
+        }
+      ]
+    },
+    {
+      "index": 29,
+      "userId": "f0ea5c5d-887e-4f54-8d71-ed6d812ef0f8",
+      "ticketId": "8cd7d5c4-409e-427e-aa1d-3428876f616a",
+      "finalState": "CLOSED",
+      "waitTimeMs": 6319,
+      "admittedAt": "2026-09-09T08:19:53.971Z",
+      "joinedAt": "2026-09-09T08:19:47.652Z",
+      "admissionWave": 1,
+      "relinquishedAt": "2026-09-09T08:20:06.534Z",
+      "outcome": "RELINQUISHED",
+      "confirmation": null,
+      "events": [
+        {
+          "type": "join",
+          "at": "2026-09-09T08:19:48.386Z",
+          "status": 200,
+          "state": "WAITING",
+          "latencyMs": 734,
+          "cookieSet": false,
+          "error": null
+        },
+        {
+          "type": "state",
+          "at": "2026-09-09T08:19:53.971Z",
+          "from": "WAITING",
+          "to": "ADMITTED",
+          "status": 200,
+          "latencyMs": 328
+        },
+        {
+          "type": "relinquish",
+          "at": "2026-09-09T08:20:06.534Z",
+          "mode": "EXPLICIT",
+          "status": 204,
+          "latencyMs": 195,
+          "error": null
+        }
+      ]
+    },
+    {
+      "index": 30,
+      "userId": "0b25aaf1-1321-4e81-bab1-e0d100d6c956",
+      "ticketId": "aa659a5a-7513-434b-ad36-1f94da568e63",
+      "finalState": "CLOSED",
+      "waitTimeMs": 6328,
+      "admittedAt": "2026-09-09T08:19:53.980Z",
+      "joinedAt": "2026-09-09T08:19:47.652Z",
+      "admissionWave": 1,
+      "relinquishedAt": "2026-09-09T08:20:06.535Z",
+      "outcome": "RELINQUISHED",
+      "confirmation": null,
+      "events": [
+        {
+          "type": "join",
+          "at": "2026-09-09T08:19:48.387Z",
+          "status": 200,
+          "state": "WAITING",
+          "latencyMs": 735,
+          "cookieSet": false,
+          "error": null
+        },
+        {
+          "type": "state",
+          "at": "2026-09-09T08:19:53.980Z",
+          "from": "WAITING",
+          "to": "ADMITTED",
+          "status": 200,
+          "latencyMs": 337
+        },
+        {
+          "type": "relinquish",
+          "at": "2026-09-09T08:20:06.535Z",
+          "mode": "EXPLICIT",
+          "status": 204,
+          "latencyMs": 196,
+          "error": null
+        }
+      ]
+    },
+    {
+      "index": 31,
+      "userId": "7b353bca-3807-41ef-9dfb-1667c6c1089d",
+      "ticketId": "e0a01786-c0ad-4ca5-88d9-145e27f4ef40",
+      "finalState": "CLOSED",
+      "waitTimeMs": 10845,
+      "admittedAt": "2026-09-09T08:19:58.497Z",
+      "joinedAt": "2026-09-09T08:19:47.652Z",
+      "admissionWave": 2,
+      "relinquishedAt": "2026-09-09T08:20:09.103Z",
+      "outcome": "RELINQUISHED",
+      "confirmation": null,
+      "events": [
+        {
+          "type": "join",
+          "at": "2026-09-09T08:19:48.388Z",
+          "status": 200,
+          "state": "WAITING",
+          "latencyMs": 736,
+          "cookieSet": false,
+          "error": null
+        },
+        {
+          "type": "state",
+          "at": "2026-09-09T08:19:58.497Z",
+          "from": "WAITING",
+          "to": "ADMITTED",
+          "status": 200,
+          "latencyMs": 259
+        },
+        {
+          "type": "relinquish",
+          "at": "2026-09-09T08:20:09.103Z",
+          "mode": "EXPLICIT",
+          "status": 204,
+          "latencyMs": 149,
+          "error": null
+        }
+      ]
+    },
+    {
+      "index": 32,
+      "userId": "13444b03-8b47-485f-bdf3-fbc0beb7ac5e",
+      "ticketId": "b3f05bf0-f056-4d3f-bf32-529c3d8c2035",
+      "finalState": "CLOSED",
+      "waitTimeMs": 10844,
+      "admittedAt": "2026-09-09T08:19:58.496Z",
+      "joinedAt": "2026-09-09T08:19:47.652Z",
+      "admissionWave": 2,
+      "relinquishedAt": "2026-09-09T08:20:09.102Z",
+      "outcome": "RELINQUISHED",
+      "confirmation": null,
+      "events": [
+        {
+          "type": "join",
+          "at": "2026-09-09T08:19:48.388Z",
+          "status": 200,
+          "state": "WAITING",
+          "latencyMs": 736,
+          "cookieSet": false,
+          "error": null
+        },
+        {
+          "type": "state",
+          "at": "2026-09-09T08:19:58.496Z",
+          "from": "WAITING",
+          "to": "ADMITTED",
+          "status": 200,
+          "latencyMs": 258
+        },
+        {
+          "type": "relinquish",
+          "at": "2026-09-09T08:20:09.102Z",
+          "mode": "EXPLICIT",
+          "status": 204,
+          "latencyMs": 148,
+          "error": null
+        }
+      ]
+    },
+    {
+      "index": 33,
+      "userId": "25feb59b-b672-405d-8f97-37e224a3ac09",
+      "ticketId": "bb484cd2-0aa2-44d6-8f47-9dd40610623a",
+      "finalState": "CLOSED",
+      "waitTimeMs": 6329,
+      "admittedAt": "2026-09-09T08:19:53.981Z",
+      "joinedAt": "2026-09-09T08:19:47.652Z",
+      "admissionWave": 1,
+      "relinquishedAt": "2026-09-09T08:20:06.535Z",
+      "outcome": "RELINQUISHED",
+      "confirmation": null,
+      "events": [
+        {
+          "type": "join",
+          "at": "2026-09-09T08:19:48.385Z",
+          "status": 200,
+          "state": "WAITING",
+          "latencyMs": 733,
+          "cookieSet": false,
+          "error": null
+        },
+        {
+          "type": "state",
+          "at": "2026-09-09T08:19:53.981Z",
+          "from": "WAITING",
+          "to": "ADMITTED",
+          "status": 200,
+          "latencyMs": 337
+        },
+        {
+          "type": "relinquish",
+          "at": "2026-09-09T08:20:06.535Z",
+          "mode": "EXPLICIT",
+          "status": 204,
+          "latencyMs": 196,
+          "error": null
+        }
+      ]
+    },
+    {
+      "index": 34,
+      "userId": "a514824b-c2bd-4df5-b01e-15d1e407a6fd",
+      "ticketId": "dadf9bc2-f0f2-4ff3-82f0-dccc8dbc5fe7",
+      "finalState": "CLOSED",
+      "waitTimeMs": 10845,
+      "admittedAt": "2026-09-09T08:19:58.497Z",
+      "joinedAt": "2026-09-09T08:19:47.652Z",
+      "admissionWave": 2,
+      "relinquishedAt": "2026-09-09T08:20:09.103Z",
+      "outcome": "RELINQUISHED",
+      "confirmation": null,
+      "events": [
+        {
+          "type": "join",
+          "at": "2026-09-09T08:19:48.399Z",
+          "status": 200,
+          "state": "WAITING",
+          "latencyMs": 747,
+          "cookieSet": false,
+          "error": null
+        },
+        {
+          "type": "state",
+          "at": "2026-09-09T08:19:58.497Z",
+          "from": "WAITING",
+          "to": "ADMITTED",
+          "status": 200,
+          "latencyMs": 258
+        },
+        {
+          "type": "relinquish",
+          "at": "2026-09-09T08:20:09.103Z",
+          "mode": "EXPLICIT",
+          "status": 204,
+          "latencyMs": 149,
+          "error": null
+        }
+      ]
+    },
+    {
+      "index": 35,
+      "userId": "e1421b14-69bb-4edc-9db4-1e5727437478",
+      "ticketId": "1e339da9-8113-4b56-a4f1-d96314c79ffc",
+      "finalState": "CLOSED",
+      "waitTimeMs": 13603,
+      "admittedAt": "2026-09-09T08:20:01.255Z",
+      "joinedAt": "2026-09-09T08:19:47.652Z",
+      "admissionWave": 3,
+      "relinquishedAt": "2026-09-09T08:20:11.609Z",
+      "outcome": "RELINQUISHED",
+      "confirmation": null,
+      "events": [
+        {
+          "type": "join",
+          "at": "2026-09-09T08:19:48.400Z",
+          "status": 200,
+          "state": "WAITING",
+          "latencyMs": 748,
+          "cookieSet": false,
+          "error": null
+        },
+        {
+          "type": "state",
+          "at": "2026-09-09T08:20:01.255Z",
+          "from": "WAITING",
+          "to": "ADMITTED",
+          "status": 200,
+          "latencyMs": 220
+        },
+        {
+          "type": "relinquish",
+          "at": "2026-09-09T08:20:11.609Z",
+          "mode": "EXPLICIT",
+          "status": 204,
+          "latencyMs": 116,
+          "error": null
+        }
+      ]
+    },
+    {
+      "index": 36,
+      "userId": "82bc08ca-e690-41dc-97d2-d90385ee821b",
+      "ticketId": "df71447a-a85d-4f08-bc5a-9b4ea4526265",
+      "finalState": "CLOSED",
+      "waitTimeMs": 13602,
+      "admittedAt": "2026-09-09T08:20:01.254Z",
+      "joinedAt": "2026-09-09T08:19:47.652Z",
+      "admissionWave": 3,
+      "relinquishedAt": "2026-09-09T08:20:11.609Z",
+      "outcome": "RELINQUISHED",
+      "confirmation": null,
+      "events": [
+        {
+          "type": "join",
+          "at": "2026-09-09T08:19:48.400Z",
+          "status": 200,
+          "state": "WAITING",
+          "latencyMs": 748,
+          "cookieSet": false,
+          "error": null
+        },
+        {
+          "type": "state",
+          "at": "2026-09-09T08:20:01.254Z",
+          "from": "WAITING",
+          "to": "ADMITTED",
+          "status": 200,
+          "latencyMs": 219
+        },
+        {
+          "type": "relinquish",
+          "at": "2026-09-09T08:20:11.609Z",
+          "mode": "EXPLICIT",
+          "status": 204,
+          "latencyMs": 117,
+          "error": null
+        }
+      ]
+    },
+    {
+      "index": 37,
+      "userId": "5ad98a4d-eb98-4a1a-9d52-f858a2d69a52",
+      "ticketId": "3c6ab4b5-eea9-48e0-8f06-4e2670486137",
+      "finalState": "CLOSED",
+      "waitTimeMs": 5449,
+      "admittedAt": "2026-09-09T08:19:53.101Z",
+      "joinedAt": "2026-09-09T08:19:47.652Z",
+      "admissionWave": 1,
+      "relinquishedAt": "2026-09-09T08:20:06.533Z",
+      "outcome": "RELINQUISHED",
+      "confirmation": null,
+      "events": [
+        {
+          "type": "join",
+          "at": "2026-09-09T08:19:48.384Z",
+          "status": 200,
+          "state": "WAITING",
+          "latencyMs": 732,
+          "cookieSet": false,
+          "error": null
+        },
+        {
+          "type": "state",
+          "at": "2026-09-09T08:19:53.101Z",
+          "from": "WAITING",
+          "to": "ADMITTED",
+          "status": 200,
+          "latencyMs": 295
+        },
+        {
+          "type": "relinquish",
+          "at": "2026-09-09T08:20:06.533Z",
+          "mode": "EXPLICIT",
+          "status": 204,
+          "latencyMs": 195,
+          "error": null
+        }
+      ]
+    },
+    {
+      "index": 38,
+      "userId": "396e1062-d8f8-49a6-b23d-2fab1414b5fa",
+      "ticketId": "3697c8b1-2d92-4508-83b1-8fd606e7f2cd",
+      "finalState": "CLOSED",
+      "waitTimeMs": 5450,
+      "admittedAt": "2026-09-09T08:19:53.102Z",
+      "joinedAt": "2026-09-09T08:19:47.652Z",
+      "admissionWave": 1,
+      "relinquishedAt": "2026-09-09T08:20:06.534Z",
+      "outcome": "RELINQUISHED",
+      "confirmation": null,
+      "events": [
+        {
+          "type": "join",
+          "at": "2026-09-09T08:19:48.385Z",
+          "status": 200,
+          "state": "WAITING",
+          "latencyMs": 733,
+          "cookieSet": false,
+          "error": null
+        },
+        {
+          "type": "state",
+          "at": "2026-09-09T08:19:53.102Z",
+          "from": "WAITING",
+          "to": "ADMITTED",
+          "status": 200,
+          "latencyMs": 296
+        },
+        {
+          "type": "relinquish",
+          "at": "2026-09-09T08:20:06.534Z",
+          "mode": "EXPLICIT",
+          "status": 204,
+          "latencyMs": 196,
+          "error": null
+        }
+      ]
+    },
+    {
+      "index": 39,
+      "userId": "189bea6d-29df-4074-9fd0-d58e452f0ef4",
+      "ticketId": "b54090a2-bb71-4cbd-9517-30777b72eba2",
+      "finalState": "CLOSED",
+      "waitTimeMs": 6336,
+      "admittedAt": "2026-09-09T08:19:53.988Z",
+      "joinedAt": "2026-09-09T08:19:47.652Z",
+      "admissionWave": 1,
+      "relinquishedAt": "2026-09-09T08:20:06.535Z",
+      "outcome": "RELINQUISHED",
+      "confirmation": null,
+      "events": [
+        {
+          "type": "join",
+          "at": "2026-09-09T08:19:48.385Z",
+          "status": 200,
+          "state": "WAITING",
+          "latencyMs": 733,
+          "cookieSet": false,
+          "error": null
+        },
+        {
+          "type": "state",
+          "at": "2026-09-09T08:19:53.988Z",
+          "from": "WAITING",
+          "to": "ADMITTED",
+          "status": 200,
+          "latencyMs": 343
+        },
+        {
+          "type": "relinquish",
+          "at": "2026-09-09T08:20:06.535Z",
+          "mode": "EXPLICIT",
+          "status": 204,
+          "latencyMs": 196,
+          "error": null
+        }
+      ]
+    },
+    {
+      "index": 40,
+      "userId": "c9e53cf1-1a10-49b3-802d-00bb8d461945",
+      "ticketId": "c2d84267-6e89-4806-8c4d-b9bab345de3f",
+      "finalState": "CLOSED",
+      "waitTimeMs": 5449,
+      "admittedAt": "2026-09-09T08:19:53.102Z",
+      "joinedAt": "2026-09-09T08:19:47.653Z",
+      "admissionWave": 1,
+      "relinquishedAt": "2026-09-09T08:20:06.534Z",
+      "outcome": "RELINQUISHED",
+      "confirmation": null,
+      "events": [
+        {
+          "type": "join",
+          "at": "2026-09-09T08:19:48.384Z",
+          "status": 200,
+          "state": "WAITING",
+          "latencyMs": 731,
+          "cookieSet": false,
+          "error": null
+        },
+        {
+          "type": "state",
+          "at": "2026-09-09T08:19:53.102Z",
+          "from": "WAITING",
+          "to": "ADMITTED",
+          "status": 200,
+          "latencyMs": 295
+        },
+        {
+          "type": "relinquish",
+          "at": "2026-09-09T08:20:06.534Z",
+          "mode": "EXPLICIT",
+          "status": 204,
+          "latencyMs": 196,
+          "error": null
+        }
+      ]
+    },
+    {
+      "index": 41,
+      "userId": "9238d0a6-2b50-4a25-bb61-0dd26d56c5d5",
+      "ticketId": "92a377fd-399e-4117-b4df-fbfaf12f2f7a",
+      "finalState": "CLOSED",
+      "waitTimeMs": 6336,
+      "admittedAt": "2026-09-09T08:19:53.989Z",
+      "joinedAt": "2026-09-09T08:19:47.653Z",
+      "admissionWave": 1,
+      "relinquishedAt": "2026-09-09T08:20:09.099Z",
+      "outcome": "RELINQUISHED",
+      "confirmation": null,
+      "events": [
+        {
+          "type": "join",
+          "at": "2026-09-09T08:19:48.386Z",
+          "status": 200,
+          "state": "WAITING",
+          "latencyMs": 733,
+          "cookieSet": false,
+          "error": null
+        },
+        {
+          "type": "state",
+          "at": "2026-09-09T08:19:53.989Z",
+          "from": "WAITING",
+          "to": "ADMITTED",
+          "status": 200,
+          "latencyMs": 344
+        },
+        {
+          "type": "relinquish",
+          "at": "2026-09-09T08:20:09.099Z",
+          "mode": "EXPLICIT",
+          "status": 204,
+          "latencyMs": 146,
+          "error": null
+        }
+      ]
+    },
+    {
+      "index": 42,
+      "userId": "ba61bc35-3cb3-4413-b5c8-09189e3dbff9",
+      "ticketId": "c4d9b3e8-08b4-46cd-96c9-d73d63879d9f",
+      "finalState": "CLOSED",
+      "waitTimeMs": 6337,
+      "admittedAt": "2026-09-09T08:19:53.990Z",
+      "joinedAt": "2026-09-09T08:19:47.653Z",
+      "admissionWave": 1,
+      "relinquishedAt": "2026-09-09T08:20:09.101Z",
+      "outcome": "RELINQUISHED",
+      "confirmation": null,
+      "events": [
+        {
+          "type": "join",
+          "at": "2026-09-09T08:19:48.386Z",
+          "status": 200,
+          "state": "WAITING",
+          "latencyMs": 733,
+          "cookieSet": false,
+          "error": null
+        },
+        {
+          "type": "state",
+          "at": "2026-09-09T08:19:53.990Z",
+          "from": "WAITING",
+          "to": "ADMITTED",
+          "status": 200,
+          "latencyMs": 344
+        },
+        {
+          "type": "relinquish",
+          "at": "2026-09-09T08:20:09.101Z",
+          "mode": "EXPLICIT",
+          "status": 204,
+          "latencyMs": 148,
+          "error": null
+        }
+      ]
+    },
+    {
+      "index": 43,
+      "userId": "75e01f9e-6aa0-4ccd-8ea5-5de5561d9112",
+      "ticketId": "d36a421a-cefc-4061-8b92-c54dfc4b2c7e",
+      "finalState": "CLOSED",
+      "waitTimeMs": 13607,
+      "admittedAt": "2026-09-09T08:20:01.260Z",
+      "joinedAt": "2026-09-09T08:19:47.653Z",
+      "admissionWave": 3,
+      "relinquishedAt": "2026-09-09T08:20:11.610Z",
+      "outcome": "RELINQUISHED",
+      "confirmation": null,
+      "events": [
+        {
+          "type": "join",
+          "at": "2026-09-09T08:19:48.389Z",
+          "status": 200,
+          "state": "WAITING",
+          "latencyMs": 736,
+          "cookieSet": false,
+          "error": null
+        },
+        {
+          "type": "state",
+          "at": "2026-09-09T08:20:01.260Z",
+          "from": "WAITING",
+          "to": "ADMITTED",
+          "status": 200,
+          "latencyMs": 223
+        },
+        {
+          "type": "relinquish",
+          "at": "2026-09-09T08:20:11.610Z",
+          "mode": "EXPLICIT",
+          "status": 204,
+          "latencyMs": 117,
+          "error": null
+        }
+      ]
+    },
+    {
+      "index": 44,
+      "userId": "a2a5e521-d40d-47b5-a074-866c54706dc2",
+      "ticketId": "37efe3c4-9eab-4839-9d1e-e6fc2285714b",
+      "finalState": "CLOSED",
+      "waitTimeMs": 6338,
+      "admittedAt": "2026-09-09T08:19:53.991Z",
+      "joinedAt": "2026-09-09T08:19:47.653Z",
+      "admissionWave": 1,
+      "relinquishedAt": "2026-09-09T08:20:09.102Z",
+      "outcome": "RELINQUISHED",
+      "confirmation": null,
+      "events": [
+        {
+          "type": "join",
+          "at": "2026-09-09T08:19:48.386Z",
+          "status": 200,
+          "state": "WAITING",
+          "latencyMs": 733,
+          "cookieSet": false,
+          "error": null
+        },
+        {
+          "type": "state",
+          "at": "2026-09-09T08:19:53.991Z",
+          "from": "WAITING",
+          "to": "ADMITTED",
+          "status": 200,
+          "latencyMs": 345
+        },
+        {
+          "type": "relinquish",
+          "at": "2026-09-09T08:20:09.102Z",
+          "mode": "EXPLICIT",
+          "status": 204,
+          "latencyMs": 149,
+          "error": null
+        }
+      ]
+    },
+    {
+      "index": 45,
+      "userId": "c1b00dfc-afae-49d1-9ace-371d25766110",
+      "ticketId": "226a09dd-d944-49e2-bc72-00c7221c78d9",
+      "finalState": "CLOSED",
+      "waitTimeMs": 6339,
+      "admittedAt": "2026-09-09T08:19:53.992Z",
+      "joinedAt": "2026-09-09T08:19:47.653Z",
+      "admissionWave": 1,
+      "relinquishedAt": "2026-09-09T08:20:09.102Z",
+      "outcome": "RELINQUISHED",
+      "confirmation": null,
+      "events": [
+        {
+          "type": "join",
+          "at": "2026-09-09T08:19:48.385Z",
+          "status": 200,
+          "state": "WAITING",
+          "latencyMs": 732,
+          "cookieSet": false,
+          "error": null
+        },
+        {
+          "type": "state",
+          "at": "2026-09-09T08:19:53.992Z",
+          "from": "WAITING",
+          "to": "ADMITTED",
+          "status": 200,
+          "latencyMs": 346
+        },
+        {
+          "type": "relinquish",
+          "at": "2026-09-09T08:20:09.102Z",
+          "mode": "EXPLICIT",
+          "status": 204,
+          "latencyMs": 149,
+          "error": null
+        }
+      ]
+    },
+    {
+      "index": 46,
+      "userId": "79e3d5eb-2027-4275-9635-9ae4b44599fe",
+      "ticketId": "f6fbc408-013f-4b0b-9ec7-451e9ec2438c",
+      "finalState": "CLOSED",
+      "waitTimeMs": 6339,
+      "admittedAt": "2026-09-09T08:19:53.992Z",
+      "joinedAt": "2026-09-09T08:19:47.653Z",
+      "admissionWave": 1,
+      "relinquishedAt": "2026-09-09T08:20:09.102Z",
+      "outcome": "RELINQUISHED",
+      "confirmation": null,
+      "events": [
+        {
+          "type": "join",
+          "at": "2026-09-09T08:19:48.388Z",
+          "status": 200,
+          "state": "WAITING",
+          "latencyMs": 735,
+          "cookieSet": false,
+          "error": null
+        },
+        {
+          "type": "state",
+          "at": "2026-09-09T08:19:53.992Z",
+          "from": "WAITING",
+          "to": "ADMITTED",
+          "status": 200,
+          "latencyMs": 346
+        },
+        {
+          "type": "relinquish",
+          "at": "2026-09-09T08:20:09.102Z",
+          "mode": "EXPLICIT",
+          "status": 204,
+          "latencyMs": 149,
+          "error": null
+        }
+      ]
+    },
+    {
+      "index": 47,
+      "userId": "e998313b-86fc-4d94-a6e3-93f4449c20d1",
+      "ticketId": "ed309303-3c2b-4c26-9bbf-475cbb9d4f80",
+      "finalState": "CLOSED",
+      "waitTimeMs": 13607,
+      "admittedAt": "2026-09-09T08:20:01.260Z",
+      "joinedAt": "2026-09-09T08:19:47.653Z",
+      "admissionWave": 3,
+      "relinquishedAt": "2026-09-09T08:20:11.610Z",
+      "outcome": "RELINQUISHED",
+      "confirmation": null,
+      "events": [
+        {
+          "type": "join",
+          "at": "2026-09-09T08:19:48.389Z",
+          "status": 200,
+          "state": "WAITING",
+          "latencyMs": 736,
+          "cookieSet": false,
+          "error": null
+        },
+        {
+          "type": "state",
+          "at": "2026-09-09T08:20:01.260Z",
+          "from": "WAITING",
+          "to": "ADMITTED",
+          "status": 200,
+          "latencyMs": 222
+        },
+        {
+          "type": "relinquish",
+          "at": "2026-09-09T08:20:11.610Z",
+          "mode": "EXPLICIT",
+          "status": 204,
+          "latencyMs": 117,
+          "error": null
+        }
+      ]
+    },
+    {
+      "index": 48,
+      "userId": "48191952-de47-475d-a146-d0175178b1e9",
+      "ticketId": "8ab07772-c1ee-43f2-87ac-570780b3640b",
+      "finalState": "CLOSED",
+      "waitTimeMs": 13608,
+      "admittedAt": "2026-09-09T08:20:01.261Z",
+      "joinedAt": "2026-09-09T08:19:47.653Z",
+      "admissionWave": 3,
+      "relinquishedAt": "2026-09-09T08:20:11.610Z",
+      "outcome": "RELINQUISHED",
+      "confirmation": null,
+      "events": [
+        {
+          "type": "join",
+          "at": "2026-09-09T08:19:48.389Z",
+          "status": 200,
+          "state": "WAITING",
+          "latencyMs": 736,
+          "cookieSet": false,
+          "error": null
+        },
+        {
+          "type": "state",
+          "at": "2026-09-09T08:20:01.261Z",
+          "from": "WAITING",
+          "to": "ADMITTED",
+          "status": 200,
+          "latencyMs": 223
+        },
+        {
+          "type": "relinquish",
+          "at": "2026-09-09T08:20:11.610Z",
+          "mode": "EXPLICIT",
+          "status": 204,
+          "latencyMs": 116,
+          "error": null
+        }
+      ]
+    },
+    {
+      "index": 49,
+      "userId": "9b069151-4481-4c5d-960f-ee8708cb5e3b",
+      "ticketId": "dfb51c9f-24bb-440b-813f-9c6b7826515b",
+      "finalState": "CLOSED",
+      "waitTimeMs": 13607,
+      "admittedAt": "2026-09-09T08:20:01.261Z",
+      "joinedAt": "2026-09-09T08:19:47.654Z",
+      "admissionWave": 3,
+      "relinquishedAt": "2026-09-09T08:20:11.610Z",
+      "outcome": "RELINQUISHED",
+      "confirmation": null,
+      "events": [
+        {
+          "type": "join",
+          "at": "2026-09-09T08:19:48.390Z",
+          "status": 200,
+          "state": "WAITING",
+          "latencyMs": 736,
+          "cookieSet": false,
+          "error": null
+        },
+        {
+          "type": "state",
+          "at": "2026-09-09T08:20:01.261Z",
+          "from": "WAITING",
+          "to": "ADMITTED",
+          "status": 200,
+          "latencyMs": 223
+        },
+        {
+          "type": "relinquish",
+          "at": "2026-09-09T08:20:11.610Z",
+          "mode": "EXPLICIT",
+          "status": 204,
+          "latencyMs": 116,
+          "error": null
+        }
+      ]
+    },
+    {
+      "index": 50,
+      "userId": "378b0e9e-4f0b-43dd-9408-5b939f6550dd",
+      "ticketId": "18fde28a-2015-4272-8d67-3c1da5b61e7d",
+      "finalState": "CLOSED",
+      "waitTimeMs": 13607,
+      "admittedAt": "2026-09-09T08:20:01.261Z",
+      "joinedAt": "2026-09-09T08:19:47.654Z",
+      "admissionWave": 3,
+      "relinquishedAt": "2026-09-09T08:20:11.611Z",
+      "outcome": "RELINQUISHED",
+      "confirmation": null,
+      "events": [
+        {
+          "type": "join",
+          "at": "2026-09-09T08:19:48.389Z",
+          "status": 200,
+          "state": "WAITING",
+          "latencyMs": 735,
+          "cookieSet": false,
+          "error": null
+        },
+        {
+          "type": "state",
+          "at": "2026-09-09T08:20:01.261Z",
+          "from": "WAITING",
+          "to": "ADMITTED",
+          "status": 200,
+          "latencyMs": 223
+        },
+        {
+          "type": "relinquish",
+          "at": "2026-09-09T08:20:11.611Z",
+          "mode": "EXPLICIT",
+          "status": 204,
+          "latencyMs": 117,
+          "error": null
+        }
+      ]
+    },
+    {
+      "index": 51,
+      "userId": "345dfae9-820b-4888-84f7-437dab23820f",
+      "ticketId": "5fac27f6-b483-4ceb-abf7-590ff680657f",
+      "finalState": "CLOSED",
+      "waitTimeMs": 13607,
+      "admittedAt": "2026-09-09T08:20:01.261Z",
+      "joinedAt": "2026-09-09T08:19:47.654Z",
+      "admissionWave": 3,
+      "relinquishedAt": "2026-09-09T08:20:11.611Z",
+      "outcome": "RELINQUISHED",
+      "confirmation": null,
+      "events": [
+        {
+          "type": "join",
+          "at": "2026-09-09T08:19:48.389Z",
+          "status": 200,
+          "state": "WAITING",
+          "latencyMs": 735,
+          "cookieSet": false,
+          "error": null
+        },
+        {
+          "type": "state",
+          "at": "2026-09-09T08:20:01.261Z",
+          "from": "WAITING",
+          "to": "ADMITTED",
+          "status": 200,
+          "latencyMs": 223
+        },
+        {
+          "type": "relinquish",
+          "at": "2026-09-09T08:20:11.611Z",
+          "mode": "EXPLICIT",
+          "status": 204,
+          "latencyMs": 117,
+          "error": null
+        }
+      ]
+    },
+    {
+      "index": 52,
+      "userId": "4b9cf91c-e6fa-4d1f-a489-fa7035a9a1e3",
+      "ticketId": "47a19460-8891-4049-971a-dd92c001fb44",
+      "finalState": "CLOSED",
+      "waitTimeMs": 16337,
+      "admittedAt": "2026-09-09T08:20:03.991Z",
+      "joinedAt": "2026-09-09T08:19:47.654Z",
+      "admissionWave": 4,
+      "relinquishedAt": "2026-09-09T08:20:13.979Z",
+      "outcome": "RELINQUISHED",
+      "confirmation": null,
+      "events": [
+        {
+          "type": "join",
+          "at": "2026-09-09T08:19:48.400Z",
+          "status": 200,
+          "state": "WAITING",
+          "latencyMs": 746,
+          "cookieSet": false,
+          "error": null
+        },
+        {
+          "type": "state",
+          "at": "2026-09-09T08:20:03.991Z",
+          "from": "WAITING",
+          "to": "ADMITTED",
+          "status": 200,
+          "latencyMs": 173
+        },
+        {
+          "type": "relinquish",
+          "at": "2026-09-09T08:20:13.979Z",
+          "mode": "EXPLICIT",
+          "status": 204,
+          "latencyMs": 62,
+          "error": null
+        }
+      ]
+    },
+    {
+      "index": 53,
+      "userId": "4f4a7a1b-d7da-4e94-b1dc-f670107beb6f",
+      "ticketId": "e2c3be42-4fab-4bc5-9359-a6f910f76cce",
+      "finalState": "CLOSED",
+      "waitTimeMs": 13608,
+      "admittedAt": "2026-09-09T08:20:01.262Z",
+      "joinedAt": "2026-09-09T08:19:47.654Z",
+      "admissionWave": 3,
+      "relinquishedAt": "2026-09-09T08:20:11.611Z",
+      "outcome": "RELINQUISHED",
+      "confirmation": null,
+      "events": [
+        {
+          "type": "join",
+          "at": "2026-09-09T08:19:48.390Z",
+          "status": 200,
+          "state": "WAITING",
+          "latencyMs": 736,
+          "cookieSet": false,
+          "error": null
+        },
+        {
+          "type": "state",
+          "at": "2026-09-09T08:20:01.262Z",
+          "from": "WAITING",
+          "to": "ADMITTED",
+          "status": 200,
+          "latencyMs": 223
+        },
+        {
+          "type": "relinquish",
+          "at": "2026-09-09T08:20:11.611Z",
+          "mode": "EXPLICIT",
+          "status": 204,
+          "latencyMs": 116,
+          "error": null
+        }
+      ]
+    },
+    {
+      "index": 54,
+      "userId": "0e15c743-0bab-4167-8b30-94e96971e8ea",
+      "ticketId": "fdb55a4e-a194-45e0-8f2e-e1da0a3b1e74",
+      "finalState": "CLOSED",
+      "waitTimeMs": 13608,
+      "admittedAt": "2026-09-09T08:20:01.262Z",
+      "joinedAt": "2026-09-09T08:19:47.654Z",
+      "admissionWave": 3,
+      "relinquishedAt": "2026-09-09T08:20:11.611Z",
+      "outcome": "RELINQUISHED",
+      "confirmation": null,
+      "events": [
+        {
+          "type": "join",
+          "at": "2026-09-09T08:19:48.389Z",
+          "status": 200,
+          "state": "WAITING",
+          "latencyMs": 735,
+          "cookieSet": false,
+          "error": null
+        },
+        {
+          "type": "state",
+          "at": "2026-09-09T08:20:01.262Z",
+          "from": "WAITING",
+          "to": "ADMITTED",
+          "status": 200,
+          "latencyMs": 223
+        },
+        {
+          "type": "relinquish",
+          "at": "2026-09-09T08:20:11.612Z",
+          "mode": "EXPLICIT",
+          "status": 204,
+          "latencyMs": 116,
+          "error": null
+        }
+      ]
+    },
+    {
+      "index": 55,
+      "userId": "0c0de350-bf3a-42d7-9ad1-da39d6f46903",
+      "ticketId": "6898d835-be41-41d5-97c7-701a17594f70",
+      "finalState": "CLOSED",
+      "waitTimeMs": 16341,
+      "admittedAt": "2026-09-09T08:20:03.995Z",
+      "joinedAt": "2026-09-09T08:19:47.654Z",
+      "admissionWave": 4,
+      "relinquishedAt": "2026-09-09T08:20:13.979Z",
+      "outcome": "RELINQUISHED",
+      "confirmation": null,
+      "events": [
+        {
+          "type": "join",
+          "at": "2026-09-09T08:19:48.388Z",
+          "status": 200,
+          "state": "WAITING",
+          "latencyMs": 734,
+          "cookieSet": false,
+          "error": null
+        },
+        {
+          "type": "state",
+          "at": "2026-09-09T08:20:03.995Z",
+          "from": "WAITING",
+          "to": "ADMITTED",
+          "status": 200,
+          "latencyMs": 176
+        },
+        {
+          "type": "relinquish",
+          "at": "2026-09-09T08:20:13.979Z",
+          "mode": "EXPLICIT",
+          "status": 204,
+          "latencyMs": 62,
+          "error": null
+        }
+      ]
+    },
+    {
+      "index": 56,
+      "userId": "67c803ea-c8d5-4c99-a993-6b09f3d74cdf",
+      "ticketId": "98177e55-0ea5-4b44-992f-d64a4921b3f5",
+      "finalState": "CLOSED",
+      "waitTimeMs": 16342,
+      "admittedAt": "2026-09-09T08:20:03.996Z",
+      "joinedAt": "2026-09-09T08:19:47.654Z",
+      "admissionWave": 4,
+      "relinquishedAt": "2026-09-09T08:20:13.980Z",
+      "outcome": "RELINQUISHED",
+      "confirmation": null,
+      "events": [
+        {
+          "type": "join",
+          "at": "2026-09-09T08:19:48.401Z",
+          "status": 200,
+          "state": "WAITING",
+          "latencyMs": 747,
+          "cookieSet": false,
+          "error": null
+        },
+        {
+          "type": "state",
+          "at": "2026-09-09T08:20:03.996Z",
+          "from": "WAITING",
+          "to": "ADMITTED",
+          "status": 200,
+          "latencyMs": 177
+        },
+        {
+          "type": "relinquish",
+          "at": "2026-09-09T08:20:13.980Z",
+          "mode": "EXPLICIT",
+          "status": 204,
+          "latencyMs": 63,
+          "error": null
+        }
+      ]
+    },
+    {
+      "index": 57,
+      "userId": "688e6fc5-96ae-4ec6-a01f-d3d582ed13b3",
+      "ticketId": "66d74f16-9934-4d36-8741-2c8741835210",
+      "finalState": "CLOSED",
+      "waitTimeMs": 16342,
+      "admittedAt": "2026-09-09T08:20:03.996Z",
+      "joinedAt": "2026-09-09T08:19:47.654Z",
+      "admissionWave": 4,
+      "relinquishedAt": "2026-09-09T08:20:13.980Z",
+      "outcome": "RELINQUISHED",
+      "confirmation": null,
+      "events": [
+        {
+          "type": "join",
+          "at": "2026-09-09T08:19:48.401Z",
+          "status": 200,
+          "state": "WAITING",
+          "latencyMs": 747,
+          "cookieSet": false,
+          "error": null
+        },
+        {
+          "type": "state",
+          "at": "2026-09-09T08:20:03.996Z",
+          "from": "WAITING",
+          "to": "ADMITTED",
+          "status": 200,
+          "latencyMs": 177
+        },
+        {
+          "type": "relinquish",
+          "at": "2026-09-09T08:20:13.980Z",
+          "mode": "EXPLICIT",
+          "status": 204,
+          "latencyMs": 63,
+          "error": null
+        }
+      ]
+    },
+    {
+      "index": 58,
+      "userId": "9407ea75-b73e-4e73-a803-6ef22d44fc35",
+      "ticketId": "acdcdbe6-b584-4f13-9a14-a10d548c319f",
+      "finalState": "CLOSED",
+      "waitTimeMs": 16342,
+      "admittedAt": "2026-09-09T08:20:03.996Z",
+      "joinedAt": "2026-09-09T08:19:47.654Z",
+      "admissionWave": 4,
+      "relinquishedAt": "2026-09-09T08:20:13.980Z",
+      "outcome": "RELINQUISHED",
+      "confirmation": null,
+      "events": [
+        {
+          "type": "join",
+          "at": "2026-09-09T08:19:48.401Z",
+          "status": 200,
+          "state": "WAITING",
+          "latencyMs": 747,
+          "cookieSet": false,
+          "error": null
+        },
+        {
+          "type": "state",
+          "at": "2026-09-09T08:20:03.996Z",
+          "from": "WAITING",
+          "to": "ADMITTED",
+          "status": 200,
+          "latencyMs": 177
+        },
+        {
+          "type": "relinquish",
+          "at": "2026-09-09T08:20:13.980Z",
+          "mode": "EXPLICIT",
+          "status": 204,
+          "latencyMs": 63,
+          "error": null
+        }
+      ]
+    },
+    {
+      "index": 59,
+      "userId": "e42256ba-0c43-4abe-85d9-47960c2280cb",
+      "ticketId": "47e1561a-8096-4bfa-9d4a-0b72b0ed908b",
+      "finalState": "CLOSED",
+      "waitTimeMs": 16341,
+      "admittedAt": "2026-09-09T08:20:03.996Z",
+      "joinedAt": "2026-09-09T08:19:47.655Z",
+      "admissionWave": 4,
+      "relinquishedAt": "2026-09-09T08:20:13.981Z",
+      "outcome": "RELINQUISHED",
+      "confirmation": null,
+      "events": [
+        {
+          "type": "join",
+          "at": "2026-09-09T08:19:48.401Z",
+          "status": 200,
+          "state": "WAITING",
+          "latencyMs": 746,
+          "cookieSet": false,
+          "error": null
+        },
+        {
+          "type": "state",
+          "at": "2026-09-09T08:20:03.996Z",
+          "from": "WAITING",
+          "to": "ADMITTED",
+          "status": 200,
+          "latencyMs": 176
+        },
+        {
+          "type": "relinquish",
+          "at": "2026-09-09T08:20:13.981Z",
+          "mode": "EXPLICIT",
+          "status": 204,
+          "latencyMs": 64,
+          "error": null
+        }
+      ]
+    },
+    {
+      "index": 60,
+      "userId": "e3a24684-f259-4ef0-aa9f-8353d4f6c88a",
+      "ticketId": "2fa34fdb-343c-407a-ae2a-0e58cc277581",
+      "finalState": "CLOSED",
+      "waitTimeMs": 16341,
+      "admittedAt": "2026-09-09T08:20:03.996Z",
+      "joinedAt": "2026-09-09T08:19:47.655Z",
+      "admissionWave": 4,
+      "relinquishedAt": "2026-09-09T08:20:13.981Z",
+      "outcome": "RELINQUISHED",
+      "confirmation": null,
+      "events": [
+        {
+          "type": "join",
+          "at": "2026-09-09T08:19:48.402Z",
+          "status": 200,
+          "state": "WAITING",
+          "latencyMs": 747,
+          "cookieSet": false,
+          "error": null
+        },
+        {
+          "type": "state",
+          "at": "2026-09-09T08:20:03.996Z",
+          "from": "WAITING",
+          "to": "ADMITTED",
+          "status": 200,
+          "latencyMs": 176
+        },
+        {
+          "type": "relinquish",
+          "at": "2026-09-09T08:20:13.981Z",
+          "mode": "EXPLICIT",
+          "status": 204,
+          "latencyMs": 64,
+          "error": null
+        }
+      ]
+    },
+    {
+      "index": 61,
+      "userId": "7b89e31a-67e8-4db4-a5cd-fe1ac2dbe6ca",
+      "ticketId": "4e29c8e7-4ba6-4925-a017-5eb55cab9e94",
+      "finalState": "CLOSED",
+      "waitTimeMs": 19065,
+      "admittedAt": "2026-09-09T08:20:06.720Z",
+      "joinedAt": "2026-09-09T08:19:47.655Z",
+      "admissionWave": 5,
+      "relinquishedAt": "2026-09-09T08:20:18.559Z",
+      "outcome": "RELINQUISHED",
+      "confirmation": null,
+      "events": [
+        {
+          "type": "join",
+          "at": "2026-09-09T08:19:48.405Z",
+          "status": 200,
+          "state": "WAITING",
+          "latencyMs": 750,
+          "cookieSet": false,
+          "error": null
+        },
+        {
+          "type": "state",
+          "at": "2026-09-09T08:20:06.720Z",
+          "from": "WAITING",
+          "to": "ADMITTED",
+          "status": 200,
+          "latencyMs": 176
+        },
+        {
+          "type": "relinquish",
+          "at": "2026-09-09T08:20:18.559Z",
+          "mode": "EXPLICIT",
+          "status": 204,
+          "latencyMs": 113,
+          "error": null
+        }
+      ]
+    },
+    {
+      "index": 62,
+      "userId": "f448b096-9e0c-4f7a-b5ba-d39af0a8e639",
+      "ticketId": "165c13c2-65b6-47e7-a60a-d62d94ce736d",
+      "finalState": "CLOSED",
+      "waitTimeMs": 19065,
+      "admittedAt": "2026-09-09T08:20:06.720Z",
+      "joinedAt": "2026-09-09T08:19:47.655Z",
+      "admissionWave": 5,
+      "relinquishedAt": "2026-09-09T08:20:18.558Z",
+      "outcome": "RELINQUISHED",
+      "confirmation": null,
+      "events": [
+        {
+          "type": "join",
+          "at": "2026-09-09T08:19:48.390Z",
+          "status": 200,
+          "state": "WAITING",
+          "latencyMs": 735,
+          "cookieSet": false,
+          "error": null
+        },
+        {
+          "type": "state",
+          "at": "2026-09-09T08:20:06.720Z",
+          "from": "WAITING",
+          "to": "ADMITTED",
+          "status": 200,
+          "latencyMs": 175
+        },
+        {
+          "type": "relinquish",
+          "at": "2026-09-09T08:20:18.558Z",
+          "mode": "EXPLICIT",
+          "status": 204,
+          "latencyMs": 112,
+          "error": null
+        }
+      ]
+    },
+    {
+      "index": 63,
+      "userId": "2712c450-4f83-4579-ae59-a0f727750f2e",
+      "ticketId": "a4750ace-20b1-40fa-ae58-c25947a82c71",
+      "finalState": "CLOSED",
+      "waitTimeMs": 19065,
+      "admittedAt": "2026-09-09T08:20:06.720Z",
+      "joinedAt": "2026-09-09T08:19:47.655Z",
+      "admissionWave": 5,
+      "relinquishedAt": "2026-09-09T08:20:18.559Z",
+      "outcome": "RELINQUISHED",
+      "confirmation": null,
+      "events": [
+        {
+          "type": "join",
+          "at": "2026-09-09T08:19:48.402Z",
+          "status": 200,
+          "state": "WAITING",
+          "latencyMs": 747,
+          "cookieSet": false,
+          "error": null
+        },
+        {
+          "type": "state",
+          "at": "2026-09-09T08:20:06.720Z",
+          "from": "WAITING",
+          "to": "ADMITTED",
+          "status": 200,
+          "latencyMs": 175
+        },
+        {
+          "type": "relinquish",
+          "at": "2026-09-09T08:20:18.559Z",
+          "mode": "EXPLICIT",
+          "status": 204,
+          "latencyMs": 112,
+          "error": null
+        }
+      ]
+    },
+    {
+      "index": 64,
+      "userId": "f0eecee9-2166-4f8b-ad58-cdf1c5e164b2",
+      "ticketId": "f466d93a-99a5-4d3b-bb16-5b16481476f0",
+      "finalState": "CLOSED",
+      "waitTimeMs": 16343,
+      "admittedAt": "2026-09-09T08:20:03.998Z",
+      "joinedAt": "2026-09-09T08:19:47.655Z",
+      "admissionWave": 4,
+      "relinquishedAt": "2026-09-09T08:20:13.981Z",
+      "outcome": "RELINQUISHED",
+      "confirmation": null,
+      "events": [
+        {
+          "type": "join",
+          "at": "2026-09-09T08:19:48.401Z",
+          "status": 200,
+          "state": "WAITING",
+          "latencyMs": 746,
+          "cookieSet": false,
+          "error": null
+        },
+        {
+          "type": "state",
+          "at": "2026-09-09T08:20:03.998Z",
+          "from": "WAITING",
+          "to": "ADMITTED",
+          "status": 200,
+          "latencyMs": 178
+        },
+        {
+          "type": "relinquish",
+          "at": "2026-09-09T08:20:13.981Z",
+          "mode": "EXPLICIT",
+          "status": 204,
+          "latencyMs": 63,
+          "error": null
+        }
+      ]
+    },
+    {
+      "index": 65,
+      "userId": "acac3cd6-c05a-46f5-bdd1-6eb5f7b96c2a",
+      "ticketId": "74672058-df7c-48c4-b9d2-b57fee52eeab",
+      "finalState": "CLOSED",
+      "waitTimeMs": 16343,
+      "admittedAt": "2026-09-09T08:20:03.998Z",
+      "joinedAt": "2026-09-09T08:19:47.655Z",
+      "admissionWave": 4,
+      "relinquishedAt": "2026-09-09T08:20:13.982Z",
+      "outcome": "RELINQUISHED",
+      "confirmation": null,
+      "events": [
+        {
+          "type": "join",
+          "at": "2026-09-09T08:19:48.401Z",
+          "status": 200,
+          "state": "WAITING",
+          "latencyMs": 746,
+          "cookieSet": false,
+          "error": null
+        },
+        {
+          "type": "state",
+          "at": "2026-09-09T08:20:03.998Z",
+          "from": "WAITING",
+          "to": "ADMITTED",
+          "status": 200,
+          "latencyMs": 177
+        },
+        {
+          "type": "relinquish",
+          "at": "2026-09-09T08:20:13.982Z",
+          "mode": "EXPLICIT",
+          "status": 204,
+          "latencyMs": 64,
+          "error": null
+        }
+      ]
+    },
+    {
+      "index": 66,
+      "userId": "0adae780-2afd-415c-9246-50df641a415c",
+      "ticketId": "5fe24435-74a4-4ae7-9e77-5a4b97c71501",
+      "finalState": "CLOSED",
+      "waitTimeMs": 19065,
+      "admittedAt": "2026-09-09T08:20:06.720Z",
+      "joinedAt": "2026-09-09T08:19:47.655Z",
+      "admissionWave": 5,
+      "relinquishedAt": "2026-09-09T08:20:18.559Z",
+      "outcome": "RELINQUISHED",
+      "confirmation": null,
+      "events": [
+        {
+          "type": "join",
+          "at": "2026-09-09T08:19:48.417Z",
+          "status": 200,
+          "state": "WAITING",
+          "latencyMs": 762,
+          "cookieSet": false,
+          "error": null
+        },
+        {
+          "type": "state",
+          "at": "2026-09-09T08:20:06.720Z",
+          "from": "WAITING",
+          "to": "ADMITTED",
+          "status": 200,
+          "latencyMs": 174
+        },
+        {
+          "type": "relinquish",
+          "at": "2026-09-09T08:20:18.559Z",
+          "mode": "EXPLICIT",
+          "status": 204,
+          "latencyMs": 112,
+          "error": null
+        }
+      ]
+    },
+    {
+      "index": 67,
+      "userId": "7870e015-676d-4620-a9ae-13d6245a1ac9",
+      "ticketId": "d4f68ba2-339d-4ce8-a07c-a26f272fe369",
+      "finalState": "CLOSED",
+      "waitTimeMs": 19066,
+      "admittedAt": "2026-09-09T08:20:06.721Z",
+      "joinedAt": "2026-09-09T08:19:47.655Z",
+      "admissionWave": 5,
+      "relinquishedAt": "2026-09-09T08:20:18.559Z",
+      "outcome": "RELINQUISHED",
+      "confirmation": null,
+      "events": [
+        {
+          "type": "join",
+          "at": "2026-09-09T08:19:48.404Z",
+          "status": 200,
+          "state": "WAITING",
+          "latencyMs": 749,
+          "cookieSet": false,
+          "error": null
+        },
+        {
+          "type": "state",
+          "at": "2026-09-09T08:20:06.721Z",
+          "from": "WAITING",
+          "to": "ADMITTED",
+          "status": 200,
+          "latencyMs": 174
+        },
+        {
+          "type": "relinquish",
+          "at": "2026-09-09T08:20:18.559Z",
+          "mode": "EXPLICIT",
+          "status": 204,
+          "latencyMs": 112,
+          "error": null
+        }
+      ]
+    },
+    {
+      "index": 68,
+      "userId": "c4257056-d4d5-4ed4-8283-c72f95e363fc",
+      "ticketId": "fcad86dd-f4ed-4d79-bc0d-ab51c53937a5",
+      "finalState": "CLOSED",
+      "waitTimeMs": 16344,
+      "admittedAt": "2026-09-09T08:20:03.999Z",
+      "joinedAt": "2026-09-09T08:19:47.655Z",
+      "admissionWave": 4,
+      "relinquishedAt": "2026-09-09T08:20:13.982Z",
+      "outcome": "RELINQUISHED",
+      "confirmation": null,
+      "events": [
+        {
+          "type": "join",
+          "at": "2026-09-09T08:19:48.402Z",
+          "status": 200,
+          "state": "WAITING",
+          "latencyMs": 747,
+          "cookieSet": false,
+          "error": null
+        },
+        {
+          "type": "state",
+          "at": "2026-09-09T08:20:03.999Z",
+          "from": "WAITING",
+          "to": "ADMITTED",
+          "status": 200,
+          "latencyMs": 177
+        },
+        {
+          "type": "relinquish",
+          "at": "2026-09-09T08:20:13.982Z",
+          "mode": "EXPLICIT",
+          "status": 204,
+          "latencyMs": 64,
+          "error": null
+        }
+      ]
+    },
+    {
+      "index": 69,
+      "userId": "413af868-02d9-4f20-bdef-f6644e5e054c",
+      "ticketId": "739bc86c-12f7-4155-b890-cd6f5637e1ed",
+      "finalState": "CLOSED",
+      "waitTimeMs": 19066,
+      "admittedAt": "2026-09-09T08:20:06.721Z",
+      "joinedAt": "2026-09-09T08:19:47.655Z",
+      "admissionWave": 5,
+      "relinquishedAt": "2026-09-09T08:20:18.559Z",
+      "outcome": "RELINQUISHED",
+      "confirmation": null,
+      "events": [
+        {
+          "type": "join",
+          "at": "2026-09-09T08:19:48.404Z",
+          "status": 200,
+          "state": "WAITING",
+          "latencyMs": 749,
+          "cookieSet": false,
+          "error": null
+        },
+        {
+          "type": "state",
+          "at": "2026-09-09T08:20:06.721Z",
+          "from": "WAITING",
+          "to": "ADMITTED",
+          "status": 200,
+          "latencyMs": 175
+        },
+        {
+          "type": "relinquish",
+          "at": "2026-09-09T08:20:18.559Z",
+          "mode": "EXPLICIT",
+          "status": 204,
+          "latencyMs": 111,
+          "error": null
+        }
+      ]
+    },
+    {
+      "index": 70,
+      "userId": "6a31bc17-ec56-403e-b3ef-92374bc64d2a",
+      "ticketId": "08adc584-85cb-4040-9b56-7a12edaf6100",
+      "finalState": "CLOSED",
+      "waitTimeMs": 10853,
+      "admittedAt": "2026-09-09T08:19:58.509Z",
+      "joinedAt": "2026-09-09T08:19:47.656Z",
+      "admissionWave": 2,
+      "relinquishedAt": "2026-09-09T08:20:09.103Z",
+      "outcome": "RELINQUISHED",
+      "confirmation": null,
+      "events": [
+        {
+          "type": "join",
+          "at": "2026-09-09T08:19:48.416Z",
+          "status": 200,
+          "state": "WAITING",
+          "latencyMs": 760,
+          "cookieSet": false,
+          "error": null
+        },
+        {
+          "type": "state",
+          "at": "2026-09-09T08:19:58.509Z",
+          "from": "WAITING",
+          "to": "ADMITTED",
+          "status": 200,
+          "latencyMs": 263
+        },
+        {
+          "type": "relinquish",
+          "at": "2026-09-09T08:20:09.103Z",
+          "mode": "EXPLICIT",
+          "status": 204,
+          "latencyMs": 149,
+          "error": null
+        }
+      ]
+    },
+    {
+      "index": 71,
+      "userId": "d3a61cef-e064-4823-a11f-e2c5b3371052",
+      "ticketId": "83b4a0bd-6783-4065-b22b-9e0e3d114e53",
+      "finalState": "CLOSED",
+      "waitTimeMs": 19065,
+      "admittedAt": "2026-09-09T08:20:06.721Z",
+      "joinedAt": "2026-09-09T08:19:47.656Z",
+      "admissionWave": 5,
+      "relinquishedAt": "2026-09-09T08:20:18.560Z",
+      "outcome": "RELINQUISHED",
+      "confirmation": null,
+      "events": [
+        {
+          "type": "join",
+          "at": "2026-09-09T08:19:48.404Z",
+          "status": 200,
+          "state": "WAITING",
+          "latencyMs": 748,
+          "cookieSet": false,
+          "error": null
+        },
+        {
+          "type": "state",
+          "at": "2026-09-09T08:20:06.721Z",
+          "from": "WAITING",
+          "to": "ADMITTED",
+          "status": 200,
+          "latencyMs": 174
+        },
+        {
+          "type": "relinquish",
+          "at": "2026-09-09T08:20:18.560Z",
+          "mode": "EXPLICIT",
+          "status": 204,
+          "latencyMs": 112,
+          "error": null
+        }
+      ]
+    },
+    {
+      "index": 72,
+      "userId": "e50665e3-5904-46eb-8558-c5c61e47ff75",
+      "ticketId": "faf33f6d-e29c-4ca7-8a11-10f7f6ec89bc",
+      "finalState": "CLOSED",
+      "waitTimeMs": 19065,
+      "admittedAt": "2026-09-09T08:20:06.721Z",
+      "joinedAt": "2026-09-09T08:19:47.656Z",
+      "admissionWave": 5,
+      "relinquishedAt": "2026-09-09T08:20:18.560Z",
+      "outcome": "RELINQUISHED",
+      "confirmation": null,
+      "events": [
+        {
+          "type": "join",
+          "at": "2026-09-09T08:19:48.416Z",
+          "status": 200,
+          "state": "WAITING",
+          "latencyMs": 760,
+          "cookieSet": false,
+          "error": null
+        },
+        {
+          "type": "state",
+          "at": "2026-09-09T08:20:06.721Z",
+          "from": "WAITING",
+          "to": "ADMITTED",
+          "status": 200,
+          "latencyMs": 174
+        },
+        {
+          "type": "relinquish",
+          "at": "2026-09-09T08:20:18.560Z",
+          "mode": "EXPLICIT",
+          "status": 204,
+          "latencyMs": 112,
+          "error": null
+        }
+      ]
+    },
+    {
+      "index": 73,
+      "userId": "93ada543-8724-4364-a1b5-1ab75fc8bbcb",
+      "ticketId": "71232a87-b36e-40c9-8abb-6c9f2a44ea56",
+      "finalState": "CLOSED",
+      "waitTimeMs": 19066,
+      "admittedAt": "2026-09-09T08:20:06.722Z",
+      "joinedAt": "2026-09-09T08:19:47.656Z",
+      "admissionWave": 5,
+      "relinquishedAt": "2026-09-09T08:20:18.560Z",
+      "outcome": "RELINQUISHED",
+      "confirmation": null,
+      "events": [
+        {
+          "type": "join",
+          "at": "2026-09-09T08:19:48.411Z",
+          "status": 200,
+          "state": "WAITING",
+          "latencyMs": 755,
+          "cookieSet": false,
+          "error": null
+        },
+        {
+          "type": "state",
+          "at": "2026-09-09T08:20:06.722Z",
+          "from": "WAITING",
+          "to": "ADMITTED",
+          "status": 200,
+          "latencyMs": 175
+        },
+        {
+          "type": "relinquish",
+          "at": "2026-09-09T08:20:18.560Z",
+          "mode": "EXPLICIT",
+          "status": 204,
+          "latencyMs": 112,
+          "error": null
+        }
+      ]
+    },
+    {
+      "index": 74,
+      "userId": "57bf1648-5bab-4ced-a985-1f549dd0b26f",
+      "ticketId": "36e8df8f-da19-4d22-b987-615d231e0dce",
+      "finalState": "CLOSED",
+      "waitTimeMs": 21629,
+      "admittedAt": "2026-09-09T08:20:09.285Z",
+      "joinedAt": "2026-09-09T08:19:47.656Z",
+      "admissionWave": 6,
+      "relinquishedAt": "2026-09-09T08:20:18.560Z",
+      "outcome": "RELINQUISHED",
+      "confirmation": null,
+      "events": [
+        {
+          "type": "join",
+          "at": "2026-09-09T08:19:48.418Z",
+          "status": 200,
+          "state": "WAITING",
+          "latencyMs": 762,
+          "cookieSet": false,
+          "error": null
+        },
+        {
+          "type": "state",
+          "at": "2026-09-09T08:20:09.285Z",
+          "from": "WAITING",
+          "to": "ADMITTED",
+          "status": 200,
+          "latencyMs": 169
+        },
+        {
+          "type": "relinquish",
+          "at": "2026-09-09T08:20:18.560Z",
+          "mode": "EXPLICIT",
+          "status": 204,
+          "latencyMs": 111,
+          "error": null
+        }
+      ]
+    },
+    {
+      "index": 75,
+      "userId": "4ce6c7ea-115d-49cd-bbd4-83f1ea3b358c",
+      "ticketId": "cabf0897-872c-44f7-ae6c-40b75544e7ad",
+      "finalState": "CLOSED",
+      "waitTimeMs": 21630,
+      "admittedAt": "2026-09-09T08:20:09.286Z",
+      "joinedAt": "2026-09-09T08:19:47.656Z",
+      "admissionWave": 6,
+      "relinquishedAt": "2026-09-09T08:20:18.563Z",
+      "outcome": "RELINQUISHED",
+      "confirmation": null,
+      "events": [
+        {
+          "type": "join",
+          "at": "2026-09-09T08:19:48.418Z",
+          "status": 200,
+          "state": "WAITING",
+          "latencyMs": 762,
+          "cookieSet": false,
+          "error": null
+        },
+        {
+          "type": "state",
+          "at": "2026-09-09T08:20:09.286Z",
+          "from": "WAITING",
+          "to": "ADMITTED",
+          "status": 200,
+          "latencyMs": 170
+        },
+        {
+          "type": "relinquish",
+          "at": "2026-09-09T08:20:18.563Z",
+          "mode": "EXPLICIT",
+          "status": 204,
+          "latencyMs": 114,
+          "error": null
+        }
+      ]
+    },
+    {
+      "index": 76,
+      "userId": "9948bc7c-dbd9-47fe-91a2-39c102139f75",
+      "ticketId": "48564e10-584f-4c82-a0e7-9fe051ca754b",
+      "finalState": "CLOSED",
+      "waitTimeMs": 19067,
+      "admittedAt": "2026-09-09T08:20:06.723Z",
+      "joinedAt": "2026-09-09T08:19:47.656Z",
+      "admissionWave": 5,
+      "relinquishedAt": "2026-09-09T08:20:18.563Z",
+      "outcome": "RELINQUISHED",
+      "confirmation": null,
+      "events": [
+        {
+          "type": "join",
+          "at": "2026-09-09T08:19:48.416Z",
+          "status": 200,
+          "state": "WAITING",
+          "latencyMs": 760,
+          "cookieSet": false,
+          "error": null
+        },
+        {
+          "type": "state",
+          "at": "2026-09-09T08:20:06.723Z",
+          "from": "WAITING",
+          "to": "ADMITTED",
+          "status": 200,
+          "latencyMs": 175
+        },
+        {
+          "type": "relinquish",
+          "at": "2026-09-09T08:20:18.563Z",
+          "mode": "EXPLICIT",
+          "status": 204,
+          "latencyMs": 114,
+          "error": null
+        }
+      ]
+    },
+    {
+      "index": 77,
+      "userId": "4d6a042f-52d5-44b8-aa64-cff39c4825d1",
+      "ticketId": "89bd0224-1574-482d-a06f-7560d424f6a6",
+      "finalState": "CLOSED",
+      "waitTimeMs": 21630,
+      "admittedAt": "2026-09-09T08:20:09.287Z",
+      "joinedAt": "2026-09-09T08:19:47.657Z",
+      "admissionWave": 6,
+      "relinquishedAt": "2026-09-09T08:20:18.563Z",
+      "outcome": "RELINQUISHED",
+      "confirmation": null,
+      "events": [
+        {
+          "type": "join",
+          "at": "2026-09-09T08:19:48.425Z",
+          "status": 200,
+          "state": "WAITING",
+          "latencyMs": 768,
+          "cookieSet": false,
+          "error": null
+        },
+        {
+          "type": "state",
+          "at": "2026-09-09T08:20:09.287Z",
+          "from": "WAITING",
+          "to": "ADMITTED",
+          "status": 200,
+          "latencyMs": 170
+        },
+        {
+          "type": "relinquish",
+          "at": "2026-09-09T08:20:18.563Z",
+          "mode": "EXPLICIT",
+          "status": 204,
+          "latencyMs": 114,
+          "error": null
+        }
+      ]
+    },
+    {
+      "index": 78,
+      "userId": "fe7e19eb-b312-4cc9-903d-e3542282d91e",
+      "ticketId": "524ada0d-2649-4331-88e9-5e75e6984384",
+      "finalState": "CLOSED",
+      "waitTimeMs": 21630,
+      "admittedAt": "2026-09-09T08:20:09.287Z",
+      "joinedAt": "2026-09-09T08:19:47.657Z",
+      "admissionWave": 6,
+      "relinquishedAt": "2026-09-09T08:20:18.563Z",
+      "outcome": "RELINQUISHED",
+      "confirmation": null,
+      "events": [
+        {
+          "type": "join",
+          "at": "2026-09-09T08:19:48.416Z",
+          "status": 200,
+          "state": "WAITING",
+          "latencyMs": 759,
+          "cookieSet": false,
+          "error": null
+        },
+        {
+          "type": "state",
+          "at": "2026-09-09T08:20:09.287Z",
+          "from": "WAITING",
+          "to": "ADMITTED",
+          "status": 200,
+          "latencyMs": 170
+        },
+        {
+          "type": "relinquish",
+          "at": "2026-09-09T08:20:18.563Z",
+          "mode": "EXPLICIT",
+          "status": 204,
+          "latencyMs": 113,
+          "error": null
+        }
+      ]
+    },
+    {
+      "index": 79,
+      "userId": "a88b4a7b-6e0d-4ea6-b884-db79438ed675",
+      "ticketId": "0474792e-787f-48c7-827c-3abef749cde8",
+      "finalState": "CLOSED",
+      "waitTimeMs": 21630,
+      "admittedAt": "2026-09-09T08:20:09.287Z",
+      "joinedAt": "2026-09-09T08:19:47.657Z",
+      "admissionWave": 6,
+      "relinquishedAt": "2026-09-09T08:20:18.563Z",
+      "outcome": "RELINQUISHED",
+      "confirmation": null,
+      "events": [
+        {
+          "type": "join",
+          "at": "2026-09-09T08:19:48.418Z",
+          "status": 200,
+          "state": "WAITING",
+          "latencyMs": 761,
+          "cookieSet": false,
+          "error": null
+        },
+        {
+          "type": "state",
+          "at": "2026-09-09T08:20:09.287Z",
+          "from": "WAITING",
+          "to": "ADMITTED",
+          "status": 200,
+          "latencyMs": 170
+        },
+        {
+          "type": "relinquish",
+          "at": "2026-09-09T08:20:18.563Z",
+          "mode": "EXPLICIT",
+          "status": 204,
+          "latencyMs": 113,
+          "error": null
+        }
+      ]
+    },
+    {
+      "index": 80,
+      "userId": "4559053a-ce64-4393-a63c-418c56d602e5",
+      "ticketId": "a0638edb-29aa-42ab-afae-6ff15af15edd",
+      "finalState": "CLOSED",
+      "waitTimeMs": 21631,
+      "admittedAt": "2026-09-09T08:20:09.288Z",
+      "joinedAt": "2026-09-09T08:19:47.657Z",
+      "admissionWave": 6,
+      "relinquishedAt": "2026-09-09T08:20:18.563Z",
+      "outcome": "RELINQUISHED",
+      "confirmation": null,
+      "events": [
+        {
+          "type": "join",
+          "at": "2026-09-09T08:19:48.436Z",
+          "status": 200,
+          "state": "WAITING",
+          "latencyMs": 779,
+          "cookieSet": false,
+          "error": null
+        },
+        {
+          "type": "state",
+          "at": "2026-09-09T08:20:09.288Z",
+          "from": "WAITING",
+          "to": "ADMITTED",
+          "status": 200,
+          "latencyMs": 171
+        },
+        {
+          "type": "relinquish",
+          "at": "2026-09-09T08:20:18.563Z",
+          "mode": "EXPLICIT",
+          "status": 204,
+          "latencyMs": 113,
+          "error": null
+        }
+      ]
+    },
+    {
+      "index": 81,
+      "userId": "2499a306-17f0-416d-8938-4af7846ef407",
+      "ticketId": "811778cd-7427-4257-95b8-14a812b754e5",
+      "finalState": "CLOSED",
+      "waitTimeMs": 21631,
+      "admittedAt": "2026-09-09T08:20:09.288Z",
+      "joinedAt": "2026-09-09T08:19:47.657Z",
+      "admissionWave": 6,
+      "relinquishedAt": "2026-09-09T08:20:18.564Z",
+      "outcome": "RELINQUISHED",
+      "confirmation": null,
+      "events": [
+        {
+          "type": "join",
+          "at": "2026-09-09T08:19:48.431Z",
+          "status": 200,
+          "state": "WAITING",
+          "latencyMs": 774,
+          "cookieSet": false,
+          "error": null
+        },
+        {
+          "type": "state",
+          "at": "2026-09-09T08:20:09.288Z",
+          "from": "WAITING",
+          "to": "ADMITTED",
+          "status": 200,
+          "latencyMs": 170
+        },
+        {
+          "type": "relinquish",
+          "at": "2026-09-09T08:20:18.564Z",
+          "mode": "EXPLICIT",
+          "status": 204,
+          "latencyMs": 114,
+          "error": null
+        }
+      ]
+    },
+    {
+      "index": 82,
+      "userId": "6692aa7f-003d-4dc8-8aa8-ba7d9d9c5293",
+      "ticketId": "08014d94-b7a2-40a5-8c8e-3de6c336a63f",
+      "finalState": "CLOSED",
+      "waitTimeMs": 21631,
+      "admittedAt": "2026-09-09T08:20:09.288Z",
+      "joinedAt": "2026-09-09T08:19:47.657Z",
+      "admissionWave": 6,
+      "relinquishedAt": "2026-09-09T08:20:18.564Z",
+      "outcome": "RELINQUISHED",
+      "confirmation": null,
+      "events": [
+        {
+          "type": "join",
+          "at": "2026-09-09T08:19:48.434Z",
+          "status": 200,
+          "state": "WAITING",
+          "latencyMs": 777,
+          "cookieSet": false,
+          "error": null
+        },
+        {
+          "type": "state",
+          "at": "2026-09-09T08:20:09.288Z",
+          "from": "WAITING",
+          "to": "ADMITTED",
+          "status": 200,
+          "latencyMs": 170
+        },
+        {
+          "type": "relinquish",
+          "at": "2026-09-09T08:20:18.564Z",
+          "mode": "EXPLICIT",
+          "status": 204,
+          "latencyMs": 114,
+          "error": null
+        }
+      ]
+    },
+    {
+      "index": 83,
+      "userId": "f9f25fad-0162-4301-bb24-3d040b3a4aa8",
+      "ticketId": "5c796876-09ac-48c8-b3ea-7d746551c0d6",
+      "finalState": "CLOSED",
+      "waitTimeMs": 21632,
+      "admittedAt": "2026-09-09T08:20:09.289Z",
+      "joinedAt": "2026-09-09T08:19:47.657Z",
+      "admissionWave": 6,
+      "relinquishedAt": "2026-09-09T08:20:18.564Z",
+      "outcome": "RELINQUISHED",
+      "confirmation": null,
+      "events": [
+        {
+          "type": "join",
+          "at": "2026-09-09T08:19:48.435Z",
+          "status": 200,
+          "state": "WAITING",
+          "latencyMs": 778,
+          "cookieSet": false,
+          "error": null
+        },
+        {
+          "type": "state",
+          "at": "2026-09-09T08:20:09.289Z",
+          "from": "WAITING",
+          "to": "ADMITTED",
+          "status": 200,
+          "latencyMs": 171
+        },
+        {
+          "type": "relinquish",
+          "at": "2026-09-09T08:20:18.564Z",
+          "mode": "EXPLICIT",
+          "status": 204,
+          "latencyMs": 113,
+          "error": null
+        }
+      ]
+    },
+    {
+      "index": 84,
+      "userId": "3f32efc1-1b8a-4683-b3a0-7b6607baf449",
+      "ticketId": "980ca3e6-faa9-42fb-b6c9-4946443b5824",
+      "finalState": "CLOSED",
+      "waitTimeMs": 24091,
+      "admittedAt": "2026-09-09T08:20:11.748Z",
+      "joinedAt": "2026-09-09T08:19:47.657Z",
+      "admissionWave": 7,
+      "relinquishedAt": "2026-09-09T08:20:18.564Z",
+      "outcome": "RELINQUISHED",
+      "confirmation": null,
+      "events": [
+        {
+          "type": "join",
+          "at": "2026-09-09T08:19:48.432Z",
+          "status": 200,
+          "state": "WAITING",
+          "latencyMs": 775,
+          "cookieSet": false,
+          "error": null
+        },
+        {
+          "type": "state",
+          "at": "2026-09-09T08:20:11.748Z",
+          "from": "WAITING",
+          "to": "ADMITTED",
+          "status": 200,
+          "latencyMs": 130
+        },
+        {
+          "type": "relinquish",
+          "at": "2026-09-09T08:20:18.564Z",
+          "mode": "EXPLICIT",
+          "status": 204,
+          "latencyMs": 113,
+          "error": null
+        }
+      ]
+    },
+    {
+      "index": 85,
+      "userId": "3c19f069-4e3e-4c42-ad98-08cc75c5e36d",
+      "ticketId": "f5a05da2-f16d-47bb-9f65-9acde4894a0c",
+      "finalState": "CLOSED",
+      "waitTimeMs": 24091,
+      "admittedAt": "2026-09-09T08:20:11.749Z",
+      "joinedAt": "2026-09-09T08:19:47.658Z",
+      "admissionWave": 7,
+      "relinquishedAt": "2026-09-09T08:20:18.564Z",
+      "outcome": "RELINQUISHED",
+      "confirmation": null,
+      "events": [
+        {
+          "type": "join",
+          "at": "2026-09-09T08:19:48.432Z",
+          "status": 200,
+          "state": "WAITING",
+          "latencyMs": 774,
+          "cookieSet": false,
+          "error": null
+        },
+        {
+          "type": "state",
+          "at": "2026-09-09T08:20:11.749Z",
+          "from": "WAITING",
+          "to": "ADMITTED",
+          "status": 200,
+          "latencyMs": 131
+        },
+        {
+          "type": "relinquish",
+          "at": "2026-09-09T08:20:18.564Z",
+          "mode": "EXPLICIT",
+          "status": 204,
+          "latencyMs": 113,
+          "error": null
+        }
+      ]
+    },
+    {
+      "index": 86,
+      "userId": "4401caf6-b14d-4795-9a43-02524e039c9e",
+      "ticketId": "c377182d-1614-4e03-ac9a-8ae6d9308d10",
+      "finalState": "CLOSED",
+      "waitTimeMs": 24091,
+      "admittedAt": "2026-09-09T08:20:11.749Z",
+      "joinedAt": "2026-09-09T08:19:47.658Z",
+      "admissionWave": 7,
+      "relinquishedAt": "2026-09-09T08:20:18.564Z",
+      "outcome": "RELINQUISHED",
+      "confirmation": null,
+      "events": [
+        {
+          "type": "join",
+          "at": "2026-09-09T08:19:48.435Z",
+          "status": 200,
+          "state": "WAITING",
+          "latencyMs": 777,
+          "cookieSet": false,
+          "error": null
+        },
+        {
+          "type": "state",
+          "at": "2026-09-09T08:20:11.749Z",
+          "from": "WAITING",
+          "to": "ADMITTED",
+          "status": 200,
+          "latencyMs": 131
+        },
+        {
+          "type": "relinquish",
+          "at": "2026-09-09T08:20:18.564Z",
+          "mode": "EXPLICIT",
+          "status": 204,
+          "latencyMs": 113,
+          "error": null
+        }
+      ]
+    },
+    {
+      "index": 87,
+      "userId": "d9567aba-62d6-4cb2-b4fd-f056f161779b",
+      "ticketId": "e6aca28c-93c8-43e4-974d-67c9150b5e04",
+      "finalState": "CLOSED",
+      "waitTimeMs": 24091,
+      "admittedAt": "2026-09-09T08:20:11.749Z",
+      "joinedAt": "2026-09-09T08:19:47.658Z",
+      "admissionWave": 7,
+      "relinquishedAt": "2026-09-09T08:20:18.564Z",
+      "outcome": "RELINQUISHED",
+      "confirmation": null,
+      "events": [
+        {
+          "type": "join",
+          "at": "2026-09-09T08:19:48.432Z",
+          "status": 200,
+          "state": "WAITING",
+          "latencyMs": 774,
+          "cookieSet": false,
+          "error": null
+        },
+        {
+          "type": "state",
+          "at": "2026-09-09T08:20:11.749Z",
+          "from": "WAITING",
+          "to": "ADMITTED",
+          "status": 200,
+          "latencyMs": 131
+        },
+        {
+          "type": "relinquish",
+          "at": "2026-09-09T08:20:18.564Z",
+          "mode": "EXPLICIT",
+          "status": 204,
+          "latencyMs": 112,
+          "error": null
+        }
+      ]
+    },
+    {
+      "index": 88,
+      "userId": "b119e23a-69fa-4046-b19e-109e604b345f",
+      "ticketId": "693bb040-be7e-44f6-ad53-0895caa44eae",
+      "finalState": "CLOSED",
+      "waitTimeMs": 21633,
+      "admittedAt": "2026-09-09T08:20:09.291Z",
+      "joinedAt": "2026-09-09T08:19:47.658Z",
+      "admissionWave": 6,
+      "relinquishedAt": "2026-09-09T08:20:18.565Z",
+      "outcome": "RELINQUISHED",
+      "confirmation": null,
+      "events": [
+        {
+          "type": "join",
+          "at": "2026-09-09T08:19:48.435Z",
+          "status": 200,
+          "state": "WAITING",
+          "latencyMs": 777,
+          "cookieSet": false,
+          "error": null
+        },
+        {
+          "type": "state",
+          "at": "2026-09-09T08:20:09.291Z",
+          "from": "WAITING",
+          "to": "ADMITTED",
+          "status": 200,
+          "latencyMs": 170
+        },
+        {
+          "type": "relinquish",
+          "at": "2026-09-09T08:20:18.565Z",
+          "mode": "EXPLICIT",
+          "status": 204,
+          "latencyMs": 110,
+          "error": null
+        }
+      ]
+    },
+    {
+      "index": 89,
+      "userId": "0c3942bb-c5d8-4cfa-8ed9-abb75463edb6",
+      "ticketId": "690bc92f-deb7-4fc2-9c9a-b65cd6699a7d",
+      "finalState": "CLOSED",
+      "waitTimeMs": 24092,
+      "admittedAt": "2026-09-09T08:20:11.750Z",
+      "joinedAt": "2026-09-09T08:19:47.658Z",
+      "admissionWave": 7,
+      "relinquishedAt": "2026-09-09T08:20:18.565Z",
+      "outcome": "RELINQUISHED",
+      "confirmation": {
+        "phase": "final-confirmation",
+        "status": 409,
+        "latencyMs": 111,
+        "code": "CHECKOUT_NOT_READY"
+      },
+      "events": [
+        {
+          "type": "join",
+          "at": "2026-09-09T08:19:48.436Z",
+          "status": 200,
+          "state": "WAITING",
+          "latencyMs": 778,
+          "cookieSet": false,
+          "error": null
+        },
+        {
+          "type": "state",
+          "at": "2026-09-09T08:20:11.750Z",
+          "from": "WAITING",
+          "to": "ADMITTED",
+          "status": 200,
+          "latencyMs": 130
+        },
+        {
+          "type": "preview",
+          "at": "2026-09-09T08:20:14.418Z",
+          "status": 200,
+          "latencyMs": 166,
+          "error": null
+        },
+        {
+          "type": "confirm",
+          "at": "2026-09-09T08:20:14.539Z",
+          "phase": "final-confirmation",
+          "status": 409,
+          "latencyMs": 111,
+          "code": "CHECKOUT_NOT_READY",
+          "error": null
+        },
+        {
+          "type": "relinquish",
+          "at": "2026-09-09T08:20:18.565Z",
+          "mode": "EXPLICIT",
+          "status": 204,
+          "latencyMs": 110,
+          "error": null
+        }
+      ]
+    },
+    {
+      "index": 90,
+      "userId": "a46b2ab4-899d-4b3d-a124-0a7d401b21e9",
+      "ticketId": "34e4eb07-25b6-4432-b19a-a5834ed9729b",
+      "finalState": "CLOSED",
+      "waitTimeMs": 24092,
+      "admittedAt": "2026-09-09T08:20:11.750Z",
+      "joinedAt": "2026-09-09T08:19:47.658Z",
+      "admissionWave": 7,
+      "relinquishedAt": null,
+      "outcome": "ORDER_CREATED",
+      "confirmation": {
+        "phase": "final-confirmation",
+        "status": 201,
+        "latencyMs": 1602,
+        "code": null
+      },
+      "events": [
+        {
+          "type": "join",
+          "at": "2026-09-09T08:19:48.436Z",
+          "status": 200,
+          "state": "WAITING",
+          "latencyMs": 778,
+          "cookieSet": false,
+          "error": null
+        },
+        {
+          "type": "state",
+          "at": "2026-09-09T08:20:11.750Z",
+          "from": "WAITING",
+          "to": "ADMITTED",
+          "status": 200,
+          "latencyMs": 131
+        },
+        {
+          "type": "preview",
+          "at": "2026-09-09T08:20:14.417Z",
+          "status": 200,
+          "latencyMs": 165,
+          "error": null
+        },
+        {
+          "type": "confirm",
+          "at": "2026-09-09T08:20:16.333Z",
+          "phase": "final-confirmation",
+          "status": 429,
+          "latencyMs": 1904,
+          "code": "FLASH_SALE_BUSY",
+          "error": null
+        },
+        {
+          "type": "confirm",
+          "at": "2026-09-09T08:20:18.331Z",
+          "phase": "final-confirmation",
+          "status": 201,
+          "latencyMs": 1602,
+          "code": null,
+          "error": null
+        }
+      ]
+    },
+    {
+      "index": 91,
+      "userId": "47a3ea12-f907-4a52-aef1-56c7c4e57cdf",
+      "ticketId": "43660600-502c-4c00-a18a-30d59ff248c3",
+      "finalState": "CLOSED",
+      "waitTimeMs": 26433,
+      "admittedAt": "2026-09-09T08:20:14.092Z",
+      "joinedAt": "2026-09-09T08:19:47.659Z",
+      "admissionWave": 8,
+      "relinquishedAt": null,
+      "outcome": "ORDER_CREATED",
+      "confirmation": {
+        "phase": "final-confirmation",
+        "status": 201,
+        "latencyMs": 1924,
+        "code": null
+      },
+      "events": [
+        {
+          "type": "join",
+          "at": "2026-09-09T08:19:48.436Z",
+          "status": 200,
+          "state": "WAITING",
+          "latencyMs": 777,
+          "cookieSet": false,
+          "error": null
+        },
+        {
+          "type": "state",
+          "at": "2026-09-09T08:20:14.092Z",
+          "from": "WAITING",
+          "to": "ADMITTED",
+          "status": 200,
+          "latencyMs": 102
+        },
+        {
+          "type": "preview",
+          "at": "2026-09-09T08:20:14.416Z",
+          "status": 200,
+          "latencyMs": 165,
+          "error": null
+        },
+        {
+          "type": "confirm",
+          "at": "2026-09-09T08:20:16.351Z",
+          "phase": "final-confirmation",
+          "status": 201,
+          "latencyMs": 1924,
+          "code": null,
+          "error": null
+        }
+      ]
+    },
+    {
+      "index": 92,
+      "userId": "3d63f016-162a-4fb8-949b-edaadd718726",
+      "ticketId": "95924835-515a-4409-9f1f-2ae685f7a878",
+      "finalState": "CLOSED",
+      "waitTimeMs": 24091,
+      "admittedAt": "2026-09-09T08:20:11.750Z",
+      "joinedAt": "2026-09-09T08:19:47.659Z",
+      "admissionWave": 7,
+      "relinquishedAt": "2026-09-09T08:20:18.565Z",
+      "outcome": "RELINQUISHED",
+      "confirmation": null,
+      "events": [
+        {
+          "type": "join",
+          "at": "2026-09-09T08:19:48.437Z",
+          "status": 200,
+          "state": "WAITING",
+          "latencyMs": 778,
+          "cookieSet": false,
+          "error": null
+        },
+        {
+          "type": "state",
+          "at": "2026-09-09T08:20:11.750Z",
+          "from": "WAITING",
+          "to": "ADMITTED",
+          "status": 200,
+          "latencyMs": 130
+        },
+        {
+          "type": "relinquish",
+          "at": "2026-09-09T08:20:18.565Z",
+          "mode": "EXPLICIT",
+          "status": 204,
+          "latencyMs": 110,
+          "error": null
+        }
+      ]
+    },
+    {
+      "index": 93,
+      "userId": "6339b216-90c3-4e38-9cb2-732876bd8116",
+      "ticketId": "5feb6254-9293-4df6-a835-cc6ac51db0d9",
+      "finalState": "CLOSED",
+      "waitTimeMs": 26433,
+      "admittedAt": "2026-09-09T08:20:14.092Z",
+      "joinedAt": "2026-09-09T08:19:47.659Z",
+      "admissionWave": 8,
+      "relinquishedAt": null,
+      "outcome": "ORDER_CREATED",
+      "confirmation": {
+        "phase": "final-confirmation",
+        "status": 201,
+        "latencyMs": 1589,
+        "code": null
+      },
+      "events": [
+        {
+          "type": "join",
+          "at": "2026-09-09T08:19:48.437Z",
+          "status": 200,
+          "state": "WAITING",
+          "latencyMs": 778,
+          "cookieSet": false,
+          "error": null
+        },
+        {
+          "type": "state",
+          "at": "2026-09-09T08:20:14.092Z",
+          "from": "WAITING",
+          "to": "ADMITTED",
+          "status": 200,
+          "latencyMs": 102
+        },
+        {
+          "type": "preview",
+          "at": "2026-09-09T08:20:14.416Z",
+          "status": 200,
+          "latencyMs": 165,
+          "error": null
+        },
+        {
+          "type": "confirm",
+          "at": "2026-09-09T08:20:16.017Z",
+          "phase": "final-confirmation",
+          "status": 201,
+          "latencyMs": 1589,
+          "code": null,
+          "error": null
+        }
+      ]
+    },
+    {
+      "index": 94,
+      "userId": "7d8a0eb3-80a2-4e80-aa31-200092324a23",
+      "ticketId": "dc83f45a-af97-4fc0-a518-b2657886f0ab",
+      "finalState": "CLOSED",
+      "waitTimeMs": 26433,
+      "admittedAt": "2026-09-09T08:20:14.092Z",
+      "joinedAt": "2026-09-09T08:19:47.659Z",
+      "admissionWave": 8,
+      "relinquishedAt": "2026-09-09T08:20:18.565Z",
+      "outcome": "RELINQUISHED",
+      "confirmation": {
+        "phase": "final-confirmation",
+        "status": 409,
+        "latencyMs": 110,
+        "code": "CHECKOUT_NOT_READY"
+      },
+      "events": [
+        {
+          "type": "join",
+          "at": "2026-09-09T08:19:48.437Z",
+          "status": 200,
+          "state": "WAITING",
+          "latencyMs": 778,
+          "cookieSet": false,
+          "error": null
+        },
+        {
+          "type": "state",
+          "at": "2026-09-09T08:20:14.092Z",
+          "from": "WAITING",
+          "to": "ADMITTED",
+          "status": 200,
+          "latencyMs": 102
+        },
+        {
+          "type": "preview",
+          "at": "2026-09-09T08:20:14.415Z",
+          "status": 200,
+          "latencyMs": 164,
+          "error": null
+        },
+        {
+          "type": "confirm",
+          "at": "2026-09-09T08:20:14.538Z",
+          "phase": "final-confirmation",
+          "status": 409,
+          "latencyMs": 110,
+          "code": "CHECKOUT_NOT_READY",
+          "error": null
+        },
+        {
+          "type": "relinquish",
+          "at": "2026-09-09T08:20:18.565Z",
+          "mode": "EXPLICIT",
+          "status": 204,
+          "latencyMs": 110,
+          "error": null
+        }
+      ]
+    },
+    {
+      "index": 95,
+      "userId": "a1b0e960-3443-46f1-87c6-ae4ff6435540",
+      "ticketId": "589fd793-e099-4422-bb62-2b9555f8cad2",
+      "finalState": "CLOSED",
+      "waitTimeMs": 24092,
+      "admittedAt": "2026-09-09T08:20:11.751Z",
+      "joinedAt": "2026-09-09T08:19:47.659Z",
+      "admissionWave": 7,
+      "relinquishedAt": "2026-09-09T08:20:18.565Z",
+      "outcome": "RELINQUISHED",
+      "confirmation": {
+        "phase": "final-confirmation",
+        "status": 409,
+        "latencyMs": 110,
+        "code": "CHECKOUT_NOT_READY"
+      },
+      "events": [
+        {
+          "type": "join",
+          "at": "2026-09-09T08:19:48.436Z",
+          "status": 200,
+          "state": "WAITING",
+          "latencyMs": 777,
+          "cookieSet": false,
+          "error": null
+        },
+        {
+          "type": "state",
+          "at": "2026-09-09T08:20:11.751Z",
+          "from": "WAITING",
+          "to": "ADMITTED",
+          "status": 200,
+          "latencyMs": 131
+        },
+        {
+          "type": "preview",
+          "at": "2026-09-09T08:20:14.417Z",
+          "status": 200,
+          "latencyMs": 165,
+          "error": null
+        },
+        {
+          "type": "confirm",
+          "at": "2026-09-09T08:20:14.538Z",
+          "phase": "final-confirmation",
+          "status": 409,
+          "latencyMs": 110,
+          "code": "CHECKOUT_NOT_READY",
+          "error": null
+        },
+        {
+          "type": "relinquish",
+          "at": "2026-09-09T08:20:18.565Z",
+          "mode": "EXPLICIT",
+          "status": 204,
+          "latencyMs": 110,
+          "error": null
+        }
+      ]
+    },
+    {
+      "index": 96,
+      "userId": "4cc40b5d-25d9-4165-a6d5-8cf18b0b0166",
+      "ticketId": "4b8134b2-630b-4b5a-87c1-1de135407cd5",
+      "finalState": "CLOSED",
+      "waitTimeMs": 26434,
+      "admittedAt": "2026-09-09T08:20:14.093Z",
+      "joinedAt": "2026-09-09T08:19:47.659Z",
+      "admissionWave": 8,
+      "relinquishedAt": null,
+      "outcome": "ORDER_CREATED",
+      "confirmation": {
+        "phase": "final-confirmation",
+        "status": 201,
+        "latencyMs": 1441,
+        "code": null
+      },
+      "events": [
+        {
+          "type": "join",
+          "at": "2026-09-09T08:19:48.437Z",
+          "status": 200,
+          "state": "WAITING",
+          "latencyMs": 778,
+          "cookieSet": false,
+          "error": null
+        },
+        {
+          "type": "state",
+          "at": "2026-09-09T08:20:14.093Z",
+          "from": "WAITING",
+          "to": "ADMITTED",
+          "status": 200,
+          "latencyMs": 102
+        },
+        {
+          "type": "preview",
+          "at": "2026-09-09T08:20:14.426Z",
+          "status": 200,
+          "latencyMs": 176,
+          "error": null
+        },
+        {
+          "type": "confirm",
+          "at": "2026-09-09T08:20:16.333Z",
+          "phase": "final-confirmation",
+          "status": 429,
+          "latencyMs": 1906,
+          "code": "FLASH_SALE_BUSY",
+          "error": null
+        },
+        {
+          "type": "confirm",
+          "at": "2026-09-09T08:20:18.169Z",
+          "phase": "final-confirmation",
+          "status": 201,
+          "latencyMs": 1441,
+          "code": null,
+          "error": null
+        }
+      ]
+    },
+    {
+      "index": 97,
+      "userId": "2d866f47-a2ef-4632-96aa-9df8c7470403",
+      "ticketId": "f81cb1cf-038e-4e76-8f8f-79e2a657a277",
+      "finalState": "CLOSED",
+      "waitTimeMs": 24093,
+      "admittedAt": "2026-09-09T08:20:11.752Z",
+      "joinedAt": "2026-09-09T08:19:47.659Z",
+      "admissionWave": 7,
+      "relinquishedAt": "2026-09-09T08:20:18.565Z",
+      "outcome": "RELINQUISHED",
+      "confirmation": {
+        "phase": "final-confirmation",
+        "status": 409,
+        "latencyMs": 111,
+        "code": "CHECKOUT_NOT_READY"
+      },
+      "events": [
+        {
+          "type": "join",
+          "at": "2026-09-09T08:19:48.431Z",
+          "status": 200,
+          "state": "WAITING",
+          "latencyMs": 772,
+          "cookieSet": false,
+          "error": null
+        },
+        {
+          "type": "state",
+          "at": "2026-09-09T08:20:11.752Z",
+          "from": "WAITING",
+          "to": "ADMITTED",
+          "status": 200,
+          "latencyMs": 132
+        },
+        {
+          "type": "preview",
+          "at": "2026-09-09T08:20:14.427Z",
+          "status": 200,
+          "latencyMs": 176,
+          "error": null
+        },
+        {
+          "type": "confirm",
+          "at": "2026-09-09T08:20:14.539Z",
+          "phase": "final-confirmation",
+          "status": 409,
+          "latencyMs": 111,
+          "code": "CHECKOUT_NOT_READY",
+          "error": null
+        },
+        {
+          "type": "relinquish",
+          "at": "2026-09-09T08:20:18.565Z",
+          "mode": "EXPLICIT",
+          "status": 204,
+          "latencyMs": 109,
+          "error": null
+        }
+      ]
+    },
+    {
+      "index": 98,
+      "userId": "db7690df-91da-4e75-9c25-cbe2f155f5db",
+      "ticketId": "fff1de57-db2e-43c9-bf47-fe938fed0621",
+      "finalState": "CLOSED",
+      "waitTimeMs": 24093,
+      "admittedAt": "2026-09-09T08:20:11.752Z",
+      "joinedAt": "2026-09-09T08:19:47.659Z",
+      "admissionWave": 7,
+      "relinquishedAt": null,
+      "outcome": "ORDER_CREATED",
+      "confirmation": {
+        "phase": "final-confirmation",
+        "status": 201,
+        "latencyMs": 1751,
+        "code": null
+      },
+      "events": [
+        {
+          "type": "join",
+          "at": "2026-09-09T08:19:48.436Z",
+          "status": 200,
+          "state": "WAITING",
+          "latencyMs": 777,
+          "cookieSet": false,
+          "error": null
+        },
+        {
+          "type": "state",
+          "at": "2026-09-09T08:20:11.752Z",
+          "from": "WAITING",
+          "to": "ADMITTED",
+          "status": 200,
+          "latencyMs": 132
+        },
+        {
+          "type": "preview",
+          "at": "2026-09-09T08:20:14.427Z",
+          "status": 200,
+          "latencyMs": 175,
+          "error": null
+        },
+        {
+          "type": "confirm",
+          "at": "2026-09-09T08:20:16.179Z",
+          "phase": "final-confirmation",
+          "status": 201,
+          "latencyMs": 1751,
+          "code": null,
+          "error": null
+        }
+      ]
+    },
+    {
+      "index": 99,
+      "userId": "fd63cc94-a756-450c-9574-e0fd23618e5c",
+      "ticketId": "decf0f10-972b-4220-a1b9-a454baf6441e",
+      "finalState": "CLOSED",
+      "waitTimeMs": 26434,
+      "admittedAt": "2026-09-09T08:20:14.093Z",
+      "joinedAt": "2026-09-09T08:19:47.659Z",
+      "admissionWave": 8,
+      "relinquishedAt": "2026-09-09T08:20:18.565Z",
+      "outcome": "RELINQUISHED",
+      "confirmation": {
+        "phase": "final-confirmation",
+        "status": 409,
+        "latencyMs": 111,
+        "code": "CHECKOUT_NOT_READY"
+      },
+      "events": [
+        {
+          "type": "join",
+          "at": "2026-09-09T08:19:48.437Z",
+          "status": 200,
+          "state": "WAITING",
+          "latencyMs": 778,
+          "cookieSet": false,
+          "error": null
+        },
+        {
+          "type": "state",
+          "at": "2026-09-09T08:20:14.093Z",
+          "from": "WAITING",
+          "to": "ADMITTED",
+          "status": 200,
+          "latencyMs": 102
+        },
+        {
+          "type": "preview",
+          "at": "2026-09-09T08:20:14.416Z",
+          "status": 200,
+          "latencyMs": 165,
+          "error": null
+        },
+        {
+          "type": "confirm",
+          "at": "2026-09-09T08:20:14.538Z",
+          "phase": "final-confirmation",
+          "status": 409,
+          "latencyMs": 111,
+          "code": "CHECKOUT_NOT_READY",
+          "error": null
+        },
+        {
+          "type": "relinquish",
+          "at": "2026-09-09T08:20:18.565Z",
+          "mode": "EXPLICIT",
+          "status": 204,
+          "latencyMs": 109,
+          "error": null
+        }
+      ]
+    }
+  ],
+  "preflightSnapshot": {
+    "capturedAt": "2026-09-09T08:19:47.639Z",
+    "postgres": {
+      "available": true,
+      "sku": {
+        "id": "00000000-0000-4000-8000-000000000941",
+        "campaignId": "00000000-0000-4000-8000-000000000914",
+        "variantId": "cbc97eff-fe53-580a-a0fa-5e336366728b",
+        "allocatedQuantity": 10,
+        "remainingQuantity": 10,
+        "netConsumedQuantity": 0,
+        "version": 34
+      },
+      "globalClaims": 16,
+      "globalActiveConsumptions": 0,
+      "globalOrders": 16,
+      "runClaims": null,
+      "runActiveConsumptions": null,
+      "runOrders": null
+    },
+    "redis": {
+      "available": true,
+      "activeLeases": 0,
+      "pendingReleases": 0,
+      "confirmationSlotsAvailable": null,
+      "skuRemainingAdmission": null
+    }
+  },
+  "initialSnapshot": {
+    "capturedAt": "2026-09-09T08:19:54.059Z",
+    "postgres": {
+      "available": true,
+      "sku": {
+        "id": "00000000-0000-4000-8000-000000000941",
+        "campaignId": "00000000-0000-4000-8000-000000000914",
+        "variantId": "cbc97eff-fe53-580a-a0fa-5e336366728b",
+        "allocatedQuantity": 10,
+        "remainingQuantity": 10,
+        "netConsumedQuantity": 0,
+        "version": 34
+      },
+      "globalClaims": 16,
+      "globalActiveConsumptions": 0,
+      "globalOrders": 16,
+      "runClaims": 0,
+      "runActiveConsumptions": 0,
+      "runOrders": 0
+    },
+    "redis": {
+      "available": true,
+      "activeLeases": 40,
+      "pendingReleases": 0,
+      "confirmationSlotsAvailable": null,
+      "skuRemainingAdmission": null
+    }
+  },
+  "observed": {
+    "peakActiveLeases": 40,
+    "peakPendingReleases": 0,
+    "minimumConfirmationSlotsAvailable": 0,
+    "peakExecutingConfirmations": 5,
+    "seedSuccessfulOrders": 5,
+    "finalSuccessfulOrders": 5,
+    "finalBusyResponses": 2,
+    "finalConflictResponses": 5,
+    "finalUnsuccessfulBuyers": 5,
+    "finalSoldOutResponses": 0,
+    "relinquishedBuyers": 60,
+    "cleanupReleasedLeases": 30,
+    "duplicateOrders": 0
+  },
+  "finalSnapshot": {
+    "capturedAt": "2026-09-09T08:20:18.711Z",
+    "postgres": {
+      "available": true,
+      "sku": {
+        "id": "00000000-0000-4000-8000-000000000941",
+        "campaignId": "00000000-0000-4000-8000-000000000914",
+        "variantId": "cbc97eff-fe53-580a-a0fa-5e336366728b",
+        "allocatedQuantity": 10,
+        "remainingQuantity": 0,
+        "netConsumedQuantity": 10,
+        "version": 44
+      },
+      "globalClaims": 26,
+      "globalActiveConsumptions": 10,
+      "globalOrders": 26,
+      "runClaims": 10,
+      "runActiveConsumptions": 10,
+      "runOrders": 10
+    },
+    "redis": {
+      "available": true,
+      "activeLeases": 0,
+      "pendingReleases": 0,
+      "confirmationSlotsAvailable": 5,
+      "skuRemainingAdmission": 2
+    }
+  },
+  "finalInvariants": [
+    {
+      "name": "all 100 buyers joined",
+      "pass": true,
+      "observed": 100,
+      "expected": 100,
+      "detail": "The runner sends all joins concurrently."
+    },
+    {
+      "name": "all buyers have unique tickets",
+      "pass": true,
+      "observed": {
+        "present": 100,
+        "unique": 100
+      },
+      "expected": {
+        "present": 100,
+        "unique": 100
+      },
+      "detail": "Distinct join keys and Redis buyer/gate deduplication must not collapse distinct buyers."
+    },
+    {
+      "name": "admission pool reaches configured 40",
+      "pass": true,
+      "observed": 40,
+      "expected": 40,
+      "detail": "A lower value usually means the API was not started with the requested pool configuration."
+    },
+    {
+      "name": "relinquishment waves release 60 buyers",
+      "pass": true,
+      "observed": 60,
+      "expected": 60,
+      "detail": "Explicit relinquishment is immediate and idempotent."
+    },
+    {
+      "name": "all 100 buyers eventually receive admission",
+      "pass": true,
+      "observed": 100,
+      "expected": 100,
+      "detail": "A released lease must be granted to a waiting buyer without waiting for a new checkout request."
+    },
+    {
+      "name": "cleanup leaves no active admission lease",
+      "pass": true,
+      "observed": 0,
+      "expected": 0,
+      "detail": "The harness cleans up remaining leases after the final wave."
+    },
+    {
+      "name": "cleanup releases every non-purchasing active lease",
+      "pass": true,
+      "observed": 30,
+      "expected": 30,
+      "detail": "Every admitted buyer ends through purchase, explicit wave release, or harness cleanup."
+    },
+    {
+      "name": "seed phase creates 5 successful orders",
+      "pass": true,
+      "observed": 5,
+      "expected": 5,
+      "detail": "The seed phase leaves exactly five quota units for the final contention wave."
+    },
+    {
+      "name": "final wave has 5 successful orders",
+      "pass": true,
+      "observed": 5,
+      "expected": 5,
+      "detail": "Requires a SKU with five quota units remaining before the final wave."
+    },
+    {
+      "name": "final contention leaves exactly 5 buyers without an order",
+      "pass": true,
+      "observed": 5,
+      "expected": 5,
+      "detail": "Busy responses may retry; terminal conflicts remain non-purchasing contenders."
+    },
+    {
+      "name": "final contention observes bounded backpressure",
+      "pass": true,
+      "observed": 2,
+      "expected": ">0",
+      "detail": "At least one concurrent request receives 429 and retries with the same order key."
+    },
+    {
+      "name": "confirmation execution peak reaches exactly 5",
+      "pass": true,
+      "observed": 5,
+      "expected": 5,
+      "detail": "Redis slot sampling runs while the concurrent confirmations are in flight."
+    },
+    {
+      "name": "database remaining quota matches successful orders",
+      "pass": true,
+      "observed": 0,
+      "expected": 0,
+      "detail": "No external buyer or seller mutation may occur during the run."
+    },
+    {
+      "name": "database quota is nonnegative and bounded",
+      "pass": true,
+      "observed": 0,
+      "expected": "0..10",
+      "detail": "DB invariant."
+    },
+    {
+      "name": "database net consumption matches active consumption",
+      "pass": true,
+      "observed": 10,
+      "expected": 10,
+      "detail": "Global DB consumption delta equals non-reversed consumption created by this run."
+    },
+    {
+      "name": "run-scoped orders match successful confirmations",
+      "pass": true,
+      "observed": 10,
+      "expected": 10,
+      "detail": "Counts only orders belonging to the 100 fixture buyers."
+    },
+    {
+      "name": "no duplicate orders are created",
+      "pass": true,
+      "observed": 0,
+      "expected": 0,
+      "detail": "Run-scoped durable orders equal successful API confirmations."
+    }
+  ],
+  "failureAnalysis": []
+}

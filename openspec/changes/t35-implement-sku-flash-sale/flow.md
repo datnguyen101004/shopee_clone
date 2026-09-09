@@ -18,10 +18,18 @@
    Redis atomic admission tối đa 5 confirmation đồng thời trước transaction
    Serializable, rồi trong cùng transaction ghi order, inventory
    reservation/consumption, voucher, claim buyer-product và quota.
-5. Một buyer chỉ có một claim cho `(campaign, product)`. Vì vậy hai sibling SKU
+5. Buyer có thể bấm rời lượt khi ADMITTED: nếu chưa confirmation đang chạy,
+   lease được trả ngay; page-leave chỉ tạo pending release sau grace 5–10 giây.
+   Refresh hoặc tab cùng session gửi heartbeat khớp ticket/lease để hủy pending,
+   không gia hạn deadline 300 giây. Tab hidden, preview và checkout failure không
+   tự release; relinquish trong lúc confirmation chạy chờ kết quả chắc chắn.
+   Mỗi giây expiry reaper đối soát deadline Redis; nếu thu hồi ít nhất một lease
+   thì gọi `grantWaiting()` ngay. SQS redelivery chỉ hỗ trợ retry, kể cả khi tắt
+   SQS thì waiting room vẫn tiến khi capacity hết hạn được trả về.
+6. Một buyer chỉ có một claim cho `(campaign, product)`. Vì vậy hai sibling SKU
    của cùng product không thể tạo hai claim. Claim vẫn tồn tại sau hủy; quota
    được hoàn lại nếu campaign/SKU còn live, còn sau end thì unit về kho thường.
-6. Seller reject và buyer cancel dùng compensation marker để physical inventory
+7. Seller reject và buyer cancel dùng compensation marker để physical inventory
    chỉ hoàn một lần. Outbox snapshot mang `stateVersion` và `managementEpoch`;
    mutation cũng xoá public cache để request kế tiếp revalidate.
 

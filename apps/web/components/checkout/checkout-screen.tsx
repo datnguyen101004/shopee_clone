@@ -4,7 +4,7 @@ import { CHECKOUT_NOTE_MAX_LENGTH, SHIPPING_SERVICES } from '@shopee-clone/contr
 import { StorefrontContainer } from '@shopee-clone/ui';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import {
   CheckoutApiError,
@@ -23,7 +23,9 @@ import { CheckoutWaitingRoom } from './checkout-waiting-room';
 import type { CheckoutAdmissionState } from '../../lib/flash-sale-types';
 import {
   fetchCheckoutTicketStatus,
+  heartbeatCheckoutLease,
   leaveCheckoutQueue,
+  relinquishCheckoutLease,
   requestCheckoutTicket,
 } from '../../lib/flash-sale-api';
 
@@ -37,32 +39,114 @@ function money(value: number): string {
   return `${new Intl.NumberFormat('vi-VN').format(value)}₫`;
 }
 
+type WaitingRoomSnapshot = {
+  active: boolean;
+  ticketId: string;
+  status: CheckoutAdmissionState;
+  retryAfterSeconds: number;
+  leaseExpiresAt?: string | null;
+  message?: string;
+};
+
+const ADMISSION_KEY_STORAGE = 'checkout:admission:join-key';
+const ADMISSION_TICKET_STORAGE = 'checkout:admission:ticket-id';
+const ADMISSION_BROWSER_STORAGE = 'checkout:admission:browser-instance';
+
+function browserUuid(): string {
+  return typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+    ? crypto.randomUUID()
+    : `00000000-0000-4000-8000-${Math.floor(Math.random() * 0xffffffff)
+        .toString(16)
+        .padStart(12, '0')}`;
+}
+
+function readSessionValue(key: string): string | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    return window.sessionStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+function writeSessionValue(key: string, value: string): void {
+  try {
+    window.sessionStorage.setItem(key, value);
+  } catch {
+    // Session storage is a convenience for refresh-safe coordination only.
+  }
+}
+
+function clearAdmissionSession(): void {
+  try {
+    window.sessionStorage.removeItem(ADMISSION_KEY_STORAGE);
+    window.sessionStorage.removeItem(ADMISSION_TICKET_STORAGE);
+  } catch {
+    // Ignore storage restrictions; the server remains authoritative.
+  }
+}
+
 export function CheckoutScreen() {
   const auth = useAuthSession();
   const cart = useCart();
   const router = useRouter();
   const currentCart = cart.state.cart;
   const intent = useRef(new CheckoutSubmitIntent());
-  const admissionKey = useRef(crypto.randomUUID());
+  const admissionKey = useRef(readSessionValue(ADMISSION_KEY_STORAGE) ?? browserUuid());
+  const browserInstanceId = useRef(readSessionValue(ADMISSION_BROWSER_STORAGE) ?? browserUuid());
+  const restoredTicketId = useRef(readSessionValue(ADMISSION_TICKET_STORAGE));
+  const restoreAttempted = useRef(false);
+  const admissionSnapshot = useRef<WaitingRoomSnapshot | null>(null);
   const submitLock = useRef(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitMessage, setSubmitMessage] = useState('');
   const [addressDialogOpen, setAddressDialogOpen] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<'COD' | 'MOMO' | 'VNPAY'>('COD');
-  const [waitingRoomState, setWaitingRoomState] = useState<{
-    active: boolean;
-    ticketId: string;
-    status: CheckoutAdmissionState;
-    retryAfterSeconds: number;
-    leaseExpiresAt?: string | null;
-    message?: string;
-  } | null>(null);
+  const [waitingRoomState, setWaitingRoomState] = useState<WaitingRoomSnapshot | null>(null);
+
+  useEffect(() => {
+    writeSessionValue(ADMISSION_KEY_STORAGE, admissionKey.current);
+    writeSessionValue(ADMISSION_BROWSER_STORAGE, browserInstanceId.current);
+  }, []);
+
+  const updateAdmissionSnapshot = useCallback((next: WaitingRoomSnapshot | null) => {
+    if (next) {
+      admissionSnapshot.current = next;
+      writeSessionValue(ADMISSION_TICKET_STORAGE, next.ticketId);
+    }
+    setWaitingRoomState(next);
+  }, []);
+
+  useEffect(() => {
+    const ticketId = restoredTicketId.current;
+    if (auth.state.status !== 'authenticated' || restoreAttempted.current || !ticketId) return;
+    restoreAttempted.current = true;
+    void fetchCheckoutTicketStatus(auth.authenticatedFetch, ticketId)
+      .then((ticket) => {
+        updateAdmissionSnapshot({
+          active: true,
+          ticketId: ticket.ticketId,
+          status: ticket.status,
+          retryAfterSeconds: ticket.retryAfterSeconds,
+          leaseExpiresAt: ticket.leaseExpiresAt,
+          message: ticket.message,
+        });
+      })
+      .catch(() => {
+        restoredTicketId.current = null;
+        try {
+          window.sessionStorage.removeItem(ADMISSION_TICKET_STORAGE);
+        } catch {
+          // A failed convenience restore must not block the authoritative join flow.
+        }
+      });
+  }, [auth.authenticatedFetch, auth.state.status, updateAdmissionSnapshot]);
 
   const beginAdmission = useCallback(
     (message?: string, retryAfterSeconds = 5) => {
       void requestCheckoutTicket(auth.authenticatedFetch, admissionKey.current)
         .then((ticket) => {
-          setWaitingRoomState({
+          updateAdmissionSnapshot({
             active: true,
             ticketId: ticket.ticketId,
             status: ticket.status,
@@ -75,8 +159,59 @@ export function CheckoutScreen() {
           setSubmitMessage('Không thể vào phòng chờ thanh toán. Vui lòng thử lại.');
         });
     },
-    [auth.authenticatedFetch],
+    [auth.authenticatedFetch, updateAdmissionSnapshot],
   );
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const channel = typeof BroadcastChannel !== 'undefined'
+      ? new BroadcastChannel('sc-admission-checkout')
+      : null;
+    const sendHeartbeat = () => {
+      const snapshot = admissionSnapshot.current;
+      if (!snapshot || snapshot.status !== 'ADMITTED' || !snapshot.leaseExpiresAt) return;
+      if (Date.parse(snapshot.leaseExpiresAt) <= Date.now()) return;
+      void heartbeatCheckoutLease(
+        auth.sessionFetch,
+        snapshot.ticketId,
+        browserInstanceId.current,
+      ).catch(() => undefined);
+    };
+    const onChannelMessage = (event: MessageEvent) => {
+      if (event.data?.type === 'admission-page-leave') sendHeartbeat();
+    };
+    const onVisibility = () => {
+      if (!document.hidden) sendHeartbeat();
+    };
+    const onPageHide = () => {
+      const snapshot = admissionSnapshot.current;
+      if (!snapshot || snapshot.status !== 'ADMITTED' || !snapshot.leaseExpiresAt) return;
+      if (Date.parse(snapshot.leaseExpiresAt) <= Date.now()) return;
+      channel?.postMessage({ type: 'admission-page-leave', ticketId: snapshot.ticketId });
+      void relinquishCheckoutLease(
+        auth.sessionFetch,
+        snapshot.ticketId,
+        browserInstanceId.current,
+        'PAGE_LEAVE',
+      ).catch(() => undefined);
+    };
+    const heartbeatTimer = window.setInterval(sendHeartbeat, 3_000);
+    document.addEventListener('visibilitychange', onVisibility);
+    window.addEventListener('pagehide', onPageHide);
+    channel?.addEventListener('message', onChannelMessage);
+    sendHeartbeat();
+    return () => {
+      // App Router navigation can unmount this screen without firing pagehide.
+      // The grace window makes this safe for refresh/Strict Mode remounts: the
+      // next live instance heartbeat cancels the idempotent pending release.
+      onPageHide();
+      window.clearInterval(heartbeatTimer);
+      document.removeEventListener('visibilitychange', onVisibility);
+      window.removeEventListener('pagehide', onPageHide);
+      channel?.removeEventListener('message', onChannelMessage);
+      channel?.close();
+    };
+  }, [auth.sessionFetch]);
   const checkout = useCheckoutPreview(currentCart, cart.refresh, beginAdmission);
   const preview = checkout.preview;
   const hasFlashSaleLine = Boolean(
@@ -130,28 +265,42 @@ export function CheckoutScreen() {
         message={waitingRoomState.message}
         onPollStatus={async () => {
           const res = await fetchCheckoutTicketStatus(auth.authenticatedFetch, waitingRoomState.ticketId);
-          setWaitingRoomState((prev) =>
-            prev
-              ? {
-                  ...prev,
-                  ticketId: res.ticketId,
-                  status: res.status,
-                  retryAfterSeconds: res.retryAfterSeconds,
-                  leaseExpiresAt: res.leaseExpiresAt,
-                  message: res.message,
-                }
-              : null,
+          updateAdmissionSnapshot(waitingRoomState
+            ? {
+                ...waitingRoomState,
+                ticketId: res.ticketId,
+                status: res.status,
+                retryAfterSeconds: res.retryAfterSeconds,
+                leaseExpiresAt: res.leaseExpiresAt,
+                message: res.message,
+              }
+            : null,
           );
         }}
         onLeaveQueue={async () => {
           await leaveCheckoutQueue(auth.authenticatedFetch, waitingRoomState.ticketId);
+          admissionSnapshot.current = null;
+          clearAdmissionSession();
+          setWaitingRoomState(null);
+          router.push('/cart');
+        }}
+        onLeaveAdmission={async () => {
+          await relinquishCheckoutLease(
+            auth.authenticatedFetch,
+            waitingRoomState.ticketId,
+            browserInstanceId.current,
+            'EXPLICIT',
+          );
+          admissionSnapshot.current = null;
+          clearAdmissionSession();
           setWaitingRoomState(null);
           router.push('/cart');
         }}
         onRejoinQueue={async () => {
-          admissionKey.current = crypto.randomUUID();
+          admissionKey.current = browserUuid();
+          writeSessionValue(ADMISSION_KEY_STORAGE, admissionKey.current);
           const res = await requestCheckoutTicket(auth.authenticatedFetch, admissionKey.current);
-          setWaitingRoomState({
+          updateAdmissionSnapshot({
             active: true,
             ticketId: res.ticketId,
             status: res.status,

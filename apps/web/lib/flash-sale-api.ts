@@ -258,6 +258,39 @@ export async function leaveCheckoutQueue(
   return { success: true };
 }
 
+export type CheckoutLeaseRelinquishMode = 'EXPLICIT' | 'PAGE_LEAVE';
+
+export async function relinquishCheckoutLease(
+  fetcher: AuthenticatedFetcher,
+  ticketId: string,
+  browserInstanceId: string,
+  mode: CheckoutLeaseRelinquishMode = 'EXPLICIT',
+): Promise<void> {
+  const url = new URL('/api/v1/admission/checkout/relinquish', apiBase());
+  const res = await fetcher(url, {
+    method: 'POST',
+    keepalive: mode === 'PAGE_LEAVE',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ticketId, browserInstanceId, mode }),
+  });
+  await handleResponse<void>(res);
+}
+
+export async function heartbeatCheckoutLease(
+  fetcher: AuthenticatedFetcher,
+  ticketId: string,
+  browserInstanceId: string,
+): Promise<void> {
+  const url = new URL('/api/v1/admission/checkout/heartbeat', apiBase());
+  const res = await fetcher(url, {
+    method: 'POST',
+    keepalive: true,
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ticketId, browserInstanceId }),
+  });
+  await handleResponse<void>(res);
+}
+
 export async function lookupCheckoutResult(
   fetcher: AuthenticatedFetcher,
   idempotencyKey: string,

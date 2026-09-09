@@ -143,15 +143,31 @@ The Admission/Queue control plane SHALL use SQS Standard and Lambda in LocalStac
 - **THEN** same-key retry can complete that ticket's publication without a second ticket or a falsely successful abandoned join
 
 ### Requirement: Twenty five-minute admission leases
-The Redis pool SHALL grant at most 20 active leases atomically, issuing a fresh random token stored with a 300-second TTL from grant. It SHALL release a lease exactly once only upon successful order creation or expiry. Failure, preview, tab closure or leaving checkout SHALL NOT release an admitted lease early. A waiting ticket may be canceled without granting it. Expiry accounting SHALL reclaim capacity without relying on token-key disappearance alone, and old delivery/release events SHALL NOT affect a newer admission cycle. Admission SHALL NOT reserve SKU stock.
+The Redis pool SHALL grant at most 20 active leases atomically, issuing a fresh random token stored with an immutable 300-second deadline from grant. It SHALL release a lease exactly once upon successful order creation, expiry, an authenticated explicit leave, or a best-effort last-tab/page-leave request after a 5–10-second grace period. Refresh or another live same-session tab SHALL cancel the matching pending early release without renewing the deadline. Hidden/background state, preview and confirmation failure alone SHALL NOT release the lease. A leave received while confirmation is executing SHALL be deferred until processing has a definite result. A waiting ticket may be canceled without granting it. Expiry and relinquishment accounting SHALL reclaim capacity without relying on token-key disappearance alone, and stale heartbeat, delivery or release events SHALL NOT affect a newer admission cycle. When the periodic expiry reaper reclaims capacity, the service SHALL immediately attempt waiting grants; SQS redelivery remains a retry path and SHALL NOT be required for liveness. Admission SHALL NOT reserve SKU stock.
 
 #### Scenario: Success and expiry compete
 - **WHEN** successful order creation and expiry both attempt to release the same lease
 - **THEN** exactly one pool slot is returned and a waiting buyer may receive a fresh token
 
-#### Scenario: Failure or closed tab
-- **WHEN** preview completes, confirmation fails or the admitted buyer closes the page
-- **THEN** the lease remains occupied until successful creation or its original five-minute expiry
+#### Scenario: Last live tab leaves checkout
+- **WHEN** the admitted buyer closes or navigates away from the last live sale-checkout tab and does not return within the grace period
+- **THEN** the owned lease is released exactly once and waiting admission may consume the returned slot
+
+#### Scenario: Refresh, backgrounding or another live tab
+- **WHEN** an admitted page refreshes, becomes hidden, or one tab closes while another same-session checkout tab remains live
+- **THEN** access remains admitted, a matching pending page-leave release is canceled, and the original five-minute deadline is not extended
+
+#### Scenario: Page-leave signal is lost
+- **WHEN** the browser exits without delivering its best-effort relinquish signal
+- **THEN** the lease remains safe and is reclaimed at its original five-minute deadline
+
+#### Scenario: Expiry advances the waiting room without SQS redelivery
+- **WHEN** the periodic reaper reclaims one or more expired leases while tickets are waiting
+- **THEN** the service immediately attempts to grant the returned capacity without waiting for another join, poll, or SQS redelivery
+
+#### Scenario: Buyer leaves during confirmation
+- **WHEN** an admitted buyer leaves while order confirmation is executing
+- **THEN** downstream processing is not interrupted and lease release waits for a definite processing outcome
 
 #### Scenario: Seller replenishes stock
 - **WHEN** a seller adds quota to a sold-out participation

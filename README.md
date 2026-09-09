@@ -325,8 +325,8 @@ Quản trị viên có thể tạo chiến dịch tại `/admin/campaigns`, ch�
 
 **Campaign flow**
 
-- Seller mở `/seller/campaigns` để xem các chiến dịch đủ điều kiện, nhận thông báo trước hạn đăng ký, chọn sản phẩm và mức giảm riêng cho từng sản phẩm, hoặc từ chối/rút lui trước cutoff. Chi tiết sản phẩm tại `/seller/products/[productId]` hiển thị các campaign đang chạy, sắp tới và lịch sử.
-- Buyer truy cập `/banner/:bannerId` để xem nội dung, lịch và sản phẩm đang bán. Kệ Flash Sale trên trang chủ chỉ lấy sản phẩm từ campaign `FLASH_SALE` đang active và dùng cùng nguồn giá authoritative với catalog, cart và checkout.
+- Seller mở `/seller/campaigns` để xem các chiến dịch đủ điều kiện, nhận thông báo trước hạn đăng ký, chọn sản phẩm hoặc từ chối/rút lui trước cutoff. Với `FLASH_SALE`, seller đăng ký theo SKU bằng giá bán cố định và quota có bảo chứng tồn kho; SKU hết quota mới có thể được bổ sung quota hoặc kết thúc tham gia.
+- Buyer truy cập `/banner/:bannerId` để xem nội dung, lịch và sản phẩm đang bán. Kệ Flash Sale trên trang chủ chỉ lấy SKU còn đủ điều kiện trong campaign đang active và dùng cùng nguồn giá authoritative với catalog, cart và checkout.
 - Reservation dùng cửa sổ thời gian nửa kín `[startsAt, endsAt)` để chặn một sản phẩm tham gia hai chương trình trùng thời gian, bao gồm cả promotion của shop.
 
 <details>
@@ -364,6 +364,113 @@ Các quyết định nghiệp vụ chính:
 - **Tìm kiếm có đường dự phòng:** Elasticsearch phục vụ tìm kiếm; PostgreSQL vẫn quyết định sản phẩm nào được hiển thị và mua.
 - **Chat có lưu trữ:** Socket.IO truyền cập nhật thời gian thực, PostgreSQL lưu hội thoại/tin nhắn và trạng thái liên quan.
 - **Phân quyền gắn với dữ liệu:** role đi cùng kiểm tra trạng thái tài khoản, shop và quyền sở hữu; audit ghi nhận thao tác đặc quyền.
+
+### Flash Sale theo SKU và admission gate
+
+Flash Sale được quản lý ở cấp **SKU/biến thể**, không suy ra quota từ toàn bộ tồn
+kho của sản phẩm. Seller đăng ký giá cố định và quota; hệ thống luôn bảo đảm tồn
+kho vật lý khả dụng không thấp hơn quota còn cam kết. Buyer không nhìn thấy số
+quota chính xác. Cart có ít nhất một dòng Flash Sale chỉ được thanh toán bằng
+**COD**; cart hoàn toàn là hàng thường bỏ qua waiting room và giữ các phương thức
+thanh toán hiện có.
+
+#### Kiến trúc
+
+```mermaid
+flowchart LR
+  B[Buyer checkout] -->|join + join key| A[Admission API]
+  A -->|ticket/idempotency| R[(Redis)]
+  A -.->|khi bật queue| Q[SQS Standard]
+  Q -.->|topology external| L[Lambda grant worker]
+  L -->|authenticated grant| A
+  A -->|WAITING / ADMITTED| B
+  B -->|preview / confirm COD| C[Checkout API]
+  C -->|validate lease + max 5 confirmations| R
+  C -->|serializable transaction| P[(PostgreSQL)]
+  P -->|ordered outbox| R
+```
+
+| Thành phần | Vai trò trong Flash Sale |
+| ---------- | ------------------------ |
+| PostgreSQL | Nguồn dữ liệu bền vững cuối cùng cho campaign/SKU, quota, tồn kho, buyer claim, consumption và order; transaction serializable ngăn oversell |
+| Redis | Lưu ticket, trạng thái waiting/admitted, opaque lease token, deadline, idempotency và budget tối đa 5 confirmation đang thực thi; Redis lỗi thì Flash Sale fail closed |
+| SQS Standard | Topology tùy chọn để chuyển ticket tới grant worker theo cơ chế at-least-once; không cam kết FIFO nên duplicate/out-of-order delivery phải được Redis fencing |
+| Lambda | Consumer external không trạng thái, gọi internal grant; message chỉ được hoàn tất sau khi grant đã persist hoặc ticket đã terminal. Khi không dùng Lambda, Nest poller có thể consume SQS; khi tắt SQS, API grant trực tiếp |
+| L1/L2 cache | Public read đi qua memory L1 → Redis L2 → PostgreSQL fill có giới hạn; snapshot tối đa 2 giây và tách biệt hoàn toàn với counter admission |
+| Outbox | Project thay đổi quota/cancellation/replenishment đã commit từ PostgreSQL sang Redis/public snapshot; cơ chế fencing projection và provisional allocation vẫn cần được kiểm chứng thêm |
+
+Kiến trúc có hai lớp giới hạn độc lập. Waiting room mặc định production có pool
+**20 active lease**, mỗi lease có deadline **300 giây**; local diagnostic có thể
+override TTL. Sau khi buyer được admission, lớp checkout mới xử lý provisional
+quota theo SKU và chỉ cho tối đa **5** Flash Sale order-confirmation cùng thực
+thi. `T35_POC_MAX_LEASES=40` là override giới hạn cho môi trường non-production
+để chạy POC; production vẫn hard-cap 20. Traffic admission chỉ cho quyền đi tiếp
+vào checkout, không giữ SKU và không bảo đảm buyer sẽ mua được hàng.
+
+#### Flow hoạt động
+
+1. Seller đăng ký SKU với giá Flash Sale cố định và quota dương. Trước giờ bắt
+   đầu có thể sửa quota trong giới hạn tồn kho; khi campaign active và quota còn
+   dương thì quota bị khóa.
+2. Buyer có cart chứa Flash Sale gọi join bằng join `Idempotency-Key`. API tạo
+   ticket trong Redis rồi chuyển sang grant path theo topology đang bật: publish
+   SQS cho Lambda/Nest poller, hoặc grant trực tiếp khi tắt SQS. Polling status
+   chỉ đọc trạng thái, không tự grant, không gọi checkout và không truy vấn
+   PostgreSQL order.
+3. Grant worker xử lý ticket. Nếu pool còn chỗ, Redis atomically chuyển ticket
+   sang `ADMITTED`, tạo opaque token gắn buyer/session/gate và deadline; API trả
+   token qua cookie HttpOnly. Nếu pool đầy, ticket tiếp tục `WAITING`; topology
+   SQS dùng redelivery/backoff để thử lại sau.
+4. Preview kiểm tra lease nhưng không chiếm confirmation slot và không trừ
+   quota. Khi buyer xác nhận COD, Redis giữ một trong 5 execution slot rồi
+   PostgreSQL revalidate giá, thời gian, quota, tồn kho và buyer claim trong một
+   transaction trước khi tạo order.
+5. Request 429 giữ nguyên lease và retry có giới hạn bằng **cùng order key**.
+   Commit thành công đóng lease đúng một lần; rollback xác định chỉ bù attempt
+   của chính request đó. Kết quả commit không rõ phải được tra cứu bền vững trước
+   khi hoàn quota.
+6. Lease được giải phóng khi order thành công, hết deadline, buyer rời rõ ràng,
+   hoặc last-tab/page-leave sau grace 5–10 giây. Refresh/heartbeat chỉ hủy pending
+   release khớp browser instance, không gia hạn deadline; hidden tab không tự
+   release. Nếu confirmation đang chạy thì release được hoãn đến khi có kết quả.
+7. Khi expiry/page-leave reaper thực sự thu hồi lease, API gọi `grantWaiting()`
+   ngay để cấp capacity cho buyer đang chờ, không phụ thuộc request/poll mới.
+8. Quota về 0 là `SOLD_OUT`, chưa phải `ENDED`: seller được bổ sung quota hoặc
+   kết thúc riêng SKU đó. Hủy đơn khi participation còn hiệu lực hoàn stock và
+   quota đúng một lần, nhưng buyer claim đã mua vẫn được giữ; sau khi SKU/campaign
+   kết thúc chỉ hoàn tồn kho thường.
+
+#### Kết quả POC admission 100 buyer
+
+Lượt `admission-100x40-20260909-151947` chạy trên một NestJS API với Redis,
+PostgreSQL test và endpoint LocalStack SQS/Lambda được cấu hình, health-check
+thành công; fixture có quota 10 và pool POC 40 lease. Đây là kiểm tra correctness
+local, không phải bằng chứng độc lập cho delivery/recovery SQS/Lambda, benchmark
+throughput hay cam kết SLO/HA production.
+
+| Phase | Kết quả đo được |
+| ----- | --------------- |
+| Join | 100/100 buyer join đồng thời, 100 ticket duy nhất; peak active lease = 40 |
+| 40 buyer đầu | Thời gian chờ 2.787–6.339 giây |
+| Seed purchase | 5 buyer mua thành công, quota từ 10 còn 5; response 429 được retry bằng cùng order key |
+| Relinquishment | 6 đợt cách nhau 2 giây, mỗi đợt giải phóng đúng 10 lease; 100/100 buyer cuối cùng đều từng được admission |
+| Nhóm cuối | 5 buyer cuối chờ 26.433–26.434 giây; 10 buyer admitted gần nhất cùng tranh 5 quota còn lại |
+| Final contention | Lượt đầu: 3 thành công, 2 `FLASH_SALE_BUSY` 429, 5 `checkout-not-ready` 409; hai request 429 retry thành công → đúng 5 có order và 5 không có order |
+| Đối soát cuối | Quota = 0, 10 order/10 consumption thuộc run, peak confirmation = 5, duplicate order = 0, active lease sau cleanup = 0 |
+
+Kết quả đạt **PASS 17/17 invariant**. Thời gian của từng buyer và event từng
+phase nằm trong [báo cáo tổng hợp](result/t35-admission-100-buyers-40-leases-10-stock/summary.md),
+[CSV wait-time](result/t35-admission-100-buyers-40-leases-10-stock/buyer-wait-times.csv)
+và [JSON chi tiết](result/t35-admission-100-buyers-40-leases-10-stock/result.json).
+Runner/tài liệu tái lập nằm tại [scripts POC T35](scripts/poc/t35/README.md).
+
+Theo thiết kế, khả năng chịu lỗi ưu tiên **an toàn dữ liệu hơn availability**:
+SQS down làm dừng delivery ticket mới ở topology queue nhưng lease/order đang
+chạy vẫn tiếp tục; Lambda down làm message tích lại để retry nếu không có consumer
+khác; Redis down làm admission và Flash Sale checkout fail closed; PostgreSQL
+down làm dừng tạo order. POC trên chưa fault-inject từng dependency và chưa chứng
+minh recovery Redis/cache-loss, multi-instance, browser cookie policy hoặc công
+suất production.
 
 ```text
 apps/web/                 Next.js: giao diện buyer, seller, admin

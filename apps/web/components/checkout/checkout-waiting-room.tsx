@@ -11,6 +11,7 @@ export interface CheckoutWaitingRoomProps {
   message?: string;
   onPollStatus: () => Promise<void>;
   onLeaveQueue: () => Promise<void>;
+  onLeaveAdmission: () => Promise<void>;
   onRejoinQueue: () => Promise<void>;
   onProceedToCheckout: () => void;
 }
@@ -22,6 +23,7 @@ export function CheckoutWaitingRoom({
   message,
   onPollStatus,
   onLeaveQueue,
+  onLeaveAdmission,
   onRejoinQueue,
   onProceedToCheckout,
 }: CheckoutWaitingRoomProps) {
@@ -102,6 +104,15 @@ export function CheckoutWaitingRoom({
     }
   };
 
+  const handleLeaveAdmission = async () => {
+    setLeaving(true);
+    try {
+      await onLeaveAdmission();
+    } finally {
+      setLeaving(false);
+    }
+  };
+
   return (
     <StorefrontContainer className="checkout-page">
       <div className="checkout-waiting-room" role="region" aria-labelledby="waiting-room-title">
@@ -145,6 +156,14 @@ export function CheckoutWaitingRoom({
               <p>Thời gian truy cập còn lại: <strong>{Math.floor((leaseCountdown ?? 300) / 60)} phút {(leaseCountdown ?? 300) % 60}s</strong>. Bạn cần tự bấm đặt hàng; hệ thống không tự gửi đơn.</p>
             </div>
             <div className="checkout-waiting-actions">
+              <button
+                type="button"
+                className="checkout-waiting-btn checkout-waiting-btn--secondary"
+                disabled={leaving}
+                onClick={() => void handleLeaveAdmission()}
+              >
+                {leaving ? 'Đang rời...' : 'Rời lượt thanh toán'}
+              </button>
               <button
                 type="button"
                 className="checkout-waiting-btn checkout-waiting-btn--primary"

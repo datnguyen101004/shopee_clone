@@ -47,6 +47,8 @@ export interface AdmissionLease {
   expiresAt: number;
 }
 
+export type AdmissionRelinquishMode = 'EXPLICIT' | 'PAGE_LEAVE';
+
 interface Ticket {
   ticketId: string;
   userId: string;
@@ -84,7 +86,19 @@ const EFFECTIVE_LEASE_TTL_MS = Number.isFinite(configuredPocLeaseTtl)
   : LEASE_TTL_MS;
 const MAX_QUEUE = 5_000;
 const MAX_LEASES = 20;
+// The production/default pool remains 20. A larger pool is permitted only
+// for the local T35 load harness and cannot be enabled in production.
+export function resolveAdmissionMaxLeases(env: NodeJS.ProcessEnv = process.env): number {
+  const configured = Number(env.T35_POC_MAX_LEASES);
+  if (env.NODE_ENV !== 'production' && Number.isFinite(configured))
+    return Math.max(MAX_LEASES, Math.min(40, Math.floor(configured)));
+  return MAX_LEASES;
+}
 const GRANT_VISIBILITY_MS = 30_000;
+const PAGE_LEAVE_GRACE_MS = Math.max(
+  5_000,
+  Math.min(10_000, Number(process.env.ADMISSION_PAGE_LEAVE_GRACE_MS ?? 7_500)),
+);
 
 /** Redis backed waiting-room control plane. SQS Standard is at-least-once;
  * ticket state and the atomic Redis grant script make duplicates harmless. */
@@ -103,7 +117,10 @@ export class TrafficAdmissionService implements OnModuleInit, OnModuleDestroy {
   );
   private readonly maxLeases = Math.max(
     1,
-    Math.min(MAX_LEASES, Number(process.env.TRAFFIC_ADMISSION_MAX_OUTSTANDING ?? MAX_LEASES)),
+    Math.min(
+      resolveAdmissionMaxLeases(),
+      Number(process.env.TRAFFIC_ADMISSION_MAX_OUTSTANDING ?? resolveAdmissionMaxLeases()),
+    ),
   );
   private readonly queueUrl = process.env.ADMISSION_SQS_QUEUE_URL?.trim() ?? '';
   private readonly sqsEnabled =
@@ -142,7 +159,7 @@ export class TrafficAdmissionService implements OnModuleInit, OnModuleDestroy {
   onModuleInit(): void {
     if (!this.enabled) return;
     if (this.sqsConsumerEnabled) this.schedulePoll(0);
-    this.scheduleReaper(5_000);
+    this.scheduleReaper(1_000);
   }
   onModuleDestroy(): void {
     if (this.pollTimer) clearTimeout(this.pollTimer);
@@ -158,13 +175,17 @@ export class TrafficAdmissionService implements OnModuleInit, OnModuleDestroy {
   }
   private async reapAndReschedule(): Promise<void> {
     try {
-      if (this.redis.isReady()) await this.reapExpired('checkout');
+      if (this.redis.isReady()) {
+        const expiredCount = await this.reapExpired('checkout');
+        if (expiredCount > 0) await this.grantWaiting('checkout');
+        await this.reapPendingRelinquishments('checkout');
+      }
     } catch (error) {
       this.logger.warn(
         `Admission lease reaper failed: ${error instanceof Error ? error.message : String(error)}`,
       );
     } finally {
-      if (this.enabled) this.scheduleReaper(5_000);
+      if (this.enabled) this.scheduleReaper(1_000);
     }
   }
   private key(gateId: string, suffix: string): string {
@@ -181,6 +202,18 @@ export class TrafficAdmissionService implements OnModuleInit, OnModuleDestroy {
   }
   private leaseKey(gateId: string, ticketId: string): string {
     return this.key(gateId, `lease:${ticketId}`);
+  }
+  private confirmationKey(gateId: string, ticketId: string): string {
+    return this.key(gateId, `confirmation:${ticketId}`);
+  }
+  private pendingReleaseLeaseKey(gateId: string, ticketId: string): string {
+    return this.key(gateId, `pending-release:${ticketId}`);
+  }
+  private pendingReleaseBrowserKey(gateId: string, ticketId: string): string {
+    return this.key(gateId, `pending-release-browser:${ticketId}`);
+  }
+  private pendingReleaseIndexKey(gateId: string): string {
+    return this.key(gateId, 'pending-releases');
   }
   private tokenIndexKey(tokenHash: string): string {
     return `admission:token:${tokenHash}`;
@@ -215,7 +248,7 @@ export class TrafficAdmissionService implements OnModuleInit, OnModuleDestroy {
     return (
       (await this.prisma.flashSaleSku.count({
         where: {
-          variantId: { in: cart.lines.map((line) => line.variantId) },
+          variantId: { in: cart.lines.map((line: { variantId: string }) => line.variantId) },
           endedAt: null,
           campaign: {
             cancelledAt: null,
@@ -239,7 +272,7 @@ export class TrafficAdmissionService implements OnModuleInit, OnModuleDestroy {
     return (
       (await this.prisma.flashSaleSku.count({
         where: {
-          variantId: { in: cart.lines.map((line) => line.variantId) },
+          variantId: { in: cart.lines.map((line: { variantId: string }) => line.variantId) },
           endedAt: null,
           campaign: {
             cancelledAt: null,
@@ -410,7 +443,9 @@ export class TrafficAdmissionService implements OnModuleInit, OnModuleDestroy {
       message:
         ticket.terminalReason === 'SUCCESS'
           ? 'Lượt truy cập đã được sử dụng.'
-          : 'Lượt truy cập đã hết hạn.',
+          : ticket.state === 'CLOSED'
+            ? 'Lượt truy cập đã được đóng.'
+            : 'Lượt truy cập đã hết hạn.',
     };
   }
 
@@ -454,16 +489,94 @@ if state ~= 'ADMITTED' then return 0 end
 if redis.call('GET', KEYS[5]) ~= ARGV[1] then return -1 end
 redis.call('SET', KEYS[1], ARGV[2], 'PX', ARGV[4])
 redis.call('ZREM', KEYS[2], ARGV[3])
-redis.call('DEL', KEYS[3], KEYS[4], KEYS[5])
+redis.call('ZREM', KEYS[9], ARGV[3])
+redis.call('DEL', KEYS[3], KEYS[4], KEYS[5], KEYS[6], KEYS[7], KEYS[8])
 return 1`;
 
   private readonly REAP_SCRIPT = `
 local count = 0
 for _, id in ipairs(redis.call('ZRANGEBYSCORE', KEYS[1], '-inf', ARGV[1])) do
   redis.call('ZREM', KEYS[1], id)
+  redis.call('ZREM', KEYS[2], id)
   redis.call('SET', ARGV[2] .. id, 'EXPIRED', 'PX', ARGV[5])
-  redis.call('DEL', ARGV[3] .. id, ARGV[4] .. id)
+  local tokenJson = redis.call('GET', ARGV[3] .. id)
+  if tokenJson then
+    local ok, token = pcall(cjson.decode, tokenJson)
+    if ok and token.tokenHash then redis.call('DEL', ARGV[8] .. token.tokenHash) end
+  end
+  redis.call('DEL', ARGV[3] .. id, ARGV[4] .. id, ARGV[6] .. id, ARGV[7] .. id, ARGV[9] .. id)
   count = count + 1
+end
+return count`;
+
+  private readonly RELINQUISH_SCRIPT = `
+local state = redis.call('GET', KEYS[1])
+if state ~= 'ADMITTED' then return 0 end
+if redis.call('GET', KEYS[5]) ~= ARGV[1] then return -1 end
+local confirmation = redis.call('EXISTS', KEYS[6]) == 1
+if ARGV[5] == 'PAGE_LEAVE' or confirmation then
+  redis.call('SET', KEYS[7], ARGV[1], 'PX', ARGV[4])
+  redis.call('SET', KEYS[8], ARGV[6], 'PX', ARGV[4])
+  redis.call('ZADD', KEYS[9], tonumber(ARGV[7]), ARGV[3])
+  return 2
+end
+redis.call('SET', KEYS[1], ARGV[2], 'PX', ARGV[4])
+redis.call('ZREM', KEYS[2], ARGV[3])
+redis.call('ZREM', KEYS[9], ARGV[3])
+redis.call('DEL', KEYS[3], KEYS[4], KEYS[5], KEYS[6], KEYS[7], KEYS[8])
+return 1`;
+
+  private readonly HEARTBEAT_SCRIPT = `
+local state = redis.call('GET', KEYS[1])
+if state ~= 'ADMITTED' then return 0 end
+if redis.call('GET', KEYS[2]) ~= ARGV[1] then return -1 end
+if redis.call('GET', KEYS[3]) ~= ARGV[1] then return 0 end
+redis.call('DEL', KEYS[3], KEYS[4])
+redis.call('ZREM', KEYS[5], ARGV[2])
+return 1`;
+
+  private readonly CONFIRMATION_BEGIN_SCRIPT = `
+if redis.call('GET', KEYS[1]) ~= 'ADMITTED' then return 0 end
+if redis.call('GET', KEYS[2]) ~= ARGV[1] then return -1 end
+redis.call('SET', KEYS[3], ARGV[1], 'PX', ARGV[2])
+return 1`;
+
+  private readonly CONFIRMATION_FINISH_SCRIPT = `
+if redis.call('GET', KEYS[2]) ~= ARGV[1] then return 0 end
+redis.call('DEL', KEYS[1])
+return 1`;
+
+  private readonly PENDING_REAP_SCRIPT = `
+local count = 0
+for _, id in ipairs(redis.call('ZRANGEBYSCORE', KEYS[1], '-inf', ARGV[1])) do
+  redis.call('ZREM', KEYS[1], id)
+  local state = redis.call('GET', ARGV[2] .. id)
+  local pendingLease = redis.call('GET', ARGV[6] .. id)
+  local currentLease = redis.call('GET', ARGV[11] .. id)
+  if state == 'ADMITTED' and pendingLease and currentLease == pendingLease then
+    if redis.call('EXISTS', ARGV[7] .. id) == 1 then
+      redis.call('ZADD', KEYS[1], tonumber(ARGV[1]) + 1000, id)
+    else
+      redis.call('SET', ARGV[2] .. id, 'CLOSED', 'PX', ARGV[5])
+      redis.call('ZREM', KEYS[2], id)
+      local ticketJson = redis.call('GET', ARGV[3] .. id)
+      if ticketJson then
+        local ok, ticket = pcall(cjson.decode, ticketJson)
+        if ok and ticket.userId and redis.call('GET', ARGV[4] .. ticket.userId) == id then
+          redis.call('DEL', ARGV[4] .. ticket.userId)
+        end
+      end
+      local tokenJson = redis.call('GET', ARGV[8] .. id)
+      if tokenJson then
+        local ok, token = pcall(cjson.decode, tokenJson)
+        if ok and token.tokenHash then redis.call('DEL', ARGV[9] .. token.tokenHash) end
+      end
+      redis.call('DEL', ARGV[8] .. id, ARGV[6] .. id, ARGV[10] .. id, ARGV[7] .. id, ARGV[11] .. id)
+      count = count + 1
+    end
+  else
+    redis.call('DEL', ARGV[6] .. id, ARGV[10] .. id)
+  end
 end
 return count`;
 
@@ -536,19 +649,46 @@ return count`;
     }
   }
 
-  private async reapExpired(gateId: string): Promise<void> {
-    await this.redis.evalVersioned(
-      'admission-reap-v1',
+  private async reapExpired(gateId: string): Promise<number> {
+    const result = await this.redis.evalVersioned(
+      'admission-reap-v2',
       this.REAP_SCRIPT,
-      [this.key(gateId, 'admitted')],
+      [this.key(gateId, 'admitted'), this.pendingReleaseIndexKey(gateId)],
       [
         String(Date.now()),
         this.key(gateId, 'state:'),
         this.key(gateId, 'token:'),
         this.key(gateId, 'lease:'),
         String(TICKET_TTL_MS),
+        this.key(gateId, 'pending-release:'),
+        this.key(gateId, 'confirmation:'),
+        'admission:token:',
+        this.key(gateId, 'pending-release-browser:'),
       ],
     );
+    return Number(result ?? 0);
+  }
+
+  private async reapPendingRelinquishments(gateId: string): Promise<void> {
+    const result = await this.redis.evalVersioned(
+      'admission-pending-release-v1',
+      this.PENDING_REAP_SCRIPT,
+      [this.pendingReleaseIndexKey(gateId), this.key(gateId, 'admitted')],
+      [
+        String(Date.now()),
+        this.key(gateId, 'state:'),
+        this.key(gateId, 'ticket:'),
+        this.key(gateId, 'buyer:'),
+        String(TICKET_TTL_MS),
+        this.key(gateId, 'pending-release:'),
+        this.key(gateId, 'confirmation:'),
+        this.key(gateId, 'token:'),
+        'admission:token:',
+        this.key(gateId, 'pending-release-browser:'),
+        this.key(gateId, 'lease:'),
+      ],
+    );
+    if (Number(result) > 0) await this.grantWaiting(gateId);
   }
 
   async processQueueTicket(ticketId: string, gateId: string): Promise<AdmissionGrantResult> {
@@ -645,7 +785,7 @@ return count`;
 
   private async expireLease(ticket: Ticket): Promise<void> {
     const result = await this.redis.evalVersioned(
-      'admission-release-v2',
+      'admission-release-v3',
       this.RELEASE_SCRIPT,
       [
         this.stateKey(ticket.gateId, ticket.ticketId),
@@ -653,6 +793,10 @@ return count`;
         this.tokenKey(ticket.gateId, ticket.ticketId),
         this.tokenIndexKey(ticket.tokenHash ?? ''),
         this.leaseKey(ticket.gateId, ticket.ticketId),
+        this.confirmationKey(ticket.gateId, ticket.ticketId),
+        this.pendingReleaseLeaseKey(ticket.gateId, ticket.ticketId),
+        this.pendingReleaseBrowserKey(ticket.gateId, ticket.ticketId),
+        this.pendingReleaseIndexKey(ticket.gateId),
       ],
       [ticket.leaseId ?? '', 'EXPIRED', ticket.ticketId, String(TICKET_TTL_MS)],
     );
@@ -661,11 +805,11 @@ return count`;
 
   async releaseLease(
     lease: AdmissionLease | undefined,
-    reason: 'SUCCESS' | 'EXPIRED' = 'SUCCESS',
+    reason: 'SUCCESS' | 'EXPIRED' | 'RELINQUISHED' = 'SUCCESS',
   ): Promise<void> {
     if (!lease || !this.enabled || !this.redis.isReady()) return;
     const result = await this.redis.evalVersioned(
-      'admission-release-v2',
+      'admission-release-v3',
       this.RELEASE_SCRIPT,
       [
         this.stateKey(lease.gateId, lease.ticketId),
@@ -673,15 +817,164 @@ return count`;
         this.tokenKey(lease.gateId, lease.ticketId),
         this.tokenIndexKey(lease.tokenHash),
         this.leaseKey(lease.gateId, lease.ticketId),
+        this.confirmationKey(lease.gateId, lease.ticketId),
+        this.pendingReleaseLeaseKey(lease.gateId, lease.ticketId),
+        this.pendingReleaseBrowserKey(lease.gateId, lease.ticketId),
+        this.pendingReleaseIndexKey(lease.gateId),
       ],
       [
         lease.leaseId,
-        reason === 'SUCCESS' ? 'CLOSED' : 'EXPIRED',
+        reason === 'EXPIRED' ? 'EXPIRED' : 'CLOSED',
         lease.ticketId,
         String(TICKET_TTL_MS),
       ],
     );
     if (result === 1) await this.grantWaiting(lease.gateId);
+  }
+
+  private async ownedLease(
+    token: string | undefined,
+    userId: string,
+    sessionId: string,
+    ticketId: string,
+    gateId = 'checkout',
+  ): Promise<AdmissionLease> {
+    if (!token) throw new AdmissionRequiredError();
+    const hash = this.tokenHash(token);
+    const record = await this.redis.getJson<TokenRecord>(this.tokenIndexKey(hash));
+    if (
+      !record ||
+      record.scope !== 'checkout' ||
+      record.ticketId !== ticketId ||
+      record.userId !== userId ||
+      record.sessionId !== sessionId ||
+      record.gateId !== gateId ||
+      record.tokenHash !== hash
+    )
+      throw new AdmissionInvalidError();
+    const ticket = await this.readTicket(gateId, record.ticketId);
+    if (!ticket || ticket.state !== 'ADMITTED' || ticket.leaseId !== record.leaseId)
+      throw new AdmissionInvalidError();
+    if (
+      record.expiresAt <= Date.now() ||
+      !ticket.leaseExpiresAt ||
+      ticket.leaseExpiresAt <= Date.now()
+    ) {
+      await this.expireLease(ticket);
+      throw new AdmissionExpiredError();
+    }
+    return {
+      ticketId: record.ticketId,
+      gateId,
+      userId,
+      sessionId,
+      leaseId: record.leaseId,
+      tokenHash: hash,
+      expiresAt: record.expiresAt,
+    };
+  }
+
+  async relinquish(
+    userId: string,
+    sessionId: string,
+    ticketId: string,
+    browserInstanceId: string,
+    token: string | undefined,
+    mode: AdmissionRelinquishMode = 'EXPLICIT',
+    gateId = 'checkout',
+  ): Promise<void> {
+    if (!this.enabled) return;
+    await this.ensureRedis();
+    const ticket = await this.readTicket(gateId, ticketId);
+    if (!ticket || ticket.userId !== userId || ticket.sessionId !== sessionId) return;
+    if (ticket.state === 'WAITING') {
+      if (mode === 'EXPLICIT') await this.closeWaitingTicket(ticket);
+      return;
+    }
+    if (ticket.state !== 'ADMITTED') return;
+    const lease = await this.ownedLease(token, userId, sessionId, ticketId, gateId);
+    const now = Date.now();
+    const dueAt = now + (mode === 'PAGE_LEAVE' ? PAGE_LEAVE_GRACE_MS : 1_000);
+    const result = await this.redis.evalVersioned(
+      'admission-relinquish-v1',
+      this.RELINQUISH_SCRIPT,
+      [
+        this.stateKey(gateId, ticketId),
+        this.key(gateId, 'admitted'),
+        this.tokenKey(gateId, ticketId),
+        this.tokenIndexKey(lease.tokenHash),
+        this.leaseKey(gateId, ticketId),
+        this.confirmationKey(gateId, ticketId),
+        this.pendingReleaseLeaseKey(gateId, ticketId),
+        this.pendingReleaseBrowserKey(gateId, ticketId),
+        this.pendingReleaseIndexKey(gateId),
+      ],
+      [
+        lease.leaseId,
+        'CLOSED',
+        ticketId,
+        String(TICKET_TTL_MS),
+        mode,
+        browserInstanceId,
+        String(dueAt),
+      ],
+    );
+    if (result === 1) await this.grantWaiting(gateId);
+  }
+
+  async heartbeat(
+    userId: string,
+    sessionId: string,
+    ticketId: string,
+    browserInstanceId: string,
+    token: string | undefined,
+    gateId = 'checkout',
+  ): Promise<void> {
+    if (!this.enabled) return;
+    await this.ensureRedis();
+    const ticket = await this.readTicket(gateId, ticketId);
+    if (!ticket || ticket.userId !== userId || ticket.sessionId !== sessionId || ticket.state !== 'ADMITTED') return;
+    const lease = await this.ownedLease(token, userId, sessionId, ticketId, gateId);
+    await this.redis.evalVersioned(
+      'admission-heartbeat-v1',
+      this.HEARTBEAT_SCRIPT,
+      [
+        this.stateKey(gateId, ticketId),
+        this.leaseKey(gateId, ticketId),
+        this.pendingReleaseLeaseKey(gateId, ticketId),
+        this.pendingReleaseBrowserKey(gateId, ticketId),
+        this.pendingReleaseIndexKey(gateId),
+      ],
+      [lease.leaseId, ticketId, browserInstanceId],
+    );
+  }
+
+  async beginConfirmation(lease: AdmissionLease | undefined): Promise<void> {
+    if (!lease || !this.enabled) return;
+    const result = await this.redis.evalVersioned(
+      'admission-confirmation-begin-v1',
+      this.CONFIRMATION_BEGIN_SCRIPT,
+      [
+        this.stateKey(lease.gateId, lease.ticketId),
+        this.leaseKey(lease.gateId, lease.ticketId),
+        this.confirmationKey(lease.gateId, lease.ticketId),
+      ],
+      [lease.leaseId, String(TICKET_TTL_MS)],
+    );
+    if (result !== 1) throw new AdmissionInvalidError();
+  }
+
+  async finishConfirmation(lease: AdmissionLease | undefined): Promise<void> {
+    if (!lease || !this.enabled || !this.redis.isReady()) return;
+    await this.redis.evalVersioned(
+      'admission-confirmation-finish-v1',
+      this.CONFIRMATION_FINISH_SCRIPT,
+      [this.confirmationKey(lease.gateId, lease.ticketId), this.leaseKey(lease.gateId, lease.ticketId)],
+      [lease.leaseId],
+    );
+    if ((await this.redis.getValue(this.pendingReleaseLeaseKey(lease.gateId, lease.ticketId))) === lease.leaseId) {
+      await this.releaseLease(lease, 'RELINQUISHED');
+    }
   }
 
   async verify(
@@ -700,29 +993,11 @@ return count`;
         tokenHash: 'disabled',
         expiresAt: Number.MAX_SAFE_INTEGER,
       };
-    if (!token) throw new AdmissionRequiredError();
     await this.ensureRedis();
-    const hash = this.tokenHash(token);
+    const hash = this.tokenHash(token ?? '');
     const record = await this.redis.getJson<TokenRecord>(this.tokenIndexKey(hash));
-    if (!record || record.scope !== 'checkout') throw new AdmissionInvalidError();
-    if (
-      record.userId !== userId ||
-      record.sessionId !== sessionId ||
-      record.gateId !== gateId ||
-      record.tokenHash !== hash
-    )
-      throw new AdmissionInvalidError();
-    const ticket = await this.readTicket(gateId, record.ticketId);
-    if (!ticket || ticket.state !== 'ADMITTED' || ticket.leaseId !== record.leaseId)
-      throw new AdmissionInvalidError();
-    if (
-      record.expiresAt <= Date.now() ||
-      !ticket.leaseExpiresAt ||
-      ticket.leaseExpiresAt <= Date.now()
-    ) {
-      await this.expireLease(ticket);
-      throw new AdmissionExpiredError();
-    }
+    if (!record) throw new AdmissionInvalidError();
+    const lease = await this.ownedLease(token, userId, sessionId, record.ticketId, gateId);
     const budget = await this.redis.consumeRateLimit(
       `admission:token-budget:${hash}`,
       Number(process.env.TRAFFIC_ADMISSION_REQUESTS_PER_TOKEN ?? 30),
@@ -730,14 +1005,6 @@ return count`;
     );
     if (!budget.available) throw new AdmissionUnavailableError();
     if (!budget.allowed) throw new AdmissionRateLimitError(budget.retryAfterSeconds);
-    return {
-      ticketId: record.ticketId,
-      gateId,
-      userId,
-      sessionId,
-      leaseId: record.leaseId,
-      tokenHash: hash,
-      expiresAt: record.expiresAt,
-    };
+    return lease;
   }
 }

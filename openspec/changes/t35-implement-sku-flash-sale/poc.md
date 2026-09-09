@@ -112,8 +112,8 @@ Chạy từng scenario độc lập trước khi phối hợp tải. Mọi PASS 
 | A05 — 6/5 | Sáu buyer đã admitted, đủ quota, dùng barrier giữ 5 execution rồi gửi người thứ sáu | Peak execution = 5 trong tình huống này; thứ sáu 429 + Retry-After, chưa phân bổ quota/chưa vào allocation transaction; giữ lease. Sau nhả barrier, retry cùng key có thể xử lý nếu còn hợp lệ |
 | A06 — Preview/bypass | Preview nhiều lần; confirm ordinary-only không admission; mixed cart thiếu token; gọi online cho sale | Preview không chiếm confirmation slot; ordinary-only bypass; mixed cart bị gate; sale không đi đường online. Kiểm tra selection phía server, không dựa flag client |
 | A07 — Token binding | Thiếu token, token hết hạn, token sai, dùng cookie buyer/session khác hoặc sai scope | Missing/expired 428, invalid/mismatch 403, chưa auth 401; không allocation/order. Không lưu positive validation ở L1 để cho token cũ đi qua |
-| A08 — TTL/release | Grant rồi preview, gây checkout failure, ngừng gửi request; chờ qua 300 giây | Không release sớm, không renewal; hết deadline trả đúng một lease; waiting buyer tiếp tục được grant. Xóa WAITING đóng ticket; DELETE khi ADMITTED không giải phóng sớm |
-| A09 — Expiry khi chạy | Bắt đầu execution gần deadline, giữ qua deadline; xen kẽ success/expiry và cấp lease mới | Lease cũ thu hồi một lần; execution slot vẫn bị giữ khi công việc còn chạy; delayed completion không thu hồi lease mới, không tự hoàn quota chỉ vì token hết hạn |
+| A08 — TTL/release | Grant rồi preview, gây checkout failure, thử explicit leave, page-leave rồi refresh/heartbeat; chờ qua 300 giây | Preview/failure không release; explicit leave release ngay khi không executing; page-leave release sau grace 5–10 giây nếu không heartbeat; refresh/heartbeat hủy pending mà không renewal; hidden tab không release; hết deadline trả đúng một lease và expiry reaper gọi grant ngay nếu đã thu hồi capacity, kể cả fallback không SQS; waiting buyer tiếp tục được grant. Xóa WAITING đóng ticket; DELETE khi ADMITTED không giải phóng sớm |
+| A09 — Expiry khi chạy | Bắt đầu execution gần deadline, giữ qua deadline; xen kẽ success/expiry, leave-during-execution và cấp lease mới | Lease cũ thu hồi một lần; execution slot vẫn bị giữ khi công việc còn chạy; explicit/page-leave trong execution defer tới definite result; delayed completion không thu hồi lease mới, không tự hoàn quota chỉ vì token hết hạn |
 | A10 — Lost success | Cho commit thành công rồi chặn response về client bằng hook/proxy; gọi authenticated result lookup bằng order key cũ | Tìm được đúng kết quả dù lease đã trả; không tạo thêm order/claim/consumption. Chỉ timeout client không đủ chứng minh response bị mất sau commit |
 | Q01 — Suất cuối | Quota 1, nhiều buyer đã admitted cùng confirm; retry có giới hạn với buyer nhận 429 | Cuối cùng đúng một đơn vị sale thành công; quota không âm, stock giảm đúng một; loser không có consumption. Phân biệt quota loser với overload loser |
 | Q02 — Một buyer/nhiều biến thể | Cùng buyer mua SKU-A/SKU-B của cùng product/campaign bằng key khác nhau; thử quantity > 1 | Tổng đơn vị sale thành công cho buyer/product/campaign tối đa một; quantity không hợp lệ bị từ chối. SKU-C vẫn mua giá thường theo quy tắc thông thường |
@@ -211,3 +211,25 @@ Kết luận: NOT RUN | BLOCKED | PASS | FAIL
 | 2.12, 2.13, 2.16, 2.18 | Tiếp tục để mở phần browser/E2E/visual: k6 không chứng minh refresh/tab lifecycle, cookie browser policy, focus/layout hoặc render delay |
 
 Không tự đánh dấu task hoàn thành chỉ vì một script exit code 0. Tổng hợp HTTP checks, quan sát execution và đối soát DB/Redis; nêu rõ case BLOCKED/chưa chạy và topology còn thiếu.
+
+## 9. Kết quả bổ sung — 100 buyer / 40 lease / quota 10
+
+Lượt `admission-100x40-20260909-151947` chạy trên một API local, Redis DB 15,
+PostgreSQL test và LocalStack SQS/Lambda đã PASS. Artifact nằm tại
+`result/t35-admission-100-buyers-40-leases-10-stock/`.
+
+- 100/100 join thành công với 100 ticket duy nhất; peak active lease = 40.
+- 5 buyer seed mua thành công, đưa quota từ 10 xuống 5.
+- Sáu đợt cách nhau 2 giây giải phóng đúng 10 lease/đợt; 100/100 buyer cuối
+  cùng đều từng nhận admission. Nhóm đầu chờ 2.787–6.339 giây; nhóm cuối chờ
+  26.433–26.434 giây. CSV lưu thời gian của từng buyer.
+- 10 buyer cuối confirm đồng thời. Lượt đầu có 3 thành công, 2 lỗi
+  `FLASH_SALE_BUSY` 429 và 5 `checkout-not-ready` 409; hai request 429 retry có
+  giới hạn bằng cùng order key và thành công. Kết quả cuối đúng 5 đơn thành
+  công/5 buyer không có đơn, peak execution = 5.
+- PostgreSQL kết thúc quota = 0, consumption của run = 10, order của run = 10,
+  không duplicate; Redis cleanup còn 0 active lease.
+
+Đây là bằng chứng bổ sung cho admission/relinquishment và contention trong
+1.28/1.32, không thay thế các case A01–A10/R01–R05 còn lại và không tự đánh dấu
+hai task đó hoàn tất. Không chạy Playwright/E2E trong lượt này theo yêu cầu.

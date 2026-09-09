@@ -2,7 +2,9 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   fetchSellerFlashSaleSnapshot,
   fetchFlashSaleStatus,
+  heartbeatCheckoutLease,
   lookupCheckoutResult,
+  relinquishCheckoutLease,
 } from './flash-sale-api';
 import { RoleApiError } from './role-api';
 
@@ -41,5 +43,27 @@ describe('flash-sale-api', () => {
     fetcher.mockResolvedValue(new Response(JSON.stringify({ code: 'ADMISSION_EXPIRED' }), { status: 428, headers: { 'content-type': 'application/problem+json', 'Retry-After': '5' } }));
     await expect(lookupCheckoutResult(fetcher, 'key-1234567890123456')).rejects.toMatchObject({ status: 428 });
     expect(RoleApiError).toBeDefined();
+  });
+
+  it('uses keepalive lifecycle requests while keeping the opaque token out of request bodies', async () => {
+    const fetcher = vi.fn().mockResolvedValue(new Response(null, { status: 204 }));
+    await relinquishCheckoutLease(fetcher, 'ticket-1', 'browser-1', 'PAGE_LEAVE');
+    await heartbeatCheckoutLease(fetcher, 'ticket-1', 'browser-1');
+
+    expect(fetcher).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({ pathname: '/api/v1/admission/checkout/relinquish' }),
+      expect.objectContaining({ method: 'POST', keepalive: true }),
+    );
+    expect(JSON.parse(String(fetcher.mock.calls[0]?.[1]?.body))).toEqual({
+      ticketId: 'ticket-1',
+      browserInstanceId: 'browser-1',
+      mode: 'PAGE_LEAVE',
+    });
+    expect(fetcher).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ pathname: '/api/v1/admission/checkout/heartbeat' }),
+      expect.objectContaining({ method: 'POST', keepalive: true }),
+    );
   });
 });

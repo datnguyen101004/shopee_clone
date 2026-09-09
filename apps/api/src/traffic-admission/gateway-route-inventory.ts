@@ -10,6 +10,8 @@ export const EXEMPT_GATEWAY_ROUTES = [
   'POST /api/v1/admission/checkout/tickets',
   'GET /api/v1/admission/checkout/status',
   'DELETE /api/v1/admission/checkout/ticket',
+  'POST /api/v1/admission/checkout/relinquish',
+  'POST /api/v1/admission/checkout/heartbeat',
   'GET /api/v1/admission/checkout/results/:idempotencyKey',
   'GET /api/v1/campaigns/:campaignId/flash-sale/status',
 ] as const;

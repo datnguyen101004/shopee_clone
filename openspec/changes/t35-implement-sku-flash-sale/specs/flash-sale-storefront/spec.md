@@ -89,7 +89,7 @@ The system SHALL provide a public batched campaign status endpoint for 1–50 un
 - **THEN** periodic sale requests stop, and returning to an ongoing page triggers a deduplicated jittered refresh
 
 ### Requirement: Waiting-room checkout experience
-For carts containing Flash Sale lines only, FE SHALL display WAITING, ADMITTED, EXPIRED and CLOSED states using private Admission/Queue control-plane status responses, server-directed 5–10-second jittered queue polling, one in-flight request and hidden-tab pause. It SHALL preserve the cart, original unchanged-checkout idempotency key and live ticket across refresh. Traffic tokens SHALL use Secure HttpOnly SameSite cookies with origin/CSRF protection and SHALL NOT appear in URLs or localStorage. Queue status SHALL be no-store. Public product/status browsing SHALL remain separately rate limited and cached.
+For carts containing Flash Sale lines only, FE SHALL display WAITING, ADMITTED, EXPIRED and CLOSED states using private Admission/Queue control-plane status responses, server-directed 5–10-second jittered queue polling, one in-flight request and hidden-tab pause. It SHALL preserve the cart, original unchanged-checkout idempotency key and live ticket across refresh. For ADMITTED access, FE SHALL provide an explicit leave action and coordinate same-session browser instances so a best-effort page-leave signal releases only the last live sale-checkout tab after a 5–10-second grace period. Refresh SHALL cancel its matching pending release, hidden state alone SHALL not release access, and heartbeat SHALL never renew the original five-minute deadline. Traffic tokens SHALL use Secure HttpOnly SameSite cookies with origin/CSRF protection and SHALL NOT appear in URLs or localStorage. Queue status SHALL be no-store. Public product/status browsing SHALL remain separately rate limited and cached.
 
 #### Scenario: Buyer receives access
 - **WHEN** Lambda grants a waiting buyer access
@@ -113,4 +113,8 @@ For carts containing Flash Sale lines only, FE SHALL display WAITING, ADMITTED, 
 
 #### Scenario: Five-minute access and ordinary-only checkout
 - **WHEN** the buyer receives admission or changes the selected cart to ordinary-only items
-- **THEN** admitted access shows its original five-minute expiry, ordinary-only checkout bypasses waiting, and leaving sale checkout does not release the old lease early
+- **THEN** admitted access shows its original five-minute expiry, ordinary-only checkout bypasses waiting, and leaving the last live sale-checkout tab starts the grace-period relinquishment flow
+
+#### Scenario: Refresh and multiple tabs retain access
+- **WHEN** an admitted buyer refreshes the checkout or closes one tab while another same-session checkout tab remains live
+- **THEN** FE cancels the matching pending release, preserves the live ticket and does not extend its original deadline

@@ -14,6 +14,7 @@ describe('CheckoutWaitingRoom', () => {
         retryAfterSeconds={5}
         onPollStatus={vi.fn()}
         onLeaveQueue={handleLeave}
+        onLeaveAdmission={vi.fn().mockResolvedValue(undefined)}
         onRejoinQueue={vi.fn()}
         onProceedToCheckout={vi.fn()}
       />
@@ -37,6 +38,7 @@ describe('CheckoutWaitingRoom', () => {
         retryAfterSeconds={0}
         onPollStatus={vi.fn()}
         onLeaveQueue={vi.fn()}
+        onLeaveAdmission={vi.fn().mockResolvedValue(undefined)}
         onRejoinQueue={vi.fn()}
         onProceedToCheckout={handleProceed}
       />
@@ -46,6 +48,25 @@ describe('CheckoutWaitingRoom', () => {
     const proceedBtn = screen.getByRole('button', { name: 'Tiếp tục vào thanh toán ngay' });
     await user.click(proceedBtn);
     expect(handleProceed).toHaveBeenCalled();
+  });
+
+  it('offers explicit admitted relinquishment without auto-submitting', async () => {
+    const user = userEvent.setup();
+    const handleLeaveAdmission = vi.fn().mockResolvedValue(undefined);
+    render(
+      <CheckoutWaitingRoom
+        status="ADMITTED"
+        retryAfterSeconds={0}
+        onPollStatus={vi.fn()}
+        onLeaveQueue={vi.fn()}
+        onLeaveAdmission={handleLeaveAdmission}
+        onRejoinQueue={vi.fn()}
+        onProceedToCheckout={vi.fn()}
+      />,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Rời lượt thanh toán' }));
+    expect(handleLeaveAdmission).toHaveBeenCalledTimes(1);
   });
 
   it('renders EXPIRED state with button to rejoin queue', async () => {
@@ -58,6 +79,7 @@ describe('CheckoutWaitingRoom', () => {
         retryAfterSeconds={0}
         onPollStatus={vi.fn()}
         onLeaveQueue={vi.fn()}
+        onLeaveAdmission={vi.fn().mockResolvedValue(undefined)}
         onRejoinQueue={handleRejoin}
         onProceedToCheckout={vi.fn()}
       />
@@ -76,6 +98,7 @@ describe('CheckoutWaitingRoom', () => {
         retryAfterSeconds={0}
         onPollStatus={vi.fn()}
         onLeaveQueue={vi.fn()}
+        onLeaveAdmission={vi.fn().mockResolvedValue(undefined)}
         onRejoinQueue={vi.fn()}
         onProceedToCheckout={vi.fn()}
       />
@@ -93,6 +116,7 @@ describe('CheckoutWaitingRoom', () => {
         retryAfterSeconds={5}
         onPollStatus={vi.fn()}
         onLeaveQueue={vi.fn()}
+        onLeaveAdmission={vi.fn().mockResolvedValue(undefined)}
         onRejoinQueue={vi.fn()}
         onProceedToCheckout={vi.fn()}
       />,

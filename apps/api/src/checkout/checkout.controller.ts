@@ -116,17 +116,23 @@ export class CheckoutController {
     }
     const parsed = parseCheckoutConfirmationRequest(input);
     if (!parsed) throw new CheckoutValidationError(['request']);
-    const result = await this.checkout.confirmCod(
-      request.authUser.id,
-      expectedVersion(ifMatch),
-      idempotencyKey,
-      parsed,
-    );
-    await this.admission.releaseLease(request.admissionLease, 'SUCCESS');
-    response.status(result.replayed ? HttpStatus.OK : HttpStatus.CREATED);
-    response.setHeader('Cache-Control', 'private, no-store');
-    response.setHeader('ETag', `"cart-${result.purchase.sourceCartVersion + 1}"`);
-    return result;
+    const lease = request.admissionLease;
+    await this.admission.beginConfirmation(lease);
+    try {
+      const result = await this.checkout.confirmCod(
+        request.authUser.id,
+        expectedVersion(ifMatch),
+        idempotencyKey,
+        parsed,
+      );
+      await this.admission.releaseLease(lease, 'SUCCESS');
+      response.status(result.replayed ? HttpStatus.OK : HttpStatus.CREATED);
+      response.setHeader('Cache-Control', 'private, no-store');
+      response.setHeader('ETag', `"cart-${result.purchase.sourceCartVersion + 1}"`);
+      return result;
+    } finally {
+      await this.admission.finishConfirmation(lease);
+    }
   }
 
   @Get('purchases/:purchaseReference')

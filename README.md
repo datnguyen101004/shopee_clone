@@ -284,16 +284,16 @@ Các lệnh E2E và kiểm tra database có yêu cầu môi trường riêng; xe
 
 ### Admin — quản trị sàn
 
-| Nhóm       | Tính năng                                                                  |
-| ---------- | -------------------------------------------------------------------------- |
-| Tổng quan  | Thống kê tài khoản, shop, nội dung trang chủ và hoạt động quản trị         |
-| Người dùng | Tìm kiếm, quản lý trạng thái, cấp/thu hồi quyền và ghi nhận lý do thao tác |
-| Gian hàng  | Duyệt/từ chối đăng ký, xem hồ sơ, tạm ngưng và khôi phục shop              |
-| Nội dung   | Kiểm soát sản phẩm, quản lý danh mục, banner và các khối trang chủ         |
+| Nhóm       | Tính năng                                                                                           |
+| ---------- | --------------------------------------------------------------------------------------------------- |
+| Tổng quan  | Thống kê tài khoản, shop, nội dung trang chủ và hoạt động quản trị                                  |
+| Người dùng | Tìm kiếm, quản lý trạng thái, cấp/thu hồi quyền và ghi nhận lý do thao tác                          |
+| Gian hàng  | Duyệt/từ chối đăng ký, xem hồ sơ, tạm ngưng và khôi phục shop                                       |
+| Nội dung   | Kiểm soát sản phẩm, quản lý danh mục, banner và các khối trang chủ                                  |
 | Chiến dịch | Chọn loại STANDARD, FLASH_SALE hoặc CHEAPEST_DEALS; publish/cancel, mời seller và theo dõi tham gia |
-| Kiểm duyệt | Xử lý tố cáo sản phẩm/shop/đánh giá/tin nhắn, lưu hồ sơ và kết quả xử lý   |
-| Tranh chấp | Xem yêu cầu trả hàng, bằng chứng và đưa ra quyết định theo quyền admin     |
-| Audit      | Tra cứu nhật ký thao tác đặc quyền, đối tượng, lý do và thay đổi           |
+| Kiểm duyệt | Xử lý tố cáo sản phẩm/shop/đánh giá/tin nhắn, lưu hồ sơ và kết quả xử lý                            |
+| Tranh chấp | Xem yêu cầu trả hàng, bằng chứng và đưa ra quyết định theo quyền admin                              |
+| Audit      | Tra cứu nhật ký thao tác đặc quyền, đối tượng, lý do và thay đổi                                    |
 
 **Trung tâm quản trị**
 
@@ -326,7 +326,7 @@ Quản trị viên có thể tạo chiến dịch tại `/admin/campaigns`, ch�
 **Campaign flow**
 
 - Seller mở `/seller/campaigns` để xem các chiến dịch đủ điều kiện, nhận thông báo trước hạn đăng ký, chọn sản phẩm hoặc từ chối/rút lui trước cutoff. Với `FLASH_SALE`, seller đăng ký theo SKU bằng giá bán cố định và quota có bảo chứng tồn kho; SKU hết quota mới có thể được bổ sung quota hoặc kết thúc tham gia.
-- Buyer truy cập `/banner/:bannerId` để xem nội dung, lịch và sản phẩm đang bán. Kệ Flash Sale trên trang chủ chỉ lấy SKU còn đủ điều kiện trong campaign đang active và dùng cùng nguồn giá authoritative với catalog, cart và checkout.
+- Buyer truy cập `/banner/:bannerId` để xem nội dung, lịch và sản phẩm đang bán. Kệ Flash Sale trên trang chủ chỉ lấy SKU còn đủ điều kiện trong campaign đang active và dùng cùng nguồn giá do server xác định với catalog, cart và checkout.
 - Reservation dùng cửa sổ thời gian nửa kín `[startsAt, endsAt)` để chặn một sản phẩm tham gia hai chương trình trùng thời gian, bao gồm cả promotion của shop.
 
 <details>
@@ -367,110 +367,81 @@ Các quyết định nghiệp vụ chính:
 
 ### Flash Sale theo SKU và admission gate
 
-Flash Sale được quản lý ở cấp **SKU/biến thể**, không suy ra quota từ toàn bộ tồn
-kho của sản phẩm. Seller đăng ký giá cố định và quota; hệ thống luôn bảo đảm tồn
-kho vật lý khả dụng không thấp hơn quota còn cam kết. Buyer không nhìn thấy số
-quota chính xác. Cart có ít nhất một dòng Flash Sale chỉ được thanh toán bằng
-**COD**; cart hoàn toàn là hàng thường bỏ qua waiting room và giữ các phương thức
-thanh toán hiện có.
+Flash Sale được quản lý ở cấp **SKU/biến thể**. Seller đăng ký giá cố định và
+quota có bảo chứng tồn kho; buyer chỉ thấy trạng thái còn hàng hoặc hết hàng, không
+thấy quota chính xác. Cart có sản phẩm Flash Sale phải đi qua waiting room và chỉ
+được thanh toán bằng **COD**. Cart chỉ có hàng thường giữ nguyên luồng checkout và
+các phương thức thanh toán hiện có.
 
 #### Kiến trúc
 
 ```mermaid
 flowchart LR
-  B[Buyer checkout] -->|join + join key| A[Admission API]
-  A -->|ticket/idempotency| R[(Redis)]
-  A -.->|khi bật queue| Q[SQS Standard]
-  Q -.->|topology external| L[Lambda grant worker]
-  L -->|authenticated grant| A
+  B[Buyer checkout] -->|join| A[Admission API]
+  A -->|ticket và lease| R[(Redis)]
+  A -.->|tùy chọn| Q[SQS Standard]
+  Q -.-> L[Lambda grant worker]
+  L --> A
   A -->|WAITING / ADMITTED| B
   B -->|preview / confirm COD| C[Checkout API]
-  C -->|validate lease + max 5 confirmations| R
-  C -->|serializable transaction| P[(PostgreSQL)]
-  P -->|ordered outbox| R
+  C -->|kiểm tra lease và giới hạn đồng thời| R
+  C -->|transaction| P[(PostgreSQL)]
+  P -->|outbox| R
 ```
 
-| Thành phần | Vai trò trong Flash Sale |
-| ---------- | ------------------------ |
-| PostgreSQL | Nguồn dữ liệu bền vững cuối cùng cho campaign/SKU, quota, tồn kho, buyer claim, consumption và order; transaction serializable ngăn oversell |
-| Redis | Lưu ticket, trạng thái waiting/admitted, opaque lease token, deadline, idempotency và budget tối đa 5 confirmation đang thực thi; Redis lỗi thì Flash Sale fail closed |
-| SQS Standard | Topology tùy chọn để chuyển ticket tới grant worker theo cơ chế at-least-once; không cam kết FIFO nên duplicate/out-of-order delivery phải được Redis fencing |
-| Lambda | Consumer external không trạng thái, gọi internal grant; message chỉ được hoàn tất sau khi grant đã persist hoặc ticket đã terminal. Khi không dùng Lambda, Nest poller có thể consume SQS; khi tắt SQS, API grant trực tiếp |
-| L1/L2 cache | Public read đi qua memory L1 → Redis L2 → PostgreSQL fill có giới hạn; snapshot tối đa 2 giây và tách biệt hoàn toàn với counter admission |
-| Outbox | Project thay đổi quota/cancellation/replenishment đã commit từ PostgreSQL sang Redis/public snapshot; cơ chế fencing projection và provisional allocation vẫn cần được kiểm chứng thêm |
+| Thành phần            | Vai trò trong Flash Sale                                                                                                                             |
+| --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| PostgreSQL            | Lưu campaign, quota, tồn kho, lượt mua và order; transaction serializable ngăn oversell                                                              |
+| Redis                 | Lưu ticket, trạng thái waiting/admitted, lease, idempotency và giới hạn số confirmation đang xử lý; khi Redis lỗi, Flash Sale dừng nhận checkout mới |
+| SQS Standard / Lambda | Hàng đợi và worker tùy chọn để cấp lượt vào theo cơ chế at-least-once; có thể thay bằng NestJS poller hoặc cấp trực tiếp khi không bật SQS           |
+| L1/L2 cache           | Phục vụ dữ liệu đọc qua memory, Redis và PostgreSQL; cache hiển thị tách biệt với bộ đếm admission                                                   |
+| Outbox                | Đồng bộ thay đổi quota, hủy và bổ sung hàng từ PostgreSQL sang Redis và public snapshot sau khi transaction hoàn tất                                 |
 
-Kiến trúc có hai lớp giới hạn độc lập. Waiting room mặc định production có pool
-**20 active lease**, mỗi lease có deadline **300 giây**; local diagnostic có thể
-override TTL. Sau khi buyer được admission, lớp checkout mới xử lý provisional
-quota theo SKU và chỉ cho tối đa **5** Flash Sale order-confirmation cùng thực
-thi. `T35_POC_MAX_LEASES=40` là override giới hạn cho môi trường non-production
-để chạy POC; production vẫn hard-cap 20. Traffic admission chỉ cho quyền đi tiếp
-vào checkout, không giữ SKU và không bảo đảm buyer sẽ mua được hàng.
+Hệ thống áp dụng hai giới hạn độc lập. Waiting room production mặc định có
+**20 lease đang hoạt động**, mỗi lease hết hạn sau **300 giây**. Checkout Flash
+Sale cho phép tối đa **5 yêu cầu xác nhận đơn** xử lý đồng thời. Admission chỉ
+cấp quyền vào checkout, không giữ SKU và không bảo đảm buyer sẽ mua được hàng.
 
 #### Flow hoạt động
 
-1. Seller đăng ký SKU với giá Flash Sale cố định và quota dương. Trước giờ bắt
-   đầu có thể sửa quota trong giới hạn tồn kho; khi campaign active và quota còn
-   dương thì quota bị khóa.
-2. Buyer có cart chứa Flash Sale gọi join bằng join `Idempotency-Key`. API tạo
-   ticket trong Redis rồi chuyển sang grant path theo topology đang bật: publish
-   SQS cho Lambda/Nest poller, hoặc grant trực tiếp khi tắt SQS. Polling status
-   chỉ đọc trạng thái, không tự grant, không gọi checkout và không truy vấn
-   PostgreSQL order.
-3. Grant worker xử lý ticket. Nếu pool còn chỗ, Redis atomically chuyển ticket
-   sang `ADMITTED`, tạo opaque token gắn buyer/session/gate và deadline; API trả
-   token qua cookie HttpOnly. Nếu pool đầy, ticket tiếp tục `WAITING`; topology
-   SQS dùng redelivery/backoff để thử lại sau.
-4. Preview kiểm tra lease nhưng không chiếm confirmation slot và không trừ
-   quota. Khi buyer xác nhận COD, Redis giữ một trong 5 execution slot rồi
-   PostgreSQL revalidate giá, thời gian, quota, tồn kho và buyer claim trong một
-   transaction trước khi tạo order.
-5. Request 429 giữ nguyên lease và retry có giới hạn bằng **cùng order key**.
-   Commit thành công đóng lease đúng một lần; rollback xác định chỉ bù attempt
-   của chính request đó. Kết quả commit không rõ phải được tra cứu bền vững trước
-   khi hoàn quota.
-6. Lease được giải phóng khi order thành công, hết deadline, buyer rời rõ ràng,
-   hoặc last-tab/page-leave sau grace 5–10 giây. Refresh/heartbeat chỉ hủy pending
-   release khớp browser instance, không gia hạn deadline; hidden tab không tự
-   release. Nếu confirmation đang chạy thì release được hoãn đến khi có kết quả.
-7. Khi expiry/page-leave reaper thực sự thu hồi lease, API gọi `grantWaiting()`
-   ngay để cấp capacity cho buyer đang chờ, không phụ thuộc request/poll mới.
-8. Quota về 0 là `SOLD_OUT`, chưa phải `ENDED`: seller được bổ sung quota hoặc
-   kết thúc riêng SKU đó. Hủy đơn khi participation còn hiệu lực hoàn stock và
-   quota đúng một lần, nhưng buyer claim đã mua vẫn được giữ; sau khi SKU/campaign
-   kết thúc chỉ hoàn tồn kho thường.
+1. Seller đăng ký SKU với giá Flash Sale và quota trong giới hạn tồn kho. Quota
+   được khóa khi campaign đang active và SKU vẫn còn hàng.
+2. Buyer có cart Flash Sale gửi yêu cầu tham gia với `Idempotency-Key`. API tạo
+   ticket trong Redis; worker cấp lease khi pool còn chỗ, nếu không ticket tiếp
+   tục ở trạng thái `WAITING`.
+3. Preview chỉ kiểm tra lease. Khi buyer xác nhận COD, Redis giữ một trong năm
+   slot xử lý; PostgreSQL kiểm tra lại giá, thời gian, quota, tồn kho và quyền mua
+   trong cùng transaction trước khi tạo order.
+4. Khi hệ thống trả `429`, client có thể retry có giới hạn bằng cùng order key.
+   Lease được giải phóng sau khi order hoàn tất, hết hạn hoặc buyer rời checkout;
+   capacity thu hồi sẽ được cấp cho buyer kế tiếp.
+5. Quota bằng 0 chuyển SKU sang `SOLD_OUT`, nhưng seller vẫn có thể bổ sung quota
+   hoặc kết thúc SKU. Hủy order khi chương trình còn hiệu lực hoàn tồn kho và quota
+   đúng một lần; lịch sử mua của buyer vẫn được giữ.
 
-#### Kết quả POC admission 100 buyer
+#### Kết quả POC với 100 buyer
 
-Lượt `admission-100x40-20260909-151947` chạy trên một NestJS API với Redis,
-PostgreSQL test và endpoint LocalStack SQS/Lambda được cấu hình, health-check
-thành công; fixture có quota 10 và pool POC 40 lease. Đây là kiểm tra correctness
-local, không phải bằng chứng độc lập cho delivery/recovery SQS/Lambda, benchmark
-throughput hay cam kết SLO/HA production.
+POC local sử dụng 100 buyer đồng thời, pool 40 lease và quota 10. Kết quả đạt
+**17/17 tiêu chí kiểm tra**:
 
-| Phase | Kết quả đo được |
-| ----- | --------------- |
-| Join | 100/100 buyer join đồng thời, 100 ticket duy nhất; peak active lease = 40 |
-| 40 buyer đầu | Thời gian chờ 2.787–6.339 giây |
-| Seed purchase | 5 buyer mua thành công, quota từ 10 còn 5; response 429 được retry bằng cùng order key |
-| Relinquishment | 6 đợt cách nhau 2 giây, mỗi đợt giải phóng đúng 10 lease; 100/100 buyer cuối cùng đều từng được admission |
-| Nhóm cuối | 5 buyer cuối chờ 26.433–26.434 giây; 10 buyer admitted gần nhất cùng tranh 5 quota còn lại |
-| Final contention | Lượt đầu: 3 thành công, 2 `FLASH_SALE_BUSY` 429, 5 `checkout-not-ready` 409; hai request 429 retry thành công → đúng 5 có order và 5 không có order |
-| Đối soát cuối | Quota = 0, 10 order/10 consumption thuộc run, peak confirmation = 5, duplicate order = 0, active lease sau cleanup = 0 |
+- 100 ticket duy nhất được tạo và toàn bộ buyer cuối cùng đều được admission.
+- Số lease hoạt động cao nhất là 40; số confirmation đồng thời cao nhất là 5.
+- Đúng 10 order được tạo, quota về 0, không có order trùng và không còn lease sau
+  khi hoàn tất kiểm tra.
+- Retry sau `FLASH_SALE_BUSY` sử dụng cùng order key và không làm vượt quota.
 
-Kết quả đạt **PASS 17/17 invariant**. Thời gian của từng buyer và event từng
-phase nằm trong [báo cáo tổng hợp](result/t35-admission-100-buyers-40-leases-10-stock/summary.md),
-[CSV wait-time](result/t35-admission-100-buyers-40-leases-10-stock/buyer-wait-times.csv)
-và [JSON chi tiết](result/t35-admission-100-buyers-40-leases-10-stock/result.json).
-Runner/tài liệu tái lập nằm tại [scripts POC T35](scripts/poc/t35/README.md).
+Đây là kiểm tra tính đúng đắn trong môi trường local, không phải benchmark hoặc
+cam kết SLO/HA production. Báo cáo, dữ liệu đo và hướng dẫn tái lập nằm tại
+[báo cáo tổng hợp](result/t35-admission-100-buyers-40-leases-10-stock/summary.md),
+[CSV wait-time](result/t35-admission-100-buyers-40-leases-10-stock/buyer-wait-times.csv),
+[JSON chi tiết](result/t35-admission-100-buyers-40-leases-10-stock/result.json) và
+[scripts POC T35](scripts/poc/t35/README.md).
 
-Theo thiết kế, khả năng chịu lỗi ưu tiên **an toàn dữ liệu hơn availability**:
-SQS down làm dừng delivery ticket mới ở topology queue nhưng lease/order đang
-chạy vẫn tiếp tục; Lambda down làm message tích lại để retry nếu không có consumer
-khác; Redis down làm admission và Flash Sale checkout fail closed; PostgreSQL
-down làm dừng tạo order. POC trên chưa fault-inject từng dependency và chưa chứng
-minh recovery Redis/cache-loss, multi-instance, browser cookie policy hoặc công
-suất production.
+Thiết kế ưu tiên **an toàn dữ liệu hơn availability**: Redis hoặc PostgreSQL lỗi
+sẽ dừng checkout Flash Sale mới; SQS/Lambda lỗi sẽ tạm dừng cấp admission qua
+hàng đợi cho đến khi dịch vụ phục hồi hoặc có consumer khác tiếp quản. POC chưa
+bao phủ fault injection, recovery sau cache loss, multi-instance và tải
+production.
 
 ```text
 apps/web/                 Next.js: giao diện buyer, seller, admin
@@ -493,7 +464,7 @@ compose-prod.yaml        API + Elasticsearch + migrator trên EC2
 
 ![Sơ đồ AWS: Amplify, ALB và ACM, EC2, RDS, CloudFront/S3, IAM role và SSM qua NAT](docs/images/architecture/aws-deployment.png)
 
-Sơ đồ dùng [AWS Architecture Icons chính thức](https://aws.amazon.com/architecture/icons/). Bản [SVG](docs/images/architecture/aws-deployment.svg) nhúng sẵn icon để chỉnh sửa và xuất ảnh. Các dịch vụ và luồng mạng bên dưới theo cấu hình triển khai do chủ dự án xác nhận; cấu hình container và CI/CD được đối chiếu với repository.
+Sơ đồ dùng [AWS Architecture Icons chính thức](https://aws.amazon.com/architecture/icons/). Bản [SVG](docs/images/architecture/aws-deployment.svg) nhúng sẵn icon để chỉnh sửa và xuất ảnh.
 
 | Thành phần                      | Vai trò trong triển khai hiện tại                                                                  |
 | ------------------------------- | -------------------------------------------------------------------------------------------------- |
@@ -511,13 +482,13 @@ Sơ đồ dùng [AWS Architecture Icons chính thức](https://aws.amazon.com/ar
 
 ### Các luồng truy cập
 
-1. **Frontend → ALB → EC2:** người dùng mở ứng dụng trên Amplify; frontend gọi API qua HTTPS tới ALB. ALB sử dụng chứng chỉ do ACM quản lý và chuyển request tới EC2 theo target group. ACM gắn chứng chỉ vào listener, không nằm trên đường truyền request. [Tài liệu HTTPS listener của AWS](https://docs.aws.amazon.com/elasticloadbalancing/latest/application/create-https-listener.html).
+1. **Frontend → ALB → EC2:** người dùng mở ứng dụng trên Amplify; frontend gọi API qua HTTPS tới ALB. ALB sử dụng chứng chỉ do ACM quản lý và chuyển request tới EC2 theo target group. [Tài liệu HTTPS listener của AWS](https://docs.aws.amazon.com/elasticloadbalancing/latest/application/create-https-listener.html).
 2. **Frontend → CloudFront → S3:** frontend tải ảnh bằng URL CloudFront. CloudFront đọc object từ private S3 origin theo OAC và phục vụ nội dung qua CDN.
-3. **EC2 → S3 bằng IAM role:** AWS SDK trong backend dùng credential tạm thời từ instance profile. IAM role quyết định quyền thao tác S3, không phải gateway chuyển tiếp traffic. Mũi tên này biểu diễn quyền truy cập logic, không khẳng định đường mạng S3 sử dụng NAT hay VPC endpoint.
-4. **EC2 → NAT → Internet Gateway → SSM:** SSM Agent chủ động mở kết nối outbound HTTPS cổng 443 tới các endpoint Systems Manager. Sơ đồ thể hiện đúng đường qua NAT đang sử dụng. [Tài liệu kết nối của SSM Agent](https://docs.aws.amazon.com/systems-manager/latest/userguide/troubleshooting-ssm-agent.html).
-5. **Quản trị viên → SSM → phiên trên EC2:** quản trị viên mở Session Manager hoặc SSH over SSM. Phiên quản trị sử dụng kênh do agent thiết lập ở luồng 4; không cần mở cổng SSH 22 ra Internet. [Tài liệu Session Manager](https://docs.aws.amazon.com/systems-manager/latest/userguide/session-manager.html).
+3. **EC2 → S3 bằng IAM role:** AWS SDK trong backend dùng credential tạm thời từ instance profile để thao tác S3.
+4. **EC2 → NAT → Internet Gateway → SSM:** SSM Agent mở kết nối outbound HTTPS cổng 443 tới các endpoint Systems Manager. [Tài liệu kết nối của SSM Agent](https://docs.aws.amazon.com/systems-manager/latest/userguide/troubleshooting-ssm-agent.html).
+5. **Quản trị viên → SSM → phiên trên EC2:** quản trị viên mở Session Manager hoặc SSH over SSM qua kênh do SSM Agent thiết lập, không cần mở cổng SSH 22 ra Internet. [Tài liệu Session Manager](https://docs.aws.amazon.com/systems-manager/latest/userguide/session-manager.html).
 
-Mũi tên liền thể hiện chiều khởi tạo request; response đi ngược chiều. Nét đứt thể hiện quan hệ cấp quyền hoặc gắn chứng chỉ. Public/private subnet được gom theo chức năng, không biểu diễn số Availability Zone hoặc số instance thực tế.
+Mũi tên liền thể hiện chiều khởi tạo request; nét đứt thể hiện quan hệ cấp quyền hoặc gắn chứng chỉ.
 
 ### Luồng deploy backend
 
@@ -549,7 +520,10 @@ Pipeline này deploy backend; cấu hình build/deploy Amplify được quản l
 | IAM role cho EC2                | Cấp quyền S3 qua credential tạm thời; ứng dụng không cần nhúng access key dài hạn                                           |
 | SSM qua NAT                     | Quản trị EC2 private bằng kênh outbound, giảm nhu cầu mở cổng SSH public                                                    |
 
-**Phạm vi vận hành:** ALB đã có trong kiến trúc triển khai và chuyển request đến EC2. Compose hiện chạy API cùng Elasticsearch single-node trên EC2; có ALB không đồng nghĩa backend đã chạy nhiều replica hoặc deploy không gián đoạn. Migration đã áp dụng không tự rollback nếu API mới lỗi; migration cần tương thích với phiên bản API trước đó. Số AZ, số instance, RDS Multi-AZ, backup retention và autoscaling không được suy ra từ sơ đồ này.
+**Giới hạn hiện tại:** Compose chạy một API và Elasticsearch single-node trên EC2;
+kiến trúc chưa cung cấp nhiều replica hoặc zero-downtime deployment. Migration đã
+áp dụng không tự rollback khi API mới lỗi, vì vậy migration phải tương thích với
+phiên bản API trước đó.
 
 ## 5. Cập nhật ảnh tài liệu
 

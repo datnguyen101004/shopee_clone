@@ -14,20 +14,30 @@ describe('FlashSaleAdmissionService', () => {
     };
     const prisma = {
       cart: {
-        findUnique: (jest.fn() as any).mockResolvedValue({
+        findUnique: jest.fn<
+          () => Promise<{ version: number; lines: Array<{ variantId: string; quantity: number }> }>
+        >().mockResolvedValue({
           version: 0,
           lines: [{ variantId: sku.variantId, quantity: 1 }],
         }),
       },
-      flashSaleSku: { findMany: (jest.fn() as any).mockResolvedValue([sku]) },
-      flashSaleBuyerClaim: { findMany: (jest.fn() as any).mockResolvedValue([]) },
+      flashSaleSku: {
+        findMany: jest.fn<() => Promise<Array<typeof sku>>>().mockResolvedValue([sku]),
+      },
+      flashSaleBuyerClaim: {
+        findMany: jest.fn<() => Promise<unknown[]>>().mockResolvedValue([]),
+      },
     };
     const redis = {
       isReady: jest.fn().mockReturnValue(true),
-      consumeRateLimit: (jest.fn() as any).mockResolvedValue({ available: true, allowed: true, retryAfterSeconds: 0 }),
-      getValue: (jest.fn() as any).mockResolvedValue(null),
-      setNxValue: (jest.fn() as any).mockResolvedValue(true),
-      evalVersioned: (jest.fn() as any)
+      consumeRateLimit: jest
+        .fn<
+          () => Promise<{ available: boolean; allowed: boolean; retryAfterSeconds: number }>
+        >()
+        .mockResolvedValue({ available: true, allowed: true, retryAfterSeconds: 0 }),
+      getValue: jest.fn<() => Promise<string | null>>().mockResolvedValue(null),
+      setNxValue: jest.fn<() => Promise<boolean>>().mockResolvedValue(true),
+      evalVersioned: jest.fn<() => Promise<number>>()
         .mockResolvedValueOnce(-2)
         .mockResolvedValueOnce(1),
     };

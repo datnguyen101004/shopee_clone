@@ -5,11 +5,12 @@ import { Search, ShoppingCart, Store, StorefrontContainer, UserRound } from '@sh
 import Link from 'next/link';
 import { useEffect, useRef, useState, type FormEvent, type RefObject } from 'react';
 
-import type { AuthSessionState } from './auth-session-provider';
+import { useAuthSession, type AuthSessionState } from './auth-session-provider';
 import { fetchCatalogSuggestions } from '../lib/catalog-suggestions-api';
 import type { CatalogSearchSuggestion } from '@shopee-clone/contracts';
 import { marketplaceCategories } from './marketplace-navigation';
 import { NotificationBell } from './notifications/notification-bell';
+import { submitClickstreamEvent } from '../lib/clickstream';
 
 const mobileNavigationId = 'marketplace-mobile-categories';
 
@@ -30,12 +31,15 @@ export function MarketplaceHeader({
   onCategoriesToggle,
   menuButtonRef,
 }: MarketplaceHeaderProps) {
+  const { sessionFetch } = useAuthSession();
   const [searchError, setSearchError] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [suggestions, setSuggestions] = useState<CatalogSearchSuggestion[]>([]);
+  const [suggestionsQuery, setSuggestionsQuery] = useState('');
   const [suggestionsOpen, setSuggestionsOpen] = useState(false);
   const userMenuId = 'marketplace-user-menu';
   const suggestionsId = 'market-search-suggestions';
+  const currentSuggestions = suggestionsQuery === searchQuery.trim() ? suggestions : [];
 
   useEffect(() => {
     if (!searchError) return;
@@ -47,10 +51,6 @@ export function MarketplaceHeader({
 
   useEffect(() => {
     const query = searchQuery.trim();
-    // Do not keep displaying results for the previous query while the
-    // debounced request for the current query is pending.
-    setSuggestions([]);
-    setSuggestionsOpen(false);
     if (!query) return;
 
     const controller = new AbortController();
@@ -59,6 +59,7 @@ export function MarketplaceHeader({
         .then((nextSuggestions) => {
           if (controller.signal.aborted) return;
           setSuggestions(nextSuggestions);
+          setSuggestionsQuery(query);
           setSuggestionsOpen(nextSuggestions.length > 0);
         })
         .catch(() => {
@@ -87,6 +88,16 @@ export function MarketplaceHeader({
     }
     input.value = query;
     setSearchQuery(query);
+    submitClickstreamEvent(
+      {
+        eventType: 'search_submitted',
+        surface: 'search',
+        query,
+        properties: {},
+      },
+      1_500,
+      sessionFetch,
+    );
     setSuggestionsOpen(false);
     setSearchError('');
   }
@@ -134,7 +145,9 @@ export function MarketplaceHeader({
             placeholder="Tìm sản phẩm, thương hiệu và tên shop"
             autoComplete="off"
             aria-autocomplete="list"
-            aria-controls={suggestionsOpen && suggestions.length ? suggestionsId : undefined}
+            aria-controls={
+              suggestionsOpen && currentSuggestions.length ? suggestionsId : undefined
+            }
             aria-invalid={Boolean(searchError) || undefined}
             aria-describedby={searchError ? 'site-search-error' : undefined}
             onInput={(event) => {
@@ -142,6 +155,7 @@ export function MarketplaceHeader({
               setSearchQuery(nextValue);
               if (!nextValue.trim()) {
                 setSuggestions([]);
+                setSuggestionsQuery('');
                 setSuggestionsOpen(false);
               } else {
                 setSuggestionsOpen(true);
@@ -149,7 +163,7 @@ export function MarketplaceHeader({
               if (searchError) setSearchError('');
             }}
             onFocus={() => {
-              if (suggestions.length) setSuggestionsOpen(true);
+              if (currentSuggestions.length) setSuggestionsOpen(true);
             }}
             onKeyDown={(event) => {
               if (event.key === 'Escape') setSuggestionsOpen(false);
@@ -163,9 +177,9 @@ export function MarketplaceHeader({
               {searchError}
             </span>
           ) : null}
-          {suggestionsOpen && suggestions.length ? (
+          {suggestionsOpen && currentSuggestions.length ? (
             <ul className="market-search__suggestions" id={suggestionsId} role="listbox">
-              {suggestions.map((suggestion) => (
+              {currentSuggestions.map((suggestion) => (
                 <li key={suggestion.text} role="option" aria-selected="false">
                   <Link href={`/search?q=${encodeURIComponent(suggestion.text)}`} onClick={() => setSuggestionsOpen(false)}>
                     <Search aria-hidden="true" size={16} />

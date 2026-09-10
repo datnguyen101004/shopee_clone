@@ -1,6 +1,38 @@
 export { isHealthResponse } from './health';
 export type { HealthResponse } from './health';
 export {
+  CLICKSTREAM_EVENT_TYPES,
+  CLICKSTREAM_SCHEMA_VERSION,
+  CLICKSTREAM_SURFACES,
+  isClickstreamHealthResponse,
+  parseClickstreamAcknowledgement,
+  parseClickstreamCollectionRequest,
+  parseClickstreamEvent,
+} from './clickstream';
+export type {
+  CartChangedEvent,
+  ClickstreamAcceptanceDisposition,
+  ClickstreamAcceptanceResponse,
+  ClickstreamAcknowledgement,
+  ClickstreamBatch,
+  ClickstreamCollectionRequest,
+  ClickstreamEvent,
+  ClickstreamEventType,
+  ClickstreamExportEvent,
+  ClickstreamHealthResponse,
+  ClickstreamProblemDetails,
+  ClickstreamRejectedEvent,
+  ClickstreamStatus,
+  ClickstreamSurface,
+  FavoriteChangedEvent,
+  OrderCompletedEvent,
+  ProductClickedEvent,
+  ProductImpressionEvent,
+  RecommendationClickedEvent,
+  RecommendationImpressionEvent,
+  SearchSubmittedEvent,
+} from './clickstream';
+export {
   DEMO_CARRIER_CALLBACK_OUTCOMES,
   DEMO_CARRIER_CALLBACK_WINDOW_SECONDS,
   DEMO_CARRIER_CURRENCY,

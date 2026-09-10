@@ -17,9 +17,19 @@ import { CheckoutExceptionFilter } from './checkout-exception.filter';
 import { CheckoutService } from './checkout.service';
 import { OrderWriter } from './order-writer';
 import { PurchaseProjector } from './purchase-projector';
+import { ClickstreamModule } from '../clickstream/clickstream.module';
 
 @Module({
-  imports: [AuthModule, PricingModule, VouchersModule, InventoryModule, NotificationsModule, TrafficAdmissionModule, CacheModule],
+  imports: [
+    AuthModule,
+    PricingModule,
+    VouchersModule,
+    InventoryModule,
+    NotificationsModule,
+    TrafficAdmissionModule,
+    CacheModule,
+    ClickstreamModule,
+  ],
   controllers: [CheckoutController, AdmissionResultController],
   providers: [
     CheckoutExceptionFilter,

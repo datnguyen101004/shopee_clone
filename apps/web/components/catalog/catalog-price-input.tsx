@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 
 import { formatPriceDisplay } from './catalog-utils';
 
@@ -17,22 +17,23 @@ export function FormattedPriceInput({
   onChangeValue: (val: number | null) => void;
   placeholder: string;
 }) {
-  const [displayValue, setDisplayValue] = useState(() => formatPriceDisplay(value));
-
-  useEffect(() => {
-    setDisplayValue(formatPriceDisplay(value));
-  }, [value]);
+  const [displayDraft, setDisplayDraft] = useState(() => ({
+    value,
+    text: formatPriceDisplay(value),
+  }));
+  const displayValue =
+    displayDraft.value === value ? displayDraft.text : formatPriceDisplay(value);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const rawDigits = e.target.value.replace(/\D/g, '');
     if (!rawDigits) {
-      setDisplayValue('');
+      setDisplayDraft({ value: null, text: '' });
       onChangeValue(null);
       return;
     }
     const num = Number(rawDigits);
     if (!Number.isSafeInteger(num)) return;
-    setDisplayValue(new Intl.NumberFormat('vi-VN').format(num));
+    setDisplayDraft({ value: num, text: new Intl.NumberFormat('vi-VN').format(num) });
     onChangeValue(num);
   };
 

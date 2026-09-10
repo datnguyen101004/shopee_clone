@@ -1,0 +1,4 @@
+interface:
+  display_name: "Backend Architecture"
+  short_description: "Design and review backend architecture with explicit trade-offs"
+  default_prompt: "Design or review this backend architecture and present explicit trade-offs for every material decision."

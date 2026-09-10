@@ -562,6 +562,16 @@ enum ChatRateLimitScope {
   @@map("chat_rate_limit_scope")
 }
 
+enum ClickstreamOutboxStatus {
+  PENDING   @map("pending")
+  LEASED    @map("leased")
+  DELIVERED @map("delivered")
+  TERMINAL  @map("terminal")
+  DROPPED   @map("dropped")
+
+  @@map("clickstream_outbox_status")
+}
+
 enum RefundLedgerKind {
   MOCK_CREDIT @map("mock_credit")
 
@@ -2994,4 +3004,31 @@ model NotificationTemplate {
 
   @@unique([type, channel, locale, version])
   @@map("notification_templates")
+}
+
+model ClickstreamOutbox {
+  id             String                  @id @default(uuid()) @db.Uuid
+  eventId        String                  @unique @map("event_id") @db.Uuid
+  schemaVersion  Int                     @map("schema_version")
+  eventType      String                  @map("event_type") @db.VarChar(64)
+  surface        String                  @db.VarChar(64)
+  payload        Json                    @db.JsonB
+  payloadHash    String                  @map("payload_hash") @db.Char(64)
+  status         ClickstreamOutboxStatus @default(PENDING)
+  attemptCount   Int                     @default(0) @map("attempt_count")
+  nextAttemptAt  DateTime                @default(now()) @map("next_attempt_at") @db.Timestamptz(3)
+  leaseOwner     String?                 @map("lease_owner") @db.Uuid
+  leaseUntil     DateTime?               @map("lease_until") @db.Timestamptz(3)
+  acceptedAt     DateTime                @default(now()) @map("accepted_at") @db.Timestamptz(3)
+  deliveredAt    DateTime?               @map("delivered_at") @db.Timestamptz(3)
+  terminalAt     DateTime?               @map("terminal_at") @db.Timestamptz(3)
+  expiresAt      DateTime                @map("expires_at") @db.Timestamptz(3)
+  updatedAt      DateTime                @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  lastErrorCode  String?                 @map("last_error_code") @db.VarChar(64)
+  lastHttpStatus Int?                    @map("last_http_status")
+
+  @@index([status, nextAttemptAt, acceptedAt])
+  @@index([status, leaseUntil])
+  @@index([expiresAt])
+  @@map("clickstream_outbox")
 }

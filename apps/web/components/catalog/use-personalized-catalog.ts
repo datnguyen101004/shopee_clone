@@ -20,7 +20,9 @@ export function usePersonalizedCatalog({
   personalizedPath?: string;
 }) {
   const { state: authState, authenticatedFetch } = useAuthSession();
+  const authenticatedUserId = authState.status === 'authenticated' ? authState.user.id : null;
   const [personalizedResponse, setPersonalizedResponse] = useState<{
+    userId: string;
     path: string;
     response: Pick<CatalogProductsResponse, 'items' | 'pagination'>;
   } | null>(null);
@@ -48,11 +50,9 @@ export function usePersonalizedCatalog({
   }, [context, personalizedPath, response.pagination.page]);
 
   useEffect(() => {
-    // Reset personalized data on logout to avoid leaking private state
-    if (authState.status !== 'authenticated') {
-      setPersonalizedResponse(null);
-      return;
-    }
+    // The active response is derived below, so private data is never rendered
+    // after logout while the in-flight request is cancelled here.
+    if (authenticatedUserId === null) return;
     if (!catalogPath) return;
 
     const controller = new AbortController();
@@ -68,15 +68,24 @@ export function usePersonalizedCatalog({
         const personalized = isCatalogProductsResponse(body)
           ? body
           : parsePublicShopCatalogPage(body);
-        if (personalized) setPersonalizedResponse({ path: catalogPath, response: personalized });
+        if (personalized)
+          setPersonalizedResponse({
+            userId: authenticatedUserId,
+            path: catalogPath,
+            response: personalized,
+          });
       })
       .catch(() => undefined);
 
     return () => controller.abort();
-  }, [authState.status, authenticatedFetch, catalogPath]);
+  }, [authenticatedUserId, authenticatedFetch, catalogPath]);
 
   const activeResponse =
-    personalizedResponse?.path === catalogPath ? personalizedResponse.response : response;
+    authenticatedUserId !== null &&
+    personalizedResponse?.userId === authenticatedUserId &&
+    personalizedResponse.path === catalogPath
+      ? personalizedResponse.response
+      : response;
 
   return activeResponse;
 }

@@ -8,10 +8,7 @@ import { CatalogPagination } from './catalog-pagination';
 import { ProductCard } from './catalog-product-card';
 import { CatalogProductGrid } from './catalog-product-grid';
 import { CatalogSortBar } from './catalog-sort-bar';
-import {
-  catalogPageHref,
-  type CatalogRouteContext,
-} from './catalog-utils';
+import { catalogPageHref, type CatalogRouteContext } from './catalog-utils';
 import { usePersonalizedCatalog } from './use-personalized-catalog';
 import { FavoriteStateProvider } from '../engagement/favorite-state-provider';
 
@@ -57,7 +54,7 @@ export function CatalogContent({
 
   return (
     <div className="shopee-catalog-content">
-      <CatalogProductGrid products={activeResponse.items} />
+      <CatalogProductGrid products={activeResponse.items} query={context?.q ?? undefined} />
       <CatalogPagination
         response={activeResponse}
         context={context}

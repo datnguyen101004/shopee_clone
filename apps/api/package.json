@@ -45,6 +45,8 @@
     "returns:deadlines": "tsx scripts/process-return-deadlines.ts",
     "returns:evidence:cleanup": "tsx scripts/cleanup-return-evidence.ts",
     "notifications:dispatch": "tsx scripts/process-notification-outbox.ts",
+    "clickstream:dispatch": "tsx scripts/clickstream-dispatch.ts",
+    "clickstream:replay": "tsx scripts/clickstream-replay.ts",
     "search:reindex": "tsx scripts/search-full-reindex.ts",
     "search:reconcile": "tsx scripts/search-reconcile.ts",
     "search:rollback": "tsx scripts/search-rollback.ts",

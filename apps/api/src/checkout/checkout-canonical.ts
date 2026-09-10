@@ -18,7 +18,8 @@ export function checkoutFingerprint(preview: CheckoutPreviewResponse): string {
       // campaignPrice.evaluatedAt is an observation timestamp, not a checkout
       // fact. Repricing is still detected through the material price/campaign
       // fields, while a confirm immediately after preview remains valid.
-      const { evaluatedAt: _evaluatedAt, ...campaignPrice } = line.campaignPrice;
+      const campaignPrice = { ...line.campaignPrice };
+      Reflect.deleteProperty(campaignPrice, 'evaluatedAt');
       return { ...line, campaignPrice };
     }),
   }));

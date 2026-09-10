@@ -2,7 +2,7 @@
 
 import type { CatalogProductsResponse } from '@shopee-clone/contracts';
 import Link from 'next/link';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 
 import {
   FaFilter,
@@ -26,17 +26,35 @@ export function CatalogFilterPanel({
   context: CatalogRouteContext;
 }) {
   const { query, facets } = response;
-  const [minPrice, setMinPrice] = useState<number | null>(query.minPrice);
-  const [maxPrice, setMaxPrice] = useState<number | null>(query.maxPrice);
+  const [priceDraft, setPriceDraft] = useState(() => ({
+    sourceMinPrice: query.minPrice,
+    sourceMaxPrice: query.maxPrice,
+    minPrice: query.minPrice,
+    maxPrice: query.maxPrice,
+  }));
+  const queryChanged =
+    priceDraft.sourceMinPrice !== query.minPrice || priceDraft.sourceMaxPrice !== query.maxPrice;
+  // Treat a changed URL query as the new source of truth during render. This
+  // keeps browser Back/Forward in sync without a cascading effect update.
+  const minPrice = queryChanged ? query.minPrice : priceDraft.minPrice;
+  const maxPrice = queryChanged ? query.maxPrice : priceDraft.maxPrice;
 
-  // Synchronize state when URL/query changes (supports back/forward history)
-  useEffect(() => {
-    setMinPrice(query.minPrice);
-  }, [query.minPrice]);
-
-  useEffect(() => {
-    setMaxPrice(query.maxPrice);
-  }, [query.maxPrice]);
+  const updateMinPrice = (nextMinPrice: number | null) => {
+    setPriceDraft((current) => ({
+      sourceMinPrice: query.minPrice,
+      sourceMaxPrice: query.maxPrice,
+      minPrice: nextMinPrice,
+      maxPrice: queryChanged ? query.maxPrice : current.maxPrice,
+    }));
+  };
+  const updateMaxPrice = (nextMaxPrice: number | null) => {
+    setPriceDraft((current) => ({
+      sourceMinPrice: query.minPrice,
+      sourceMaxPrice: query.maxPrice,
+      minPrice: queryChanged ? query.minPrice : current.minPrice,
+      maxPrice: nextMaxPrice,
+    }));
+  };
 
   const activePresetKey = useMemo(() => {
     const matched = PRICE_RANGE_PRESETS.find(
@@ -48,13 +66,12 @@ export function CatalogFilterPanel({
   const handlePresetChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const selectedKey = e.target.value;
     const matched = PRICE_RANGE_PRESETS.find((p) => p.key === selectedKey);
-    if (matched) {
-      setMinPrice(matched.min);
-      setMaxPrice(matched.max);
-    } else {
-      setMinPrice(null);
-      setMaxPrice(null);
-    }
+    setPriceDraft({
+      sourceMinPrice: query.minPrice,
+      sourceMaxPrice: query.maxPrice,
+      minPrice: matched?.min ?? null,
+      maxPrice: matched?.max ?? null,
+    });
   };
 
   return (
@@ -155,7 +172,7 @@ export function CatalogFilterPanel({
             ariaLabel="Giá thấp nhất"
             name="minPrice"
             value={minPrice}
-            onChangeValue={setMinPrice}
+            onChangeValue={updateMinPrice}
             placeholder={
               facets.priceRange.min === null ? 'TỪ' : formatPriceDisplay(facets.priceRange.min)
             }
@@ -165,7 +182,7 @@ export function CatalogFilterPanel({
             ariaLabel="Giá cao nhất"
             name="maxPrice"
             value={maxPrice}
-            onChangeValue={setMaxPrice}
+            onChangeValue={updateMaxPrice}
             placeholder={
               facets.priceRange.max === null ? 'ĐẾN' : formatPriceDisplay(facets.priceRange.max)
             }

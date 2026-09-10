@@ -2,11 +2,12 @@ import { isCanonicalProductId } from '@shopee-clone/contracts';
 import { Badge, StorefrontContainer } from '@shopee-clone/ui';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
+import { randomUUID } from 'node:crypto';
 
 import { ProductDetailExperience } from '../../../../components/product-detail/product-detail-experience';
 import { ChatNowButton } from '../../../../components/chat/chat-now-button';
 import { fetchProductDetail, ProductDetailApiError } from '../../../../lib/product-detail-api';
-import { marketplaceMediaUrl } from '../../../../lib/marketplace-media-url';
+import { ProductDetailRelatedCard } from '../../../../components/product-detail/product-detail-related-card';
 
 export const dynamic = 'force-dynamic';
 
@@ -55,6 +56,7 @@ export default async function ProductDetailPage({
     );
   }
 
+  const relatedRequestId = randomUUID();
   return (
     <StorefrontContainer className="product-detail-page">
       <nav className="product-detail-breadcrumb" aria-label="Điều hướng sản phẩm">
@@ -108,8 +110,8 @@ export default async function ProductDetailPage({
         <article className="product-detail-context__card product-detail-context__shop">
           <div className="product-detail-context__badge">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
-              <polyline points="9 22 9 12 15 12 15 22"/>
+              <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+              <polyline points="9 22 9 12 15 12 15 22" />
             </svg>
             <span>SHOP</span>
           </div>
@@ -160,8 +162,8 @@ export default async function ProductDetailPage({
             </p>
             <div className="product-detail-context__shipping-badge">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <circle cx="12" cy="12" r="10"/>
-                <polyline points="12 6 12 12 14 14"/>
+                <circle cx="12" cy="12" r="10" />
+                <polyline points="12 6 12 12 14 14" />
               </svg>
               <span>{product.shippingPreview.message}</span>
             </div>
@@ -175,20 +177,13 @@ export default async function ProductDetailPage({
             <h2 id="related-products-title">Sản phẩm tương tự</h2>
           </div>
           <div className="product-detail-related__grid">
-            {product.relatedProducts.map((related) => (
-              <Link key={related.id} href={related.href} className="product-detail-related__card">
-                <div className="product-detail-related__image-wrap">
-                  {related.imageUrl ? (
-                    <img src={marketplaceMediaUrl(related.imageUrl)} alt={related.imageAlt} />
-                  ) : (
-                    <span aria-hidden="true" className="product-detail-related__fallback">S</span>
-                  )}
-                </div>
-                <div className="product-detail-related__info">
-                  <span className="font-medium">{related.name}</span>
-                  <span className="product-detail-related__price font-semibold">₫{formatNumber(related.priceMinor)}</span>
-                </div>
-              </Link>
+            {product.relatedProducts.map((related, position) => (
+              <ProductDetailRelatedCard
+                key={related.id}
+                product={related}
+                position={position}
+                requestId={relatedRequestId}
+              />
             ))}
           </div>
         </section>

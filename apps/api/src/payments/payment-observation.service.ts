@@ -7,6 +7,7 @@ import { Prisma } from '../generated/prisma/client';
 import { InventoryService } from '../inventory/inventory.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { VoucherConsumptionService } from '../vouchers/voucher-consumption.service';
+import { ClickstreamService } from '../clickstream/clickstream.service';
 import { classifyMomoResultCode, MomoResultCodeMetrics } from './momo-result-code';
 import { classifyVnpayResultCode, VnpayResultCodeMetrics } from './vnpay-result-code';
 import type {
@@ -100,6 +101,7 @@ export class PaymentObservationService {
     @Inject(InventoryService) private readonly inventory: InventoryService,
     @Inject(VoucherConsumptionService)
     private readonly voucherConsumption: VoucherConsumptionService,
+    @Inject(ClickstreamService) private readonly clickstream?: ClickstreamService,
   ) {}
 
   async applyProviderObservation(
@@ -109,7 +111,7 @@ export class PaymentObservationService {
     if (!/^[0-9a-f]{64}$/.test(fingerprint)) {
       throw new ProviderObservationValidationError('Observation fingerprint is invalid.');
     }
-    return this.prisma.$transaction(async (transaction) => {
+    const result: AppliedProviderObservation = await this.prisma.$transaction(async (transaction) => {
       const candidate = await transaction.paymentAttempt.findUnique({
         where: {
           provider_orderId: {
@@ -489,5 +491,36 @@ export class PaymentObservationService {
         duplicate: false,
       };
     });
+    if (result.decision === 'APPLIED' && result.status === 'PAID') {
+      void Promise.resolve()
+        .then(async () => {
+          const attempt = await this.prisma.paymentAttempt.findUnique({
+            where: { id: result.attemptId },
+            select: {
+              purchase: {
+                select: {
+                  id: true,
+                  buyerId: true,
+                  orders: { select: { lines: { select: { quantity: true } } } },
+                },
+              },
+            },
+          });
+          if (!attempt?.purchase) return;
+          const itemCount = attempt.purchase.orders.reduce(
+            (total, order) =>
+              total + order.lines.reduce((sum, line) => sum + line.quantity, 0),
+            0,
+          );
+          await this.clickstream?.captureAuthoritativeOutcome({
+            eventType: 'order_completed',
+            surface: 'checkout',
+            userId: attempt.purchase.buyerId,
+            properties: { orderId: attempt.purchase.id, itemCount },
+          });
+        })
+        .catch(() => undefined);
+    }
+    return result;
   }
 }

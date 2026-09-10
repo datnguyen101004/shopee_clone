@@ -23,6 +23,7 @@ import {
 import { EngagementRepository, type FavoriteRow } from './engagement.repository';
 import { BuyerBestPriceService } from '../pricing/buyer-best-price.service';
 import { ScheduledDiscountService } from '../pricing/scheduled-discount.service';
+import { ClickstreamService } from '../clickstream/clickstream.service';
 
 function pagination(query: EngagementPageQuery, totalItems: number) {
   return {
@@ -41,6 +42,8 @@ export class EngagementService {
     private readonly scheduledDiscounts?: ScheduledDiscountService,
     @Inject(BuyerBestPriceService)
     private readonly buyerPrices?: BuyerBestPriceService,
+    @Inject(ClickstreamService)
+    private readonly clickstream?: ClickstreamService,
   ) {}
 
   private async productCards(
@@ -165,12 +168,40 @@ export class EngagementService {
       throw new EngagementProductNotFoundError();
     }
     const row = await this.repository.upsertFavorite(userId, productId, this.clock.now());
+    void this.captureFavoriteOutcome({
+      eventType: 'favorite_changed',
+      surface: 'favorite',
+      userId,
+      productId,
+      properties: { isFavorite: true },
+    });
     return { productId, isFavorite: true, favoritedAt: row.favoritedAt.toISOString() };
   }
 
   async removeFavorite(userId: string, productId: string): Promise<FavoriteMutationResponse> {
     await this.repository.deleteFavorite(userId, productId);
+    void this.captureFavoriteOutcome({
+      eventType: 'favorite_changed',
+      surface: 'favorite',
+      userId,
+      productId,
+      properties: { isFavorite: false },
+    });
     return { productId, isFavorite: false, favoritedAt: null };
+  }
+
+  private async captureFavoriteOutcome(input: {
+    eventType: 'favorite_changed';
+    surface: 'favorite';
+    userId: string;
+    productId: string;
+    properties: { isFavorite: boolean };
+  }): Promise<void> {
+    try {
+      await this.clickstream?.captureAuthoritativeOutcome(input);
+    } catch {
+      // Analytics is a post-commit side effect and must never alter engagement responses.
+    }
   }
 
   async recentlyViewed(userId: string, query: EngagementPageQuery): Promise<RecentlyViewedPage> {

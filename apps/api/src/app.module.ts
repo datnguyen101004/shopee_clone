@@ -36,6 +36,7 @@ import { RecommendationsModule } from './recommendations/recommendations.module'
 import { MarketplaceCampaignsModule } from './marketplace-campaigns/marketplace-campaigns.module';
 import { TrafficAdmissionModule } from './traffic-admission/traffic-admission.module';
 import { CacheModule } from './cache/cache.module';
+import { ClickstreamModule } from './clickstream/clickstream.module';
 
 @Module({
   imports: [
@@ -45,6 +46,7 @@ import { CacheModule } from './cache/cache.module';
     MarketplaceCampaignsModule,
     TrafficAdmissionModule,
     CacheModule,
+    ClickstreamModule,
     HealthModule,
     HomepageModule,
     CatalogModule,

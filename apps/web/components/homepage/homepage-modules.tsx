@@ -22,11 +22,17 @@ import {
 } from '@shopee-clone/ui';
 import Image from 'next/image';
 import Link from 'next/link';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { MarketplaceProductImage } from '../marketplace-product-image';
 import { FavoriteStateProvider } from '../engagement/favorite-state-provider';
 import { useAuthSession } from '../auth-session-provider';
+import {
+  clickstreamImpressionKey,
+  createClickstreamCorrelationId,
+  createClickstreamImpressionDeduper,
+  submitClickstreamEvent,
+} from '../../lib/clickstream';
 
 function normalizeText(text: string): string {
   return text
@@ -452,10 +458,51 @@ function formatMoney(value: number): string {
   return new Intl.NumberFormat('vi-VN').format(value);
 }
 
-function ProductCard({ product }: { product: HomepageProductSummary }) {
+function ProductCard({
+  product,
+  tracking,
+}: {
+  product: HomepageProductSummary;
+  tracking?: {
+    eventType: 'product_clicked' | 'recommendation_clicked';
+    requestId: string;
+    placement: string;
+    position: number;
+    recommendationId?: string;
+  };
+}) {
+  const { sessionFetch } = useAuthSession();
   return (
     <UiProductCard
       className="product-card"
+      onClick={
+        tracking
+          ? () =>
+              submitClickstreamEvent(
+                tracking.eventType === 'recommendation_clicked'
+                  ? {
+                      eventType: tracking.eventType,
+                      surface: 'homepage',
+                      productId: product.id,
+                      placement: tracking.placement,
+                      position: tracking.position,
+                      recommendationId: tracking.recommendationId ?? tracking.requestId,
+                      properties: {},
+                    }
+                  : {
+                      eventType: tracking.eventType,
+                      surface: 'homepage',
+                      productId: product.id,
+                      placement: tracking.placement,
+                      position: tracking.position,
+                      requestId: tracking.requestId,
+                      properties: {},
+                },
+                1_500,
+                sessionFetch,
+              )
+          : undefined
+      }
       linkClassName="product-card__link"
       linkComponent={Link}
       href={product.href}
@@ -513,6 +560,37 @@ function DailyRecommendationsSection({ module }: { module: HomepageProductModule
   const containerRef = useRef<HTMLDivElement>(null);
   const [canScrollPrev, setCanScrollPrev] = useState(false);
   const [canScrollNext, setCanScrollNext] = useState(true);
+  const { sessionFetch } = useAuthSession();
+  const resultSetKey = `${module.id}:${module.products.map(({ id }) => id).join(',')}`;
+  const requestId = useMemo(() => createClickstreamCorrelationId(resultSetKey), [resultSetKey]);
+  const [deduper] = useState(createClickstreamImpressionDeduper);
+
+  useEffect(() => {
+    for (const [position, product] of module.products.entries()) {
+      const placement = `homepage:${module.type}`;
+      const key = clickstreamImpressionKey({
+        requestId,
+        placement,
+        productId: product.id,
+        position,
+      });
+      if (deduper.seen(key))
+        submitClickstreamEvent(
+          {
+            eventType: 'recommendation_impression',
+            surface: 'homepage',
+            productId: product.id,
+            placement,
+            position,
+            recommendationId: requestId,
+            properties: {},
+          },
+          1_500,
+          sessionFetch,
+        );
+    }
+    return () => deduper.clear();
+  }, [deduper, module.products, module.type, requestId, sessionFetch]);
 
   const checkScrollability = useCallback(() => {
     const el = containerRef.current;
@@ -559,9 +637,18 @@ function DailyRecommendationsSection({ module }: { module: HomepageProductModule
         </button>
         <div className="carousel-container" ref={containerRef} onScroll={checkScrollability}>
           <div className="carousel-track">
-            {module.products.map((product) => (
+            {module.products.map((product, position) => (
               <div className="carousel-item" key={product.id}>
-                <ProductCard product={product} />
+                <ProductCard
+                  product={product}
+                  tracking={{
+                    eventType: 'recommendation_clicked',
+                    requestId,
+                    placement: `homepage:${module.type}`,
+                    position,
+                    recommendationId: requestId,
+                  }}
+                />
               </div>
             ))}
           </div>
@@ -581,6 +668,8 @@ function DailyRecommendationsSection({ module }: { module: HomepageProductModule
 }
 
 function ProductSection({ module }: { module: HomepageProductModule }) {
+  const resultSetKey = `${module.id}:${module.products.map(({ id }) => id).join(',')}`;
+  const requestId = useMemo(() => createClickstreamCorrelationId(resultSetKey), [resultSetKey]);
   if (module.type === 'daily-recommendations') {
     return <DailyRecommendationsSection module={module} />;
   }
@@ -607,8 +696,17 @@ function ProductSection({ module }: { module: HomepageProductModule }) {
     >
       <SectionHeader id={`module-${module.id}`} title={titleContent} subtitle={module.subtitle} />
       <div className="product-grid">
-        {module.products.map((product) => (
-          <ProductCard product={product} key={product.id} />
+        {module.products.map((product, position) => (
+          <ProductCard
+            product={product}
+            key={product.id}
+            tracking={{
+              eventType: 'product_clicked',
+              requestId,
+              placement: `homepage:${module.type}`,
+              position,
+            }}
+          />
         ))}
       </div>
     </StorefrontSection>
@@ -617,17 +715,20 @@ function ProductSection({ module }: { module: HomepageProductModule }) {
 
 export function HomepageModules({ modules }: { modules: HomepageModule[] }) {
   const { state: authState, authenticatedFetch } = useAuthSession();
+  const authenticatedUserId = authState.status === 'authenticated' ? authState.user.id : null;
   const [personalizedModules, setPersonalizedModules] = useState<{
+    userId: string;
     source: HomepageModule[];
     modules: HomepageModule[];
   } | null>(null);
   const displayModules =
-    personalizedModules?.source === modules ? personalizedModules.modules : modules;
+    authenticatedUserId !== null &&
+    personalizedModules?.userId === authenticatedUserId &&
+    personalizedModules.source === modules
+      ? personalizedModules.modules
+      : modules;
   useEffect(() => {
-    if (authState.status !== 'authenticated') {
-      setPersonalizedModules(null);
-      return;
-    }
+    if (authenticatedUserId === null) return;
     const controller = new AbortController();
     const endpoint = new URL(
       '/api/v1/homepage',
@@ -637,11 +738,16 @@ export function HomepageModules({ modules }: { modules: HomepageModule[] }) {
       .then(async (result) => {
         if (!result.ok) return;
         const parsed = parseHomepageResponse(await result.json());
-        if (parsed) setPersonalizedModules({ source: modules, modules: parsed.modules });
+        if (parsed)
+          setPersonalizedModules({
+            userId: authenticatedUserId,
+            source: modules,
+            modules: parsed.modules,
+          });
       })
       .catch(() => undefined);
     return () => controller.abort();
-  }, [authState.status, authenticatedFetch, modules]);
+  }, [authenticatedUserId, authenticatedFetch, modules]);
 
   const productIds = displayModules.flatMap((module) =>
     'products' in module ? module.products.map(({ id }) => id) : [],

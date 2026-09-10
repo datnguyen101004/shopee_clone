@@ -1,5 +1,5 @@
 import { timingSafeEqual } from 'node:crypto';
-import { Body, Controller, Headers, Post, UnauthorizedException } from '@nestjs/common';
+import { Body, Controller, Headers, Inject, Post, UnauthorizedException } from '@nestjs/common';
 import { TrafficAdmissionService } from './traffic-admission.service';
 import type { AdmissionGrantResult } from './admission-lambda';
 import { ExternalRequest } from '../security/external-request.decorator';
@@ -18,7 +18,7 @@ interface AdmissionGrantBody {
 @Controller('internal/admission')
 @ExternalRequest('internal-signed')
 export class AdmissionInternalController {
-  constructor(private readonly admission: TrafficAdmissionService) {}
+  constructor(@Inject(TrafficAdmissionService) private readonly admission: TrafficAdmissionService) {}
 
   @Post('queue/grant')
   async grant(

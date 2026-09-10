@@ -15,6 +15,7 @@ import { VariantStatus } from '../generated/prisma/enums';
 import { isSellableProduct } from '../catalog/sellable-product';
 import { isSellableShop } from '../catalog/sellable-shop';
 import { PrismaService } from '../prisma/prisma.service';
+import { ClickstreamService } from '../clickstream/clickstream.service';
 import {
   CartCapacityError,
   CartConflictError,
@@ -49,8 +50,16 @@ type CartTransaction = Prisma.TransactionClient;
 type CartRow = Prisma.CartGetPayload<{ include: typeof cartInclude }>;
 type CartLineRow = CartRow['lines'][number];
 
+type CartAnalyticsOutcome = {
+  productId: string;
+  action: 'add' | 'update' | 'remove' | 'select';
+  quantity?: number;
+  selected?: boolean;
+};
+
 interface MutationResult {
   response: CartMutationResponse;
+  outcomes?: CartAnalyticsOutcome[];
 }
 
 function emptyCart(): CartResponse {
@@ -102,7 +111,10 @@ function currentFacts(line: CartLineRow) {
 
 @Injectable()
 export class CartService {
-  constructor(@Inject(PrismaService) private readonly prisma: PrismaService) {}
+  constructor(
+    @Inject(PrismaService) private readonly prisma: PrismaService,
+    @Inject(ClickstreamService) private readonly clickstream?: ClickstreamService,
+  ) {}
 
   async read(userId: string): Promise<CartResponse> {
     const cart = await this.prisma.cart.findUnique({ where: { userId }, include: cartInclude });
@@ -116,7 +128,7 @@ export class CartService {
     quantity: number,
   ): Promise<MutationResult> {
     const now = new Date();
-    return this.prisma.$transaction(async (transaction) => {
+    const result = await this.prisma.$transaction(async (transaction) => {
       const variant = await transaction.productVariant.findUnique({
         where: { id: variantId },
         include: {
@@ -209,8 +221,17 @@ export class CartService {
           cart: await this.projectById(transaction, cart.id),
           adjustments,
         },
+        outcomes: [
+          {
+            productId: variant.product.id,
+            action: 'add' as const,
+            quantity: acceptedQuantity,
+          },
+        ],
       };
     });
+    void this.captureCartOutcome(userId, result.outcomes ?? []);
+    return result;
   }
 
   async updateQuantity(
@@ -219,7 +240,7 @@ export class CartService {
     lineId: string,
     quantity: number,
   ): Promise<MutationResult> {
-    return this.prisma.$transaction(async (transaction) => {
+    const result = await this.prisma.$transaction(async (transaction) => {
       const owner = await this.requireCart(transaction, userId);
       await this.lockCart(transaction, owner.id);
       const line = await transaction.cartLine.findFirst({
@@ -274,19 +295,28 @@ export class CartService {
           cart: await this.projectById(transaction, cart.id),
           adjustments,
         },
+        outcomes: [
+          {
+            productId: (line as CartLineRow).variant.product.id,
+            action: 'update' as const,
+            quantity: acceptedQuantity,
+          },
+        ],
       };
     });
+    void this.captureCartOutcome(userId, result.outcomes ?? []);
+    return result;
   }
 
   async remove(userId: string, expectedVersion: number, lineId: string): Promise<MutationResult> {
-    return this.prisma.$transaction(async (transaction) => {
+    const result = await this.prisma.$transaction(async (transaction) => {
       const owner = await this.findCart(transaction, userId);
       if (!owner) return { response: { cart: emptyCart(), adjustments: [] } };
 
       await this.lockCart(transaction, owner.id);
       const line = await transaction.cartLine.findFirst({
         where: { id: lineId, cartId: owner.id },
-        select: { id: true },
+        select: { id: true, variant: { select: { productId: true } } },
       });
       if (!line) {
         const addressedElsewhere = await transaction.cartLine.findUnique({
@@ -308,8 +338,13 @@ export class CartService {
       });
       return {
         response: { cart: await this.projectById(transaction, cart.id), adjustments: [] },
+        outcomes: [
+          { productId: line.variant.productId, action: 'remove' as const, quantity: 0 },
+        ],
       };
     });
+    void this.captureCartOutcome(userId, result.outcomes ?? []);
+    return result;
   }
 
   async selectLine(
@@ -319,9 +354,14 @@ export class CartService {
     selected: boolean,
   ): Promise<MutationResult> {
     return this.mutateSelection(userId, expectedVersion, async (transaction, cartId) => {
-      const line = await transaction.cartLine.findFirst({ where: { id: lineId, cartId } });
+      const line = await transaction.cartLine.findFirst({
+        where: { id: lineId, cartId },
+        include: { variant: { select: { productId: true } } },
+      });
       if (!line) throw new CartLineNotFoundError();
+      if (line.isSelected === selected) return [];
       await transaction.cartLine.update({ where: { id: line.id }, data: { isSelected: selected } });
+      return [{ productId: line.variant.productId, action: 'select' as const, selected }];
     });
   }
 
@@ -337,15 +377,15 @@ export class CartService {
         include: cartInclude.lines.include,
       });
       if (lines.length === 0) throw new CartLineNotFoundError();
+      const outcomes: CartAnalyticsOutcome[] = [];
       for (const line of lines) {
         const facts = currentFacts(line as CartLineRow);
-        await transaction.cartLine.update({
-          where: { id: line.id },
-          data: {
-            isSelected: selected && facts.eligible && line.quantity <= facts.maxPurchaseQuantity,
-          },
-        });
+        const nextSelected = selected && facts.eligible && line.quantity <= facts.maxPurchaseQuantity;
+        if (line.isSelected === nextSelected) continue;
+        await transaction.cartLine.update({ where: { id: line.id }, data: { isSelected: nextSelected } });
+        outcomes.push({ productId: line.variant.product.id, action: 'select', selected: nextSelected });
       }
+      return outcomes;
     });
   }
 
@@ -359,37 +399,69 @@ export class CartService {
         where: { cartId },
         include: cartInclude.lines.include,
       });
+      const outcomes: CartAnalyticsOutcome[] = [];
       for (const line of lines) {
         const facts = currentFacts(line as CartLineRow);
-        await transaction.cartLine.update({
-          where: { id: line.id },
-          data: {
-            isSelected: selected && facts.eligible && line.quantity <= facts.maxPurchaseQuantity,
-          },
-        });
+        const nextSelected = selected && facts.eligible && line.quantity <= facts.maxPurchaseQuantity;
+        if (line.isSelected === nextSelected) continue;
+        await transaction.cartLine.update({ where: { id: line.id }, data: { isSelected: nextSelected } });
+        outcomes.push({ productId: line.variant.product.id, action: 'select', selected: nextSelected });
       }
+      return outcomes;
     });
   }
 
   private async mutateSelection(
     userId: string,
     expectedVersion: number,
-    work: (transaction: CartTransaction, cartId: string) => Promise<void>,
+    work: (
+      transaction: CartTransaction,
+      cartId: string,
+    ) => Promise<CartAnalyticsOutcome[]>,
   ): Promise<MutationResult> {
-    return this.prisma.$transaction(async (transaction) => {
+    const result = await this.prisma.$transaction(async (transaction) => {
       const owner = await this.requireCart(transaction, userId);
       await this.lockCart(transaction, owner.id);
       const cart = await transaction.cart.findUniqueOrThrow({ where: { id: owner.id } });
       this.expectVersion(cart.version, expectedVersion);
-      await work(transaction, cart.id);
+      const outcomes = await work(transaction, cart.id);
       await transaction.cart.update({
         where: { id: cart.id },
         data: { version: { increment: 1 } },
       });
       return {
         response: { cart: await this.projectById(transaction, cart.id), adjustments: [] },
+        outcomes,
       };
     });
+    void this.captureCartOutcome(userId, result.outcomes ?? []);
+    return result;
+  }
+
+  private async captureCartOutcome(
+    userId: string,
+    outcomes: CartAnalyticsOutcome[],
+  ): Promise<void> {
+    if (!this.clickstream) return;
+    await Promise.all(
+      outcomes.map((outcome) =>
+        Promise.resolve()
+          .then(() =>
+            this.clickstream!.captureAuthoritativeOutcome({
+              eventType: 'cart_changed',
+              surface: 'cart',
+              userId,
+              productId: outcome.productId,
+              properties: {
+                action: outcome.action,
+                ...(outcome.quantity === undefined ? {} : { quantity: outcome.quantity }),
+                ...(outcome.selected === undefined ? {} : { selected: outcome.selected }),
+              },
+            }),
+          )
+          .catch(() => undefined),
+      ),
+    );
   }
 
   private async ensureUserCart(transaction: CartTransaction, userId: string, now: Date) {

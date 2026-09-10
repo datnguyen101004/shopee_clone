@@ -1,6 +1,7 @@
 import { Controller, Get, Inject } from '@nestjs/common';
 import type {
   ChatOutboxHealthResponse,
+  ClickstreamHealthResponse,
   HealthResponse,
   ProductRetentionCleanupStatus,
 } from '@shopee-clone/contracts';
@@ -13,6 +14,7 @@ import {
   SearchElasticsearchAdapter,
   type ElasticsearchHealthResponse,
 } from '../search/search-elasticsearch.adapter';
+import { ClickstreamDispatcher } from '../clickstream/clickstream.dispatcher';
 
 @Controller('health')
 export class HealthController {
@@ -25,6 +27,7 @@ export class HealthController {
     @Inject(ChatOutboxDispatcher) private readonly chatOutbox: ChatOutboxDispatcher,
     @Inject(SearchElasticsearchAdapter)
     private readonly searchElasticsearch: SearchElasticsearchAdapter,
+    @Inject(ClickstreamDispatcher) private readonly clickstreamOutbox: ClickstreamDispatcher,
   ) {}
 
   @Get()
@@ -57,5 +60,10 @@ export class HealthController {
   @Get('elasticsearch')
   async getElasticsearchHealth(): Promise<ElasticsearchHealthResponse> {
     return this.searchElasticsearch.getHealth();
+  }
+
+  @Get('clickstream-outbox')
+  async getClickstreamOutboxHealth(): Promise<ClickstreamHealthResponse> {
+    return this.clickstreamOutbox.health();
   }
 }

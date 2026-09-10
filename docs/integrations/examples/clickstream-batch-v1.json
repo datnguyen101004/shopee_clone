@@ -1,0 +1,23 @@
+{
+  "contractVersion": "1",
+  "batchId": "55555555-5555-4555-8555-555555555555",
+  "producer": "shopee-clone-api",
+  "sentAt": "2026-09-10T00:00:00.000Z",
+  "events": [
+    {
+      "eventId": "11111111-1111-4111-8111-111111111111",
+      "schemaVersion": 1,
+      "eventType": "product_clicked",
+      "occurredAt": "2026-09-10T00:00:00.000Z",
+      "surface": "search",
+      "sessionPseudonym": "4b2c8f6d0d4d2a5c0d9b2f4baf8b7903b8f1f6f4e0d5ce6d8e8e1a6d7c2b3a91",
+      "buyerPseudonym": "e9a0f8d6c4b2a1908877665544332211ffeeddccbbaa0099887766554433221100",
+      "pseudonymKeyId": "clickstream-prod-2026-09",
+      "productId": "22222222-2222-4222-8222-222222222222",
+      "placement": "search_results",
+      "position": 0,
+      "requestId": "33333333-3333-4333-8333-333333333333",
+      "properties": {}
+    }
+  ]
+}

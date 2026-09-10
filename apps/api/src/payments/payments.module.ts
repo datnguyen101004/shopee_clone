@@ -24,11 +24,19 @@ import { VNPAY_CONFIG, loadVnpayConfig, type VnpayConfig } from './vnpay.config'
 import { VnpayPaymentProvider } from './vnpay-payment-provider';
 import { VnpayResultCodeMetrics } from './vnpay-result-code';
 import { PAYMENT_PROVIDER_REGISTRY, PaymentProviderRegistry } from './payment-provider.registry';
+import { ClickstreamModule } from '../clickstream/clickstream.module';
 
 export const MOMO_HTTP_TRANSPORT = Symbol('MOMO_HTTP_TRANSPORT');
 
 @Module({
-  imports: [AuthModule, CheckoutModule, InventoryModule, VouchersModule, TrafficAdmissionModule],
+  imports: [
+    AuthModule,
+    CheckoutModule,
+    InventoryModule,
+    VouchersModule,
+    TrafficAdmissionModule,
+    ClickstreamModule,
+  ],
   controllers: [MomoIpnController, VnpayIpnController, PaymentsController],
   providers: [
     { provide: MOMO_CONFIG, useFactory: (): MomoConfig => loadMomoConfig() },

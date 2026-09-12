@@ -19,6 +19,7 @@ describe('clickstream contract', () => {
     'search_submitted',
     'product_impression',
     'product_clicked',
+    'product_viewed',
     'recommendation_impression',
     'recommendation_clicked',
     'favorite_changed',
@@ -37,6 +38,13 @@ describe('clickstream contract', () => {
               placement: 'feed',
               position: 0,
               recommendationId: '44444444-4444-4444-8444-444444444444',
+            }
+        : eventType === 'product_viewed'
+          ? {
+              ...base,
+              eventType,
+              surface: 'product_detail',
+              productId: '33333333-3333-4333-8333-333333333333',
             }
           : eventType.startsWith('product_')
             ? {

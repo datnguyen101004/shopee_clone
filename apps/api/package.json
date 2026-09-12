@@ -55,11 +55,14 @@
     "search:baseline:evaluate": "tsx scripts/search-baseline-evaluate.ts",
     "recommendations:profiles": "tsx scripts/recommendations-build-profiles.ts",
     "recommendations:seed": "tsx scripts/recommendations-seed-examples.ts",
+    "recommendations:snapshots": "tsx scripts/recommendations-export-snapshots.ts",
     "recommendations:train": "tsx scripts/recommendations-train-model.ts",
     "recommendations:activate": "tsx scripts/recommendations-activate-model.ts"
   },
   "dependencies": {
     "@aws-sdk/client-lambda": "^3.1127.0",
+    "@aws-sdk/client-athena": "3.1127.0",
+    "@aws-sdk/client-sts": "3.1127.0",
     "@aws-sdk/client-s3": "^3.1111.0",
     "@aws-sdk/client-sqs": "^3.1127.0",
     "@aws-sdk/s3-request-presigner": "3.1111.0",

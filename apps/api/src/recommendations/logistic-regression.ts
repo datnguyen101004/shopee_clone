@@ -1,6 +1,8 @@
 import {
   BUYER_PAIR_FEATURE_NAMES,
+  CLICKSTREAM_TRAINING_SOURCE,
   CURRENT_RECOMMENDATION_VERSIONS,
+  SEEDED_TRAINING_SOURCE,
   RECOMMENDATION_DATASET_VERSION,
   RECOMMENDATION_RANDOM_SEED,
   type BuyerPairFeatureName,
@@ -47,7 +49,14 @@ export function normalizePairFeature(name: BuyerPairFeatureName, value: number):
   }
 }
 
-function vector(example: SeededTrainingExample): readonly number[] {
+function vector(
+  example: SeededTrainingExample,
+  zeroFilledOnlineFeatures = false,
+): readonly number[] {
+  if (example.featureVectorSource === 'snapshot-backed') {
+    return BUYER_PAIR_FEATURE_NAMES.map((name) => clamp(example.features[name]));
+  }
+  if (zeroFilledOnlineFeatures) return BUYER_PAIR_FEATURE_NAMES.map(() => 0);
   return BUYER_PAIR_FEATURE_NAMES.map((name) => normalizePairFeature(name, example.features[name]));
 }
 
@@ -145,8 +154,17 @@ export function trainLogisticRegression(
   options: {
     trainedAt?: Date;
     trainingSource?: string;
+    trainingDatasetUri?: string;
     iterations?: number;
     learningRate?: number;
+    modelVersion?: number;
+    initialIntercept?: number;
+    initialFeatureWeights?: Partial<Record<BuyerPairFeatureName, number>>;
+    trainingManifestUri?: string;
+    trainingMode?: 'daily' | 'full';
+    trainingInputUris?: readonly string[];
+    baseModelVersion?: number;
+    baseModelTrainingDatasetUri?: string;
   } = {},
 ): TrainedRankingModel {
   const sorted = [...examples].sort((left, right) => left.exampleId.localeCompare(right.exampleId));
@@ -160,8 +178,13 @@ export function trainLogisticRegression(
     throw new Error('Training requires deterministic train and held-out partitions.');
   }
 
-  const weights = new Array<number>(BUYER_PAIR_FEATURE_NAMES.length).fill(0);
-  let intercept = 0;
+  const trainingSource = options.trainingSource ?? SEEDED_TRAINING_SOURCE;
+  const weights = BUYER_PAIR_FEATURE_NAMES.map((name) => {
+    const initial = options.initialFeatureWeights?.[name] ?? 0;
+    return Number.isFinite(initial) ? Math.max(-20, Math.min(20, initial)) : 0;
+  });
+  const zeroFilledOnlineFeatures = trainingSource === CLICKSTREAM_TRAINING_SOURCE;
+  let intercept = Number.isFinite(options.initialIntercept) ? options.initialIntercept! : 0;
   const iterations = options.iterations ?? ITERATIONS;
   const learningRate = options.learningRate ?? LEARNING_RATE;
 
@@ -169,7 +192,7 @@ export function trainLogisticRegression(
     const gradient = new Array<number>(weights.length).fill(0);
     let interceptGradient = 0;
     for (const example of train) {
-      const features = vector(example);
+      const features = vector(example, zeroFilledOnlineFeatures);
       const prediction = score(intercept, weights, features);
       const error = (prediction - example.label) * Math.max(0, example.sampleWeight);
       interceptGradient += error;
@@ -191,11 +214,12 @@ export function trainLogisticRegression(
     }
   }
 
-  const heldoutPredictions = heldout.map((example) => score(intercept, weights, vector(example)));
+  const heldoutPredictions = heldout.map((example) =>
+    score(intercept, weights, vector(example, zeroFilledOnlineFeatures)),
+  );
   const labels = heldout.map((example) => example.label);
   const metrics = rankingMetrics(heldout, heldoutPredictions);
   const heldoutPositiveCount = labels.filter((label) => label === 1).length;
-  const trainingSource = options.trainingSource ?? 'seeded-fixture';
   const demonstrationOnly =
     trainingSource !== 'production-impressions' || heldoutPositiveCount < 200;
   const trainedAt = options.trainedAt
@@ -203,13 +227,14 @@ export function trainLogisticRegression(
     : new Date(Math.max(...sorted.map((example) => example.impressionAt.getTime())));
 
   return {
-    modelVersion: CURRENT_RECOMMENDATION_VERSIONS.modelVersion,
+    modelVersion: options.modelVersion ?? CURRENT_RECOMMENDATION_VERSIONS.modelVersion,
     productProjectionVersion: CURRENT_RECOMMENDATION_VERSIONS.productProjectionVersion,
     featureSchemaVersion: CURRENT_RECOMMENDATION_VERSIONS.featureSchemaVersion,
     storedScriptVersion: CURRENT_RECOMMENDATION_VERSIONS.storedScriptVersion,
     datasetVersion: sorted[0]?.datasetVersion ?? RECOMMENDATION_DATASET_VERSION,
     randomSeed: sorted[0]?.randomSeed ?? RECOMMENDATION_RANDOM_SEED,
     trainingSource,
+    trainingDatasetUri: options.trainingDatasetUri,
     intercept,
     featureWeights: BUYER_PAIR_FEATURE_NAMES.map((name, index) => ({
       name,
@@ -225,6 +250,12 @@ export function trainLogisticRegression(
       heldoutPositiveCount,
       demonstrationOnly,
       metricsLabel: demonstrationOnly ? 'demonstration-only' : 'production-candidate',
+      trainingDatasetUri: options.trainingDatasetUri,
+      trainingManifestUri: options.trainingManifestUri,
+      trainingMode: options.trainingMode,
+      trainingInputUris: options.trainingInputUris,
+      baseModelVersion: options.baseModelVersion,
+      baseModelTrainingDatasetUri: options.baseModelTrainingDatasetUri,
     },
     trainedAt,
   };

@@ -29,10 +29,17 @@ class MatrixAuthGuard implements CanActivate {
 const range = { from: '2026-08-01', to: '2026-08-07', timeZone: 'Asia/Ho_Chi_Minh', fromUtc: '2026-07-31T17:00:00.000Z', toUtcExclusive: '2026-08-07T17:00:00.000Z' };
 const dashboard = { sellerAnalyticsVersion: 'seller-analytics-v1', currency: 'VND', range, generatedAt: '2026-08-19T00:00:00.000Z', kpis: { eligibleOrderCount: 0, unitsSold: 0, merchandiseRevenueMinor: 0 }, timeSeries: [{ bucket: '2026-08-01', eligibleOrderCount: 0, unitsSold: 0, merchandiseRevenueMinor: 0 }], bestSellers: [], lowStock: { threshold: 10, items: [] }, conversion: { status: 'NOT_AVAILABLE', rateBasisPoints: null, visits: null } };
 const productPage = { sellerAnalyticsVersion: 'seller-analytics-v1', currency: 'VND', range, items: [], nextCursor: null };
+const zeroMetric = { current: 0, previous: 0, change: 0 };
+const overview = {
+  sellerAnalyticsVersion: 'seller-analytics-overview-v1', currency: 'VND', generatedAt: '2026-08-19T00:00:00.000Z', freshness: 'near_real_time',
+  range: { preset: 'today', from: '2026-08-19', to: '2026-08-19', timeZone: 'Asia/Ho_Chi_Minh', fromUtc: '2026-08-18T17:00:00.000Z', toUtcExclusive: '2026-08-19T00:00:00.000Z', previousFromUtc: '2026-08-17T17:00:00.000Z', previousToUtcExclusive: '2026-08-18T00:00:00.000Z' },
+  summary: { impressions: zeroMetric, productViews: zeroMetric, uniqueVisitors: zeroMetric, clicks: zeroMetric, ctr: zeroMetric, addToCart: zeroMetric, orders: zeroMetric, unitsSold: zeroMetric, revenue: zeroMetric, conversionRate: zeroMetric },
+  trend: { interval: 'hour', buckets: [] }, products: { items: [], page: 1, pageSize: 10, totalItems: 0, totalPages: 0 },
+};
 
 describe('Seller analytics HTTP contract', () => {
   let app: INestApplication;
-  const analytics = { dashboard: jest.fn(), products: jest.fn() };
+  const analytics = { dashboard: jest.fn(), products: jest.fn(), overview: jest.fn() };
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
       .overrideProvider(PrismaService).useValue({ onModuleInit: jest.fn(), onModuleDestroy: jest.fn() })
@@ -43,7 +50,7 @@ describe('Seller analytics HTTP contract', () => {
     configureApplication(app, loadAuthConfig({ NODE_ENV: 'test', AUTH_ALLOWED_ORIGINS: 'http://localhost:3000' }));
     await app.init();
   });
-  beforeEach(() => { jest.clearAllMocks(); analytics.dashboard.mockResolvedValue(dashboard); analytics.products.mockResolvedValue(productPage); });
+  beforeEach(() => { jest.clearAllMocks(); analytics.dashboard.mockResolvedValue(dashboard); analytics.products.mockResolvedValue(productPage); analytics.overview.mockResolvedValue(overview); });
   afterAll(async () => app.close());
 
   it('enforces authentication/role, private caching, ownership and exact dashboard output', async () => {
@@ -67,6 +74,17 @@ describe('Seller analytics HTTP contract', () => {
     expect(response.body).toEqual(productPage);
     expect(analytics.products).toHaveBeenCalledWith(users.seller!.id, { from: '2026-08-01', to: '2026-08-07', granularity: 'DAY', limit: 100, cursor: 'abc_DEF' });
     await request(app.getHttpServer()).get('/api/v1/seller/analytics/products?from=2026-08-01&to=2026-08-07&limit=101').set('Authorization', 'Bearer seller').expect(400);
+  });
+
+  it('enforces seller auth, owner-scoped overview input and exact response validation', async () => {
+    await request(app.getHttpServer()).get('/api/v1/seller/analytics/overview?preset=today').expect(401);
+    await request(app.getHttpServer()).get('/api/v1/seller/analytics/overview?preset=today').set('Authorization', 'Bearer buyer').expect(403);
+    const response = await request(app.getHttpServer()).get('/api/v1/seller/analytics/overview?preset=today&page=1&pageSize=10').set('Authorization', 'Bearer seller').expect(200);
+    expect(response.headers['cache-control']).toBe('private, max-age=30, stale-while-revalidate=60');
+    expect(response.body).toEqual(overview);
+    expect(analytics.overview).toHaveBeenCalledWith(users.seller!.id, { preset: 'today', page: 1, pageSize: 10 });
+    await request(app.getHttpServer()).get('/api/v1/seller/analytics/overview?preset=today&shopId=foreign').set('Authorization', 'Bearer seller').expect(400);
+    expect(analytics.overview).toHaveBeenCalledTimes(1);
   });
 });
 

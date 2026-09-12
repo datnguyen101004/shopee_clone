@@ -48,7 +48,6 @@ export function CatalogProductGrid({
           sessionFetch,
         );
     }
-    return () => deduper.clear();
   }, [deduper, products, query, requestId, sessionFetch]);
   return (
     <FavoriteStateProvider productIds={products.map(({ id }) => id)}>

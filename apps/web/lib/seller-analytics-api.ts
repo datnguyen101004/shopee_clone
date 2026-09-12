@@ -1,4 +1,10 @@
-import { isSellerAnalyticsProductPage, isSellerDashboardResponse, type SellerAnalyticsProductPage, type SellerDashboardResponse } from '@shopee-clone/contracts';
+import {
+  isSellerAnalyticsOverviewResponse,
+  isSellerDashboardResponse,
+  type SellerAnalyticsOverviewQuery,
+  type SellerAnalyticsOverviewResponse,
+  type SellerDashboardResponse,
+} from '@shopee-clone/contracts';
 import { RoleApiError, type AuthenticatedFetcher } from './role-api';
 
 const endpoint = (path: string) => new URL(path, process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:3001');
@@ -22,12 +28,25 @@ export async function fetchSellerDashboard(fetcher: AuthenticatedFetcher, input:
   return body;
 }
 
-export async function fetchSellerProductAnalytics(fetcher: AuthenticatedFetcher, input: { from: string; to: string; limit?: number; cursor?: string }): Promise<SellerAnalyticsProductPage> {
-  const url = endpoint('/api/v1/seller/analytics/products');
-  Object.entries(input).forEach(([key, value]) => { if (value !== undefined) url.searchParams.set(key, String(value)); });
-  const response = await fetcher(url, { method: 'GET', cache: 'no-store', headers: { Accept: 'application/json, application/problem+json' } });
+export async function fetchSellerAnalyticsOverview(
+  fetcher: AuthenticatedFetcher,
+  input: Omit<SellerAnalyticsOverviewQuery, 'page' | 'pageSize'> & Partial<Pick<SellerAnalyticsOverviewQuery, 'page' | 'pageSize'>>,
+  options?: { signal?: AbortSignal },
+): Promise<SellerAnalyticsOverviewResponse> {
+  const url = endpoint('/api/v1/seller/analytics/overview');
+  if (input.preset) url.searchParams.set('preset', input.preset);
+  if (input.from) url.searchParams.set('from', input.from);
+  if (input.to) url.searchParams.set('to', input.to);
+  url.searchParams.set('page', String(input.page ?? 1));
+  url.searchParams.set('pageSize', String(input.pageSize ?? 10));
+  const response = await fetcher(url, {
+    method: 'GET',
+    cache: 'no-store',
+    headers: { Accept: 'application/json, application/problem+json' },
+    signal: options?.signal,
+  });
   const body = await readBody(response);
   if (!response.ok) throw new RoleApiError('status', response.status, problemOf(body));
-  if (!isSellerAnalyticsProductPage(body)) throw new RoleApiError('contract', response.status);
+  if (!isSellerAnalyticsOverviewResponse(body)) throw new RoleApiError('contract', response.status);
   return body;
 }

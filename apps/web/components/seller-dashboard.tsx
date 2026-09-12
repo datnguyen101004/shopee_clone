@@ -285,7 +285,10 @@ export function SellerDashboard() {
                 </div>
               </div>
               <strong>Chưa có dữ liệu</strong>
-              <small className="seller-kpi-trend">Chưa có tracking lượt truy cập</small>
+              <Link className="seller-dashboard-analytics-link" href="/seller/analytics">
+                Xem phân tích shop
+              </Link>
+              <small className="seller-kpi-trend">Theo dõi phễu sản phẩm, đơn hàng và doanh thu</small>
             </article>
           </div>
 

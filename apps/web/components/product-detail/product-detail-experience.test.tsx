@@ -11,15 +11,17 @@ import {
   selectProductVariant,
 } from './product-detail-interactions';
 
-const { push, addItem, authSession, cartSession } = vi.hoisted(() => {
+const { push, addItem, submitClickstreamEvent, authSession, cartSession } = vi.hoisted(() => {
   const addItemFn = vi.fn();
   return {
     push: vi.fn(),
     addItem: addItemFn,
+    submitClickstreamEvent: vi.fn(),
     authSession: {
       state: {
         state: { status: 'guest' as 'guest' | 'authenticated' | 'loading' },
         authenticatedFetch: vi.fn(),
+        sessionFetch: vi.fn(),
       },
     },
     cartSession: {
@@ -40,6 +42,7 @@ const { push, addItem, authSession, cartSession } = vi.hoisted(() => {
 });
 
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push }) }));
+vi.mock('../../lib/clickstream', () => ({ submitClickstreamEvent }));
 vi.mock('../auth-session-provider', () => ({
   useAuthSession: () => authSession.state,
 }));
@@ -137,10 +140,20 @@ describe('product detail interactions', () => {
     push.mockReset();
     addItem.mockReset();
     authSession.state.authenticatedFetch.mockReset();
+    authSession.state.sessionFetch.mockReset();
+    submitClickstreamEvent.mockReset();
     authSession.state.authenticatedFetch.mockResolvedValue(new Response(null, { status: 503 }));
     authSession.state.state = { status: 'guest' };
     cartSession.state.state = { status: 'unauthenticated', cart: null };
     cartSession.state.pending = false;
+  });
+
+  it('captures one product view when the detail experience rerenders', async () => {
+    const { rerender } = render(<ProductDetailExperience product={product} />);
+    await waitFor(() => expect(submitClickstreamEvent).toHaveBeenCalledTimes(1));
+    rerender(<ProductDetailExperience product={{ ...product, name: 'Phone updated' }} />);
+    expect(submitClickstreamEvent).toHaveBeenCalledTimes(1);
+    expect(submitClickstreamEvent).toHaveBeenCalledWith(expect.objectContaining({ eventType: 'product_viewed', surface: 'product_detail', productId: product.id }), 1500, expect.anything());
   });
 
   it('initializes deterministically, switches media, resets invalid quantity, and serializes only trusted handoffs', () => {

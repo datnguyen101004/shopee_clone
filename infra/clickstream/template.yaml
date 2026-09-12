@@ -1,0 +1,503 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Shopee Clone MVP clickstream ingestion, seller CTR and training pipeline.
+
+Parameters:
+  RawBucketName:
+    Type: String
+  ProcessedBucketName:
+    Type: String
+  CreateDataBuckets:
+    Type: String
+    Default: 'true'
+    AllowedValues: ['true', 'false']
+    Description: Create and retain the Raw and Processed buckets; set false to reuse existing buckets.
+  AthenaResultsBucketName:
+    Type: String
+  AthenaDatabaseName:
+    Type: String
+    Default: clickstream
+    Description: Glue Catalog database name used by the backend Athena adapter.
+  AthenaTableName:
+    Type: String
+    Default: raw_clickstream_events
+    Description: Glue Catalog table name used by the backend Athena adapter.
+  AthenaWorkGroupName:
+    Type: String
+    Default: clickstream-mvp
+    Description: Athena workgroup name used by the backend Athena adapter.
+  LambdaCodeS3Bucket:
+    Type: String
+  LambdaCodeS3Key:
+    Type: String
+    Default: clickstream-ingestion.zip
+  GlueScriptS3Bucket:
+    Type: String
+  GlueScriptS3Key:
+    Type: String
+    Default: glue/glue_job.py
+  ExistingHttpApiId:
+    Type: String
+    Description: Existing API Gateway HTTP API id that owns the clickstream route.
+  AthenaBackendPrincipalArn:
+    Type: String
+    Description: Exact IAM role ARN of the existing backend runtime that calls the seller CTR endpoint.
+  IngestionHmacKeyId:
+    Type: String
+    NoEcho: true
+    Description: HMAC key id shared with the existing clickstream dispatcher.
+  IngestionHmacSecret:
+    Type: String
+    NoEcho: true
+    Description: HMAC secret shared with the existing clickstream dispatcher.
+  ScheduleTimeZone:
+    Type: String
+    Default: Asia/Ho_Chi_Minh
+  AttributionWindowMinutes:
+    Type: Number
+    Default: 30
+
+Conditions:
+  CreateDataBucketsCondition: !Equals [!Ref CreateDataBuckets, 'true']
+
+Resources:
+  RawBucket:
+    Type: AWS::S3::Bucket
+    Condition: CreateDataBucketsCondition
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BucketName: !Ref RawBucketName
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      LifecycleConfiguration:
+        Rules:
+          - Id: expire-raw-after-demo-retention
+            Status: Enabled
+            Prefix: raw/
+            ExpirationInDays: 90
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+
+  ProcessedBucket:
+    Type: AWS::S3::Bucket
+    Condition: CreateDataBucketsCondition
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BucketName: !Ref ProcessedBucketName
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      LifecycleConfiguration:
+        Rules:
+          - Id: expire-processed-interactions-after-35-days
+            Status: Enabled
+            Prefix: processed/interactions/
+            ExpirationInDays: 35
+          - Id: expire-training-exports-after-35-days
+            Status: Enabled
+            Prefix: exports/training/
+            ExpirationInDays: 35
+          - Id: expire-training-snapshots-after-35-days
+            Status: Enabled
+            Prefix: snapshots/
+            ExpirationInDays: 35
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+
+  AthenaResultsBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Ref AthenaResultsBucketName
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      LifecycleConfiguration:
+        Rules:
+          - Id: expire-athena-results
+            Status: Enabled
+            Prefix: athena/results/
+            ExpirationInDays: 7
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+
+  IngestionLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ${AWS::StackName}-ingestion
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: { Service: lambda.amazonaws.com }
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: put-to-designated-firehose
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: firehose:PutRecordBatch
+                Resource: !GetAtt RawFirehose.Arn
+              - Effect: Allow
+                Action: [logs:CreateLogGroup, logs:CreateLogStream, logs:PutLogEvents]
+                Resource: !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/${AWS::StackName}-ingestion:*
+
+  FirehoseDeliveryRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ${AWS::StackName}-firehose
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: { Service: firehose.amazonaws.com }
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: write-designated-raw-prefix
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: [s3:GetBucketLocation, s3:ListBucket, s3:ListBucketMultipartUploads]
+                Resource: !Sub arn:${AWS::Partition}:s3:::${RawBucketName}
+              - Effect: Allow
+                Action: [s3:AbortMultipartUpload, s3:GetObject, s3:ListMultipartUploadParts, s3:PutObject]
+                Resource:
+                  - !Sub 'arn:${AWS::Partition}:s3:::${RawBucketName}/raw/*'
+                  - !Sub 'arn:${AWS::Partition}:s3:::${RawBucketName}/raw-errors/*'
+              - Effect: Allow
+                Action: [logs:CreateLogStream, logs:DescribeLogStreams, logs:PutLogEvents]
+                Resource:
+                  - !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/kinesisfirehose/${AWS::StackName}
+                  - !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/kinesisfirehose/${AWS::StackName}:log-stream:delivery
+
+  AthenaQueryRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ${AWS::StackName}-athena-query
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              AWS: !Ref AthenaBackendPrincipalArn
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: read-raw-run-athena
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: athena:StartQueryExecution
+                Resource: !Sub arn:${AWS::Partition}:athena:${AWS::Region}:${AWS::AccountId}:workgroup/${AthenaWorkGroupName}
+              - Effect: Allow
+                Action: [athena:GetQueryExecution, athena:GetQueryResults]
+                Resource: '*'
+              - Effect: Allow
+                Action: [glue:GetDatabase, glue:GetTable]
+                Resource:
+                  - !Sub arn:${AWS::Partition}:glue:${AWS::Region}:${AWS::AccountId}:catalog
+                  - !Sub arn:${AWS::Partition}:glue:${AWS::Region}:${AWS::AccountId}:database/${AthenaDatabaseName}
+                  - !Sub arn:${AWS::Partition}:glue:${AWS::Region}:${AWS::AccountId}:table/${AthenaDatabaseName}/${AthenaTableName}
+              - Effect: Allow
+                Action: [s3:GetObject, s3:ListBucket]
+                Resource:
+                  - !Sub arn:${AWS::Partition}:s3:::${RawBucketName}
+                  - !Sub 'arn:${AWS::Partition}:s3:::${RawBucketName}/raw/*'
+              - Effect: Allow
+                Action: [s3:GetObject, s3:PutObject, s3:GetBucketLocation]
+                Resource:
+                  - !GetAtt AthenaResultsBucket.Arn
+                  - !Sub '${AthenaResultsBucket.Arn}/athena/results/*'
+
+  GlueEtlRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ${AWS::StackName}-glue
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: { Service: glue.amazonaws.com }
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: read-raw-write-processed
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: [s3:GetObject, s3:ListBucket]
+                Resource:
+                  - !Sub arn:${AWS::Partition}:s3:::${RawBucketName}
+                  - !Sub 'arn:${AWS::Partition}:s3:::${RawBucketName}/raw/*'
+              - Effect: Allow
+                Action: [s3:GetObject, s3:PutObject, s3:DeleteObject, s3:ListBucket]
+                Resource:
+                  - !Sub arn:${AWS::Partition}:s3:::${ProcessedBucketName}
+                  - !Sub 'arn:${AWS::Partition}:s3:::${ProcessedBucketName}/processed/*'
+                  - !Sub 'arn:${AWS::Partition}:s3:::${ProcessedBucketName}/exports/training/*'
+              - Effect: Allow
+                Action: s3:GetObject
+                Resource: !Sub 'arn:${AWS::Partition}:s3:::${ProcessedBucketName}/snapshots/*'
+              - Effect: Allow
+                Action: s3:PutObject
+                Resource: !Sub 'arn:${AWS::Partition}:s3:::${ProcessedBucketName}/snapshots/compacted/*'
+              - Effect: Allow
+                Action: [glue:GetDatabase, glue:GetTable, glue:GetPartitions]
+                Resource:
+                  - !Sub arn:${AWS::Partition}:glue:${AWS::Region}:${AWS::AccountId}:catalog
+                  - !Sub arn:${AWS::Partition}:glue:${AWS::Region}:${AWS::AccountId}:database/${AthenaDatabaseName}
+                  - !Sub arn:${AWS::Partition}:glue:${AWS::Region}:${AWS::AccountId}:table/${AthenaDatabaseName}/${AthenaTableName}
+              - Effect: Allow
+                Action: s3:GetObject
+                Resource: !Sub arn:${AWS::Partition}:s3:::${GlueScriptS3Bucket}/${GlueScriptS3Key}
+              - Effect: Allow
+                Action: logs:CreateLogGroup
+                Resource:
+                  - !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws-glue/jobs/error
+                  - !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws-glue/jobs/output
+              - Effect: Allow
+                Action: [logs:CreateLogStream, logs:PutLogEvents]
+                Resource:
+                  - !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws-glue/jobs/error:*
+                  - !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws-glue/jobs/output:*
+
+  SchedulerRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ${AWS::StackName}-scheduler
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: { Service: scheduler.amazonaws.com }
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: start-designated-glue-job
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: glue:StartJobRun
+                Resource: !Sub arn:${AWS::Partition}:glue:${AWS::Region}:${AWS::AccountId}:job/${AWS::StackName}-training
+
+  ClickstreamHttpIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref ExistingHttpApiId
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !GetAtt IngestionLambda.Arn
+      PayloadFormatVersion: '2.0'
+      TimeoutInMillis: 15000
+
+  ClickstreamHttpRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref ExistingHttpApiId
+      RouteKey: POST /clickstream/events
+      Target: !Sub integrations/${ClickstreamHttpIntegration}
+
+  IngestionLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/lambda/${AWS::StackName}-ingestion
+      RetentionInDays: 30
+
+  FirehoseLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/kinesisfirehose/${AWS::StackName}
+      RetentionInDays: 30
+
+  FirehoseDeliveryLogStream:
+    Type: AWS::Logs::LogStream
+    Properties:
+      LogGroupName: !Ref FirehoseLogGroup
+      LogStreamName: delivery
+
+  IngestionLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub ${AWS::StackName}-ingestion
+      Runtime: nodejs22.x
+      Handler: dist/handler.handler
+      Role: !GetAtt IngestionLambdaRole.Arn
+      Timeout: 15
+      MemorySize: 256
+      Code: { S3Bucket: !Ref LambdaCodeS3Bucket, S3Key: !Ref LambdaCodeS3Key }
+      Environment:
+        Variables:
+          CLICKSTREAM_AWS_REGION: !Ref AWS::Region
+          CLICKSTREAM_FIREHOSE_STREAM_NAME: !Ref RawFirehose
+          CLICKSTREAM_API_GATEWAY_ROUTE: /clickstream/events
+          CLICKSTREAM_HMAC_KEY_ID: !Ref IngestionHmacKeyId
+          CLICKSTREAM_HMAC_SECRET: !Ref IngestionHmacSecret
+
+  IngestionLambdaPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref IngestionLambda
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub arn:${AWS::Partition}:execute-api:${AWS::Region}:${AWS::AccountId}:${ExistingHttpApiId}/*/POST/clickstream/events
+
+  RawFirehose:
+    Type: AWS::KinesisFirehose::DeliveryStream
+    Properties:
+      DeliveryStreamName: !Sub ${AWS::StackName}-raw
+      DeliveryStreamType: DirectPut
+      ExtendedS3DestinationConfiguration:
+        BucketARN: !Sub arn:${AWS::Partition}:s3:::${RawBucketName}
+        RoleARN: !GetAtt FirehoseDeliveryRole.Arn
+        DynamicPartitioningConfiguration: { Enabled: true, RetryOptions: { DurationInSeconds: 60 } }
+        CompressionFormat: GZIP
+        Prefix: 'raw/schema_version=!{partitionKeyFromQuery:schema_version}/dt=!{partitionKeyFromQuery:dt}/hour=!{partitionKeyFromQuery:hour}/'
+        ErrorOutputPrefix: 'raw-errors/!{firehose:error-output-type}/'
+        CloudWatchLoggingOptions:
+          Enabled: true
+          LogGroupName: !Ref FirehoseLogGroup
+          LogStreamName: !Ref FirehoseDeliveryLogStream
+        BufferingHints: { IntervalInSeconds: 60, SizeInMBs: 64 }
+        ProcessingConfiguration:
+          Enabled: true
+          Processors:
+            - Type: MetadataExtraction
+              Parameters:
+                - ParameterName: MetadataExtractionQuery
+                  ParameterValue: '{schema_version:(.schemaVersion|tostring),dt:.ingestedAt[0:10],hour:.ingestedAt[11:13]}'
+                - ParameterName: JsonParsingEngine
+                  ParameterValue: JQ-1.6
+            - Type: AppendDelimiterToRecord
+              Parameters:
+                - ParameterName: Delimiter
+                  ParameterValue: '\n'
+
+  ClickstreamGlueDatabase:
+    Type: AWS::Glue::Database
+    Properties:
+      CatalogId: !Ref AWS::AccountId
+      DatabaseInput:
+        Name: !Ref AthenaDatabaseName
+
+  ClickstreamRawTable:
+    Type: AWS::Glue::Table
+    Properties:
+      CatalogId: !Ref AWS::AccountId
+      DatabaseName: !Ref ClickstreamGlueDatabase
+      TableInput:
+        Name: !Ref AthenaTableName
+        TableType: EXTERNAL_TABLE
+        Parameters:
+          classification: json
+          compressionType: gzip
+          typeOfData: file
+          projection.enabled: 'true'
+          projection.schema_version.type: enum
+          projection.schema_version.values: '1'
+          projection.dt.type: date
+          projection.dt.format: yyyy-MM-dd
+          projection.dt.range: '2026-01-01,NOW'
+          projection.dt.interval: '1'
+          projection.dt.interval.unit: DAYS
+          projection.hour.type: integer
+          projection.hour.range: '0,23'
+          projection.hour.interval: '1'
+          storage.location.template: !Sub 's3://${RawBucketName}/raw/schema_version=${!schema_version}/dt=${!dt}/hour=${!hour}/'
+        StorageDescriptor:
+          Location: !Sub s3://${RawBucketName}/raw/
+          InputFormat: org.apache.hadoop.mapred.TextInputFormat
+          OutputFormat: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
+          SerdeInfo:
+            SerializationLibrary: org.openx.data.jsonserde.JsonSerDe
+          Columns:
+            - { Name: eventId, Type: string }
+            - { Name: schemaVersion, Type: int }
+            - { Name: eventType, Type: string }
+            - { Name: occurredAt, Type: string }
+            - { Name: ingestedAt, Type: string }
+            - { Name: shopId, Type: string }
+            - { Name: productId, Type: string }
+            - { Name: surface, Type: string }
+            - { Name: sessionPseudonym, Type: string }
+            - { Name: buyerPseudonym, Type: string }
+            - { Name: placement, Type: string }
+            - { Name: position, Type: int }
+            - { Name: requestId, Type: string }
+            - { Name: recommendationId, Type: string }
+            - { Name: projectionVersion, Type: string }
+            - { Name: profileVersion, Type: string }
+            - { Name: modelVersion, Type: string }
+            - { Name: scriptVersion, Type: string }
+            # JsonSerDe keeps optional event properties nullable while exposing
+            # the authoritative cart action to Athena's analytics query.
+            - { Name: properties, Type: 'struct<action:string,quantity:int,selected:boolean,isFavorite:boolean,orderId:string,itemCount:int>' }
+        PartitionKeys:
+          - { Name: schema_version, Type: string }
+          - { Name: dt, Type: string }
+          - { Name: hour, Type: string }
+
+  ClickstreamAthenaWorkgroup:
+    Type: AWS::Athena::WorkGroup
+    Properties:
+      Name: !Ref AthenaWorkGroupName
+      WorkGroupConfiguration:
+        EnforceWorkGroupConfiguration: true
+        PublishCloudWatchMetricsEnabled: true
+        BytesScannedCutoffPerQuery: 1073741824
+        ResultConfiguration:
+          OutputLocation: !Sub s3://${AthenaResultsBucketName}/athena/results/
+
+  ClickstreamGlueJob:
+    Type: AWS::Glue::Job
+    Properties:
+      Name: !Sub ${AWS::StackName}-training
+      Role: !GetAtt GlueEtlRole.Arn
+      GlueVersion: '4.0'
+      NumberOfWorkers: 2
+      WorkerType: G.1X
+      Command:
+        Name: glueetl
+        PythonVersion: '3'
+        ScriptLocation: !Sub s3://${GlueScriptS3Bucket}/${GlueScriptS3Key}
+      DefaultArguments:
+        '--job-language': python
+        '--enable-metrics': 'true'
+        '--SOURCE_DATE': previous-local-day
+        '--RUN_DATE': previous-local-day
+        '--RAW_BUCKET': !Ref RawBucketName
+        '--PROCESSED_BUCKET': !Ref ProcessedBucketName
+        '--ATTRIBUTION_WINDOW_MINUTES': !Ref AttributionWindowMinutes
+
+  ClickstreamDailyScheduler:
+    Type: AWS::Scheduler::Schedule
+    Properties:
+      Name: !Sub ${AWS::StackName}-daily-training
+      FlexibleTimeWindow: { Mode: 'OFF' }
+      ScheduleExpression: cron(0 4 * * ? *)
+      ScheduleExpressionTimezone: !Ref ScheduleTimeZone
+      Target:
+        Arn: arn:aws:scheduler:::aws-sdk:glue:startJobRun
+        RoleArn: !GetAtt SchedulerRole.Arn
+        Input: !Sub '{"JobName":"${ClickstreamGlueJob}","Arguments":{"--SOURCE_DATE":"previous-local-day","--RUN_DATE":"previous-local-day","--RAW_BUCKET":"${RawBucketName}","--PROCESSED_BUCKET":"${ProcessedBucketName}","--ATTRIBUTION_WINDOW_MINUTES":"${AttributionWindowMinutes}","--TIME_ZONE":"${ScheduleTimeZone}"}}'
+
+Outputs:
+  RawBucketName: { Value: !Ref RawBucketName }
+  ProcessedBucketName: { Value: !Ref ProcessedBucketName }
+  AthenaWorkGroup: { Value: !Ref AthenaWorkGroupName }
+  AthenaQueryRoleArn: { Value: !GetAtt AthenaQueryRole.Arn }
+  IngestionEndpoint:
+    Value: !Sub 'https://${ExistingHttpApiId}.execute-api.${AWS::Region}.amazonaws.com/clickstream/events'

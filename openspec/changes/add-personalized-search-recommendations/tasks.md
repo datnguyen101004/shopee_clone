@@ -47,6 +47,18 @@
 - [x] 5.6 Implement a TypeScript logistic-regression training command that emits an intercept, ordered weights, AUC, log-loss, ranking metrics, and reproducible model metadata.
 - [x] 5.7 Permit model activation only when its feature schema and stored-script versions match, and label seeded-fixture metrics as demonstration-only until the held-out set contains at least 200 valid positives.
 - [x] 5.8 Add tests for deterministic profiles/training, bounded feature storage, cancelled-order exclusion, cold start, stale profiles, cross-buyer isolation, and incompatible model versions.
+- [x] 5.9 Add an exact-object S3 clickstream `training.csv` loader with strict handoff validation, pseudonymous example mapping, deterministic dataset metadata, and zero-filled online feature vectors for the MVP baseline.
+- [x] 5.10 Wire `recommendations:train` to select `RECOMMENDATION_TRAINING_DATASET_MANIFEST_S3_URI` through ambient AWS credentials while preserving the seeded fixture fallback and candidate-only lifecycle; document the variable and accepted intercept-only trade-off.
+- [x] 5.11 Add focused happy-path tests for clickstream CSV parsing, exact S3 object retrieval, deterministic partition suitability, and training-source metadata.
+- [x] 5.12 Add privacy-safe product and buyer-profile snapshot contracts, manifest-last S3 writing, and an explicit backend export command that reuses canonical projection/profile semantics and the clickstream pseudonym identity.
+- [x] 5.13 Extend the daily Glue transform with committed snapshot discovery, backward as-of joins, compatibility checks, and deterministic generation of the sixteen online ranking features.
+- [x] 5.14 Extend the S3 training loader and model metadata to accept the enriched CSV as a snapshot-backed clickstream source that learns feature weights while remaining candidate-only.
+- [x] 5.15 Add focused unit tests for snapshot privacy/serialization, feature formulas, as-of selection, enriched CSV parsing/training, and document the required export-before-04:00 happy path and trade-offs.
+- [x] 5.16 Replace per-buyer activity rebuilds with bounded pagination over materialized buyer profiles changed in `(since, cutoff]`, carry their original generation time, extend profile usability to thirty days, and keep one complete source-day product snapshot plus pseudonymous buyer delta manifests.
+- [x] 5.17 Change Glue to resolve only the source-day product snapshot, source-day buyer delta, and immediately previous compacted buyer state; merge unchanged buyers forward and join by keyed lookup/Spark operations without scanning all snapshot history per impression.
+- [x] 5.18 Make each daily training CSV create-once, update a fixed manifest with at most thirty exact daily URIs, prune compacted buyer profiles older than thirty days, and expire processed interactions, daily training, and snapshot objects after thirty-five days.
+- [x] 5.19 Add daily warm-start training from only the newest unconsumed dataset plus an explicit full thirty-day mode, preserving exact input/base-model metadata and candidate-only activation.
+- [x] 5.20 Add focused tests and documentation for bounded daily reads, inactive-buyer carry-forward, one-time daily output, fixed manifest size, incremental model initialization, and the Glue cost formula/trade-offs.
 
 ## 6. Day 3 — Personalized search scoring
 

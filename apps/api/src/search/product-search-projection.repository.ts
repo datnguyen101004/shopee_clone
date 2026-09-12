@@ -55,6 +55,23 @@ export class ProductSearchProjectionRepository {
     });
   }
 
+  findSellableProductsPage(
+    afterId: string | null,
+    take: number,
+  ): Promise<ProductSearchProjectionRecord[]> {
+    return this.prisma.product.findMany({
+      where: {
+        ...sellableProductWhere,
+        ...(afterId ? { id: { gt: afterId } } : {}),
+        shop: sellableShopWhere,
+        category: { isActive: true, deletedAt: null },
+      },
+      include: productSearchProjectionInclude,
+      orderBy: [{ id: 'asc' }],
+      take,
+    });
+  }
+
   findProductsByIds(ids: readonly string[]): Promise<ProductSearchProjectionRecord[]> {
     if (ids.length === 0) return Promise.resolve([]);
     return this.prisma.product.findMany({

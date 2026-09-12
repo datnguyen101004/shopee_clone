@@ -1,4 +1,4 @@
-import { createHash, createHmac, randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 
 import { BadRequestException, ConflictException, Inject, Injectable, Logger } from '@nestjs/common';
 import {
@@ -12,6 +12,7 @@ import {
 
 import { PrismaService } from '../prisma/prisma.service';
 import { CLICKSTREAM_CONFIG, type ClickstreamConfig } from './clickstream.config';
+import { pseudonymize } from './pseudonym';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -138,7 +139,7 @@ export class ClickstreamService {
       return { eventId: event.eventId, disposition: 'sampled_out' };
     if (!this.config.pseudonymSecret)
       throw new Error('Clickstream pseudonymization is not configured');
-    const payload = this.exportPayload(event, identity);
+    const payload = await this.exportPayload(event, identity);
     const payloadHash = hash(payload);
     const now = new Date();
     try {
@@ -171,20 +172,42 @@ export class ClickstreamService {
     }
   }
 
-  private exportPayload(
+  private async exportPayload(
     event: ClickstreamEvent,
     identity?: { userId?: string; authSessionId?: string },
-  ): ClickstreamExportEvent {
-    const pseudonym = (prefix: string, value: string): string =>
-      createHmac('sha256', this.config.pseudonymSecret!)
-        .update(`${prefix}:${value}`, 'utf8')
-        .digest('hex');
+  ): Promise<ClickstreamExportEvent> {
     const { sessionId, ...withoutSession } = event;
+    let shopId: string | undefined;
+    if (event.productId) {
+      // Product ownership is server-authoritative. The browser event never
+      // supplies shopId, and the adapter only forwards this trusted lookup.
+      const productRepository = (
+        this.prisma as unknown as { product?: { findUnique?: (args: unknown) => Promise<{ shopId: string } | null> } }
+      ).product;
+      const product = await productRepository?.findUnique?.({
+        where: { id: event.productId },
+        select: { shopId: true },
+      });
+      shopId = product?.shopId;
+    }
     return {
       ...withoutSession,
-      sessionPseudonym: pseudonym('session', sessionId),
-      buyerPseudonym: identity?.userId ? pseudonym('buyer', identity.userId) : null,
+      sessionPseudonym: pseudonymize(
+        this.config.pseudonymSecret!,
+        this.config.pseudonymKeyId,
+        'session',
+        sessionId,
+      ).pseudonym,
+      buyerPseudonym: identity?.userId
+        ? pseudonymize(
+            this.config.pseudonymSecret!,
+            this.config.pseudonymKeyId,
+            'buyer',
+            identity.userId,
+          ).pseudonym
+        : null,
       pseudonymKeyId: this.config.pseudonymKeyId,
+      ...(shopId ? { shopId } : {}),
     };
   }
   private sample(eventId: string, policyKey: string, rate: number): boolean {

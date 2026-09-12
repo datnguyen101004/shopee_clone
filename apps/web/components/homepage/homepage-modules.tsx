@@ -28,9 +28,7 @@ import { MarketplaceProductImage } from '../marketplace-product-image';
 import { FavoriteStateProvider } from '../engagement/favorite-state-provider';
 import { useAuthSession } from '../auth-session-provider';
 import {
-  clickstreamImpressionKey,
   createClickstreamCorrelationId,
-  createClickstreamImpressionDeduper,
   submitClickstreamEvent,
 } from '../../lib/clickstream';
 
@@ -472,6 +470,31 @@ function ProductCard({
   };
 }) {
   const { sessionFetch } = useAuthSession();
+  const impressionSent = useRef(false);
+  useEffect(() => {
+    if (!tracking || impressionSent.current) return;
+    impressionSent.current = true;
+    const event = tracking.eventType === 'recommendation_clicked'
+      ? {
+          eventType: 'recommendation_impression' as const,
+          surface: 'homepage' as const,
+          productId: product.id,
+          placement: tracking.placement,
+          position: tracking.position,
+          recommendationId: tracking.recommendationId ?? tracking.requestId,
+          properties: {},
+        }
+      : {
+          eventType: 'product_impression' as const,
+          surface: 'homepage' as const,
+          productId: product.id,
+          placement: tracking.placement,
+          position: tracking.position,
+          requestId: tracking.requestId,
+          properties: {},
+        };
+    submitClickstreamEvent(event, 1_500, sessionFetch);
+  }, [product.id, sessionFetch, tracking]);
   return (
     <UiProductCard
       className="product-card"
@@ -560,37 +583,8 @@ function DailyRecommendationsSection({ module }: { module: HomepageProductModule
   const containerRef = useRef<HTMLDivElement>(null);
   const [canScrollPrev, setCanScrollPrev] = useState(false);
   const [canScrollNext, setCanScrollNext] = useState(true);
-  const { sessionFetch } = useAuthSession();
   const resultSetKey = `${module.id}:${module.products.map(({ id }) => id).join(',')}`;
   const requestId = useMemo(() => createClickstreamCorrelationId(resultSetKey), [resultSetKey]);
-  const [deduper] = useState(createClickstreamImpressionDeduper);
-
-  useEffect(() => {
-    for (const [position, product] of module.products.entries()) {
-      const placement = `homepage:${module.type}`;
-      const key = clickstreamImpressionKey({
-        requestId,
-        placement,
-        productId: product.id,
-        position,
-      });
-      if (deduper.seen(key))
-        submitClickstreamEvent(
-          {
-            eventType: 'recommendation_impression',
-            surface: 'homepage',
-            productId: product.id,
-            placement,
-            position,
-            recommendationId: requestId,
-            properties: {},
-          },
-          1_500,
-          sessionFetch,
-        );
-    }
-    return () => deduper.clear();
-  }, [deduper, module.products, module.type, requestId, sessionFetch]);
 
   const checkScrollability = useCallback(() => {
     const el = containerRef.current;

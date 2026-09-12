@@ -7,6 +7,9 @@ import {
 
 export const RECOMMENDATION_DATASET_VERSION = 'mock-reco-v1';
 export const RECOMMENDATION_RANDOM_SEED = 20260902;
+export const CLICKSTREAM_TRAINING_SOURCE = 'clickstream-s3-demonstration';
+export const CLICKSTREAM_SNAPSHOT_TRAINING_SOURCE = 'clickstream-s3-feature-snapshots';
+export const SEEDED_TRAINING_SOURCE = 'seeded-fixture';
 
 export const PROFILE_POLICY = Object.freeze({
   viewWeight: 1,
@@ -14,7 +17,7 @@ export const PROFILE_POLICY = Object.freeze({
   followedShopWeight: 3,
   orderWeight: 5,
   minimumEligibilityScore: 5,
-  maximumAgeHours: 24,
+  maximumAgeHours: 24 * 30,
   viewsLookbackDays: 30,
   favoritesLookbackDays: 90,
   ordersLookbackDays: 90,
@@ -98,6 +101,11 @@ export interface SeededTrainingExample {
   labelSource: string;
   features: Record<BuyerPairFeatureName, number>;
   sampleWeight: number;
+  /** Clickstream handoff metadata; seeded fixture rows do not have these fields. */
+  sourceDate?: string;
+  runDate?: string;
+  /** Snapshot-backed rows already contain normalized serving features. */
+  featureVectorSource?: 'seeded-fixture' | 'legacy-clickstream' | 'snapshot-backed';
 }
 
 export interface OrderedFeatureWeight {
@@ -115,6 +123,12 @@ export interface RankingMetrics {
   heldoutPositiveCount: number;
   demonstrationOnly: boolean;
   metricsLabel: 'demonstration-only' | 'production-candidate';
+  trainingDatasetUri?: string;
+  trainingManifestUri?: string;
+  trainingMode?: 'daily' | 'full';
+  trainingInputUris?: readonly string[];
+  baseModelVersion?: number;
+  baseModelTrainingDatasetUri?: string;
 }
 
 export interface TrainedRankingModel {
@@ -125,6 +139,7 @@ export interface TrainedRankingModel {
   datasetVersion: string;
   randomSeed: number;
   trainingSource: string;
+  trainingDatasetUri?: string;
   intercept: number;
   featureWeights: readonly OrderedFeatureWeight[];
   metrics: RankingMetrics;

@@ -1,11 +1,50 @@
 # Seller dashboard và khuyến mãi
 
-## Analytics
+## Seller product analytics
 
-- `GET /api/v1/seller/dashboard?from=YYYY-MM-DD&to=YYYY-MM-DD&granularity=DAY|WEEK|MONTH`
-- `GET /api/v1/seller/analytics/products?from=YYYY-MM-DD&to=YYYY-MM-DD&limit=1..100&cursor=...`
+- `GET /api/v1/seller/analytics/overview?preset=today|yesterday|last_7_days|last_30_days&page=1&pageSize=10`
+- `GET /api/v1/seller/analytics/overview?from=YYYY-MM-DD&to=YYYY-MM-DD&page=1&pageSize=10`
 
-Hai endpoint yêu cầu session có role `seller` và shop `ACTIVE`/`APPROVED`. Khoảng ngày là inclusive theo `Shop.timeZone` (mặc định `Asia/Ho_Chi_Minh`), tối đa 366 ngày; response luôn `Cache-Control: private, no-store`. Chỉ các shop-order `awaiting_pickup`, `shipping`, `delivered` được tính. Conversion trả `NOT_AVAILABLE` vì hệ thống chưa có tracking lượt truy cập.
+The overview requires an authenticated `seller` session and an approved,
+active shop. The server derives the shop from the seller account; a caller
+cannot select a foreign `shopId`. Custom dates are inclusive in `Shop.timeZone`
+and are limited to 31 calendar days. Invalid, future-only, mixed preset/custom,
+or unknown query parameters are rejected. Responses use
+`Cache-Control: private, no-store`.
+
+The ten summary and product-row metrics are Impressions, Product Views, Unique
+Visitors, Clicks, CTR, Add to Cart, Orders, Units Sold, Revenue, and Conversion
+Rate. Impressions count `product_impression` plus
+`recommendation_impression`; Clicks count `product_clicked` plus
+`recommendation_clicked`; Product Views count `product_viewed`; Unique Visitors
+are distinct `COALESCE(buyerPseudonym, sessionPseudonym)` values on Product
+Views; and Add to Cart counts only server-authored `cart_changed` events with
+typed `properties.action = add`. Orders, units, and payable merchandise revenue
+come from eligible shop orders (`awaiting_pickup`, `shipping`, `delivered`).
+
+`CTR = clicks / impressions` and `Conversion Rate = orders / unique visitors`;
+both rates are zero for a zero denominator. Every metric includes current and
+immediately preceding equal-duration values. Relative change is
+`(current - previous) / previous * 100`; both zero means `0`, while positive
+current with zero previous is shown as `new`. Today/Yesterday use hourly trend
+points; longer ranges use daily points. Today ends at the one captured server
+request time and compares the same elapsed portion of the previous day. A
+custom range ending today and Last 7/30 days likewise end at that request time;
+past ranges and Yesterday use complete local calendar boundaries.
+
+The response includes `generatedAt` and `freshness=near_real_time`. Firehose
+buffering and Athena’s visibility delay mean this is recently updated rather
+than transactional real-time data. Athena reads the compressed raw partitions
+directly in one bounded current/previous scan, preserving this MVP’s no-new-
+warehouse trade-off while accepting higher scan cost and latency as raw traffic
+grows. The query is bounded by UTC `schema_version/dt/hour` partitions and the
+31-day selected-range limit.
+
+Analytics stores pseudonymous identities only. Raw IDs, e-mail, addresses,
+payment details, and other direct personal data are prohibited; key rotation
+prevents joins across pseudonym key IDs. No historical Product Views are
+backfilled. The additive event does not change the Glue training path, its
+04:00 schedule, or existing impression/click labels.
 
 ## Seller promotions
 

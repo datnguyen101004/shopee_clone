@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useEffect, useRef } from 'react';
 import { submitClickstreamEvent } from '../../lib/clickstream';
 import { marketplaceMediaUrl } from '../../lib/marketplace-media-url';
 import { useAuthSession } from '../auth-session-provider';
@@ -22,6 +23,20 @@ export function ProductDetailRelatedCard({
   requestId: string;
 }) {
   const { sessionFetch } = useAuthSession();
+  const impressionSent = useRef(false);
+  useEffect(() => {
+    if (impressionSent.current) return;
+    impressionSent.current = true;
+    submitClickstreamEvent({
+      eventType: 'product_impression',
+      surface: 'product_detail',
+      productId: product.id,
+      placement: 'related_products',
+      position,
+      requestId,
+      properties: {},
+    }, 1_500, sessionFetch);
+  }, [position, product.id, requestId, sessionFetch]);
   return (
     <Link
       href={product.href}

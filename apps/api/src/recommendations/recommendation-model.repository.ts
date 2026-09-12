@@ -80,6 +80,17 @@ export class RecommendationModelRepository {
     return this.prisma.personalizedRankingModel.findUnique({ where: { modelVersion } });
   }
 
+  findLatestCompatible() {
+    return this.prisma.personalizedRankingModel.findFirst({
+      where: {
+        productProjectionVersion: CURRENT_RECOMMENDATION_VERSIONS.productProjectionVersion,
+        featureSchemaVersion: CURRENT_RECOMMENDATION_VERSIONS.featureSchemaVersion,
+        storedScriptVersion: CURRENT_RECOMMENDATION_VERSIONS.storedScriptVersion,
+      },
+      orderBy: [{ modelVersion: 'desc' }, { trainedAt: 'desc' }],
+    });
+  }
+
   async activateCompatible(modelVersion: number, activatedAt = new Date()) {
     return this.prisma.$transaction(async (transaction) => {
       const candidate = await transaction.personalizedRankingModel.findUnique({

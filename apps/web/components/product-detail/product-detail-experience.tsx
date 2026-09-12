@@ -4,7 +4,7 @@ import {
   parseProductDetailResponse,
   type ProductDetailResponse,
 } from '@shopee-clone/contracts';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import { FavoriteStateProvider } from '../engagement/favorite-state-provider';
 import { useAuthSession } from '../auth-session-provider';
@@ -24,6 +24,7 @@ import {
   SelfPurchaseWarningModal,
 } from './product-detail-purchase-actions';
 import { useProductDetailFlow } from './use-product-detail-flow';
+import { submitClickstreamEvent } from '../../lib/clickstream';
 
 export { ProductGallery } from './product-detail-gallery';
 export {
@@ -103,6 +104,22 @@ function ProductDetailInner({ product }: { product: ProductDetailResponse }) {
   );
 }
 
+function ProductViewCapture({ productId }: { productId: string }) {
+  const { sessionFetch } = useAuthSession();
+  const capturedProductId = useRef<string | null>(null);
+  useEffect(() => {
+    if (capturedProductId.current === productId) return;
+    capturedProductId.current = productId;
+    submitClickstreamEvent({
+      eventType: 'product_viewed',
+      surface: 'product_detail',
+      productId,
+      properties: {},
+    }, 1_500, sessionFetch);
+  }, [productId, sessionFetch]);
+  return null;
+}
+
 export function ProductDetailExperience({ product }: { product: ProductDetailResponse }) {
   const { state: authState, authenticatedFetch } = useAuthSession();
   const [personalizedProduct, setPersonalizedProduct] = useState<{
@@ -134,6 +151,7 @@ export function ProductDetailExperience({ product }: { product: ProductDetailRes
     <FavoriteStateProvider
       productIds={[displayProduct.id, ...displayProduct.relatedProducts.map(({ id }) => id)]}
     >
+      <ProductViewCapture productId={displayProduct.id} />
       <ProductDetailInner product={displayProduct} />
     </FavoriteStateProvider>
   );

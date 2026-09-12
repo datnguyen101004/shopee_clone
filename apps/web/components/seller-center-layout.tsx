@@ -7,6 +7,7 @@ import {
   Bell,
   Boxes,
   CalendarDays,
+  Eye,
   MessageCircle,
   Package,
   RotateCcw,
@@ -22,6 +23,7 @@ import { WorkspaceColumnResizer } from './workspace-column-resizer';
 
 const productWorkspaceNavigation = [
   { href: '/seller', label: 'Tổng quan', Icon: Boxes },
+  { href: '/seller/analytics', label: 'Phân tích', Icon: Eye },
   { href: '/seller/notifications', label: 'Thông báo', Icon: Bell },
   { href: '/seller/chat', label: 'Chat', Icon: MessageCircle },
   { href: '/seller/shop', label: 'Hồ sơ shop', Icon: Store },
@@ -104,13 +106,15 @@ function SellerWorkspace({
                         ? ['Đánh giá', 'Theo dõi phản hồi từ khách hàng']
                         : currentPath.startsWith('/seller/promotions')
                           ? ['Khuyến mãi', 'Quản lý voucher shop']
-                          : currentPath.startsWith('/seller/returns')
-                            ? ['Trả hàng / Hoàn tiền', 'Xử lý các yêu cầu sau bán hàng']
-                            : currentPath.startsWith('/seller/moderation')
-                              ? ['Kiểm duyệt', 'Theo dõi trạng thái kiểm duyệt sản phẩm và nội dung']
-                              : currentPath.startsWith('/seller/campaigns')
-                                ? ['Chiến dịch', 'Theo dõi các chiến dịch dành cho người bán']
-                                : ['Chiến dịch', 'Theo dõi các chiến dịch dành cho người bán'];
+                            : currentPath.startsWith('/seller/returns')
+                              ? ['Trả hàng / Hoàn tiền', 'Xử lý các yêu cầu sau bán hàng']
+                              : currentPath.startsWith('/seller/moderation')
+                                ? ['Kiểm duyệt', 'Theo dõi trạng thái kiểm duyệt sản phẩm và nội dung']
+                                : currentPath.startsWith('/seller/analytics')
+                                ? ['Phân tích', 'Theo dõi phễu sản phẩm, đơn hàng và doanh thu của shop']
+                                  : currentPath.startsWith('/seller/campaigns')
+                                    ? ['Chiến dịch', 'Theo dõi các chiến dịch dành cho người bán']
+                                    : ['Chiến dịch', 'Theo dõi các chiến dịch dành cho người bán'];
   const [headerTitle, headerSubtitle] = headerCopy;
 
   return (

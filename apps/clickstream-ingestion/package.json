@@ -1,0 +1,24 @@
+{
+  "name": "@shopee-clone/clickstream-ingestion",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "lint": "eslint src test",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run --exclude test/built-handler.test.ts",
+    "test:artifact": "pnpm build && vitest run test/built-handler.test.ts"
+  },
+  "dependencies": {
+    "@aws-sdk/client-firehose": "3.1127.0",
+    "@shopee-clone/contracts": "workspace:*"
+  },
+  "devDependencies": {
+    "@shopee-clone/config": "workspace:*",
+    "@types/node": "22.20.1",
+    "eslint": "9.39.5",
+    "esbuild": "0.28.2",
+    "typescript": "5.9.3",
+    "vitest": "4.1.10"
+  }
+}

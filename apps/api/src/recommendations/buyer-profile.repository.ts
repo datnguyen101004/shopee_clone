@@ -198,4 +198,108 @@ export class BuyerProfileRepository {
     });
     return rows.map((row) => row.id);
   }
+
+  async listActiveUserIdsPage(afterId: string | null, take: number): Promise<readonly string[]> {
+    const rows = await this.prisma.user.findMany({
+      where: {
+        status: 'ACTIVE',
+        deletedAt: null,
+        ...(afterId ? { id: { gt: afterId } } : {}),
+      },
+      select: { id: true },
+      orderBy: [{ id: 'asc' }],
+      take,
+    });
+    return rows.map((row) => row.id);
+  }
+
+  async listProfilesChangedPage(
+    since: Date,
+    cutoff: Date,
+    afterUserId: string | null,
+    take: number,
+  ) {
+    return this.prisma.buyerSearchProfile.findMany({
+      where: {
+        updatedAt: { gt: since, lte: cutoff },
+        ...(afterUserId ? { userId: { gt: afterUserId } } : {}),
+      },
+      orderBy: [{ userId: 'asc' }],
+      take,
+    });
+  }
+
+  async listProfilesPage(afterUserId: string | null, take: number) {
+    return this.prisma.buyerSearchProfile.findMany({
+      where: afterUserId ? { userId: { gt: afterUserId } } : undefined,
+      orderBy: [{ userId: 'asc' }],
+      take,
+    });
+  }
+
+  /** Find users with source activity changes without scanning every profile. */
+  async listActivityUserIdsPage(since: Date, cutoff: Date, afterUserId: string | null, take: number): Promise<readonly string[]> {
+    const userFilter = afterUserId ? { gt: afterUserId } : undefined;
+    const [views, favorites, follows, orders] = await Promise.all([
+      this.prisma.recentlyViewedProduct.findMany({
+        where: { lastViewedAt: { gt: since, lte: cutoff }, ...(userFilter ? { userId: userFilter } : {}) },
+        orderBy: [{ userId: 'asc' }], distinct: ['userId'], take,
+        select: { userId: true },
+      }),
+      this.prisma.productFavorite.findMany({
+        where: { favoritedAt: { gt: since, lte: cutoff }, ...(userFilter ? { userId: userFilter } : {}) },
+        orderBy: [{ userId: 'asc' }], distinct: ['userId'], take,
+        select: { userId: true },
+      }),
+      this.prisma.shopFollower.findMany({
+        where: { followedAt: { gt: since, lte: cutoff }, ...(userFilter ? { userId: userFilter } : {}) },
+        orderBy: [{ userId: 'asc' }], distinct: ['userId'], take,
+        select: { userId: true },
+      }),
+      this.prisma.purchase.findMany({
+        where: {
+          ...(afterUserId ? { buyerId: userFilter } : {}),
+          paymentStatus: { notIn: [PurchasePaymentStatus.CANCELLED, PurchasePaymentStatus.FAILED, PurchasePaymentStatus.EXPIRED] },
+          orders: {
+            some: {
+              status: { not: ShopOrderStatus.CANCELLED },
+              lines: { some: { createdAt: { gt: since, lte: cutoff } } },
+            },
+          },
+        },
+        orderBy: [{ buyerId: 'asc' }], distinct: ['buyerId'], take,
+        select: { buyerId: true },
+      }),
+    ]);
+    const ids = new Set<string>([...views, ...favorites, ...follows].map((row) => row.userId));
+    orders.forEach((row) => ids.add(row.buyerId));
+    return [...ids].sort().slice(0, take);
+  }
+
+  /** Batch-load all four activity sources for one bounded user page. */
+  async loadActivitiesForUsers(userIds: readonly string[], now: Date): Promise<ReadonlyMap<string, readonly BuyerActivity[]>> {
+    if (userIds.length === 0) return new Map();
+    const viewSince = new Date(now.getTime() - PROFILE_POLICY.viewsLookbackDays * 86_400_000);
+    const longSince = new Date(now.getTime() - PROFILE_POLICY.ordersLookbackDays * 86_400_000);
+    const favoriteSince = new Date(now.getTime() - PROFILE_POLICY.favoritesLookbackDays * 86_400_000);
+    const perSourceTake = userIds.length * PROFILE_POLICY.maxActivityRowsPerSource;
+    const [views, favorites, follows, orderLines] = await Promise.all([
+      this.prisma.recentlyViewedProduct.findMany({ where: { userId: { in: [...userIds] }, lastViewedAt: { gte: viewSince, lte: now } }, orderBy: [{ userId: 'asc' }, { lastViewedAt: 'desc' }, { productId: 'asc' }], take: perSourceTake, select: { userId: true, productId: true, lastViewedAt: true, product: { select: productSelect } } }),
+      this.prisma.productFavorite.findMany({ where: { userId: { in: [...userIds] }, favoritedAt: { gte: favoriteSince, lte: now } }, orderBy: [{ userId: 'asc' }, { favoritedAt: 'desc' }, { productId: 'asc' }], take: perSourceTake, select: { userId: true, productId: true, favoritedAt: true, product: { select: productSelect } } }),
+      this.prisma.shopFollower.findMany({ where: { userId: { in: [...userIds] }, followedAt: { lte: now } }, orderBy: [{ userId: 'asc' }, { followedAt: 'desc' }, { shopId: 'asc' }], take: perSourceTake, select: { userId: true, shopId: true, followedAt: true } }),
+      this.prisma.orderLine.findMany({ where: { createdAt: { gte: longSince, lte: now }, order: { purchase: { buyerId: { in: [...userIds] }, paymentStatus: { notIn: [PurchasePaymentStatus.CANCELLED, PurchasePaymentStatus.FAILED, PurchasePaymentStatus.EXPIRED] }, }, status: { not: ShopOrderStatus.CANCELLED } } }, orderBy: [{ createdAt: 'desc' }, { id: 'asc' }], take: perSourceTake, select: { productId: true, sellingUnitPriceMinor: true, createdAt: true, product: { select: productSelect }, order: { select: { purchase: { select: { buyerId: true } } } } } }),
+    ]);
+    const activities = new Map<string, BuyerActivity[]>();
+    const add = (userId: string, activity: BuyerActivity) => activities.set(userId, [...(activities.get(userId) ?? []), activity]);
+    views.forEach((row) => add(row.userId, productActivity('view', row.productId, row.product, row.lastViewedAt)));
+    favorites.forEach((row) => add(row.userId, productActivity('favorite', row.productId, row.product, row.favoritedAt)));
+    follows.forEach((row) => add(row.userId, { type: 'follow', shopId: row.shopId, occurredAt: row.followedAt }));
+    orderLines.forEach((row) => { const userId = row.order.purchase?.buyerId; if (userId) add(userId, productActivity('order', row.productId, row.product, row.createdAt, row.sellingUnitPriceMinor)); });
+    return activities;
+  }
+
+  async findProfilesByUserIds(userIds: readonly string[]) {
+    if (userIds.length === 0) return [];
+    return this.prisma.buyerSearchProfile.findMany({ where: { userId: { in: [...userIds] } } });
+  }
 }

@@ -37,6 +37,7 @@
     "search:baseline:evaluate": "pnpm --filter @shopee-clone/api search:baseline:evaluate",
     "recommendations:profiles": "pnpm --filter @shopee-clone/api recommendations:profiles",
     "recommendations:seed": "pnpm --filter @shopee-clone/api recommendations:seed",
+    "recommendations:snapshots": "pnpm --filter @shopee-clone/api recommendations:snapshots",
     "recommendations:train": "pnpm --filter @shopee-clone/api recommendations:train",
     "recommendations:activate": "pnpm --filter @shopee-clone/api recommendations:activate",
     "auth:roles:bootstrap-admin": "pnpm --filter @shopee-clone/api auth:roles:bootstrap-admin",

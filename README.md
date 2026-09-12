@@ -121,6 +121,19 @@ pnpm recommendations:train
 pnpm recommendations:activate <model-version-vua-train>
 ```
 
+Mặc định `recommendations:train` dùng fixture local. Để chọn Glue handoff, đặt
+`RECOMMENDATION_TRAINING_DATASET_MANIFEST_S3_URI=s3://<bucket>/exports/training/latest.json`.
+Manifest chứa tối đa 30 URI `training.csv` theo ngày. Mặc định `--mode=daily`
+chỉ đọc URI mới nhất chưa được model gần nhất tiêu thụ và warm-start; dùng
+`--mode=full` để đọc toàn bộ cửa sổ 30 ngày từ đầu. Lệnh dùng ambient AWS
+credentials, tạo candidate demonstration-only và không tự động activate.
+Header-only và input một dòng bị từ chối. Export enriched dùng trực tiếp 16
+serving features đã normalize; export legacy vẫn zero-fill online features.
+Snapshot phải được export ở đầu ngày nguồn (hoặc sớm hơn), sau đó Glue ngày kế
+tiếp lúc 04:00 mới join as-of; dùng `--bootstrap=true` cho lần đầu nếu cần seed
+profile state. Chỉ chạy `recommendations:activate` sau khi đã đánh giá
+candidate phù hợp.
+
 | Tích hợp         | Cấu hình                                                                                                      |
 | ---------------- | ------------------------------------------------------------------------------------------------------------- |
 | COD              | Luồng checkout cơ bản, không cần credential cổng thanh toán                                                   |

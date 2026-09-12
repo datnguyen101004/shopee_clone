@@ -5,6 +5,7 @@ export const CLICKSTREAM_EVENT_TYPES = [
   'search_submitted',
   'product_impression',
   'product_clicked',
+  'product_viewed',
   'recommendation_impression',
   'recommendation_clicked',
   'favorite_changed',
@@ -67,6 +68,11 @@ export type ProductClickedEvent = BaseEvent & {
   position: number;
   requestId: string;
 };
+export type ProductViewedEvent = BaseEvent & {
+  eventType: 'product_viewed';
+  surface: 'product_detail';
+  productId: string;
+};
 export type RecommendationImpressionEvent = BaseEvent & {
   eventType: 'recommendation_impression';
   productId: string;
@@ -104,6 +110,7 @@ export type ClickstreamEvent =
   | SearchSubmittedEvent
   | ProductImpressionEvent
   | ProductClickedEvent
+  | ProductViewedEvent
   | RecommendationImpressionEvent
   | RecommendationClickedEvent
   | FavoriteChangedEvent
@@ -115,6 +122,8 @@ export type ClickstreamExportEvent = Omit<ClickstreamEvent, 'sessionId'> & {
   sessionPseudonym: string;
   buyerPseudonym: string | null;
   pseudonymKeyId: string;
+  /** Derived from the server-owned Product row; never accepted from the browser. */
+  shopId?: string;
 };
 
 export type ClickstreamCollectionRequest = Omit<ClickstreamEvent, 'schemaVersion'> & {
@@ -315,7 +324,8 @@ export function parseClickstreamEvent(value: unknown): ClickstreamEvent | null {
   const compatibleSurface =
     (eventType === 'search_submitted' && surface === 'search') ||
     ((eventType === 'product_impression' || eventType === 'product_clicked') &&
-      (surface === 'search' || surface === 'product_detail')) ||
+      (surface === 'search' || surface === 'homepage' || surface === 'product_detail')) ||
+    (eventType === 'product_viewed' && surface === 'product_detail') ||
     ((eventType === 'recommendation_impression' || eventType === 'recommendation_clicked') &&
       surface === 'homepage') ||
     (eventType === 'favorite_changed' && surface === 'favorite') ||
@@ -365,6 +375,7 @@ export function parseClickstreamEvent(value: unknown): ClickstreamEvent | null {
     )
       return null;
   }
+  if (eventType === 'product_viewed' && !isUuid(value.productId)) return null;
   if (eventType === 'recommendation_impression' || eventType === 'recommendation_clicked') {
     if (
       !isUuid(value.productId) ||

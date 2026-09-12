@@ -1,6 +1,10 @@
 # Clickstream API Gateway boundary
 
-This document describes the producer boundary implemented by Shopee Clone. The application ends at a successful, durable acceptance acknowledgement from the HTTPS API Gateway integration. Glue, S3, Athena, QuickSight, and model training are downstream ownership boundaries and are not provisioned by this repository.
+This document describes the producer boundary implemented by Shopee Clone. The
+application ends at a successful, durable acceptance acknowledgement from the
+HTTPS API Gateway integration. The MVP downstream path is provisioned by the
+companion clickstream template: Firehose -> S3 Raw -> Athena/Glue. EC2 and
+QuickSight remain outside this change.
 
 ## Request
 
@@ -22,6 +26,24 @@ event context. Raw `sessionId`, `buyerId`, and other direct identity fields are
 not present in the durable payload or the external batch.
 
 The exact UTF-8 body is hashed with SHA-256. The worker signs `timestamp + "." + bodySha256` with HMAC-SHA256 and sends `X-Clickstream-Key-Id`, `X-Clickstream-Timestamp`, and `X-Clickstream-Signature`. TLS is mandatory and redirects are refused. AWS credentials and these secrets never reach the browser.
+
+The companion ingestion Lambda verifies this signature and a bounded timestamp
+window before accepting the batch. Its deployment must provide the matching
+HMAC key id and secret; CloudFormation does not source or rotate these values.
+
+## Seller-funnel event vocabulary
+
+The additive `product_viewed` event is emitted once after a valid product-detail
+experience is presented. It is separate from discovery-card events, so a
+search or recommendation selection produces one discovery click and, when the
+detail page renders, one product view. Discovery impressions and clicks remain
+paired by surface/context: `product_impression`/`product_clicked` for listing,
+search, homepage, and related-product cards, and
+`recommendation_impression`/`recommendation_clicked` for recommendation cards.
+The server-authored `cart_changed` event is emitted for cart mutations, but
+seller Add to Cart counts only `properties.action = "add"`; update, remove, and
+select are not Add to Cart. The server enriches product events with the owning
+`shopId` before export.
 
 ## Acknowledgement
 
@@ -59,4 +81,10 @@ The export event in each batch contains only the pseudonymized session/buyer fie
 
 ## Key rotation and ownership
 
-Rotate HMAC and pseudonym secrets deliberately by key ID. New records use the current pseudonym key ID; joins across pseudonym key IDs are not implied. The external analytics owner must provide and contract-test the durable API Gateway integration (for example API Gateway → Lambda → SQS/Kinesis/Firehose), then separately own Glue → S3 → Athena → QuickSight retention, governance, schema evolution, and deduplication.
+Rotate HMAC and pseudonym secrets deliberately by key ID. New records use the
+current pseudonym key ID; joins across pseudonym key IDs are not implied. The
+analytics owner must provide the existing HTTP API id to the companion
+template. That template adds only the `POST /clickstream/events` route; it does
+not create an API or stage. Raw product/recommendation exports include a
+server-derived `shopId`, while anonymous `buyerPseudonym: null` and validated
+dispatcher `properties` remain valid v1 fields.

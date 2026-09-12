@@ -43,4 +43,16 @@ describe('cart clickstream outcome projection', () => {
     ).captureCartOutcome('buyer-1', []);
     expect(clickstream.captureAuthoritativeOutcome).not.toHaveBeenCalled();
   });
+
+  it('emits add only for a committed add outcome and keeps quantity updates out of Add to Cart', async () => {
+    const clickstream = { captureAuthoritativeOutcome: jest.fn().mockResolvedValue(null) };
+    const service = new CartService({} as never, clickstream as never);
+    await (service as unknown as { captureCartOutcome(userId: string, outcomes: unknown[]): Promise<void> })
+      .captureCartOutcome('buyer-1', [
+        { productId: '11111111-1111-4111-8111-111111111111', action: 'add', quantity: 2 },
+        { productId: '22222222-2222-4222-8222-222222222222', action: 'update', quantity: 3 },
+      ]);
+    expect(clickstream.captureAuthoritativeOutcome).toHaveBeenCalledWith(expect.objectContaining({ eventType: 'cart_changed', properties: { action: 'add', quantity: 2 } }));
+    expect(clickstream.captureAuthoritativeOutcome).toHaveBeenCalledWith(expect.objectContaining({ eventType: 'cart_changed', properties: { action: 'update', quantity: 3 } }));
+  });
 });

@@ -28,10 +28,29 @@ export type {
   OrderCompletedEvent,
   ProductClickedEvent,
   ProductImpressionEvent,
+  ProductViewedEvent,
   RecommendationClickedEvent,
   RecommendationImpressionEvent,
   SearchSubmittedEvent,
 } from './clickstream';
+export {
+  RAW_CLICKSTREAM_EVENT_TYPES,
+  RAW_CLICKSTREAM_HAPPY_PATH_BATCH,
+  RAW_CLICKSTREAM_PROHIBITED_FIELDS,
+  RAW_CLICKSTREAM_SCHEMA_VERSION,
+  RAW_CLICKSTREAM_SURFACES,
+  parseRawClickstreamBatch,
+  parseRawClickstreamEvent,
+} from './clickstream-pipeline';
+export { loadClickstreamPipelineConfig } from './clickstream-pipeline-config';
+export type { ClickstreamPipelineConfig } from './clickstream-pipeline-config';
+export type {
+  RawClickstreamBatch,
+  RawClickstreamEvent,
+  RawClickstreamEventType,
+  RawClickstreamRecord,
+  RawClickstreamSurface,
+} from './clickstream-pipeline';
 export {
   DEMO_CARRIER_CALLBACK_OUTCOMES,
   DEMO_CARRIER_CALLBACK_WINDOW_SECONDS,
@@ -865,10 +884,17 @@ export {
   SELLER_ANALYTICS_MAX_RANGE_DAYS,
   SELLER_ANALYTICS_TIME_ZONE,
   SELLER_ANALYTICS_GRANULARITIES,
+  SELLER_ANALYTICS_OVERVIEW_VERSION,
+  SELLER_ANALYTICS_PRESETS,
+  SELLER_ANALYTICS_OVERVIEW_MAX_RANGE_DAYS,
+  SELLER_ANALYTICS_PAGE_SIZE,
+  SELLER_ANALYTICS_MAX_PAGE_SIZE,
   isSellerDashboardResponse,
   isSellerAnalyticsProductPage,
   parseSellerAnalyticsQuery,
   parseSellerAnalyticsProductQuery,
+  parseSellerAnalyticsOverviewQuery,
+  isSellerAnalyticsOverviewResponse,
 } from './seller-analytics';
 export {
   SELLER_PROMOTION_VERSION,
@@ -929,6 +955,14 @@ export type {
   SellerAnalyticsProductRow,
   SellerAnalyticsProductPage,
   SellerAnalyticsProblemDetails,
+  SellerAnalyticsPreset,
+  SellerAnalyticsOverviewQuery,
+  SellerAnalyticsMetricKey,
+  SellerAnalyticsMetric,
+  SellerAnalyticsMetrics,
+  SellerAnalyticsTrendBucket,
+  SellerAnalyticsProductRowV2,
+  SellerAnalyticsOverviewResponse,
 } from './seller-analytics';
 export {
   INVENTORY_ADJUSTMENT_NOTE_MAX_LENGTH,

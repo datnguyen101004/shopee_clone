@@ -1,5 +1,6 @@
 import { ClickstreamService } from './clickstream.service';
 import type { ClickstreamConfig } from './clickstream.config';
+import { pseudonymize } from './pseudonym';
 
 const config: ClickstreamConfig = {
   captureEnabled: true,
@@ -45,8 +46,43 @@ describe('ClickstreamService', () => {
     const payload = create.mock.calls[0]![0].data.payload as Record<string, unknown>;
     expect(payload.sessionPseudonym).toMatch(/^[a-f0-9]{64}$/);
     expect(payload.buyerPseudonym).toMatch(/^[a-f0-9]{64}$/);
+    expect(payload.sessionPseudonym).toBe(
+      pseudonymize(config.pseudonymSecret!, config.pseudonymKeyId, 'session', event.sessionId).pseudonym,
+    );
+    expect(payload.buyerPseudonym).toBe(
+      pseudonymize(
+        config.pseudonymSecret!,
+        config.pseudonymKeyId,
+        'buyer',
+        '33333333-3333-4333-8333-333333333333',
+      ).pseudonym,
+    );
     expect(JSON.stringify(payload)).not.toContain('33333333-3333-4333-8333-333333333333');
     expect(JSON.stringify(payload)).not.toContain(event.sessionId);
+  });
+  it('derives the product shop from server-owned data for dispatcher exports', async () => {
+    const create = jest.fn().mockResolvedValue({});
+    const product = { findUnique: jest.fn().mockResolvedValue({ shopId: '55555555-5555-4555-8555-555555555555' }) };
+    const prisma = { product, clickstreamOutbox: { create, findUnique: jest.fn() } };
+    const productEvent = {
+      eventId: '44444444-4444-4444-8444-444444444444',
+      schemaVersion: 1,
+      eventType: 'product_impression',
+      occurredAt: '2026-09-10T00:00:00.000Z',
+      surface: 'search',
+      sessionId: event.sessionId,
+      productId: '66666666-6666-4666-8666-666666666666',
+      placement: 'search_results',
+      position: 1,
+      requestId: '77777777-7777-4777-8777-777777777777',
+      properties: {},
+    };
+    await expect(new ClickstreamService(prisma as never, config).capture(productEvent)).resolves.toMatchObject({ disposition: 'accepted' });
+    expect(product.findUnique).toHaveBeenCalledWith({
+      where: { id: productEvent.productId },
+      select: { shopId: true },
+    });
+    expect(create.mock.calls[0]![0].data.payload.shopId).toBe('55555555-5555-4555-8555-555555555555');
   });
   it('is disabled safely and samples deterministically', async () => {
     const disabled = { ...config, captureEnabled: false };

@@ -53,32 +53,54 @@ describe('buyer recommendation profiles', () => {
     expect(first.preferredPriceMaxMinor).toBe(300_000);
   });
 
-  it('uses cold start for guests, stale profiles, and profiles owned by another buyer', async () => {
+  it('keeps profiles usable for thirty days, then uses cold start for stale or foreign profiles', async () => {
+    const findProfile = jest.fn().mockResolvedValue({
+      userId: 'buyer-2',
+      profileVersion: 1,
+      featureSchemaVersion: 1,
+      generatedAt: new Date(now.getTime() - 29 * 24 * 3_600_000),
+      eligibilityScore: 10,
+      eligible: true,
+      viewCount30d: 10,
+      favoriteCount90d: 0,
+      followedShopCount: 0,
+      orderCount90d: 0,
+      categoryAffinities: [],
+      shopAffinities: [],
+      preferredPriceMinMinor: null,
+      preferredPriceMaxMinor: null,
+      preferredPriceMeanMinor: null,
+      recentProductIds: [],
+      source: 'test',
+    });
     const repository = {
-      findProfile: jest.fn().mockResolvedValue({
-        userId: 'buyer-2',
-        profileVersion: 1,
-        featureSchemaVersion: 1,
-        generatedAt: new Date(now.getTime() - 25 * 3_600_000),
-        eligibilityScore: 10,
-        eligible: true,
-        viewCount30d: 10,
-        favoriteCount90d: 0,
-        followedShopCount: 0,
-        orderCount90d: 0,
-        categoryAffinities: [],
-        shopAffinities: [],
-        preferredPriceMinMinor: null,
-        preferredPriceMaxMinor: null,
-        preferredPriceMeanMinor: null,
-        recentProductIds: [],
-        source: 'test',
-      }),
+      findProfile,
     } as unknown as BuyerProfileRepository;
     const service = new BuyerProfileService(repository);
 
     await expect(service.resolveEligibleProfile(null, now)).resolves.toBeNull();
     await expect(service.resolveEligibleProfile('buyer-1', now)).resolves.toBeNull();
+    await expect(service.resolveEligibleProfile('buyer-2', now)).resolves.toMatchObject({ userId: 'buyer-2' });
+    findProfile.mockResolvedValueOnce({
+      userId: 'buyer-2',
+      profileVersion: 1,
+      featureSchemaVersion: 1,
+      generatedAt: new Date(now.getTime() - 31 * 24 * 3_600_000),
+      eligibilityScore: 10,
+      eligible: true,
+      viewCount30d: 10,
+      favoriteCount90d: 0,
+      followedShopCount: 0,
+      orderCount90d: 0,
+      categoryAffinities: [],
+      shopAffinities: [],
+      preferredPriceMinMinor: null,
+      preferredPriceMaxMinor: null,
+      preferredPriceMeanMinor: null,
+      recentProductIds: [],
+      source: 'test',
+    });
+    await expect(service.resolveEligibleProfile('buyer-2', now)).resolves.toBeNull();
   });
 
   it('does not include cancelled payment/order rows in the profile source query', async () => {

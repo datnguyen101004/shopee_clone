@@ -31,7 +31,7 @@ export function MarketplaceHeader({
   onCategoriesToggle,
   menuButtonRef,
 }: MarketplaceHeaderProps) {
-  const { sessionFetch } = useAuthSession();
+  const { clickstreamFetch } = useAuthSession();
   const [searchError, setSearchError] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [suggestions, setSuggestions] = useState<CatalogSearchSuggestion[]>([]);
@@ -96,7 +96,7 @@ export function MarketplaceHeader({
         properties: {},
       },
       1_500,
-      sessionFetch,
+      clickstreamFetch,
     );
     setSuggestionsOpen(false);
     setSearchError('');

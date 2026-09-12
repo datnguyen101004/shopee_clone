@@ -44,6 +44,7 @@ describe('account forms', () => {
       restore: vi.fn(),
       completeGoogleSignIn: vi.fn(),
       authenticatedFetch: vi.fn(),
+      clickstreamFetch: vi.fn(),
       sessionFetch: vi.fn(),
       synchronizeDisplayName: vi.fn(),
     } as ReturnType<typeof useAuthSession>);

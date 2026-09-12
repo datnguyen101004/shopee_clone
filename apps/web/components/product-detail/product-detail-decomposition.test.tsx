@@ -303,5 +303,28 @@ describe('Product Detail Decomposed Components', () => {
       render(<ProductCartToast message="Đã thêm sản phẩm vào giỏ hàng thành công!" />);
       expect(screen.getByRole('status')).toHaveTextContent('Đã thêm sản phẩm vào giỏ hàng thành công!');
     });
+
+    it('triggers onClose when clicking overlay or pressing Escape', async () => {
+      const user = userEvent.setup();
+      const onClose = vi.fn();
+
+      render(
+        <ProductCartToast
+          message="Đã thêm sản phẩm vào giỏ hàng thành công!"
+          onClose={onClose}
+        />,
+      );
+
+      const overlay = screen.getByRole('status');
+      await user.click(overlay);
+      expect(onClose).toHaveBeenCalledTimes(1);
+
+      await user.keyboard('{Escape}');
+      expect(onClose).toHaveBeenCalledTimes(2);
+
+      const closeBtn = screen.getByRole('button', { name: 'Đóng thông báo' });
+      await user.click(closeBtn);
+      expect(onClose).toHaveBeenCalledTimes(3);
+    });
   });
 });

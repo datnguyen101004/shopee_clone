@@ -8,8 +8,10 @@ from glue_job import (
     build_training_rows,
     _click_candidate_index,
     _click_candidates,
+    _create_once_put,
     merge_buyer_state,
     enrich_training_rows,
+    existing_raw_paths,
     local_day_utc_bounds,
     output_keys,
     overlapping_raw_partitions,
@@ -33,6 +35,10 @@ class _ConditionalConflict(Exception):
     response = {"ResponseMetadata": {"HTTPStatusCode": 412}}
 
 
+class _NotFound(Exception):
+    response = {"Error": {"Code": "NoSuchKey"}}
+
+
 class FakeS3:
     def __init__(self, body=None):
         self.objects = {}
@@ -49,6 +55,29 @@ class FakeS3:
 
     def get_object(self, **kwargs):
         return {"Body": _Body(self.objects[kwargs["Key"]])}
+
+
+class LegacyGlueS3(FakeS3):
+    class _ServiceModel:
+        @staticmethod
+        def operation_model(_name):
+            operation = type("Operation", (), {})()
+            operation.input_shape = type("InputShape", (), {"members": {}})()
+            return operation
+
+    def __init__(self, body=None):
+        super().__init__(body)
+        self.meta = type("Meta", (), {"service_model": self._ServiceModel()})()
+
+    def put_object(self, **kwargs):
+        if "IfNoneMatch" in kwargs:
+            raise AssertionError("Glue 4.0 must not receive IfNoneMatch")
+        super().put_object(**kwargs)
+
+    def get_object(self, **kwargs):
+        if kwargs["Key"] not in self.objects:
+            raise _NotFound()
+        return super().get_object(**kwargs)
 
 
 class _Body:
@@ -81,6 +110,23 @@ class GlueTransformTests(unittest.TestCase):
         self.assertEqual(start.isoformat(), "2026-09-09T17:00:00+00:00")
         self.assertEqual(end.isoformat(), "2026-09-10T17:00:00+00:00")
         self.assertEqual(overlapping_raw_partitions("2026-09-10")[0], ("2026-09-09", "17"))
+
+    def test_spark_reads_only_raw_partitions_that_exist(self):
+        class PartitionS3:
+            def list_objects_v2(self, **kwargs):
+                if kwargs["Prefix"].endswith("hour=07/"):
+                    return {"KeyCount": 1, "Contents": [{"Key": f'{kwargs["Prefix"]}events.gz'}]}
+                return {"KeyCount": 0}
+
+        paths = existing_raw_paths(
+            PartitionS3(),
+            "raw-bucket",
+            [
+                "raw/schema_version=1/dt=2026-09-12/hour=06",
+                "raw/schema_version=1/dt=2026-09-12/hour=07",
+            ],
+        )
+        self.assertEqual(paths, ["s3://raw-bucket/raw/schema_version=1/dt=2026-09-12/hour=07/*"])
 
     def test_attribution_labels_clicked_and_unclicked_impressions(self):
         events = [
@@ -237,6 +283,15 @@ class GlueTransformTests(unittest.TestCase):
         uris = update_training_manifest(s3, "processed", uri)
         self.assertEqual(len(uris), 30)
         self.assertEqual(uris[0], uri)
+
+    def test_create_once_supports_glue_legacy_botocore_without_if_none_match(self):
+        s3 = LegacyGlueS3()
+        _create_once_put(s3, "processed", "state/manifest.json", b"same")
+        _create_once_put(s3, "processed", "state/manifest.json", b"same")
+        self.assertEqual(s3.objects["state/manifest.json"], b"same")
+        self.assertEqual(len(s3.puts), 1)
+        with self.assertRaisesRegex(RuntimeError, "content conflict"):
+            _create_once_put(s3, "processed", "state/manifest.json", b"different")
 
     def test_empty_committed_buyer_manifest_stays_enriched_instead_of_zero_filled_legacy(self):
         self.assertTrue(should_use_snapshot_enrichment(

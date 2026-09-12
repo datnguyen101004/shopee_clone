@@ -68,6 +68,7 @@ describe('CartProvider', () => {
           logout: vi.fn(),
           restore: vi.fn(),
           completeGoogleSignIn: vi.fn(),
+          clickstreamFetch: sessionFetch,
           synchronizeDisplayName: vi.fn(),
         }) as ReturnType<typeof useAuthSession>,
     );

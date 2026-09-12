@@ -103,6 +103,7 @@ describe('account management experiences', () => {
       logout: vi.fn(),
       restore: vi.fn(),
       completeGoogleSignIn: vi.fn(),
+      clickstreamFetch: vi.fn(),
     });
     vi.mocked(getBuyerProfile).mockResolvedValue(profile);
     vi.mocked(getShippingAddresses).mockResolvedValue({ items: addresses });

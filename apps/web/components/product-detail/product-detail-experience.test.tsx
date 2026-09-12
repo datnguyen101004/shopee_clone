@@ -21,6 +21,7 @@ const { push, addItem, submitClickstreamEvent, authSession, cartSession } = vi.h
       state: {
         state: { status: 'guest' as 'guest' | 'authenticated' | 'loading' },
         authenticatedFetch: vi.fn(),
+        clickstreamFetch: vi.fn(),
         sessionFetch: vi.fn(),
       },
     },
@@ -140,9 +141,10 @@ describe('product detail interactions', () => {
     push.mockReset();
     addItem.mockReset();
     authSession.state.authenticatedFetch.mockReset();
-    authSession.state.sessionFetch.mockReset();
+    authSession.state.clickstreamFetch.mockReset();
     submitClickstreamEvent.mockReset();
     authSession.state.authenticatedFetch.mockResolvedValue(new Response(null, { status: 503 }));
+    authSession.state.clickstreamFetch.mockResolvedValue(new Response(null, { status: 202 }));
     authSession.state.state = { status: 'guest' };
     cartSession.state.state = { status: 'unauthenticated', cart: null };
     cartSession.state.pending = false;
@@ -153,7 +155,7 @@ describe('product detail interactions', () => {
     await waitFor(() => expect(submitClickstreamEvent).toHaveBeenCalledTimes(1));
     rerender(<ProductDetailExperience product={{ ...product, name: 'Phone updated' }} />);
     expect(submitClickstreamEvent).toHaveBeenCalledTimes(1);
-    expect(submitClickstreamEvent).toHaveBeenCalledWith(expect.objectContaining({ eventType: 'product_viewed', surface: 'product_detail', productId: product.id }), 1500, expect.anything());
+    expect(submitClickstreamEvent).toHaveBeenCalledWith(expect.objectContaining({ eventType: 'product_viewed', surface: 'product_detail', productId: product.id }), 1500, authSession.state.clickstreamFetch);
   });
 
   it('initializes deterministically, switches media, resets invalid quantity, and serializes only trusted handoffs', () => {

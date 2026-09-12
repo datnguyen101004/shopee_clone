@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useRef } from 'react';
 import Link from 'next/link';
 
 export interface ProductPurchaseActionsProps {
@@ -151,26 +152,105 @@ export function SelfPurchaseWarningModal({ isOpen, onDismiss }: SelfPurchaseWarn
 
 export interface ProductCartToastProps {
   message: string | null;
+  onClose?: () => void;
 }
 
-export function ProductCartToast({ message }: ProductCartToastProps) {
+export function ProductCartToast({ message, onClose }: ProductCartToastProps) {
+  const toastRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!message) return;
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
+        onClose?.();
+      }
+    }
+
+    function handlePointerDown(event: PointerEvent) {
+      if (
+        toastRef.current &&
+        !toastRef.current.contains(event.target as Node)
+      ) {
+        onClose?.();
+      }
+    }
+
+    function handleWindowBlur() {
+      onClose?.();
+    }
+
+    window.addEventListener('keydown', handleKeyDown);
+    document.addEventListener('pointerdown', handlePointerDown);
+    window.addEventListener('blur', handleWindowBlur);
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener('pointerdown', handlePointerDown);
+      window.removeEventListener('blur', handleWindowBlur);
+    };
+  }, [message, onClose]);
+
   if (!message) return null;
 
   return (
-    <div className="product-detail-toast-overlay" role="status" aria-live="polite">
-      <div className="product-detail-toast">
+    <div
+      className="product-detail-toast-overlay"
+      role="status"
+      aria-live="polite"
+      tabIndex={-1}
+    >
+      <div
+        ref={toastRef}
+        className="product-detail-toast"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Thông báo thêm vào giỏ hàng"
+        tabIndex={0}
+        onBlur={(e) => {
+          if (
+            e.relatedTarget &&
+            !toastRef.current?.contains(e.relatedTarget as Node)
+          ) {
+            onClose?.();
+          }
+        }}
+      >
+        {onClose && (
+          <button
+            type="button"
+            className="product-detail-toast__close-btn"
+            onClick={onClose}
+            aria-label="Đóng thông báo"
+            title="Đóng"
+          >
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M18 6L6 18M6 6l12 12" />
+            </svg>
+          </button>
+        )}
+
         <div className="product-detail-toast__icon" aria-hidden="true">
           <svg
-            width="28"
-            height="28"
+            width="32"
+            height="32"
             viewBox="0 0 24 24"
             fill="none"
-            stroke="currentColor"
-            strokeWidth="2.5"
+            stroke="white"
+            strokeWidth="3.2"
             strokeLinecap="round"
             strokeLinejoin="round"
           >
-            <path d="M20 6 9 17l-5-5" />
+            <path d="M5 13l4 4L19 7" />
           </svg>
         </div>
         <p className="product-detail-toast__message">{message}</p>

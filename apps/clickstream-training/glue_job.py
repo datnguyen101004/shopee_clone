@@ -128,6 +128,18 @@ def raw_partition_keys(bucket: str, source_date: str, time_zone: str = DEFAULT_T
     ]
 
 
+def existing_raw_paths(s3_client: Any, bucket: str, partition_keys: Sequence[str]) -> list[str]:
+    """Return Spark globs only for hourly partitions that contain an object."""
+
+    paths: list[str] = []
+    for partition_key in partition_keys:
+        prefix = f"{partition_key.rstrip('/')}/"
+        response = s3_client.list_objects_v2(Bucket=bucket, Prefix=prefix, MaxKeys=1)
+        if response.get("KeyCount", 0) or response.get("Contents"):
+            paths.append(f"s3://{bucket}/{prefix}*")
+    return paths
+
+
 def filter_events(events: Iterable[Mapping[str, Any]], source_date: str, time_zone: str = DEFAULT_TIME_ZONE, attribution_window_minutes: int = DEFAULT_ATTRIBUTION_WINDOW_MINUTES) -> list[dict[str, Any]]:
     start, end = local_day_utc_bounds(source_date, time_zone)
     end += timedelta(minutes=attribution_window_minutes)
@@ -493,6 +505,32 @@ def merge_buyer_state(
 
 
 def _create_once_put(s3_client: Any, bucket: str, key: str, body: bytes, **kwargs: Any) -> None:
+    supports_conditional_put = True
+    try:
+        operation = s3_client.meta.service_model.operation_model("PutObject")
+        supports_conditional_put = "IfNoneMatch" in operation.input_shape.members
+    except (AttributeError, KeyError):
+        # Small test doubles do not expose botocore's service model and retain
+        # the stronger conditional-write path by default.
+        pass
+
+    if not supports_conditional_put:
+        # Glue 4.0 ships an older botocore model that rejects IfNoneMatch even
+        # though newer S3 clients support it. MaxConcurrentRuns=1 keeps this
+        # compatibility path single-writer for the MVP.
+        try:
+            existing = s3_client.get_object(Bucket=bucket, Key=key)["Body"].read()
+        except Exception as error:
+            response = getattr(error, "response", {})
+            error_code = str(response.get("Error", {}).get("Code", ""))
+            if error_code not in {"NoSuchKey", "404", "NotFound"}:
+                raise
+            s3_client.put_object(Bucket=bucket, Key=key, Body=body, **kwargs)
+            return
+        if existing != body:
+            raise RuntimeError(f"create-once object content conflict: {key}")
+        return
+
     try:
         s3_client.put_object(Bucket=bucket, Key=key, Body=body, IfNoneMatch="*", **kwargs)
     except Exception as error:
@@ -870,7 +908,13 @@ def _spark_enriched_frame(impressions: Any, products: Any, buyers: Any, source_d
         F.col("b_runId").alias("buyer_snapshot_run_id"), F.lit(pseudonym_key_id).alias("pseudonym_key_id"),
         F.lit(OFFLINE_LEXICAL_VERSION).alias("offline_lexical_version"),
     )
-    return numbered.withColumn("split", F.when(F.pmod(F.xxhash64("example_id"), 5) == 0, F.lit("heldout")).otherwise(F.lit("train"))).withColumn("fold", F.pmod(F.xxhash64("example_id"), 5))
+    # Glue 4.0 uses Spark 3.3, whose SQL function exists even though the
+    # Python functions module does not expose ``pmod``.
+    fold = F.expr("pmod(xxhash64(example_id), 5)")
+    return numbered.withColumn(
+        "split",
+        F.when(fold == 0, F.lit("heldout")).otherwise(F.lit("train")),
+    ).withColumn("fold", fold)
 
 
 def main() -> None:
@@ -884,10 +928,11 @@ def main() -> None:
     s3 = boto3.client("s3")
     spark = SparkSession.builder.getOrCreate()
     source_start, source_end = local_day_utc_bounds(source_date, args.time_zone)
-    raw_paths = [
-        f"s3://{args.raw_bucket}/{prefix}/*"
-        for prefix in raw_partition_keys(args.raw_bucket, source_date, args.time_zone, args.attribution_window_minutes)
-    ]
+    raw_paths = existing_raw_paths(
+        s3,
+        args.raw_bucket,
+        raw_partition_keys(args.raw_bucket, source_date, args.time_zone, args.attribution_window_minutes),
+    )
     # Daily objects are immutable. Avoid rereading raw/S3 snapshots if the
     # exact training handoff has already committed (operator reruns remain a
     # cheap manifest refresh).
@@ -900,13 +945,21 @@ def main() -> None:
         code = str(getattr(error, "response", {}).get("Error", {}).get("Code", ""))
         if code not in {"404", "NoSuchKey", "NotFound"}:
             raise
-    raw = spark.read.schema(_spark_raw_schema()).json(raw_paths)
+    raw_schema = _spark_raw_schema()
+    raw = spark.read.schema(raw_schema).json(raw_paths) if raw_paths else spark.createDataFrame([], raw_schema)
     events = raw.where((F.col("schemaVersion") == SCHEMA_VERSION) & F.col("occurredAt").isNotNull()).withColumn("_occurredAt", F.to_timestamp("occurredAt"))
     events = events.where((F.col("_occurredAt") >= F.lit(source_start)) & (F.col("_occurredAt") < F.lit(source_end + timedelta(minutes=args.attribution_window_minutes))))
     impressions = events.where((F.col("eventType") == "product_impression") & (F.col("_occurredAt") >= F.lit(source_start)) & (F.col("_occurredAt") < F.lit(source_end))).select(
         *[F.col(name).alias(f"i_{name}") for name in events.columns if name != "_occurredAt"], F.col("_occurredAt").alias("i_impressionAt"),
     )
-    clicks = events.where(F.col("eventType") == "product_clicked").select(*[F.col(name).alias(f"c_{name}") for name in events.columns if name != "_occurredAt"], F.col("_occurredAt").alias("c_occurredAt"))
+    clicks = events.where(F.col("eventType") == "product_clicked").select(
+        *[
+            F.col(name).alias(f"c_{name}")
+            for name in events.columns
+            if name not in {"occurredAt", "_occurredAt"}
+        ],
+        F.col("_occurredAt").alias("c_occurredAt"),
+    )
     identity = (
         (F.col("i_sessionPseudonym").isNotNull() & (F.col("i_sessionPseudonym") == F.col("c_sessionPseudonym")))
         | (F.col("i_buyerPseudonym").isNotNull() & (F.col("i_buyerPseudonym") == F.col("c_buyerPseudonym")))

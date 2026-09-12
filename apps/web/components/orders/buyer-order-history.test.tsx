@@ -171,6 +171,7 @@ describe('buyer order-history screens', () => {
       logout: vi.fn(),
       restore: vi.fn(),
       completeGoogleSignIn: vi.fn(),
+      clickstreamFetch: vi.fn(),
     });
   });
 

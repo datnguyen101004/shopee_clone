@@ -9,7 +9,7 @@ import { CatalogProductGrid } from './catalog-product-grid';
 
 const tracking = vi.hoisted(() => ({
   submitClickstreamEvent: vi.fn(),
-  sessionFetch: vi.fn(),
+  clickstreamFetch: vi.fn(),
 }));
 
 vi.mock('../../lib/clickstream', async (importOriginal) => {
@@ -37,8 +37,9 @@ describe('CatalogProductGrid impression tracking', () => {
     vi.clearAllMocks();
     vi.mocked(useAuthSession).mockReturnValue({
       state: { status: 'guest', user: null },
-      sessionFetch: tracking.sessionFetch,
-      authenticatedFetch: tracking.sessionFetch,
+      clickstreamFetch: tracking.clickstreamFetch,
+      sessionFetch: vi.fn(),
+      authenticatedFetch: vi.fn(),
       login: vi.fn(),
       register: vi.fn(),
       logout: vi.fn(),

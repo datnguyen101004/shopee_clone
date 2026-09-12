@@ -97,7 +97,10 @@ function ProductDetailInner({ product }: { product: ProductDetailResponse }) {
         onDismiss={flow.dismissSelfPurchaseWarning}
       />
 
-      <ProductCartToast message={flow.toastMessage} />
+      <ProductCartToast
+        message={flow.toastMessage}
+        onClose={flow.dismissCartToast}
+      />
 
       <ProductReviews product={product} />
     </>
@@ -105,7 +108,7 @@ function ProductDetailInner({ product }: { product: ProductDetailResponse }) {
 }
 
 function ProductViewCapture({ productId }: { productId: string }) {
-  const { sessionFetch } = useAuthSession();
+  const { clickstreamFetch } = useAuthSession();
   const capturedProductId = useRef<string | null>(null);
   useEffect(() => {
     if (capturedProductId.current === productId) return;
@@ -115,8 +118,8 @@ function ProductViewCapture({ productId }: { productId: string }) {
       surface: 'product_detail',
       productId,
       properties: {},
-    }, 1_500, sessionFetch);
-  }, [productId, sessionFetch]);
+    }, 1_500, clickstreamFetch);
+  }, [clickstreamFetch, productId]);
   return null;
 }
 

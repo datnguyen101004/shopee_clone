@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import {
@@ -48,6 +48,9 @@ function Probe() {
       </button>
       <button type="button" onClick={() => void auth.authenticatedFetch('/protected')}>
         Fetch
+      </button>
+      <button type="button" onClick={() => void auth.clickstreamFetch('/api/v1/clickstream/events')}>
+        Clickstream
       </button>
       <button type="button" onClick={() => auth.synchronizeDisplayName('Buyer Renamed')}>
         Rename
@@ -108,6 +111,107 @@ describe('AuthSessionProvider', () => {
     await user.click(screen.getByRole('button', { name: 'Logout' }));
     expect(screen.getByText('guest')).toBeInTheDocument();
     expect(logoutAccount).toHaveBeenCalledTimes(1);
+    fetcher.mockRestore();
+  });
+
+  it('does not refresh repeatedly for a known guest clickstream session', async () => {
+    vi.mocked(refreshAccountSession).mockRejectedValue(new Error('no session'));
+    const fetcher = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(null, { status: 202 }));
+    const user = userEvent.setup();
+    render(
+      <AuthSessionProvider>
+        <Probe />
+      </AuthSessionProvider>,
+    );
+    await waitFor(() => expect(screen.getByText('guest')).toBeInTheDocument());
+
+    await user.click(screen.getByRole('button', { name: 'Clickstream' }));
+    await user.click(screen.getByRole('button', { name: 'Clickstream' }));
+    await waitFor(() => expect(fetcher).toHaveBeenCalledTimes(2));
+    expect(refreshAccountSession).toHaveBeenCalledTimes(1);
+    for (const [, init] of fetcher.mock.calls)
+      expect(new Headers(init?.headers).get('Authorization')).toBeNull();
+    fetcher.mockRestore();
+  });
+
+  it('waits for the initial restore before attaching the bearer to clickstream', async () => {
+    let resolveSession!: (value: typeof session) => void;
+    vi.mocked(refreshAccountSession).mockReturnValue(
+      new Promise((resolve) => {
+        resolveSession = resolve;
+      }),
+    );
+    const fetcher = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(null, { status: 202 }));
+    const user = userEvent.setup();
+    render(
+      <AuthSessionProvider>
+        <Probe />
+      </AuthSessionProvider>,
+    );
+    await waitFor(() => expect(refreshAccountSession).toHaveBeenCalledTimes(1));
+    await user.click(screen.getByRole('button', { name: 'Clickstream' }));
+    expect(fetcher).not.toHaveBeenCalled();
+
+    await act(async () => {
+      resolveSession({ ...session, expiresAt: new Date(Date.now() + 60_000).toISOString() });
+      await Promise.resolve();
+    });
+    await waitFor(() => expect(fetcher).toHaveBeenCalledTimes(1));
+    expect(new Headers(fetcher.mock.calls[0]?.[1]?.headers).get('Authorization')).toBe(
+      `Bearer ${session.accessToken}`,
+    );
+    fetcher.mockRestore();
+  });
+
+  it('falls back to an anonymous event when initial restore exceeds the bounded wait', async () => {
+    vi.useFakeTimers();
+    let resolveSession!: (value: typeof session) => void;
+    vi.mocked(refreshAccountSession).mockReturnValue(
+      new Promise((resolve) => {
+        resolveSession = resolve;
+      }),
+    );
+    const fetcher = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(null, { status: 202 }));
+    render(
+      <AuthSessionProvider>
+        <Probe />
+      </AuthSessionProvider>,
+    );
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Clickstream' }));
+      vi.advanceTimersByTime(1_000);
+      await Promise.resolve();
+    });
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    expect(new Headers(fetcher.mock.calls[0]?.[1]?.headers).get('Authorization')).toBeNull();
+    await act(async () => {
+      resolveSession({ ...session, expiresAt: new Date(Date.now() + 60_000).toISOString() });
+      await Promise.resolve();
+    });
+    fetcher.mockRestore();
+    vi.useRealTimers();
+  });
+
+  it('refreshes an expiring in-memory token before sending clickstream', async () => {
+    vi.mocked(refreshAccountSession).mockResolvedValue({
+      ...session,
+      expiresAt: new Date(Date.now() + 1_000).toISOString(),
+    });
+    const fetcher = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(null, { status: 202 }));
+    const user = userEvent.setup();
+    render(
+      <AuthSessionProvider>
+        <Probe />
+      </AuthSessionProvider>,
+    );
+    await waitFor(() => expect(screen.getByText('authenticated')).toBeInTheDocument());
+    await user.click(screen.getByRole('button', { name: 'Clickstream' }));
+    await waitFor(() => expect(fetcher).toHaveBeenCalledTimes(1));
+    expect(refreshAccountSession).toHaveBeenCalledTimes(2);
+    expect(new Headers(fetcher.mock.calls[0]?.[1]?.headers).get('Authorization')).toBe(
+      `Bearer ${session.accessToken}`,
+    );
     fetcher.mockRestore();
   });
 });

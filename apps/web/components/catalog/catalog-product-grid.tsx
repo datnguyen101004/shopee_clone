@@ -20,7 +20,7 @@ export function CatalogProductGrid({
   products: CatalogProductCard[];
   query?: string;
 }) {
-  const { sessionFetch } = useAuthSession();
+  const { clickstreamFetch } = useAuthSession();
   const resultSetKey = `${query ?? ''}:${products.map(({ id }) => id).join(',')}`;
   const requestId = useMemo(() => createClickstreamCorrelationId(resultSetKey), [resultSetKey]);
   const [deduper] = useState(createClickstreamImpressionDeduper);
@@ -45,10 +45,10 @@ export function CatalogProductGrid({
             properties: {},
           },
           1_500,
-          sessionFetch,
+          clickstreamFetch,
         );
     }
-  }, [deduper, products, query, requestId, sessionFetch]);
+  }, [clickstreamFetch, deduper, products, query, requestId]);
   return (
     <FavoriteStateProvider productIds={products.map(({ id }) => id)}>
       <div className="catalog-grid" aria-label="Danh sách sản phẩm">

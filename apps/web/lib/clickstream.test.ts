@@ -45,9 +45,14 @@ describe('clickstream browser client', () => {
       expect.objectContaining({ credentials: 'include', keepalive: true }),
     );
   });
-  it('uses the supplied non-refreshing first-party fetcher without exposing token data', async () => {
+  it('keeps credentials in the supplied fetcher headers, never in the event body', async () => {
     const browserFetch = vi.spyOn(window, 'fetch').mockResolvedValue(new Response(null, { status: 202 }));
-    const sessionFetch = vi.fn().mockResolvedValue(new Response(null, { status: 202 }));
+    const token = 'header.payload.signature';
+    const authenticatedFetch = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const headers = new Headers(init?.headers);
+      headers.set('Authorization', `Bearer ${token}`);
+      return window.fetch(input, { ...init, headers });
+    });
     submitClickstreamEvent(
       {
         eventType: 'product_clicked',
@@ -59,11 +64,14 @@ describe('clickstream browser client', () => {
         properties: {},
       },
       1_500,
-      sessionFetch,
+      authenticatedFetch,
     );
     await Promise.resolve();
-    expect(sessionFetch).toHaveBeenCalledTimes(1);
-    expect(browserFetch).not.toHaveBeenCalled();
-    expect(String(sessionFetch.mock.calls[0]?.[1]?.body)).not.toContain('Authorization');
+    expect(authenticatedFetch).toHaveBeenCalledTimes(1);
+    const [, init] = browserFetch.mock.calls[0]!;
+    expect(new Headers(init?.headers).get('Authorization')).toBe(`Bearer ${token}`);
+    expect(String(init?.body)).not.toContain(token);
+    expect(String(init?.body)).not.toContain('Authorization');
+    expect(browserFetch).toHaveBeenCalledTimes(1);
   });
 });

@@ -135,6 +135,7 @@ describe('ChatProvider', () => {
           logout: vi.fn(),
           restore: vi.fn(),
           completeGoogleSignIn: vi.fn(),
+          clickstreamFetch: authenticatedFetch,
           synchronizeDisplayName: vi.fn(),
         }) as ReturnType<typeof useAuthSession>,
     );

@@ -58,6 +58,7 @@ import { ProductSearchQueryService } from './product-search-query.service';
     ELASTICSEARCH_INDEXING_CLIENT,
     SearchElasticsearchAdapter,
     ProductSearchProjectionBuilder,
+    ProductSearchProjectionRepository,
     ProductSearchIndexingService,
     ProductSearchQueryService,
   ],

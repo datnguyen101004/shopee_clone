@@ -17,7 +17,7 @@ export function ProductCard({
   product: CatalogProductCard;
   tracking?: { requestId: string; position: number; query?: string };
 }) {
-  const { sessionFetch } = useAuthSession();
+  const { clickstreamFetch } = useAuthSession();
   return (
     <UiProductCard
       className="catalog-card"
@@ -36,7 +36,7 @@ export function ProductCard({
                   properties: {},
                 },
                 1_500,
-                sessionFetch,
+                clickstreamFetch,
               )
           : undefined
       }

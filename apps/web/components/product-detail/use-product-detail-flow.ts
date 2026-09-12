@@ -2,7 +2,7 @@
 
 import type { ProductDetailResponse } from '@shopee-clone/contracts';
 import { useRouter } from 'next/navigation';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { useAuthSession } from '../auth-session-provider';
 import { useCart } from '../cart/cart-provider';
@@ -23,19 +23,21 @@ import { getVariantFlashSaleOffer } from './product-detail-flash-sale';
 function isSelfPurchaseError(error: unknown): boolean {
   return (
     error instanceof CartApiError &&
-    error.problem?.type === 'https://shopee-clone.local/problems/self-purchase-forbidden'
+    error.status === 400 &&
+    error.message.includes('own shop')
   );
 }
 
 export function useProductDetailFlow({ product }: { product: ProductDetailResponse }) {
+  const router = useRouter();
   const auth = useAuthSession();
   const cart = useCart();
-  const router = useRouter();
 
   const [selection, setSelection] = useState(() => initialProductDetailSelection(product));
   const [cartMessage, setCartMessage] = useState('');
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [selfPurchaseWarningOpen, setSelfPurchaseWarningOpen] = useState(false);
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Detect if any variant is tied to a Flash Sale campaign
   const flashSaleCampaignId = product.variants.find(
@@ -56,11 +58,25 @@ export function useProductDetailFlow({ product }: { product: ProductDetailRespon
 
   useEffect(() => {
     if (!toastMessage) return;
-    const timer = setTimeout(() => {
+    toastTimerRef.current = setTimeout(() => {
       setToastMessage(null);
+      toastTimerRef.current = null;
     }, 2000);
-    return () => clearTimeout(timer);
+    return () => {
+      if (toastTimerRef.current) {
+        clearTimeout(toastTimerRef.current);
+        toastTimerRef.current = null;
+      }
+    };
   }, [toastMessage]);
+
+  const dismissCartToast = useCallback(() => {
+    if (toastTimerRef.current) {
+      clearTimeout(toastTimerRef.current);
+      toastTimerRef.current = null;
+    }
+    setToastMessage(null);
+  }, []);
 
   const selectedVariant = getVariant(product, selection.variantId);
   const flashSaleOffer = getVariantFlashSaleOffer(selectedVariant, polling.statusMap);
@@ -200,5 +216,6 @@ export function useProductDetailFlow({ product }: { product: ProductDetailRespon
     handleAddToCart,
     handleBuyNow,
     dismissSelfPurchaseWarning,
+    dismissCartToast,
   };
 }

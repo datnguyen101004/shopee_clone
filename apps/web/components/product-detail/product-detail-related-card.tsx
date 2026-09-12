@@ -22,7 +22,7 @@ export function ProductDetailRelatedCard({
   position: number;
   requestId: string;
 }) {
-  const { sessionFetch } = useAuthSession();
+  const { clickstreamFetch } = useAuthSession();
   const impressionSent = useRef(false);
   useEffect(() => {
     if (impressionSent.current) return;
@@ -35,8 +35,8 @@ export function ProductDetailRelatedCard({
       position,
       requestId,
       properties: {},
-    }, 1_500, sessionFetch);
-  }, [position, product.id, requestId, sessionFetch]);
+    }, 1_500, clickstreamFetch);
+  }, [clickstreamFetch, position, product.id, requestId]);
   return (
     <Link
       href={product.href}
@@ -53,7 +53,7 @@ export function ProductDetailRelatedCard({
             properties: {},
           },
           1_500,
-          sessionFetch,
+          clickstreamFetch,
         )
       }
     >

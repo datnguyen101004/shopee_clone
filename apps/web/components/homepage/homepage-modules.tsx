@@ -469,7 +469,7 @@ function ProductCard({
     recommendationId?: string;
   };
 }) {
-  const { sessionFetch } = useAuthSession();
+  const { clickstreamFetch } = useAuthSession();
   const impressionSent = useRef(false);
   useEffect(() => {
     if (!tracking || impressionSent.current) return;
@@ -493,8 +493,8 @@ function ProductCard({
           requestId: tracking.requestId,
           properties: {},
         };
-    submitClickstreamEvent(event, 1_500, sessionFetch);
-  }, [product.id, sessionFetch, tracking]);
+    submitClickstreamEvent(event, 1_500, clickstreamFetch);
+  }, [clickstreamFetch, product.id, tracking]);
   return (
     <UiProductCard
       className="product-card"
@@ -522,7 +522,7 @@ function ProductCard({
                       properties: {},
                 },
                 1_500,
-                sessionFetch,
+                clickstreamFetch,
               )
           : undefined
       }
